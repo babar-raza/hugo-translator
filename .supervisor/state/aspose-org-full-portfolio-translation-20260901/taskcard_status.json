@@ -4,7 +4,7 @@
   "plan_revision": 6,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-04T02:56:00+00:00",
+  "updated_at": "2026-09-04T03:00:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -383,13 +383,14 @@
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "18/25 languages committed (417cf1e066, 4d67b72bf2). Quarantined needing investigation: ja (GATE36 fails both models), ko+uk (language_detection false-positive on frontmatter), hi (reconstruction punctuation bug, reproducible both models), id+ro (m2m100-specific lexical defects). Not yet attempted: vi, zh.",
+      "blocking_reason": "19/25 languages committed (417cf1e066, 4d67b72bf2, d6530401dd). 6 quarantined for follow-up investigation (evidence: data/summaries/fp-gate5-scene-entities-4cells-TC-APT-014.json): ja (GATE36 fails both models), ko+uk (language_detection false-positive on frontmatter), hi (reconstruction punctuation bug, reproducible both models), id+ro (m2m100-specific lexical defects, professionalize_llm not yet tried), zh (GATE36 warn treated as hard block, candidate never inspected).",
       "evidence_path": null,
       "commit": [
         "417cf1e066",
-        "4d67b72bf2"
+        "4d67b72bf2",
+        "d6530401dd"
       ],
-      "last_updated": "2026-09-04T02:56:00+00:00",
+      "last_updated": "2026-09-04T03:00:00+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
@@ -542,5 +543,5 @@
     }
   },
   "last_wake_summary": "data/summaries/aspose-org-wake-001-20260902.json",
-  "cells_committed_total": 18
+  "cells_committed_total": 19
 }
