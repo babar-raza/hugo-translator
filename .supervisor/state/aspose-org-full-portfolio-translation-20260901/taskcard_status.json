@@ -385,7 +385,7 @@
       "owner": "loop",
       "blocking_reason": "cells-spreadsheet-management-go quarantined (TC-APT-042). introducing-words-foss-net closed at 8/8 reject (both real bugs fixed, 2 recurring sentence-level model-quality defects, see TC-APT-042). pdf/typescript/introducing-pdf-foss-typescript: 2 real content commits landed -- ar (b52c1bf674) and es (fc26b5fc93), both APPROVE clean, via the full governed §5.1/§19.2 procedure (corrected ordering: skill_run_manager finalize AFTER commit, not before -- see field note). cs/de/el/fa each still have their own small, mostly-isolated residual content-quality issues (heal-pdf-foss-typescript-{cs,de,el,fa}); de's case/agreement error recurred identically across 2 attempts, worth watching, others look like one-off variance. Campaign still running for the remaining ~19 languages: PID 56064/57392, log logs/gate5-pdf-foss-typescript_run3.log. Do not re-launch while this PID is alive; review/commit each additional APPROVEd language as it lands.",
       "evidence_path": "data/summaries/fp-gate5-pdf-foss-typescript-20260904.json",
-      "commit": ["b52c1bf674", "fc26b5fc93"],
+      "commit": ["b52c1bf674", "fc26b5fc93", "46be9275c4"],
       "last_updated": "2026-09-04T14:20:00+00:00",
       "blocker_type": null
     },
@@ -618,6 +618,6 @@
     }
   },
   "last_wake_summary": "data/summaries/aspose-org-wake-001-20260902.json",
-  "cells_committed_total": 25,
+  "cells_committed_total": 26,
   "loop_prompt_version_seen": "9.3 (2026-09-04)"
 }
