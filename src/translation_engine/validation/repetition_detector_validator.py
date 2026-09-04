@@ -165,6 +165,29 @@ class RepetitionDetectorValidator(PostTranslationValidator):
     # incorrectly raise the translation's word-frequency threshold.
     _MIN_SOURCE_WORDS_FOR_CEILING = 30
 
+    # TC-APT-051: below this many filtered (non-stopword) words in a
+    # TRANSLATION segment, a percentage-based word-frequency ratio is just as
+    # statistically noisy as the source-side ceiling above -- a word appearing
+    # only twice among e.g. 9 filtered words already reads as 22.2%, past the
+    # default 20% warning threshold, even though "the same ordinary word used
+    # twice in one short heading/sentence" is normal prose, not the kind of
+    # mass hallucination (e.g. "miteinander" x60) this validator exists to
+    # catch. Confirmed live: blog.aspose.org/note/python/_index.md (a
+    # minimal, ~2-sentence _index.md page) hard-failed most of its 25
+    # languages this way (word_frequency count=2 threshold=0.2
+    # frequency=0.222222), a second root-cause class recurring across pages
+    # after TC-APT-040 (data/summaries/fp-tc-apt-051-repetition-short-text-
+    # 20260905.json). Below this floor, require an absolute repeat count
+    # instead of trusting the ratio -- see _MIN_ABSOLUTE_COUNT_FOR_SHORT_TEXT.
+    _MIN_FILTERED_WORDS_FOR_FREQUENCY_RATIO = 15
+
+    # TC-APT-051: the absolute repeat count required to flag a word in a
+    # segment shorter than _MIN_FILTERED_WORDS_FOR_FREQUENCY_RATIO. Set above
+    # "used twice in ordinary short prose" but well below what a genuine
+    # hallucination produces, so real short-segment corruption is still
+    # caught (e.g. a 5-word segment that is 4x the same word).
+    _MIN_ABSOLUTE_COUNT_FOR_SHORT_TEXT = 4
+
     def _source_ngram_ceiling(self, source: str) -> int:
         """Compute the maximum n-gram repetition count in the source text.
 
@@ -464,8 +487,18 @@ class RepetitionDetectorValidator(PostTranslationValidator):
             source_word_freq_ceiling * 1.05 if source_word_freq_ceiling >= self.word_freq_warning_threshold else 0.0,
         )
 
+        # TC-APT-051: below this many filtered words, a percentage ratio is
+        # statistically unreliable (2 occurrences among 9 words already reads
+        # as 22.2%). Require an absolute repeat count instead of trusting the
+        # ratio so ordinary short prose isn't flagged, while genuine
+        # short-segment corruption (a word repeated far more than normal
+        # phrasing would ever produce) is still caught.
+        short_text = total_words < self._MIN_FILTERED_WORDS_FOR_FREQUENCY_RATIO
+
         # Check for words exceeding frequency thresholds
         for word, count in word_counts.most_common(5):  # Check top 5 most common
+            if short_text and count < self._MIN_ABSOLUTE_COUNT_FOR_SHORT_TEXT:
+                continue
             frequency = count / total_words
 
             if frequency > effective_error_threshold:
