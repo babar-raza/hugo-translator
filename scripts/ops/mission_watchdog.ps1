@@ -31,6 +31,7 @@ $RepoRoot          = "c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator"
 $MissionBranch     = "mission/aspose-org-full-portfolio-translation-20260901"
 $MissionId         = "aspose-org-full-portfolio-translation-20260901"
 $SessionId         = "d18689cf-ac87-4bcb-b33f-655ef2b84358"
+$ClaudeExe         = "C:/Users/prora/AppData/Roaming/npm/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
 $TaskcardStatus    = Join-Path $RepoRoot ".supervisor\state\$MissionId\taskcard_status.json"
 $LogDir            = Join-Path $RepoRoot "logs"
 $LogFile           = Join-Path $LogDir "watchdog.log"
@@ -97,7 +98,7 @@ $resumePrompt = "Continue the aspose.org mission per project/loop-prompt.md. Run
 $stdOutLog = Join-Path $LogDir "watchdog_relaunch_stdout.log"
 $stdErrLog = Join-Path $LogDir "watchdog_relaunch_stderr.log"
 
-$proc = Start-Process -FilePath "claude" `
+$proc = Start-Process -FilePath $ClaudeExe `
     -ArgumentList @("--resume", $SessionId, "-p", $resumePrompt, "--permission-mode", "bypassPermissions") `
     -WorkingDirectory $RepoRoot `
     -RedirectStandardOutput $stdOutLog `
