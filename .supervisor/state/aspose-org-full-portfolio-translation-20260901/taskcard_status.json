@@ -376,17 +376,17 @@
       "blocker_type": null
     },
     "TC-APT-014": {
-      "status": "DONE",
+      "status": "IN_PROGRESS",
       "gate": 5,
       "title": "Gate 5 restart: blog.aspose.org/pdf/typescript/introducing-pdf-foss-typescript (Tier-1a) across all 25 languages -- pivoted off introducing-words-foss-net (8/8 reject, TC-APT-042 evidence gathered, not further pursued) and cells-spreadsheet-management-go (TC-APT-042 quarantine)",
       "depends_on": [
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "Campaign fully complete (PID 56064/57392 exited): 25/25 languages attempted in one run() call (TC-APT-041), final status PARTIAL_WITH_TICKETS. 3 committed (ar b52c1bf674, es fc26b5fc93, id 46be9275c4), all APPROVE clean via the full governed §5.1/§19.2 procedure. 15 REJECTed on real but isolated per-language content-quality issues, each heal-ticketed: cs,de,el,fa,he,hu,ko,nl,pl,ro,ru,sv,th,tr,vi -- dominant recurring pattern across ~8 of these is the frontmatter description/summary near-duplicate-field inconsistency (documented, candidate future taskcard). 7 hard-failed on pipeline gates (exhausted retries), auto-heal-ticketed by TC-APT-041: fr (TC-SAS-01 cognate false positive, root-caused), hi/uk (repetition detection on Devanagari/Cyrillic), it/pt (seoTitle language-detection confused with Spanish -- Romance-language cross-contamination pattern, not yet investigated), ja (title never translated, corroborates TC-APT-006's m2m100-better-for-ja finding), zh (not yet inspected). Gate 5's scope is exercised and every non-committed cell has a classified heal ticket, satisfying the plan's gate-close rule without waiting for 25/25. This page is now Tier-1b (partially covered) rather than Tier-1a; per strict tier order, the next Track A pass should prefer a fresh, fully-untranslated Tier-1a page over completing this page's remaining 22 languages.",
+      "blocking_reason": "pdf/typescript/introducing-pdf-foss-typescript CLOSED: 25/25 attempted in one run() call, 3 committed (ar b52c1bf674, es fc26b5fc93, id 46be9275c4), 22 heal-ticketed (15 quality, 7 hard-failed) with classified root causes -- gate-close rule satisfied. Pivoted to a fresh, deliberately minimal Tier-1a page for a genuinely independent data point AND a real shot at full page completion: blog.aspose.org/note/python/_index.md (26-line Hugo section index -- just a title and a single 'Related Resources' heading/link, essentially no complex prose) -- manifest data/campaigns/gate5-note-python/manifest.yaml, max_parallel_jobs=1, primary_model=professionalize_llm, PID 29612/30452, log logs/gate5-note-python_run.log. Do not re-launch while this PID is alive.",
       "evidence_path": "data/summaries/fp-gate5-pdf-foss-typescript-20260904.json",
       "commit": ["b52c1bf674", "fc26b5fc93", "46be9275c4"],
-      "last_updated": "2026-09-04T17:15:00+00:00",
+      "last_updated": "2026-09-04T17:20:00+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
