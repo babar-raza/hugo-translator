@@ -376,17 +376,17 @@
       "blocker_type": null
     },
     "TC-APT-014": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "gate": 5,
       "title": "Gate 5 restart: blog.aspose.org/pdf/typescript/introducing-pdf-foss-typescript (Tier-1a) across all 25 languages -- pivoted off introducing-words-foss-net (8/8 reject, TC-APT-042 evidence gathered, not further pursued) and cells-spreadsheet-management-go (TC-APT-042 quarantine)",
       "depends_on": [
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "cells-spreadsheet-management-go quarantined (TC-APT-042). introducing-words-foss-net closed at 8/8 reject (both real bugs fixed, 2 recurring sentence-level model-quality defects, see TC-APT-042). pdf/typescript/introducing-pdf-foss-typescript: 2 real content commits landed -- ar (b52c1bf674) and es (fc26b5fc93), both APPROVE clean, via the full governed §5.1/§19.2 procedure (corrected ordering: skill_run_manager finalize AFTER commit, not before -- see field note). cs/de/el/fa each still have their own small, mostly-isolated residual content-quality issues (heal-pdf-foss-typescript-{cs,de,el,fa}); de's case/agreement error recurred identically across 2 attempts, worth watching, others look like one-off variance. Campaign still running for the remaining ~19 languages: PID 56064/57392, log logs/gate5-pdf-foss-typescript_run3.log. Do not re-launch while this PID is alive; review/commit each additional APPROVEd language as it lands.",
+      "blocking_reason": "Campaign fully complete (PID 56064/57392 exited): 25/25 languages attempted in one run() call (TC-APT-041), final status PARTIAL_WITH_TICKETS. 3 committed (ar b52c1bf674, es fc26b5fc93, id 46be9275c4), all APPROVE clean via the full governed §5.1/§19.2 procedure. 15 REJECTed on real but isolated per-language content-quality issues, each heal-ticketed: cs,de,el,fa,he,hu,ko,nl,pl,ro,ru,sv,th,tr,vi -- dominant recurring pattern across ~8 of these is the frontmatter description/summary near-duplicate-field inconsistency (documented, candidate future taskcard). 7 hard-failed on pipeline gates (exhausted retries), auto-heal-ticketed by TC-APT-041: fr (TC-SAS-01 cognate false positive, root-caused), hi/uk (repetition detection on Devanagari/Cyrillic), it/pt (seoTitle language-detection confused with Spanish -- Romance-language cross-contamination pattern, not yet investigated), ja (title never translated, corroborates TC-APT-006's m2m100-better-for-ja finding), zh (not yet inspected). Gate 5's scope is exercised and every non-committed cell has a classified heal ticket, satisfying the plan's gate-close rule without waiting for 25/25. This page is now Tier-1b (partially covered) rather than Tier-1a; per strict tier order, the next Track A pass should prefer a fresh, fully-untranslated Tier-1a page over completing this page's remaining 22 languages.",
       "evidence_path": "data/summaries/fp-gate5-pdf-foss-typescript-20260904.json",
       "commit": ["b52c1bf674", "fc26b5fc93", "46be9275c4"],
-      "last_updated": "2026-09-04T14:20:00+00:00",
+      "last_updated": "2026-09-04T17:15:00+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
