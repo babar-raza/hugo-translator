@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 10.0 (2026-09-04)`
+`loop_prompt_version: 10.1 (2026-09-05)`
 
 ## 0. On reload — before anything else
 
@@ -99,16 +99,29 @@ Track A — ship translated pages:
   operator found this loop accumulating evidence without ever fixing it):** before opening a NEW
   Track-A page, count `heal_queue.jsonl`'s OPEN tickets grouped by `root_cause_class`. If any class
   has tickets from **2 or more different source pages** and its corresponding Track-B taskcard has
-  never actually been implemented (only investigated/deferred), that taskcard is the ONLY thing this
-  iteration may do -- no new Track-A page opens until it has been attempted and tested, regardless of
-  the normal Track A/B split. As of 2026-09-04 this is already true for TC-APT-040
-  (`auto:FrontmatterLanguageCheck`, 25 open tickets) and TC-APT-042
+  never actually been implemented (only investigated/deferred), no new Track-A page opens until the
+  FULL closed-loop sequence below has run, regardless of the normal Track A/B split:
+  1. **Fix** the producer-side root cause (the actual code/config change — a heal-ticket write-up is
+     not a fix).
+  2. **Reverify against the exact file(s) that originally showed the defect** — not a synthetic
+     fixture, not a different page: re-translate the SAME source path and target language(s) the
+     original heal ticket's `source_path`/`target_lang` name, and confirm the specific defect is
+     gone by reading the actual output, the same way it was originally caught. A passing unit test
+     alone does not close this step.
+  3. **Retrigger the campaign** on the pages/cells that were quarantined for this root cause (not
+     just the one file from step 2) — re-run them through the governed `campaign_runner.py` path and
+     commit whatever now passes review. Only once this step has run does a NEW, never-before-tried
+     page become selectable again.
+  Skipping straight from step 1 to a new page (or stopping after a unit test without step 2) is
+  exactly the failure pattern this rule exists to close. As of 2026-09-04 this already applies to
+  TC-APT-040 (`auto:FrontmatterLanguageCheck`, 25 open tickets) and TC-APT-042
   (`model_quality_complex_sentence_structure`/`model_quality_residual_phrase_defects`, 28 open
-  tickets across at least 4 pages) -- 67 total heal tickets exist, 0 have ever been resolved.
-  Documenting a recurring defect a third or fourth time is not progress; implementing its fix is.
-  Picking a new page specifically BECAUSE it might dodge a known, already-evidenced, unfixed defect
-  is not an acceptable Track-A strategy -- it just relocates the same wall to wherever it is hit
-  next.
+  tickets across at least 4 pages: cells-spreadsheet-management-go, introducing-words-foss-net,
+  introducing-cells-foss-go, introducing-pdf-foss-typescript) -- 67 total heal tickets exist, 0 have
+  ever been resolved. Documenting a recurring defect a third or fourth time is not progress;
+  completing all three steps above is. Picking a new page specifically BECAUSE it might dodge a
+  known, already-evidenced, unfixed defect is not an acceptable Track-A strategy -- it just relocates
+  the same wall to wherever it is hit next.
 - Model policy (plan §6.1): primary `professionalize_llm` for the 22 languages TC-APT-006 measured it
   better in; `m2m100_418m` primary for `hu`, `ja`, `ro`; the OTHER model is the retry on gate
   failure and on review reject before any quarantine. LLM concurrency stays at `max_parallel_jobs: 1` (plan §0.3/revision 10) until
@@ -259,3 +272,4 @@ most 3 minutes out — never longer**, regardless of how long the current step i
 - 2026-09-04: operator flagged, directly and correctly, that the self-healing design (find defect -> root-cause -> fix -> retranslate affected -> resume) is not converging: heal_queue.jsonl had 67 open tickets and 0 resolved at the time of the flag, with the two largest root-cause classes (auto:FrontmatterLanguageCheck, 25 tickets; the TC-APT-042 sentence-defect family, 28 tickets across 4+ pages) both fully evidenced with a plausible fix direction in TC-APT-040/042 for multiple prior iterations, yet never actually implemented -- each iteration re-hit the same wall on a new page, documented it again (sometimes usefully, with more evidence), and pivoted rather than fixing it. Root cause of the failure to converge: nothing in this runbook previously forced a stop; Track A always "has eligible cells" (there is always another untried page), so Track B's <=50%-of-iteration cap combined with no per-root-cause escalation meant a well-evidenced, multi-page-confirmed defect had the same priority as a same-iteration novel finding, and the latter kept opportunistically winning. v10.0 adds the RECURRENCE ESCALATION rule (§3) to close this gap structurally, not as a one-time manual redirect.
 - 2026-09-04: a governance-state commit (taskcard_status.json) landed ~10s after launching a background campaign and raced its verify() call — "translator repository is dirty" on the FIRST launch attempt even though the tree was clean at manifest-build time. verify() runs once, synchronously, near the very start of run(), but a slow-starting process (model/TM imports) can still be mid-startup when a later commit dirties the tree it hasn't checked yet. Fix: after launching a campaign in the background, avoid touching tracked files again until either the process has produced its first shard result or enough time has passed that verify() has clearly already run.
 - 2026-09-04: after TC-APT-049 landed, introducing-words-foss-net's fresh rerun still leaves the link text "API Reference" in English (ar/cs/de all confirmed) — this is NOT a bug, do not re-fix it. `config/terminology.yaml` explicitly protects "API Reference" (preserve_mode: protect, severity: error, category: api_phrase), and real already-shipped translations across the portfolio (scene-entities-in-net's de/fr/ru, pdf-annotations-forms-net's de, convert-obj-stl-gltf-dotnet's ru, slides-core-api-java's ru) all consistently leave "API Reference" in English too — a deliberate, curated, portfolio-wide site convention (same family as `_link_text_is_brand_navigation_label`'s "Aspose.X KB" cases), separate from the "Getting Started"/"Developer Guide" bug (which WAS real and is now fixed). Any future review of this page (or others using the same link-list convention) must not flag "API Reference" alone as a defect.
+- 2026-09-05: operator tightened v10.0's RECURRENCE ESCALATION rule -- "fix, reverify against the exact file that showed the problem, then retrigger the campaign" is the required closed loop, not "fix and move on to a new page" (which is what every prior TC-APT-040/042 encounter actually did, unit tests notwithstanding). v10.1 spells out the 3 mandatory steps in §3: (1) fix the producer-side root cause, (2) re-translate the SAME source_path/target_lang the original heal ticket named and confirm the specific defect is gone by reading the actual output (a passing unit test alone does not satisfy this), (3) retrigger the campaign on every page/cell quarantined for that root cause and commit whatever now passes. Only after step 3 does a new, never-before-tried page become selectable again.
