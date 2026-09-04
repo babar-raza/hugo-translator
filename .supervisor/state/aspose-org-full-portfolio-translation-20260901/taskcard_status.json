@@ -378,19 +378,20 @@
     "TC-APT-014": {
       "status": "IN_PROGRESS",
       "gate": 5,
-      "title": "Gate 5 restart: blog.aspose.org/cells/go/introducing-cells-foss-go (Tier-1a) across all 25 languages -- pivoted off pdf-foss-typescript (closed, 3 committed), note/python (100% pipeline-bug fail, see TC-APT-040), introducing-words-foss-net (8/8 reject, TC-APT-042) and cells-spreadsheet-management-go (TC-APT-042 quarantine)",
+      "title": "Gate 5: pdf-foss-typescript CLOSED (3 committed), note/python CLOSED (2 committed, TC-APT-040 fix proven live) -- next page blocked pending TC-APT-051 live verification per RECURRENCE ESCALATION",
       "depends_on": [
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "pdf/typescript/introducing-pdf-foss-typescript CLOSED: 3 committed, 22 heal-ticketed, gate-close rule satisfied. note/python/_index.md: 0/25, a REAL portfolio-relevant pipeline bug found and root-caused (see TC-APT-040) -- 'Aspose.X FOSS for Y' bare _index.md titles hard-fail FrontmatterLanguageCheck 100% of the time (too little non-technical signal text to clear the detector's floor); 'Introducing Aspose.X FOSS for Y' article-page titles are unaffected. Now on cells/go/introducing-cells-foss-go (title confirmed 'Introducing Aspose.Cells FOSS for Go', safe from the note/python bug) -- manifest data/campaigns/gate5-cells-foss-go/manifest.yaml, max_parallel_jobs=1, primary_model=professionalize_llm, PID 46816/39960, log logs/gate5-cells-foss-go_run.log. Same cells/go family as the TC-APT-042-quarantined cells-spreadsheet-management-go but a different specific article -- watch for the same parallel-negation-list defect shape in review. Do not re-launch while this PID is alive.",
-      "evidence_path": "data/summaries/fp-gate5-pdf-foss-typescript-20260904.json",
+      "blocking_reason": "pdf/typescript/introducing-pdf-foss-typescript CLOSED: 3 committed, 22 heal-ticketed, gate-close rule satisfied. note/python/_index.md RETRIED after TC-APT-040 landed (434eda1): title field now passes FrontmatterLanguageCheck in all 25 languages (0 occurrences vs 25/25 before) -- confirms the fix live. Result: 2/25 committed (th, vi; commit d4c43b1dc8), 23 quarantined with auto-heal tickets -- gate-close rule satisfied (scope exercised, every non-committed cell ticketed), CLOSED. Quarantine breakdown surfaced a NEW recurrence-escalation-qualifying finding: RepetitionDetectorValidator false-flagged 15/23 short-content cells (word-frequency ratio noise on <15-word segments) -- 2nd source page (also seen on introducing-pdf-foss-typescript/hi), fixed and unit-tested as TC-APT-051 (e77c633) but NOT YET proven live via a re-run. LanguageConsistencyValidator false-flagged the other 6/23 (fa,ja,ko,pt,ro,sv) -- root cause NOT YET investigated, single-page so far (does not yet cross the 2-page recurrence bar on its own). cells-foss-go's manifest (data/campaigns/gate5-cells-foss-go/manifest.yaml) still exists but its PID 46816/39960 is dead (stopped before v10.0 arrived) -- do NOT relaunch it or any new Track-A page until TC-APT-051 is proven live (re-run note/python or another short-content page) per the RECURRENCE ESCALATION rule.",
+      "evidence_path": "data/summaries/fp-gate5-pdf-foss-typescript-20260904.json, data/campaigns/gate5-note-python/summary.json",
       "commit": [
         "b52c1bf674",
         "fc26b5fc93",
-        "46be9275c4"
+        "46be9275c4",
+        "d4c43b1dc8"
       ],
-      "last_updated": "2026-09-04T17:20:00+00:00",
+      "last_updated": "2026-09-05T00:05:00+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
@@ -618,6 +619,18 @@
       "commit": "5311579",
       "last_updated": "2026-09-04T18:15:29.216416+00:00",
       "blocker_type": null
+    },
+    "TC-APT-051": {
+      "status": "IN_PROGRESS",
+      "gate": 5,
+      "title": "RepetitionDetectorValidator word-frequency false positive on short translation segments (RECURRENCE ESCALATION: 2nd source page)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": "Found while live-verifying TC-APT-040 on note/python/_index.md: 15/23 quarantined cells failed on RepetitionDetectorValidator's word-frequency check, not FrontmatterLanguageCheck. Root cause: percentage ratio is noisy on short segments -- 2 occurrences among 9 filtered (non-stopword) words already reads as 22.2%, past the default 20% WARNING threshold; zero-defect validation_policy promotes warnings to blocking. Also seen on introducing-pdf-foss-typescript/hi (1 ticket) -- 2 source pages, qualifies for v10.0's RECURRENCE ESCALATION rule. Fixed (e77c633): below _MIN_FILTERED_WORDS_FOR_FREQUENCY_RATIO=15 filtered words, require an absolute repeat count (_MIN_ABSOLUTE_COUNT_FOR_SHORT_TEXT=4) before trusting the ratio -- mirrors the file's own pre-existing _MIN_SOURCE_WORDS_FOR_CEILING rationale for the source-side ceiling, now applied translation-side too. Unit-tested: tests/unit/validation/test_repetition_detector_validator.py (36 tests incl. 2 new TestShortSegmentWordFrequencyFloor regression tests) + tests/unit/validation/ + integration/test_realtime_repetition_detection.py (497 passed, 12 skipped), all green. NOT YET proven live -- needs a re-run of note/python (or another short-content page) to confirm the 15 previously-quarantined cells now pass, per the 'attempted and tested' bar. LanguageConsistencyValidator (the OTHER note/python failure class, 6/23 cells: fa,ja,ko,pt,ro,sv) is a separate, not-yet-investigated root cause -- single page so far, does not yet cross the recurrence threshold on its own.",
+      "evidence_path": "data/campaigns/gate5-note-python/failure_metadata.jsonl, tests/unit/validation/test_repetition_detector_validator.py::TestShortSegmentWordFrequencyFloor",
+      "commit": "e77c633",
+      "last_updated": "2026-09-05T00:05:00+00:00",
+      "blocker_type": null
     }
   },
   "gate_closures": {
@@ -637,6 +650,6 @@
     }
   },
   "last_wake_summary": "data/summaries/aspose-org-wake-001-20260902.json",
-  "cells_committed_total": 26,
+  "cells_committed_total": 28,
   "loop_prompt_version_seen": "10.0 (2026-09-04)"
 }
