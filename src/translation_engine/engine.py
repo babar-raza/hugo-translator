@@ -2076,9 +2076,12 @@ class TranslationEngine:
                 # short, otherwise-correct Latin-script title. Accept only a
                 # strong positive target-language verdict from ordinary prose
                 # with governed technical tokens removed. If that positive
-                # attestation is absent, retain the stricter raw-text check.
+                # attestation is absent, retain the stricter raw-text check --
+                # but only when there was enough signal text to attempt it in
+                # the first place (see the `else` branch below, TC-APT-040).
                 signal_text = _frontmatter_language_signal_text(v_stripped)
-                if sum(character.isalpha() for character in signal_text) >= 6:
+                signal_alpha_count = sum(character.isalpha() for character in signal_text)
+                if signal_alpha_count >= 6:
                     signal_langs = _ld.detect_langs(signal_text)
                     if signal_langs:
                         signal_top = signal_langs[0]
@@ -2087,6 +2090,23 @@ class TranslationEngine:
                             signal_top.lang == target_lang or signal_top.lang in signal_accepted
                         ) and signal_top.prob > CONFIDENCE_THRESHOLD:
                             continue
+                else:
+                    # TC-APT-040: fewer than 6 alphabetic characters of real prose
+                    # survive stripping governed technical tokens (e.g. "Aspose.Note
+                    # FOSS for Python" strips to just "for", 3 chars). The old
+                    # fallback below re-detects the language of `v_stripped` -- the
+                    # FULL, UNSTRIPPED field -- which is still dominated by the very
+                    # tokens just removed and therefore reads as English with high
+                    # confidence regardless of whether the tiny residual (a bare
+                    # connector word) was actually translated. Confirmed live: this
+                    # exact mechanism hard-failed 25/25 languages identically on
+                    # blog.aspose.org/note/python/_index.md's title field
+                    # (data/summaries/fp-gate5-note-python-20260904.json) -- a
+                    # structurally guaranteed false positive, not a real signal, for
+                    # any field this dominated by required technical tokens. There is
+                    # too little independent prose left to make ANY reliable
+                    # determination either way, so skip rather than misreport.
+                    continue
                 detected_langs = _ld.detect_langs(v_stripped)
                 if detected_langs:
                     top = detected_langs[0]
