@@ -383,10 +383,10 @@
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "cells-spreadsheet-management-go stays quarantined under TC-APT-042. Gate 5 pivoted to introducing-words-foss-net -- ALL 5 independently-reviewed languages (ar,cs,de,el,es) REJECTED on full-body review, but this time the root cause is two CONFIRMED producer-side pipeline bugs, not model quality: (1) _link_text_matches_url_slug silently excluded 'Getting Started'/'Developer Guide'/'API Reference' link text from translation because its normalizer conflated spaces with hyphens against the URL's own slug -- FIXED this iteration (f737a3e). (2) _is_technical_identifier's single-word PascalCase heuristic also silently excludes ordinary headings/table-headers ('Charts', 'Format', 'Extension') that happen to match its shape -- root-caused, NOT yet fixed (needs context-aware disambiguation, not a rushed regex edit; see the first-principles record). Campaign left running (PID 49828/51744) rather than killed -- 6/25 accepted so far, all expected defective, none committed (commit_policy.enabled=false). Plan: fix bug 2, purge affected TM entries, do ONE clean stop+rerun once both fixes are complete rather than two separate restarts.",
+      "blocking_reason": "cells-spreadsheet-management-go stays quarantined under TC-APT-042. Gate 5 on introducing-words-foss-net: both confirmed producer-side bugs are now fixed -- (1) _link_text_matches_url_slug's space/hyphen conflation (f737a3e), (2) _is_technical_identifier's PascalCase false-positive on ordinary headings, fixed via 3 new i18n registry entries for Charts/Format/Extension rather than a regex change (TC-APT-049, eb4b67b). TM purge was considered and found unnecessary: do_not_translate=True units are never sent to TM (confirmed by direct code read of segment_translator.py's translation-batch filter AND an empty query_tm_cache.py search for 'Format'/cs) -- the buggy units were simply skipped, never cached, so a fresh run's TM hits on the page's other, already-correctly-translated units are pure reuse, not risk. Killed the pre-fix run (PID 49828/51744), deleted its 8 untracked never-committed generated files (ar/cs/de/el/es/fa/he/hi -- confirmed all were `??` untracked in git status before deletion), removed the stale data/campaigns/gate5-words-foss-net/ ledger directory (gitignored, not tracked), rebuilt the manifest fresh, and relaunched (PID 43228/47332, log logs/gate5-words-foss-net_run2.log). Do not re-launch again while this PID is alive; review its accepted cells with the SAME full-body-read rigor as before once it produces output.",
       "evidence_path": "data/summaries/fp-gate5-words-foss-net-20260904.json",
       "commit": null,
-      "last_updated": "2026-09-04T13:05:00+00:00",
+      "last_updated": "2026-09-04T13:36:30+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
@@ -577,15 +577,15 @@
       "last_updated": "2026-09-04T12:03:02.988720+00:00"
     },
     "TC-APT-049": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 5,
-      "title": "Context-gate _is_technical_identifier's single-segment PascalCase heuristic so it stops silently excluding ordinary single-word headings/table-headers from translation",
+      "title": "Stop _is_technical_identifier's single-segment PascalCase heuristic from silently excluding ordinary single-word headings/table-headers from translation",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": "Found on introducing-words-foss-net (TC-APT-014, this iteration): the regex `^[A-Z][a-z0-9]{3,}(?:[A-Z][a-z0-9]*)*$` matches 'Charts'/'Format'/'Extension' identically to genuine single-word API identifiers ('Body', 'Cell', 'Camera') it was designed to protect (TC-APT-013's PbrMaterial fix) -- shape alone cannot disambiguate an ordinary English heading from a real API class name. 'Read'/'Write' happened to translate correctly anyway only because they have unrelated curated entries in the i18n governance table that override do_not_translate regardless of how it was set; words without that lucky table coverage ship in English verbatim. Design direction (not yet implemented): require the single-segment branch to also see corroborating context (e.g. the same token appears as a backtick code span elsewhere in the document, or is in the terminology/protected-terms dictionary) before protecting it, mirroring the i18n table's existing column_header context-gating for TABLE_CELL_TEXT. Needs its own regression tests covering both directions (false-positive ordinary headings AND true-positive API identifiers) given this exact code has already been revised multiple times for this tension.",
-      "evidence_path": "data/summaries/fp-gate5-words-foss-net-20260904.json",
-      "commit": null,
-      "last_updated": "2026-09-04T13:05:00+00:00",
+      "blocking_reason": "Fixed WITHOUT touching the regex (rejected as too risky -- would reintroduce TC-APT-013's PbrMaterial/Scene-Graph false-negatives): reused the existing i18n governance registry (config/i18n/template_strings/_registry.yaml) that already overrides this exact heuristic for 68 other terms ('Overview', 'Value', 'Type', 'Name', ...). Added 3 entries (heading.charts/format/extension, status=pending so the completeness-gap lint that only checks status=approved stays green) -- is_translate_eligible() now returns True for these before Strategy 2's regex ever runs, exactly how 'Read'/'Write' were already (accidentally) protected by an unrelated entry. New regression tests prove both directions: 'Charts' now eligible, 'Camera' (no registry entry) still correctly protected.",
+      "evidence_path": "tests/unit/translation_engine/extractor/test_text_unit_extraction.py::test_registry_covered_single_word_heading_is_translate_eligible",
+      "commit": "eb4b67b",
+      "last_updated": "2026-09-04T13:20:00+00:00",
       "blocker_type": null
     }
   },
