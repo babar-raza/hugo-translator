@@ -303,6 +303,30 @@ def _link_text_is_brand_navigation_label(text: str) -> bool:
 _CONFIRMED_FIXED_TECHNICAL_HEADINGS = {"Scene Graph"}
 
 
+def _link_text_is_schemeless_bare_url(text: str, url: str) -> bool:
+    """A link's visible text that is the URL itself minus its scheme -- e.g.
+
+        [github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go](https://github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go)
+
+    -- is a bare URL reference, not prose. `_is_non_translatable`'s Strategy 0.6
+    already protects the scheme-prefixed form (``^https?://\\S+$``), found via
+    TC-APT-004b qualification; this catches the equally common scheme-less form
+    (confirmed on real content, TC-APT-014 Gate 5: professionalize_llm AND
+    m2m100_418m both failed TC-SAS-01 on this exact text, since translating it
+    even slightly would break the reader's ability to recognize it as the URL).
+    Exact comparison against the URL's netloc+path, mirroring
+    ``_link_text_matches_url_slug``'s "the text IS the [slug]" reasoning one
+    level broader (the whole URL, not just its final segment).
+    """
+    if not text or not url:
+        return False
+    parsed = urlsplit(url)
+    if not parsed.netloc:
+        return False
+    without_scheme = (parsed.netloc + parsed.path).rstrip("/")
+    return text.strip().rstrip("/") == without_scheme
+
+
 def _link_text_matches_url_slug(text: str, url: str) -> bool:
     """A link's visible text that is literally the URL's final path segment is an
     identifier (a repo/product slug), not prose -- e.g. the Markdown
@@ -1720,6 +1744,7 @@ class TextUnitExtractor:
                         do_not_translate=(
                             self._is_non_translatable(text)
                             or _link_text_matches_url_slug(text, url)
+                            or _link_text_is_schemeless_bare_url(text, url)
                             or _link_text_is_brand_navigation_label(text)
                         ),
                     )

@@ -20,6 +20,7 @@ from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
 from src.translation_engine.extractor.text_unit_extractor import (
     TextUnitExtractor,
     _link_text_is_brand_navigation_label,
+    _link_text_is_schemeless_bare_url,
     _link_text_matches_url_slug,
 )
 from src.translation_engine.parser.ast_nodes import (
@@ -207,12 +208,60 @@ class TestNodeTypes:
         assert not _link_text_matches_url_slug("", "https://example.com/x")
         assert not _link_text_matches_url_slug("x", "")
 
+    def test_link_text_is_schemeless_bare_url_helper(self):
+        """TC-APT-014 Gate 5: `[github.com/x/y](https://github.com/x/y)` -- visible
+        text is the URL minus its scheme, a very common way to write a plain
+        reference link. Confirmed on real content: professionalize_llm AND
+        m2m100_418m both failed TC-SAS-01 on this exact text before this fix,
+        since Strategy 0.6's `^https?://...$` bare-URL check only caught the
+        scheme-prefixed form."""
+        assert _link_text_is_schemeless_bare_url(
+            "github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go",
+            "https://github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go",
+        )
+        # trailing slash on either side is normalized away
+        assert _link_text_is_schemeless_bare_url(
+            "github.com/org/repo/", "https://github.com/org/repo"
+        )
+        assert _link_text_is_schemeless_bare_url(
+            "github.com/org/repo", "https://github.com/org/repo/"
+        )
+        # ordinary prose, and text matching only the final slug (a different,
+        # already-handled case), never match here
+        assert not _link_text_is_schemeless_bare_url(
+            "Developer Guide", "https://docs.aspose.org/3d/java/"
+        )
+        assert not _link_text_is_schemeless_bare_url(
+            "Aspose.3D-FOSS-for-Java",
+            "https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-Java",
+        )
+        # empty inputs are inert, not a crash
+        assert not _link_text_is_schemeless_bare_url("", "https://example.com/x")
+        assert not _link_text_is_schemeless_bare_url("x", "")
+
     def test_bare_url_as_link_text_is_protected(self):
         """TC-APT-004b: `[https://x](https://x)` -- a plain reference link whose
         visible text IS its own href -- has no natural-language content at all."""
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
         url = "https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-NET"
         link = ASTNode(type=NodeType.LINK, attrs={"url": url}, children=[text_node(url)])
+        para = paragraph_node([link])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
+    def test_schemeless_bare_url_as_link_text_is_protected(self):
+        """TC-APT-014 Gate 5: real portfolio content
+        (blog.aspose.org/cells/go/cells-spreadsheet-management-go) links
+        `[github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go](https://github.com/...)`
+        -- the scheme-less form of the already-protected bare-URL pattern."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        url = "https://github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go"
+        text = "github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go"
+        link = ASTNode(type=NodeType.LINK, attrs={"url": url}, children=[text_node(text)])
         para = paragraph_node([link])
         para.assign_addresses("body.paragraph[0]")
 
