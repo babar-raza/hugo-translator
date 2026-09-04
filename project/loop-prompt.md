@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 9.3 (2026-09-04)`
+`loop_prompt_version: 10.0 (2026-09-04)`
 
 ## 0. On reload — before anything else
 
@@ -95,10 +95,27 @@ Track A — ship translated pages:
   a heal ticket with a classified root cause. Never wait for N/N. Quarantined cells, and any
   (language, content-class) pair with ≥3 tickets of one class, go to `heal_queue.jsonl` and are
   skipped across pages until fixed; keep shipping every other page and language.
+- **RECURRENCE ESCALATION (mandatory, overrides the Track A/B time split -- added v10.0 after the
+  operator found this loop accumulating evidence without ever fixing it):** before opening a NEW
+  Track-A page, count `heal_queue.jsonl`'s OPEN tickets grouped by `root_cause_class`. If any class
+  has tickets from **2 or more different source pages** and its corresponding Track-B taskcard has
+  never actually been implemented (only investigated/deferred), that taskcard is the ONLY thing this
+  iteration may do -- no new Track-A page opens until it has been attempted and tested, regardless of
+  the normal Track A/B split. As of 2026-09-04 this is already true for TC-APT-040
+  (`auto:FrontmatterLanguageCheck`, 25 open tickets) and TC-APT-042
+  (`model_quality_complex_sentence_structure`/`model_quality_residual_phrase_defects`, 28 open
+  tickets across at least 4 pages) -- 67 total heal tickets exist, 0 have ever been resolved.
+  Documenting a recurring defect a third or fourth time is not progress; implementing its fix is.
+  Picking a new page specifically BECAUSE it might dodge a known, already-evidenced, unfixed defect
+  is not an acceptable Track-A strategy -- it just relocates the same wall to wherever it is hit
+  next.
 - Model policy (plan §6.1): primary `professionalize_llm` for the 22 languages TC-APT-006 measured it
   better in; `m2m100_418m` primary for `hu`, `ja`, `ro`; the OTHER model is the retry on gate
-  failure and on review reject before any quarantine. LLM concurrency up to the calibrated 16
-  parallel jobs with batch packing. Manifest: `validation_policy: zero-defect`,
+  failure and on review reject before any quarantine. LLM concurrency stays at `max_parallel_jobs: 1` (plan §0.3/revision 10) until
+  TC-APT-043-047 land and pass their own regression tests -- a process-wide
+  `_model_execution_lock` serializes every `translate_file()` call regardless of engine today,
+  so raising this now has zero throughput benefit and only removes a safety margin against an
+  unconfirmed shared-mutable-state corruption hazard. Do not raise it. Manifest: `validation_policy: zero-defect`,
   `dirty_scope: campaign_paths`, `replace_existing` declared for every existing-target cell.
 
 Track B — harden, in this order, each item exactly per its plan §11 fields:
@@ -237,5 +254,6 @@ most 3 minutes out — never longer**, regardless of how long the current step i
 - 2026-09-04: hu and ja both hard-failed (or landed with unusually many real defects) on introducing-pdf-foss-typescript, running under professionalize_llm as primary -- ja's title field never translated at all (stayed English, FrontmatterLanguageCheck). Both are among the 3 languages (hu/ja/ro) TC-APT-006 measured m2m100_418m performing BETTER for, but this manifest (like all Gate 5 manifests this session) uses --primary-model professionalize_llm uniformly for all 25 languages since TC-APT-039's full per-language routing split was never implemented at the manifest/build level (only the infrastructure to SET a single primary_model exists). This is corroborating evidence for that gap, not a new bug -- worth prioritizing the remaining TC-APT-039 scope (or a manifest-level per-locale primary_model override) before the next hu/ja/ro-heavy batch.
 - 2026-09-04: French hard-failed (exhausted all retries, TC-SAS-01) on introducing-pdf-foss-typescript's "### Annotations" heading -- confirmed via exact fingerprint match (sha256("Annotations")[:16] == 1e4d67386295974e, the failure log's own reported fingerprint) that the model correctly translated it to French, which happens to be spelled identically ("Annotations" is a true French/English cognate). TC-SAS-01's zero-tolerance same-as-source check cannot distinguish "failed to translate" from "correctly translated to an identical cognate" -- a real, unfixed blind spot, not investigated further this session (would need per-unit exemption logic keyed on confirmed cognates, likely belongs with TC-APT-040's verification-layer scope). Not a regression from TC-APT-049's fix -- the SAME false-hard-fail would have happened before too, just masked by do_not_translate=True never sending the unit to the model at all.
 - 2026-09-04: first real Gate 5 content commit landed (b52c1bf674, ar, introducing-pdf-foss-typescript) via the full governed §5.1/§19.2 procedure. Correction to this file's own §5.1 step order: `skill_run_manager.py finalize` must run AFTER the `git commit`, not before it -- the content repo's commit-msg hook (scripts/commit-msg-skills.sh) calls `skill_run_manager.py find-pending`, which only returns a run that is still OPEN/unfinalized; finalizing before committing closes the run and the hook then blocks with "no skill run record found" (confirmed directly: first attempt failed this way, second attempt with `finalize` deferred to after a successful commit -- passing `--commit-sha` at that point -- succeeded). Correct order: create → git add → git commit (skill run must still be pending here) → finalize --outcome success --commit-sha <sha>.
+- 2026-09-04: operator flagged, directly and correctly, that the self-healing design (find defect -> root-cause -> fix -> retranslate affected -> resume) is not converging: heal_queue.jsonl had 67 open tickets and 0 resolved at the time of the flag, with the two largest root-cause classes (auto:FrontmatterLanguageCheck, 25 tickets; the TC-APT-042 sentence-defect family, 28 tickets across 4+ pages) both fully evidenced with a plausible fix direction in TC-APT-040/042 for multiple prior iterations, yet never actually implemented -- each iteration re-hit the same wall on a new page, documented it again (sometimes usefully, with more evidence), and pivoted rather than fixing it. Root cause of the failure to converge: nothing in this runbook previously forced a stop; Track A always "has eligible cells" (there is always another untried page), so Track B's <=50%-of-iteration cap combined with no per-root-cause escalation meant a well-evidenced, multi-page-confirmed defect had the same priority as a same-iteration novel finding, and the latter kept opportunistically winning. v10.0 adds the RECURRENCE ESCALATION rule (§3) to close this gap structurally, not as a one-time manual redirect.
 - 2026-09-04: a governance-state commit (taskcard_status.json) landed ~10s after launching a background campaign and raced its verify() call — "translator repository is dirty" on the FIRST launch attempt even though the tree was clean at manifest-build time. verify() runs once, synchronously, near the very start of run(), but a slow-starting process (model/TM imports) can still be mid-startup when a later commit dirties the tree it hasn't checked yet. Fix: after launching a campaign in the background, avoid touching tracked files again until either the process has produced its first shard result or enough time has passed that verify() has clearly already run.
 - 2026-09-04: after TC-APT-049 landed, introducing-words-foss-net's fresh rerun still leaves the link text "API Reference" in English (ar/cs/de all confirmed) — this is NOT a bug, do not re-fix it. `config/terminology.yaml` explicitly protects "API Reference" (preserve_mode: protect, severity: error, category: api_phrase), and real already-shipped translations across the portfolio (scene-entities-in-net's de/fr/ru, pdf-annotations-forms-net's de, convert-obj-stl-gltf-dotnet's ru, slides-core-api-java's ru) all consistently leave "API Reference" in English too — a deliberate, curated, portfolio-wide site convention (same family as `_link_text_is_brand_navigation_label`'s "Aspose.X KB" cases), separate from the "Getting Started"/"Developer Guide" bug (which WAS real and is now fixed). Any future review of this page (or others using the same link-list convention) must not flag "API Reference" alone as a defect.
