@@ -4,7 +4,7 @@
   "plan_revision": 6,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-04T04:46:00+00:00",
+  "updated_at": "2026-09-04T04:52:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -383,7 +383,7 @@
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "23/25 languages committed (417cf1e066, 4d67b72bf2, d6530401dd, 8dbea1b606, 4b93142054). id/ro/ko/uk all fixed by forcing professionalize_llm -- confirms m2m100 GATE36-pass is not a quality signal, no pipeline bug in those 4. zh being tested the same way. ja and hi are CONFIRMED model-agnostic (fail/reproduce identically on both models) and need real root-cause investigation, not a retry.",
+      "blocking_reason": "23/25 languages committed. 3 cells CONFIRMED to need real investigation (not a quick model-swap): ja (GATE36 fails both models), hi (reconstruction punctuation bug both models), zh (genuine content problem confirmed via full-retry campaign run + a separate real PYTHONIOENCODING=utf-8 console-encoding finding). Evidence: data/summaries/fp-gate5-scene-entities-4cells-TC-APT-014.json.",
       "evidence_path": null,
       "commit": [
         "417cf1e066",
@@ -392,7 +392,7 @@
         "8dbea1b606",
         "4b93142054"
       ],
-      "last_updated": "2026-09-04T04:46:00+00:00",
+      "last_updated": "2026-09-04T04:52:00+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
