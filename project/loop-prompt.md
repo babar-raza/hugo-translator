@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 9.2 (2026-09-04)`
+`loop_prompt_version: 9.3 (2026-09-04)`
 
 ## 0. On reload — before anything else
 
@@ -108,7 +108,11 @@ one 25-language manifest per call) → TC-APT-038 (gate-close semantics, heal qu
 quarantine) → TC-APT-039 (split primary routing, cross-model retry on review reject,
 production-review qualification ledger) →
 TC-APT-040 (short-field language-detection, Devanagari `।.` punctuation, CJK fidelity-judge
-inspection) → TC-APT-036 (bold/link leaf-splitting) → TC-APT-035 (TM write buffering on reject) →
+inspection) → TC-APT-042 (parallel-negation-list / nested-conditional-before-link sentences
+producing duplicated/scrambled output across 10+ languages, found on cells-spreadsheet-management-go,
+`data/summaries/fp-gate5-cells-go-20260904.json` — investigate per-segment routing for these
+shapes before assuming it is unfixable, per that record's own regression-control note) →
+TC-APT-036 (bold/link leaf-splitting) → TC-APT-035 (TM write buffering on reject) →
 TC-APT-034/004b per cell (integration suite first; a passing cell flips to LLM-primary for new
 batches; a failing cell stays on m2m100; never restart all cells) → anything Track A's reviews
 surface. Implement, test, execute the acceptance criterion, mark DONE, commit to the mission branch.
@@ -215,3 +219,4 @@ most 3 minutes out — never longer**, regardless of how long the current step i
 - 2026-09-04: `campaign_runner.py::_run_locked` only commits a shard if it had zero job failures, then raises and aborts the whole `run()` call — this, not policy, is why Gate 5's batches shrank `9→7→1→2→2` languages. `_commit_verified_outputs` was confirmed to already scope strictly to checksum-receipted paths, so committing a shard's passing jobs regardless of its failures is safe. Fix is TC-APT-041 (plan G-29/§0.2). Its commit-message template also hardcodes `Co-authored-by: Codex <noreply@openai.com>` — fix alongside.
 - 2026-09-04: a wake was observed scheduled ~1547s out despite the v8.2 3-minute cap — the ScheduleWakeup tool's own built-in "idle tick" guidance (1200-1800s) silently won over the mission rule. v9.1 restates the cap in §1 (hard limits, checked first) with an explicit override statement; state `delaySeconds` in the report every time as a self-check.
 - 2026-09-04: confirmed live by the executing session (hugo-translator-82) — a 150s ScheduleWakeup request fired at 186s due to the tool's own clock-alignment rounding, 6s over the 180s ceiling. v9.2 changes the instruction to request 150s (not 180s) so this rounding cannot push the actual wake past 180s.
+- 2026-09-04: Gate 5's restart on `cells/go/cells-spreadsheet-management-go` correctly rejected all 12 attempted languages on full-body review (see TC-APT-042) — a genuine, real model-quality catch, not a stall. Operator flag: >2h passed between the last translation commits (09:44) and this check with TC-APT-041 (top Track-B priority) still TODO in code — if this recurs, the limiting factor is real review/investigation time on a single hard page, not idleness; consider whether Gate 5's canary page should be swapped for a lower-risk Tier-1a page while this one's defect is investigated in Track B, rather than staying blocked on one page.
