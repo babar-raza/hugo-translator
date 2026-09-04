@@ -383,10 +383,10 @@
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "cells-spreadsheet-management-go stays quarantined under TC-APT-042 (all 12 attempted languages rejected, genuine model-quality defect, not pipeline). Swapped Gate 5's canary to a fresh, lower-risk Tier-1a page: introducing-words-foss-net (397-line article, same family/shape as the successful scene-entities-in-net batch). Manifest data/campaigns/gate5-words-foss-net/manifest.yaml built with max_parallel_jobs=1 per plan revision 10/G-30/G-31 (concurrency>=2 has an unproven shared-mutable-state corruption hazard, TC-APT-043..047 not yet landed) and primary_model=professionalize_llm (TC-APT-039 infra) in a single 25-locale run() call (TC-APT-041 now lands this without hand-splitting). Background run launched (PID 49828, child 51744; log logs/gate5-words-foss-net_run.log); check receipts/summary on next wake, do not re-launch while it is alive.",
+      "blocking_reason": "cells-spreadsheet-management-go stays quarantined under TC-APT-042. Gate 5 canary swapped to introducing-words-foss-net; manifest data/campaigns/gate5-words-foss-net/manifest.yaml, max_parallel_jobs=1, primary_model=professionalize_llm, single 25-locale run() call, commit_policy.enabled=false (governed commit is a separate explicit step per §19.2, not automatic). Background run alive (PID 49828/51744, log logs/gate5-words-foss-net_run.log); 5/25 accepted so far (ar,cs,de,el,es -- el and es each needed retries: el hit a same-as-source link_text unit, es hit both a 7-unit same-as-source failure and a frontmatter-title language check before eventually passing clean). 5 full-body review agents launched (one per accepted language) to check before the governed commit -- see agent IDs in this iteration's field note; do not re-launch the campaign or re-review these 5 languages while their agents are in flight.",
       "evidence_path": "data/campaigns/gate5-words-foss-net/manifest.yaml",
       "commit": null,
-      "last_updated": "2026-09-04T12:19:30+00:00",
+      "last_updated": "2026-09-04T12:58:00+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
