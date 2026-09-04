@@ -816,7 +816,7 @@ class CampaignRunner:
                     "-m",
                     "Skills invoked: [S-HT-02]",
                     "-m",
-                    "Co-authored-by: Codex <noreply@openai.com>",
+                    "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
                 ]
             )
         try:
@@ -1927,6 +1927,14 @@ class CampaignRunner:
         if shard_ids and not shard_ids.issubset(available_shards):
             unknown = sorted(shard_ids - available_shards)
             raise CampaignManifestError(f"campaign shard is unknown or already complete: {unknown}")
+        # TC-APT-041 (plan G-29/§0.2): a shard with some failed jobs still commits its
+        # passing ones and the run still attempts every remaining shard -- a failing
+        # cell no longer costs its siblings (same shard) or other pages (other shards)
+        # their progress. Safe because _commit_verified_outputs only ever stages
+        # checksum-receipted paths (a failed job has no receipt, so it can never be
+        # swept into a commit); failed_shard_ids is surfaced in the final summary so
+        # failures stay visible instead of silently disappearing.
+        failed_shard_ids: list[str] = []
         for shard in all_shards:
             if shard_ids and shard["shard_id"] not in shard_ids:
                 continue
@@ -1965,9 +1973,7 @@ class CampaignRunner:
                 }
             )
             if shard_failed:
-                raise CampaignManifestError(
-                    f"shard blocked: {shard['shard_id']} failures={shard_failed}"
-                )
+                failed_shard_ids.append(str(shard["shard_id"]))
             commit_sha = None
             if self.manifest.commit_policy.get("enabled", True):
                 commit_sha = self._commit_verified_outputs(shard["shard_id"])
@@ -1988,6 +1994,7 @@ class CampaignRunner:
             **self.manifest.to_summary(),
             "accepted": accepted,
             "failed": failed,
+            "failed_shard_ids": failed_shard_ids,
             "remaining": self.manifest.expected_output_count - accepted,
             "status": (
                 "SHARD_SET_COMPLETE"
@@ -2001,8 +2008,15 @@ class CampaignRunner:
         }
         self.ledger.write_summary(final)
         if final["status"] not in {"COMPLETE", "SHARD_SET_COMPLETE"}:
-            raise CampaignManifestError(
+            # TC-APT-041: shards that failed already committed their receipted
+            # outputs above (see the per-shard loop) -- this raise only signals
+            # non-zero exit to the caller, it does not undo any commit. `final`
+            # (including failed_shard_ids) is attached so callers can still
+            # surface the full summary instead of losing it to a bare traceback.
+            err = CampaignManifestError(
                 f"campaign incomplete: accepted={accepted}, failed={failed}, "
-                f"remaining={final['remaining']}"
+                f"remaining={final['remaining']}, failed_shard_ids={failed_shard_ids}"
             )
+            err.summary = final
+            raise err
         return final

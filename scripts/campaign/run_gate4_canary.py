@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
 
     translator_repo = Path.cwd().resolve()
 
-    from src.workers.campaign_manifest import CampaignManifest
+    from src.workers.campaign_manifest import CampaignManifest, CampaignManifestError
     from src.workers.campaign_runner import CampaignRunner
 
     manifest = CampaignManifest.load(args.manifest)
@@ -114,7 +114,18 @@ def main(argv: list[str] | None = None) -> int:
         ledger_root=args.ledger_root,
     )
     shard_ids = set(args.shard_id) if args.shard_id else None
-    result = runner.run(resume=args.resume, shard_ids=shard_ids)
+    try:
+        result = runner.run(resume=args.resume, shard_ids=shard_ids)
+    except CampaignManifestError as exc:
+        # TC-APT-041: a partial-failure run still commits every shard's
+        # receipted outputs (see CampaignRunner._run_locked); print the
+        # attached summary instead of losing it to a bare traceback.
+        summary = getattr(exc, "summary", None)
+        if summary is not None:
+            print(json.dumps(summary, indent=2, default=str))
+        else:
+            print(json.dumps({"error": str(exc)}, indent=2, default=str))
+        return 1
     print(json.dumps(result, indent=2, default=str))
     return 0
 

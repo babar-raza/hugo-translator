@@ -353,8 +353,10 @@ def test_declared_target_survives_a_fully_rejected_job(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(runner, "_commit_verified_outputs", lambda _s: None)
     monkeypatch.setattr(runner, "_llm_identity_gate", lambda: None)
-    # zero-defect: a shard with a failed job raises "shard blocked" (existing behaviour)
-    with pytest.raises(CampaignManifestError, match="shard blocked"):
+    # TC-APT-041: a shard with a failed job no longer aborts mid-run -- the run
+    # still ends non-zero ("campaign incomplete"), but only after every shard
+    # has had its turn; the failing shard is named in the attached summary.
+    with pytest.raises(CampaignManifestError, match="campaign incomplete"):
         runner.run()
     assert (
         out.read_text(encoding="utf-8") == "legacy translation"

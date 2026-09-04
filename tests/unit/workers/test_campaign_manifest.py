@@ -871,6 +871,123 @@ def test_campaign_parallel_jobs_share_engine_without_cross_job_state(tmp_path, m
     assert set(receipts) == {item["outputs"]["es"] for item in payload["sources"]}
 
 
+def test_shard_failure_does_not_block_later_shard_commits(tmp_path, monkeypatch):
+    """TC-APT-041: a shard whose job(s) exhaust every retry no longer aborts
+    the whole run -- it commits whatever it did receipt (nothing here, since a
+    failed job never produces one) and the loop still reaches later shards,
+    which commit normally. The run still ends non-zero, but the raised error
+    carries the full summary (including which shard(s) failed) instead of
+    hiding it behind a mid-run traceback."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "campaign@example.invalid"], cwd=repo, check=True
+    )
+    subprocess.run(["git", "config", "user.name", "Campaign Test"], cwd=repo, check=True)
+    marker = repo / "baseline.txt"
+    marker.write_text("baseline", encoding="utf-8")
+    source = repo / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    # Commit the source alongside the baseline marker so only the campaign's
+    # own generated outputs show up as dirty later -- the source itself must
+    # already be tracked, or _commit_verified_outputs's dirty-scope check
+    # (rightly) refuses to commit anything at all.
+    subprocess.run(["git", "add", "baseline.txt", str(source.relative_to(repo))], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=repo, check=True)
+
+    payload = _manifest(repo)
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    payload["commit_policy"]["max_outputs_per_commit"] = 1  # force es and fr into separate shards
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    outputs = {
+        locale: repo / payload["sources"][0]["outputs"][locale] for locale in ("es", "fr")
+    }
+
+    class Engine:
+        def __init__(self):
+            self.campaign_context = {}
+            self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
+            self.decision_engine = SimpleNamespace(max_retry_attempts=99)
+            self.calls = []
+
+        def _get_output_path(self, _source, locale, _profile):
+            return outputs[locale]
+
+        def translate_file(self, _site, _source, target_langs, **_kwargs):
+            locale = target_langs[0]
+            self.calls.append(locale)
+            if locale == "es":
+                return SimpleNamespace(
+                    success=False,
+                    acceptance_receipts={},
+                    errors=["es rejected"],
+                    retry_attempts=0,
+                )
+            output = outputs[locale]
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(f"accepted-{locale}", encoding="utf-8")
+            receipt = {
+                "campaign_id": "pilot",
+                "source_path": str(source.resolve()),
+                "output_path": str(output.resolve()),
+                "source_sha256": sha256_file(source),
+                "output_sha256": sha256_file(output),
+                "target_lang": locale,
+                "validation_policy": "zero-defect",
+                "config_fingerprint": payload["config_fingerprint"],
+                "model_fingerprint": "fixture",
+                "gate_results": {index: {"passed": True} for index in range(1, 45)},
+            }
+            self.campaign_context["receipt_sink"](receipt)
+            return SimpleNamespace(
+                success=True,
+                acceptance_receipts={locale: receipt},
+                errors=[],
+                retry_attempts=0,
+            )
+
+    engine = Engine()
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=repo,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(
+        runner,
+        "verify",
+        lambda **_kwargs: {**manifest.to_summary(), "accepted": 0, "remaining": 2},
+    )
+
+    with pytest.raises(CampaignManifestError) as excinfo:
+        runner.run()
+
+    summary = excinfo.value.summary
+    assert summary["accepted"] == 1
+    assert summary["failed"] == 1
+    assert len(summary["failed_shard_ids"]) == 1
+    assert "es" in summary["failed_shard_ids"][0]
+
+    # es never produced a receipt, so nothing es-shaped was ever committed --
+    # but fr's shard still ran and still committed, proving the es failure
+    # didn't abort the outer shard loop.
+    assert not outputs["es"].exists()
+    assert outputs["fr"].read_text(encoding="utf-8") == "accepted-fr"
+    changed = subprocess.run(
+        ["git", "log", "--all", "--pretty=", "--name-only"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    assert payload["sources"][0]["outputs"]["fr"] in changed
+    assert payload["sources"][0]["outputs"]["es"] not in changed
+
+
 def test_campaign_retry_feedback_accumulates_distinct_gate_instructions():
     first = CampaignRunner._retry_feedback(
         SimpleNamespace(
