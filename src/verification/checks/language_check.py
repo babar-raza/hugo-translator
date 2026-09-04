@@ -327,8 +327,24 @@ class LanguageDetectionCheck(VerificationCheck):
 
         # Required product names, file formats, and platform identifiers must
         # not outvote the actual prose in short fields such as titles.
+        #
+        # TC-APT-052: a 2-char floor is not enough. A bare "_index.md" title
+        # like "Aspose.Note FOSS for Python" strips down to just the
+        # connector word ("for"/"dla"/"pro"/"para"/"per", 3-4 chars in most
+        # target languages) -- langdetect is unreliable on a single short
+        # word and frequently misclassifies it, causing a real, correctly
+        # translated connector word to fail this check. Confirmed live on
+        # blog.aspose.org/note/python/_index.md (cs/es/it/pl/uk all
+        # WRITE BLOCKED here, immediately after TC-APT-051 fixed the OTHER
+        # validator these same cells were failing) and previously on
+        # introducing-cells-foss-go/cs -- 2 source pages, the same
+        # short-signal-floor pattern already fixed once in engine.py's
+        # FrontmatterLanguageCheck (TC-APT-040) using a 6-char floor. Apply
+        # the same, empirically-set floor here: below it there is too
+        # little independent prose to make any reliable determination, so
+        # skip rather than misreport.
         detection_text = self._language_signal_text(text)
-        if sum(1 for char in detection_text if char.isalpha()) < 2:
+        if sum(1 for char in detection_text if char.isalpha()) < 6:
             logger.debug(f"No non-technical language signal at {location}")
             return []
 

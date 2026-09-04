@@ -474,6 +474,40 @@ class TestLanguageDetectionCheck:
         assert issues[0].metadata["detected_lang"] == "en"
 
 
+class TestShortSignalFloorTCAPT052:
+    """TC-APT-052: a bare `_index.md` title like "Aspose.Note FOSS for Python"
+    strips down to just the connector word ("dla"/"pro"/"para"/"per", 3-4
+    chars) after governed technical tokens are removed. The prior 2-char
+    floor let langdetect run on that single short word, which is unreliable
+    and frequently misclassifies it -- confirmed live on
+    blog.aspose.org/note/python/_index.md (cs/es/it/pl/uk all WRITE BLOCKED)
+    and previously on introducing-cells-foss-go/cs. Raised to a 6-char floor,
+    matching the same fix already proven for engine.py's
+    FrontmatterLanguageCheck (TC-APT-040).
+    """
+
+    def test_bare_index_title_below_signal_floor_is_not_flagged(self):
+        check = LanguageDetectionCheck()
+        translated = {"frontmatter": {"title": "Aspose.Note FOSS dla Python"}}
+
+        assert check.run({}, translated, "pl") == []
+
+    def test_introducing_prefixed_title_above_floor_still_flags_untranslated(self):
+        """The exemption must be narrow: titles with enough real prose (the
+        "Introducing" prefix supplies 11 signal chars) must still correctly
+        catch genuinely untranslated English -- this is not a blanket disable.
+        """
+        check = LanguageDetectionCheck()
+        translated = {
+            "frontmatter": {"title": "Introducing Aspose.Words FOSS for .NET"}
+        }
+
+        issues = check.run({}, translated, "pl")
+
+        assert len(issues) == 1
+        assert issues[0].metadata["detected_lang"] == "en"
+
+
 class TestLanguageDetectionCheckIntegration:
     """Integration tests with real langdetect (if available)."""
 
