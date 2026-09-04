@@ -568,6 +568,13 @@
       "commit": "d1764cf",
       "last_updated": "2026-09-04T06:05:00+00:00",
       "blocker_type": null
+    },
+    "TC-APT-048": {
+      "status": "DONE",
+      "owner": "claude-plan-session",
+      "blocking_reason": "",
+      "evidence_path": "scripts/ops/mission_watchdog.ps1 (b829036); registered as Windows Scheduled Task HugoTranslatorMissionWatchdog",
+      "last_updated": "2026-09-04T12:03:02.988720+00:00"
     }
   },
   "gate_closures": {
