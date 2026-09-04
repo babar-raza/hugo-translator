@@ -1,7 +1,7 @@
 {
   "mission_id": "aspose-org-full-portfolio-translation-20260901",
   "plan_path": "C:\\Users\\prora\\.claude\\plans\\hugo-translator-aspose-org-partitioned-kahn.md",
-  "plan_revision": "8.1",
+  "plan_revision": "11",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
   "updated_at": "2026-09-04T06:05:00+00:00",
@@ -378,15 +378,15 @@
     "TC-APT-014": {
       "status": "IN_PROGRESS",
       "gate": 5,
-      "title": "Gate 5 restart: cells/go/cells-spreadsheet-management-go (Tier-1a) across all 25 languages",
+      "title": "Gate 5 restart: blog.aspose.org/words/net/introducing-words-foss-net (Tier-1a) across all 25 languages -- pivoted off cells-spreadsheet-management-go per TC-APT-042 quarantine and peer (hugo-translator-db) suggestion",
       "depends_on": [
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "All 12 attempted languages (ar,cs,de,el,es,fa,fr,he,hi,id,it,ko) rejected on full-body review: a parallel 3-item negation list and a nested conditional-before-link sentence produce duplicated/scrambled output in most languages -- a genuine model-quality issue, not a pipeline bug (see evidence). hi additionally reproduces the known Devanagari punctuation bug. nl hard-failed separately (8 same-as-source units). 9 languages never attempted (pl,pt,ru,sv,th,tr,uk,vi,zh). Zero cells committed this iteration; TC-APT-039 (model routing) and the schemeless-bare-URL fix ARE committed as real Track B progress.",
-      "evidence_path": "data/summaries/fp-gate5-cells-go-20260904.json",
+      "blocking_reason": "cells-spreadsheet-management-go stays quarantined under TC-APT-042 (all 12 attempted languages rejected, genuine model-quality defect, not pipeline). Swapped Gate 5's canary to a fresh, lower-risk Tier-1a page: introducing-words-foss-net (397-line article, same family/shape as the successful scene-entities-in-net batch). Manifest data/campaigns/gate5-words-foss-net/manifest.yaml built with max_parallel_jobs=1 per plan revision 10/G-30/G-31 (concurrency>=2 has an unproven shared-mutable-state corruption hazard, TC-APT-043..047 not yet landed) and primary_model=professionalize_llm (TC-APT-039 infra) in a single 25-locale run() call (TC-APT-041 now lands this without hand-splitting). Background run launched (PID 49828, child 51744; log logs/gate5-words-foss-net_run.log); check receipts/summary on next wake, do not re-launch while it is alive.",
+      "evidence_path": "data/campaigns/gate5-words-foss-net/manifest.yaml",
       "commit": null,
-      "last_updated": "2026-09-04T05:36:00+00:00",
+      "last_updated": "2026-09-04T12:19:30+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
