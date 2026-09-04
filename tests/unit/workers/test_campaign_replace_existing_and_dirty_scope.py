@@ -50,7 +50,12 @@ def _repo(tmp_path: Path) -> Path:
 
 
 def _payload(
-    repo: Path, *, dirty_scope: str = "campaign_paths", replace: dict | None = None, tm_inputs=None
+    repo: Path,
+    *,
+    dirty_scope: str = "campaign_paths",
+    replace: dict | None = None,
+    tm_inputs=None,
+    on_job_failure: str | None = None,
 ) -> dict:
     payload = {
         "schema_version": 1,
@@ -82,6 +87,7 @@ def _payload(
             "max_parallel_jobs": 1,
             "model_sharing": "single_shared_instance",
             "dirty_scope": dirty_scope,
+            **({"on_job_failure": on_job_failure} if on_job_failure else {}),
         },
         "sources": [
             {
@@ -353,14 +359,49 @@ def test_declared_target_survives_a_fully_rejected_job(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(runner, "_commit_verified_outputs", lambda _s: None)
     monkeypatch.setattr(runner, "_llm_identity_gate", lambda: None)
-    # TC-APT-041: a shard with a failed job no longer aborts mid-run -- the run
-    # still ends non-zero ("campaign incomplete"), but only after every shard
-    # has had its turn; the failing shard is named in the attached summary.
-    with pytest.raises(CampaignManifestError, match="campaign incomplete"):
-        runner.run()
+    # TC-APT-041 (plan §11): a shard with a failed job no longer aborts mid-run,
+    # and per-file rejection no longer raises by default (execution_policy.
+    # on_job_failure="continue") -- it is expected Track-A traffic with a heal
+    # ticket, not an infrastructure failure.
+    summary = runner.run()
+    assert summary["status"] == "PARTIAL_WITH_TICKETS"
     assert (
         out.read_text(encoding="utf-8") == "legacy translation"
     )  # never deleted, never overwritten
+
+
+def test_on_job_failure_raise_restores_strict_all_or_nothing(tmp_path, monkeypatch):
+    """TC-APT-041 (plan §11): execution_policy.on_job_failure="raise" stays
+    available for a caller that deliberately wants strict all-or-nothing
+    behavior (e.g. a targeted regression re-run proving a fix)."""
+    repo = _repo(tmp_path)
+    out = repo / OUT_REL
+    out.parent.mkdir(parents=True)
+    out.write_text("legacy translation", encoding="utf-8")
+    legacy_sha = sha256_file(out)
+    manifest = _load(
+        tmp_path,
+        _payload(
+            repo,
+            replace={"es": {"expected_sha256": legacy_sha, "reason_code": "UNKNOWN_PROVENANCE"}},
+            on_job_failure="raise",
+        ),
+    )
+    engine = _engine_for(repo, out, accept_on_call=99)  # every attempt rejected
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(
+        runner, "verify", lambda **_k: {**manifest.to_summary(), "accepted": 0, "remaining": 1}
+    )
+    monkeypatch.setattr(runner, "_commit_verified_outputs", lambda _s: None)
+    monkeypatch.setattr(runner, "_llm_identity_gate", lambda: None)
+    with pytest.raises(CampaignManifestError, match="campaign incomplete"):
+        runner.run()
+    assert out.read_text(encoding="utf-8") == "legacy translation"
 
 
 def test_undeclared_pre_hash_drift_at_job_time_is_refused(tmp_path, monkeypatch):

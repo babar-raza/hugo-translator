@@ -1943,17 +1943,17 @@ class CampaignRunner:
             with ThreadPoolExecutor(
                 max_workers=min(max_parallel_jobs, len(shard["jobs"]))
             ) as executor:
-                futures = [
+                future_to_job = {
                     executor.submit(
                         self._run_campaign_job,
                         shard=shard,
                         source=source,
                         locale=locale,
                         expected_output=expected_output,
-                    )
+                    ): (source, locale, expected_output)
                     for source, locale, expected_output in shard["jobs"]
-                ]
-                for future in as_completed(futures):
+                }
+                for future in as_completed(future_to_job):
                     job_accepted, _output = future.result()
                     if job_accepted:
                         accepted += 1
@@ -1961,10 +1961,17 @@ class CampaignRunner:
                     else:
                         failed += 1
                         shard_failed += 1
+                        source, locale, expected_output = future_to_job[future]
+                        self._append_heal_ticket(
+                            shard=shard,
+                            source=source,
+                            locale=locale,
+                            expected_output=expected_output,
+                        )
             self.ledger.write_summary(
                 {
                     **self.manifest.to_summary(),
-                    "status": "SHARD_COMPLETE" if shard_failed == 0 else "SHARD_BLOCKED",
+                    "status": "SHARD_COMPLETE" if shard_failed == 0 else "SHARD_PARTIAL",
                     "shard_id": shard["shard_id"],
                     "shard_accepted": shard_accepted,
                     "shard_failed": shard_failed,
@@ -2002,21 +2009,57 @@ class CampaignRunner:
                 else (
                     "COMPLETE"
                     if accepted == self.manifest.expected_output_count and failed == 0
-                    else "INCOMPLETE"
+                    else "PARTIAL_WITH_TICKETS"
                 )
             ),
         }
         self.ledger.write_summary(final)
         if final["status"] not in {"COMPLETE", "SHARD_SET_COMPLETE"}:
-            # TC-APT-041: shards that failed already committed their receipted
-            # outputs above (see the per-shard loop) -- this raise only signals
-            # non-zero exit to the caller, it does not undo any commit. `final`
-            # (including failed_shard_ids) is attached so callers can still
-            # surface the full summary instead of losing it to a bare traceback.
-            err = CampaignManifestError(
-                f"campaign incomplete: accepted={accepted}, failed={failed}, "
-                f"remaining={final['remaining']}, failed_shard_ids={failed_shard_ids}"
-            )
-            err.summary = final
-            raise err
+            # TC-APT-041 (plan §11): shards that failed already committed their
+            # receipted outputs above -- an ordinary per-file review rejection
+            # is expected Track-A traffic (it has a heal ticket now), not an
+            # infrastructure failure, so it must never propagate as an
+            # unhandled exception. execution_policy.on_job_failure="raise" is
+            # kept for a caller that deliberately wants strict all-or-nothing
+            # behavior (e.g. a targeted regression re-run proving a fix).
+            on_job_failure = str(self.manifest.execution_policy.get("on_job_failure", "continue"))
+            if on_job_failure == "raise":
+                err = CampaignManifestError(
+                    f"campaign incomplete: accepted={accepted}, failed={failed}, "
+                    f"remaining={final['remaining']}, failed_shard_ids={failed_shard_ids}"
+                )
+                err.summary = final
+                raise err
         return final
+
+    def _append_heal_ticket(
+        self,
+        *,
+        shard: dict[str, Any],
+        source: Any,
+        locale: str,
+        expected_output: str,
+    ) -> None:
+        """TC-APT-041/038: record a content-free heal ticket for a job that
+        exhausted every retry, so a per-file rejection is never silently lost
+        once the run stops raising for it."""
+        failure = self.ledger.latest_failure(output_path=expected_output, target_lang=locale)
+        gate = str(failure.get("gate")) if failure else "unclassified"
+        note = str(failure.get("reason", ""))[:1000] if failure else ""
+        ticket = {
+            "ticket_id": (
+                f"auto-{self.manifest.campaign_id}-{shard['shard_id']}-"
+                f"{Path(source.source_path).stem}"
+            ),
+            "site_id": shard.get("site_id", getattr(source, "site_id", "")),
+            "source_path": source.source_path,
+            "target_lang": locale,
+            "opened_at": datetime.now(timezone.utc).isoformat(),
+            "root_cause_class": f"auto:{gate}",
+            "evidence_path": f"data/campaigns/{self.manifest.campaign_id}/failure_metadata.jsonl",
+            "status": "OPEN",
+            "tier": "unclassified",
+            "note": note,
+        }
+        heal_queue_path = self.ledger.root.parent / "heal_queue.jsonl"
+        self.ledger._append(heal_queue_path, ticket)

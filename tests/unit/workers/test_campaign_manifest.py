@@ -963,14 +963,20 @@ def test_shard_failure_does_not_block_later_shard_commits(tmp_path, monkeypatch)
         lambda **_kwargs: {**manifest.to_summary(), "accepted": 0, "remaining": 2},
     )
 
-    with pytest.raises(CampaignManifestError) as excinfo:
-        runner.run()
+    summary = runner.run()
 
-    summary = excinfo.value.summary
+    assert summary["status"] == "PARTIAL_WITH_TICKETS"
     assert summary["accepted"] == 1
     assert summary["failed"] == 1
     assert len(summary["failed_shard_ids"]) == 1
     assert "es" in summary["failed_shard_ids"][0]
+
+    heal_queue_path = tmp_path / "ledger" / "heal_queue.jsonl"
+    tickets = [json.loads(line) for line in heal_queue_path.read_text(encoding="utf-8").splitlines()]
+    assert len(tickets) == 1
+    assert tickets[0]["target_lang"] == "es"
+    assert tickets[0]["status"] == "OPEN"
+    assert tickets[0]["source_path"] == payload["sources"][0]["source_path"]
 
     # es never produced a receipt, so nothing es-shaped was ever committed --
     # but fr's shard still ran and still committed, proving the es failure
