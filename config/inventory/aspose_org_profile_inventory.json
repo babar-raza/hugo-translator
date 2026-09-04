@@ -2,11 +2,11 @@
   "schema_version": 1,
   "mission_id": "aspose-org-full-portfolio-translation-20260901",
   "taskcard": "TC-APT-002",
-  "generated_at": "2026-09-04T12:13:15.479730+00:00",
+  "generated_at": "2026-09-04T12:14:31.540316+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_sha": "2d2d301e50098f7dbb1cea2c2ba5aeabbbea4c85",
   "content_repo_dirty_paths": 34,
-  "translator_repo_sha": "46a28b8afd3c5c2f79dc19f7f2780027f22d7684",
+  "translator_repo_sha": "ac5f688c1e9ca41b248b8b03b7f4458b1d48b99d",
   "known_language_codes": [
     "ar",
     "bg",
