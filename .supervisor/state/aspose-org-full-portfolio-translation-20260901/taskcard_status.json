@@ -4,7 +4,7 @@
   "plan_revision": "8.1",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-04T05:45:00+00:00",
+  "updated_at": "2026-09-04T06:05:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -558,15 +558,15 @@
       "blocker_type": null
     },
     "TC-APT-041": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 5,
       "title": "Commit a shard batch its passing jobs even when some jobs failed (stop losing partial progress to abort-on-first-failure)",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": "Design confirmed safe per project/loop-prompt.md field note (2026-09-04): _commit_verified_outputs already scopes strictly to checksum-receipted paths, so committing a shard is passing jobs regardless of its failures is safe. Also fix: the commit-message template hardcodes a stray Codex/openai.com co-author trailer alongside this.",
-      "evidence_path": "project/loop-prompt.md#L (field notes)",
-      "commit": null,
-      "last_updated": "2026-09-04T05:40:00+00:00",
+      "blocking_reason": "Implemented per peer session (hugo-translator-db) escalation to prioritize this over further Gate-5 page investigation. _run_locked() no longer raises per-shard on shard_failed -- it accumulates failed_shard_ids and lets the existing unconditional commit call + outer loop proceed to every remaining shard; commit is already safely scoped to checksum-receipted paths only. The run still ends non-zero when any job failed, but the raised CampaignManifestError now carries .summary (including failed_shard_ids) so callers see the full picture instead of a bare traceback -- run_gate4_canary.py/run_gate5_batch.py updated to print it. Also fixed the stray hardcoded `Co-authored-by: Codex <noreply@openai.com>` trailer, replaced with the runbook's actual content-repo convention (Claude Fable 5.1). New regression test (test_shard_failure_does_not_block_later_shard_commits) proves a failed first shard no longer blocks a later shard's commit; one existing test's stale abort-on-first-failure assertion updated to match. tests/unit/workers/ -> 543 passed, 1 skipped.",
+      "evidence_path": "tests/unit/workers/test_campaign_manifest.py::test_shard_failure_does_not_block_later_shard_commits",
+      "commit": "d1764cf",
+      "last_updated": "2026-09-04T06:05:00+00:00",
       "blocker_type": null
     }
   },
@@ -588,5 +588,5 @@
   },
   "last_wake_summary": "data/summaries/aspose-org-wake-001-20260902.json",
   "cells_committed_total": 23,
-  "loop_prompt_version_seen": "9.1 (2026-09-04)"
+  "loop_prompt_version_seen": "9.3 (2026-09-04)"
 }
