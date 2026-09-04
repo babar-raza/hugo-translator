@@ -4,7 +4,7 @@
   "plan_revision": "8.1",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-04T05:00:00+00:00",
+  "updated_at": "2026-09-04T05:40:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -378,21 +378,15 @@
     "TC-APT-014": {
       "status": "IN_PROGRESS",
       "gate": 5,
-      "title": "Gate 5: scene-entities-in-net across all 25 approved languages",
+      "title": "Gate 5 restart: cells/go/cells-spreadsheet-management-go (Tier-1a) across all 25 languages",
       "depends_on": [
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "23/25 languages committed. 3 cells CONFIRMED to need real investigation (not a quick model-swap): ja (GATE36 fails both models), hi (reconstruction punctuation bug both models), zh (genuine content problem confirmed via full-retry campaign run + a separate real PYTHONIOENCODING=utf-8 console-encoding finding). Evidence: data/summaries/fp-gate5-scene-entities-4cells-TC-APT-014.json.",
-      "evidence_path": null,
-      "commit": [
-        "417cf1e066",
-        "4d67b72bf2",
-        "d6530401dd",
-        "8dbea1b606",
-        "4b93142054"
-      ],
-      "last_updated": "2026-09-04T04:52:00+00:00",
+      "blocking_reason": "All 12 attempted languages (ar,cs,de,el,es,fa,fr,he,hi,id,it,ko) rejected on full-body review: a parallel 3-item negation list and a nested conditional-before-link sentence produce duplicated/scrambled output in most languages -- a genuine model-quality issue, not a pipeline bug (see evidence). hi additionally reproduces the known Devanagari punctuation bug. nl hard-failed separately (8 same-as-source units). 9 languages never attempted (pl,pt,ru,sv,th,tr,uk,vi,zh). Zero cells committed this iteration; TC-APT-039 (model routing) and the schemeless-bare-URL fix ARE committed as real Track B progress.",
+      "evidence_path": "data/summaries/fp-gate5-cells-go-20260904.json",
+      "commit": null,
+      "last_updated": "2026-09-04T05:36:00+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
@@ -561,6 +555,18 @@
       "evidence_path": null,
       "commit": null,
       "last_updated": "2026-09-04T05:00:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-041": {
+      "status": "TODO",
+      "gate": 5,
+      "title": "Commit a shard batch its passing jobs even when some jobs failed (stop losing partial progress to abort-on-first-failure)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": "Design confirmed safe per project/loop-prompt.md field note (2026-09-04): _commit_verified_outputs already scopes strictly to checksum-receipted paths, so committing a shard is passing jobs regardless of its failures is safe. Also fix: the commit-message template hardcodes a stray Codex/openai.com co-author trailer alongside this.",
+      "evidence_path": "project/loop-prompt.md#L (field notes)",
+      "commit": null,
+      "last_updated": "2026-09-04T05:40:00+00:00",
       "blocker_type": null
     }
   },
