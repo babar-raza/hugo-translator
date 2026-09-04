@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 8.1 (2026-09-04)`
+`loop_prompt_version: 8.2 (2026-09-04)`
 
 ## 0. On reload — before anything else
 
@@ -125,6 +125,12 @@ surface. Implement, test, execute the acceptance criterion, mark DONE, commit to
 6. Windows traps: write multi-line files with the Write tool, not big heredocs (commands over ~5 KB
    fail); `PYTHONUTF8=1` for non-ASCII in Python snippets; `newline="\n"` when Python writes tracked
    text; `git checkout -- <path>` refreshes mtime (a restored target then looks "up to date").
+7. Wake cadence is capped at 3 minutes, so an iteration never blocks on a long step. Launch a
+   campaign batch or a qualification cell as a background process (`run_in_background`, or the
+   shard-process form the Gate-5 runner already uses) with checkpoint/`--resume` enabled; record
+   its PID and run id in `taskcard_status.json`; on the next wake check it (receipts written,
+   process alive, log tail), review whatever has completed, commit approved batches, and yield
+   again. Never re-launch a batch that is still running; never kill one to "restart cleanly".
 
 ## 5. Commit and record
 
@@ -168,8 +174,9 @@ size by root-cause class; open first-principles records; commits landed (SHAs); 
 `loop_prompt_version_seen`; next action.
 
 Stop the loop (pass `stop:true`) only when Gate 11 is closed per plan §20, or when both TRUE
-external blockers in §1 have halted every remaining cell. Otherwise self-pace the next iteration
-from what the current step needs and yield.
+external blockers in §1 have halted every remaining cell. Otherwise schedule the next wake **at
+most 3 minutes out — never longer**, regardless of how long the current step is expected to take
+(operator rule, v8.2), and yield. A long step is resumed across wakes (§4 item 7), not waited for.
 
 ## L. Field notes (append-only, one dated line each; facts, not rules)
 
