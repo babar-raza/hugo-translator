@@ -270,6 +270,49 @@ def test_manifest_loads_and_validates_as_zero_defect(content_repo, tmp_path, mon
         )
 
 
+def test_build_manifest_primary_model_swaps_escalation(content_repo, tmp_path, monkeypatch):
+    """TC-APT-039: primary_model="professionalize_llm" flips the escalation target to
+    m2m100_418m, and the resulting manifest still validates as zero-defect."""
+    translator = tmp_path / "translator"
+    _write_config(translator, ["docs.test.org"])
+    _touch(translator / "config/model_registry.yaml", "models: {}\n")
+    monkeypatch.setattr(builder, "git_sha", lambda repo: "f" * 40)
+    monkeypatch.setattr(builder, "fingerprint_files", lambda *_a, **_k: "c" * 64)
+    monkeypatch.setattr(
+        builder, "tm_fingerprint_inputs", lambda _repo: ["data/tm/l2.lmdb/data.mdb"]
+    )
+    profile = _folder_profile(content_repo / "content/docs.test.org")
+    sources, _ = builder.discover_sources(content_repo, profile, KNOWN)
+    manifest = builder.build_manifest(
+        content_repo=content_repo,
+        translator_repo=translator,
+        campaign_id="unit-llm-primary",
+        sources=builder.apply_scope(sources, families=["cells"]),
+        target_locales=["ar", "de", "fr"],
+        sites=["docs.test.org"],
+        locales=["de"],
+        primary_model="professionalize_llm",
+    )
+    assert manifest["retry_policy"]["primary_model"] == "professionalize_llm"
+    assert manifest["retry_policy"]["llm_model"] == "m2m100_418m"
+    out = tmp_path / "manifest.yaml"
+    out.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+    loaded = CampaignManifest.load(out)  # runs validate_schema()
+    assert loaded.retry_policy["primary_model"] == "professionalize_llm"
+
+    with pytest.raises(builder.DiscoveryError):
+        builder.build_manifest(
+            content_repo=content_repo,
+            translator_repo=translator,
+            campaign_id="unit-bad-primary",
+            sources=sources,
+            target_locales=["ar", "de", "fr"],
+            sites=["docs.test.org"],
+            locales=["de"],
+            primary_model="not_a_real_model",
+        )
+
+
 def test_tm_fingerprint_inputs_require_l2_and_include_present_l3(tmp_path):
     with pytest.raises(builder.DiscoveryError):
         builder.tm_fingerprint_inputs(tmp_path)

@@ -419,6 +419,7 @@ def build_manifest(
     max_parallel_jobs: int = 1,
     dirty_scope: str = "campaign_paths",
     replace_existing: dict[str, dict[str, dict[str, str]]] | None = None,
+    primary_model: str = "m2m100_418m",
 ) -> dict[str, Any]:
     """Assemble a schema-1 zero-defect manifest (validated by ``CampaignManifest.load``).
 
@@ -428,7 +429,14 @@ def build_manifest(
 
     ``locales`` (optional) narrows every source's outputs to a subset of the portfolio set
     (e.g. a Gate-4 canary cell); the manifest's ``target_locales`` then equals that subset.
+
+    ``primary_model`` (TC-APT-039, plan revision 8 §6.1): the model tried first. Must be
+    ``"m2m100_418m"`` (default; escalates to professionalize_llm) or ``"professionalize_llm"``
+    (escalates to m2m100_418m) -- ``CampaignManifest.validate_schema`` enforces this pair.
     """
+    if primary_model not in ("m2m100_418m", "professionalize_llm"):
+        raise DiscoveryError(f"primary_model must be m2m100_418m or professionalize_llm, got {primary_model!r}")
+    escalation_model = "professionalize_llm" if primary_model == "m2m100_418m" else "m2m100_418m"
     locales_final = tuple(sorted(locales)) if locales else tuple(sorted(target_locales))
     portfolio = set(target_locales)
     unknown = set(locales_final) - portfolio
@@ -466,12 +474,13 @@ def build_manifest(
         "target_locales": list(locales_final),
         "expected_source_count": len(scoped),
         "expected_output_count": output_count,
-        # Strategy default until TC-APT-004b qualifies professionalize_llm as primary (plan 6.1).
+        # TC-APT-039 (plan revision 8, §6.1): primary/escalation direction is per-manifest,
+        # chosen by the caller from TC-APT-006's measured per-language comparison.
         "retry_policy": {
-            "primary_model": "m2m100_418m",
+            "primary_model": primary_model,
             "primary_attempts": 3,
             "llm_escalation_attempts": 2,
-            "llm_model": "professionalize_llm",
+            "llm_model": escalation_model,
         },
         # hugo-translator never commits into the content repo; the loop does (plan 19.2).
         "commit_policy": {
@@ -574,6 +583,12 @@ def main(argv: list[str] | None = None) -> int:
         help="refuse: existing targets are a hard stop (default); replace: declare governed replacement from the work ledger",
     )
     parser.add_argument("--ledger", type=Path, default=Path("data/campaigns/work_ledger.sqlite3"))
+    parser.add_argument(
+        "--primary-model",
+        choices=("m2m100_418m", "professionalize_llm"),
+        default="m2m100_418m",
+        help="TC-APT-039: model tried first; the other becomes the escalation target",
+    )
     args = parser.parse_args(argv)
 
     sites = tuple(args.sites) if args.sites else IN_SCOPE_SITES
@@ -644,6 +659,7 @@ def main(argv: list[str] | None = None) -> int:
             max_parallel_jobs=args.max_parallel_jobs,
             dirty_scope=args.dirty_scope,
             replace_existing=declared,
+            primary_model=args.primary_model,
         )
         atomic_write(
             path=args.manifest_output,

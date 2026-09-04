@@ -264,14 +264,25 @@ class CampaignManifest:
             errors.append("campaign validation_policy must be zero-defect")
         if len(set(self.target_locales)) != len(self.target_locales):
             errors.append("target_locales contains duplicates")
-        if self.retry_policy.get("primary_model") != "m2m100_418m":
-            errors.append("zero-defect campaign primary model must be m2m100_418m")
+        # TC-APT-039 (plan revision 8, §6.1): the primary/escalation pair may run in
+        # either direction -- m2m100 primary with professionalize_llm escalation (the
+        # original design), or professionalize_llm primary with m2m100 escalation (for
+        # the 22 languages TC-APT-006 measured the LLM better in). Both models must
+        # still be present, in opposite roles; a manifest naming the same model for
+        # both, or a model outside this pair, is never valid.
+        _primary = self.retry_policy.get("primary_model")
+        _escalation = self.retry_policy.get("llm_model")
+        _valid_pairs = {("m2m100_418m", "professionalize_llm"), ("professionalize_llm", "m2m100_418m")}
+        if (_primary, _escalation) not in _valid_pairs:
+            errors.append(
+                "zero-defect campaign primary/escalation models must be m2m100_418m and "
+                "professionalize_llm in either order (TC-APT-039), got "
+                f"primary_model={_primary!r} llm_model={_escalation!r}"
+            )
         if self.retry_policy.get("primary_attempts") != 3:
             errors.append("zero-defect campaign requires exactly 3 primary attempts")
         if self.retry_policy.get("llm_escalation_attempts") != 2:
             errors.append("zero-defect campaign requires exactly 2 LLM attempts")
-        if self.retry_policy.get("llm_model") != "professionalize_llm":
-            errors.append("zero-defect campaign LLM escalation must use professionalize_llm")
         if self.commit_policy.get("push") is not False:
             errors.append("zero-defect campaign commit policy must prohibit push")
         if not isinstance(self.commit_policy.get("enabled", True), bool):

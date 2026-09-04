@@ -73,6 +73,38 @@ def test_manifest_loads_and_enumerates_deterministic_jobs(tmp_path):
     assert [job[1] for job in jobs] == ["es", "fr"]
 
 
+def test_manifest_accepts_professionalize_llm_as_primary(tmp_path):
+    """TC-APT-039 (plan revision 8, §6.1): the primary/escalation pair may run in
+    either direction, chosen from TC-APT-006's per-language measurement."""
+    raw = _manifest(tmp_path)
+    raw["retry_policy"]["primary_model"] = "professionalize_llm"
+    raw["retry_policy"]["llm_model"] = "m2m100_418m"
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    manifest = CampaignManifest.load(path)
+    assert manifest.retry_policy["primary_model"] == "professionalize_llm"
+    assert manifest.retry_policy["llm_model"] == "m2m100_418m"
+
+
+@pytest.mark.parametrize(
+    "primary_model,llm_model",
+    [
+        ("m2m100_418m", "m2m100_418m"),
+        ("professionalize_llm", "professionalize_llm"),
+        ("m2m100_418m", "some_other_model"),
+        ("some_other_model", "professionalize_llm"),
+    ],
+)
+def test_manifest_rejects_invalid_primary_escalation_pairs(tmp_path, primary_model, llm_model):
+    raw = _manifest(tmp_path)
+    raw["retry_policy"]["primary_model"] = primary_model
+    raw["retry_policy"]["llm_model"] = llm_model
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(CampaignManifestError):
+        CampaignManifest.load(path)
+
+
 def test_manifest_rejects_path_traversal(tmp_path):
     payload = _manifest(tmp_path)
     payload["sources"][0]["outputs"]["es"] = "../outside.md"
