@@ -469,3 +469,9 @@ entries:
   status: pending
   first_seen_incident: TC-APT-014-gate5-words-foss-net
   evidence_count: 1
+- id: heading.annotations
+  en: Annotations
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-pdf-foss-typescript
+  evidence_count: 1
