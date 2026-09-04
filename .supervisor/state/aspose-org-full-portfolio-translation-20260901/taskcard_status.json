@@ -383,10 +383,10 @@
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "cells-spreadsheet-management-go stays quarantined under TC-APT-042. Gate 5 canary swapped to introducing-words-foss-net; manifest data/campaigns/gate5-words-foss-net/manifest.yaml, max_parallel_jobs=1, primary_model=professionalize_llm, single 25-locale run() call, commit_policy.enabled=false (governed commit is a separate explicit step per §19.2, not automatic). Background run alive (PID 49828/51744, log logs/gate5-words-foss-net_run.log); 5/25 accepted so far (ar,cs,de,el,es -- el and es each needed retries: el hit a same-as-source link_text unit, es hit both a 7-unit same-as-source failure and a frontmatter-title language check before eventually passing clean). 5 full-body review agents launched (one per accepted language) to check before the governed commit -- see agent IDs in this iteration's field note; do not re-launch the campaign or re-review these 5 languages while their agents are in flight.",
-      "evidence_path": "data/campaigns/gate5-words-foss-net/manifest.yaml",
+      "blocking_reason": "cells-spreadsheet-management-go stays quarantined under TC-APT-042. Gate 5 pivoted to introducing-words-foss-net -- ALL 5 independently-reviewed languages (ar,cs,de,el,es) REJECTED on full-body review, but this time the root cause is two CONFIRMED producer-side pipeline bugs, not model quality: (1) _link_text_matches_url_slug silently excluded 'Getting Started'/'Developer Guide'/'API Reference' link text from translation because its normalizer conflated spaces with hyphens against the URL's own slug -- FIXED this iteration (f737a3e). (2) _is_technical_identifier's single-word PascalCase heuristic also silently excludes ordinary headings/table-headers ('Charts', 'Format', 'Extension') that happen to match its shape -- root-caused, NOT yet fixed (needs context-aware disambiguation, not a rushed regex edit; see the first-principles record). Campaign left running (PID 49828/51744) rather than killed -- 6/25 accepted so far, all expected defective, none committed (commit_policy.enabled=false). Plan: fix bug 2, purge affected TM entries, do ONE clean stop+rerun once both fixes are complete rather than two separate restarts.",
+      "evidence_path": "data/summaries/fp-gate5-words-foss-net-20260904.json",
       "commit": null,
-      "last_updated": "2026-09-04T12:58:00+00:00",
+      "last_updated": "2026-09-04T13:05:00+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
@@ -575,6 +575,18 @@
       "blocking_reason": "",
       "evidence_path": "scripts/ops/mission_watchdog.ps1 (b829036); registered as Windows Scheduled Task HugoTranslatorMissionWatchdog",
       "last_updated": "2026-09-04T12:03:02.988720+00:00"
+    },
+    "TC-APT-049": {
+      "status": "TODO",
+      "gate": 5,
+      "title": "Context-gate _is_technical_identifier's single-segment PascalCase heuristic so it stops silently excluding ordinary single-word headings/table-headers from translation",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": "Found on introducing-words-foss-net (TC-APT-014, this iteration): the regex `^[A-Z][a-z0-9]{3,}(?:[A-Z][a-z0-9]*)*$` matches 'Charts'/'Format'/'Extension' identically to genuine single-word API identifiers ('Body', 'Cell', 'Camera') it was designed to protect (TC-APT-013's PbrMaterial fix) -- shape alone cannot disambiguate an ordinary English heading from a real API class name. 'Read'/'Write' happened to translate correctly anyway only because they have unrelated curated entries in the i18n governance table that override do_not_translate regardless of how it was set; words without that lucky table coverage ship in English verbatim. Design direction (not yet implemented): require the single-segment branch to also see corroborating context (e.g. the same token appears as a backtick code span elsewhere in the document, or is in the terminology/protected-terms dictionary) before protecting it, mirroring the i18n table's existing column_header context-gating for TABLE_CELL_TEXT. Needs its own regression tests covering both directions (false-positive ordinary headings AND true-positive API identifiers) given this exact code has already been revised multiple times for this tension.",
+      "evidence_path": "data/summaries/fp-gate5-words-foss-net-20260904.json",
+      "commit": null,
+      "last_updated": "2026-09-04T13:05:00+00:00",
+      "blocker_type": null
     }
   },
   "gate_closures": {
