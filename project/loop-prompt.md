@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 9.1 (2026-09-04)`
+`loop_prompt_version: 9.2 (2026-09-04)`
 
 ## 0. On reload — before anything else
 
@@ -28,7 +28,10 @@ memory of a previous iteration.
 
 ## 1. Hard limits that override everything else
 
-- **`ScheduleWakeup.delaySeconds` MUST be `<= 180` (3 minutes), every single call, no exceptions.**
+- **Request `ScheduleWakeup.delaySeconds <= 150`, never higher, so the tool's own clock-alignment
+  rounding (confirmed to add up to ~36s to a request — a 150s request fired at 186s) cannot push
+  the actual wake past the 180s (3-minute) hard ceiling. `<= 180` is the true hard ceiling; `150` is
+  what to request, every single call, no exceptions.**
   This is a mission-specific operator rule found in v8.2, restated here in v9.1 because a wake was
   observed scheduled ~1547s (~26 min) out — the ScheduleWakeup tool's OWN generic guidance ("idle
   tick, no specific signal: default 1200-1800s") does NOT apply to this mission and is explicitly
@@ -211,3 +214,4 @@ most 3 minutes out — never longer**, regardless of how long the current step i
 - 2026-09-04: a batch approval needs a full-body read, not just frontmatter + the one known-risky pattern — on `cells/go/cells-spreadsheet-management-go`, two later-document sentences (a 3-item parallel negation list; a nested conditional before a link) produced real, recurring defects in most of 12 independently-reviewed languages that a first-pass spot-check missed. See `heal-cells-go-parallel-list`.
 - 2026-09-04: `campaign_runner.py::_run_locked` only commits a shard if it had zero job failures, then raises and aborts the whole `run()` call — this, not policy, is why Gate 5's batches shrank `9→7→1→2→2` languages. `_commit_verified_outputs` was confirmed to already scope strictly to checksum-receipted paths, so committing a shard's passing jobs regardless of its failures is safe. Fix is TC-APT-041 (plan G-29/§0.2). Its commit-message template also hardcodes `Co-authored-by: Codex <noreply@openai.com>` — fix alongside.
 - 2026-09-04: a wake was observed scheduled ~1547s out despite the v8.2 3-minute cap — the ScheduleWakeup tool's own built-in "idle tick" guidance (1200-1800s) silently won over the mission rule. v9.1 restates the cap in §1 (hard limits, checked first) with an explicit override statement; state `delaySeconds` in the report every time as a self-check.
+- 2026-09-04: confirmed live by the executing session (hugo-translator-82) — a 150s ScheduleWakeup request fired at 186s due to the tool's own clock-alignment rounding, 6s over the 180s ceiling. v9.2 changes the instruction to request 150s (not 180s) so this rounding cannot push the actual wake past 180s.
