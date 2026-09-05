@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T09:15:00+00:00",
+  "updated_at": "2026-09-05T09:25:03+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -716,16 +716,17 @@
       "blocker_type": null
     },
     "TC-APT-047": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": null,
       "title": "Revive process-level shard parallelism (launch_parallel_campaign_shards.py) as fallback + GPU/API isolation (hu/ja/ro dedicated shard)",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": "tests/unit/workers/test_parallel_campaign_shard_launcher.py",
       "commit": null,
-      "last_updated": "2026-09-05T07:50:00+00:00",
-      "blocker_type": null
+      "last_updated": "2026-09-05T09:25:03+00:00",
+      "blocker_type": null,
+      "note": "Launcher wired for GPU/API isolation: CampaignManifest.shards() already partitions strictly per locale, so select_pending_shards() now admits at most ONE GPU-bound shard (hu/ja/ro, plan S6.1) per wave and fills the remaining worker slots with API-bound shards; --gpu-shard-memory-percent budgets VRAM for that shard only (TC-APT-065 hook); --drain repeats waves until no receipt-incomplete shard remains; duplicate_receipts() is the receipt-dedup acceptance probe. 6 permanent regression tests green; tests/unit/workers 550 passed 1 skipped. Verified live (read-only --dry-run against the running gate5-pdf-foss-cpp-r2 manifest): selection returned hu + el/es/fa, i.e. exactly one GPU shard, and correctly skipped already-receipted locales. REMAINING for DONE: the live N-process concurrent run proving no double-accept via duplicate_receipts() -- deferred until the in-flight r2 campaign finishes so two campaigns do not contend for the content repo."
     },
     "TC-APT-054": {
       "status": "DONE",
