@@ -22,6 +22,35 @@ global:
       preserve_mode: both
       severity: error
 
+    # TC-APT-069 / RB-006 (2026-09-05). Governed on published precedent: three
+    # tracked, genuinely localized pages keep this term in English
+    # (docs.aspose.org/ar, kb.aspose.org/nl, reference.aspose.org/de) against
+    # zero counter-examples across 3771 tracked localized files.
+    #
+    # It is registered HERE in addition to blog.aspose.org.yaml's
+    # preserve_patterns because the two mechanisms cover different paths and the
+    # profile pattern alone demonstrably does not hold. Measured on
+    # gate5-words-doc-r3, the first run to carry the mask: the BODY path
+    # preserved the term 3/3 locales, but frontmatter `seoTitle` translated it
+    # 0/3 -- because segment_translator._retry_original_frontmatter_value
+    # DELIBERATELY bypasses placeholder-wrapped frontmatter on retry (and always
+    # under the professionalize_llm escalation), to dodge a documented M2M100
+    # failure where the model copies a placeholder-bearing value unchanged. That
+    # docstring names the intended safety net: "let terminology/structure/
+    # language/fidelity gates validate its returned bytes." The terminology gate
+    # is enabled for this profile but read only this file, so it could not see a
+    # term that lived solely in preserve_patterns. This entry closes that loop.
+    #
+    # preserve_mode: both -- protect where protection survives, and validate the
+    # returned bytes where it does not. severity: error so a translated instance
+    # is a RETRY rather than a silent accept; that is a control being ADDED, and
+    # it will legitimately reject cells that currently translate the term.
+    - term: "Document Object Model"
+      category: standard_term
+      case_sensitive: true
+      preserve_mode: both
+      severity: error
+
     - term: "Java"
       category: platform
       case_sensitive: true

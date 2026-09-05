@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T17:31:49+00:00",
+  "updated_at": "2026-09-05T17:41:57+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -928,13 +928,13 @@
     "TC-APT-069": {
       "status": "IN_PROGRESS",
       "gate": null,
-      "title": "'Document Object Model' governed as portfolio terminology, decided on published precedent (3 tracked localized pages in ar/nl/de keep it in English; 0 counter-examples across 3771 tracked localized files). Added to blog profile preserve_patterns AND to the frontmatter gate's technical-signal inventory -- two separate mechanisms I had previously conflated. seoTitle signal_alpha 22->3; the >=6 floor untouched and no tolerance moved. PARTIAL (first real evidence, r3/fa): the mask reaches the BODY and frontmatter SUMMARY paths but NOT frontmatter title/seoTitle -- 2 of 4 occurrences preserved. Extending it to those two fields is the remaining work.",
+      "title": "'Document Object Model' governed as portfolio terminology, decided on published precedent (3 tracked localized pages in ar/nl/de keep it in English; 0 counter-examples across 3771 tracked localized files). Added to blog profile preserve_patterns AND to the frontmatter gate's technical-signal inventory -- two separate mechanisms I had previously conflated. seoTitle signal_alpha 22->3; the >=6 floor untouched and no tolerance moved. PARTIAL (first real evidence, r3/fa): the mask reaches the BODY and frontmatter SUMMARY paths but NOT frontmatter title/seoTitle -- 2 of 4 occurrences preserved. Extending it to those two fields is the remaining work. ROOT-CAUSED 2026-09-05: the mask holds on the BODY path (3/3 locales) and fails on frontmatter seoTitle (0/3) because _retry_original_frontmatter_value deliberately bypasses placeholder protection on retry and always under the LLM escalation. Fixed at the layer that docstring names: the term is now registered in config/terminology.yaml so the already-enabled terminology_preservation gate rejects a translated instance (severity error -> RETRY).",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": "data/summaries/decision-dom-terminology-20260905.json; data/summaries/review-words-doc-r3-fa-20260905.json",
+      "evidence_path": "data/summaries/decision-dom-terminology-20260905.json; data/summaries/review-words-doc-r3-fa-20260905.json; data/summaries/fp-governed-term-frontmatter-gap-20260905.json",
       "commit": "f87299f",
-      "last_updated": "2026-09-05T17:31:49+00:00",
+      "last_updated": "2026-09-05T17:41:57+00:00",
       "blocker_type": null,
       "provenance": "first written as TC-APT-059, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     },
