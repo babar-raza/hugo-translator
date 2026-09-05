@@ -1068,6 +1068,19 @@ class CampaignRunner:
                 "letter_count",
                 "latin_letter_ratio",
                 "target_script_ratio",
+                # StructureValidator's own numbers. Without these its failures
+                # fingerprinted as "generic:...:numeric=none", so a cell that
+                # exhausted five attempts told us nothing about WHAT mismatched --
+                # observed on words-document-net's de cell, where the validator had
+                # recorded the counts all along and the fingerprint discarded them.
+                # Appended rather than merged into a general sweep so every
+                # pre-existing fingerprint stays byte-identical.
+                "source_count",
+                "translation_count",
+                "source_level",
+                "translation_level",
+                "src_len",
+                "tgt_len",
             ):
                 value = details.get(key)
                 if isinstance(value, bool) or not isinstance(value, int | float):
@@ -1081,6 +1094,13 @@ class CampaignRunner:
             for key in ("detected_lang", "expected_lang"):
                 value = str(details.get(key, "")).lower()
                 if re.fullmatch(r"[a-z]{2,3}(?:-[a-z]{2})?", value):
+                    categorical_parts.append(f"{key}={value}")
+            # Structural tag names are schema, not candidate text, so they are safe to
+            # record and they say which element mismatched. Pattern-constrained so a
+            # detail value can never smuggle prose into the ledger.
+            for key in ("src_tag", "tgt_tag"):
+                value = str(details.get(key, "")).lower()
+                if re.fullmatch(r"[a-z][a-z0-9]{0,9}", value):
                     categorical_parts.append(f"{key}={value}")
             payload_value = None
             for key in ("ngram", "word", "sentence", "heading"):
