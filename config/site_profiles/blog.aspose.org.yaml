@@ -98,6 +98,14 @@ body:
   # cause -- a pattern matching inside an already-protected span creates a
   # nested placeholder that restore()'s single sequential pass can't unwind).
   - '\[([^\]]+)\]\(([^)]+)\)'
+  # TC-APT-040 title-template class: FOSS edition compound names must mask as
+  # ONE span, and must be listed BEFORE the generic brand pattern below
+  # (patterns are consumed in order). Protected separately, SOV/postpositional
+  # languages (hi/ja/ko/zh) interleave title text between the family name and
+  # FOSS ("Aspose.PDF C++ 的 FOSS") -- confirmed on introducing-pdf-foss-cpp
+  # titles/seoTitles in 4 languages. The AST path reads THIS list, not
+  # config/terminology.yaml.
+  - \bAspose(?:\.[A-Za-z0-9][A-Za-z0-9.]*)? FOSS\b
   # Protect Aspose brand/product names as one cohesive unit (Aspose.Cells,
   # Aspose.3D, bare "Aspose", etc.) -- the previous bare-word-only pattern
   # only protected "Aspose" itself, leaving ".Cells"/".3D" etc. adjacent
