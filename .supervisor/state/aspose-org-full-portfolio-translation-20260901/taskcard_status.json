@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T14:14:00+00:00",
+  "updated_at": "2026-09-05T14:19:09+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -793,6 +793,72 @@
       "evidence_path": null,
       "commit": null,
       "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-059": {
+      "status": "DONE",
+      "gate": null,
+      "title": "'Document Object Model' governed as portfolio terminology, decided on published precedent (3 tracked localized pages in ar/nl/de keep it in English; 0 counter-examples across 3771 tracked localized files). Added to blog profile preserve_patterns AND to the frontmatter gate's technical-signal inventory -- two separate mechanisms I had previously conflated. seoTitle signal_alpha 22->3; the >=6 floor untouched and no tolerance moved.",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/decision-dom-terminology-20260905.json",
+      "commit": "f87299f",
+      "last_updated": "2026-09-05T14:19:09+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-060": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Protected-span/head-noun displacement reaches FRONTMATTER string fields (title/seoTitle/summary) -- found by review in el/fr/fa/hi; in fr it names a different entity than the source. Fix A (TC-APT-036) is body-AST only, so this is outside its scope and needs its own producer fix. Corrects my earlier field note that this page's frontmatter 'never went through the buggy leaf path' -- true for the soft-wrap class only.",
+      "depends_on": [
+        "TC-APT-036"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/review-words-doc-20260905.json",
+      "commit": null,
+      "last_updated": "2026-09-05T14:19:09+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-061": {
+      "status": "TODO",
+      "gate": null,
+      "title": "A1 determiner-binding fix holds only for prepositional, verb-medial targets; in verb-final targets (fa, hi) the finite verb lands ahead of the link and strands the anchor. A new sub-class, not a regression -- the original source-determiner defect is gone in all 5 reviewed locales.",
+      "depends_on": [
+        "TC-APT-036"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/review-words-doc-20260905.json",
+      "commit": null,
+      "last_updated": "2026-09-05T14:19:09+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-062": {
+      "status": "TODO",
+      "gate": null,
+      "title": "A2 head-noun reordering still emits source order in el at a protected span, though the 'noun inside the product name' shape is gone. Control: a second link in the same file with no protected span IS natively ordered in el, isolating the defect to protection, not the language.",
+      "depends_on": [
+        "TC-APT-036"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/review-words-doc-20260905.json",
+      "commit": null,
+      "last_updated": "2026-09-05T14:19:09+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-063": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Character-level emission defects at protected-span boundaries: doubled delimiter U+002C+U+060C byte-identical at ar:503 and fa:503 (RB-005; a delimiter de-dup fix, no retranslation needed); U+00AD injected word-interior at fr:443, invisible at render so it survives eyeball review; U+2011 substituted for ASCII hyphen 22x fr / 7x el, 0 in source.",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/review-words-doc-20260905.json",
+      "commit": null,
+      "last_updated": "2026-09-05T14:19:09+00:00",
       "blocker_type": null
     }
   },

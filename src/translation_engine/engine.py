@@ -76,7 +76,7 @@ _TARGET_SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
     "zh": ((0x3400, 0x9FFF),),
 }
 
-# TC-APT-050 (2026-09-05): "Document Object Model" is a governed technical term
+# TC-APT-059 (2026-09-05): "Document Object Model" is a governed technical term
 # for this portfolio, decided on published precedent rather than convenience --
 # three tracked, genuinely localized pages keep it verbatim in English
 # (docs.aspose.org/ar, kb.aspose.org/nl, reference.aspose.org/de), against zero

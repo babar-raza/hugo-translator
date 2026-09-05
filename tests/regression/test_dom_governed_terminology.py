@@ -1,4 +1,4 @@
-"""TC-APT-050: "Document Object Model" is governed terminology for this portfolio.
+"""TC-APT-059: "Document Object Model" is governed terminology for this portfolio.
 
 All six FrontmatterLanguageCheck failures on words-document-net shared one
 signature -- field=seoTitle, detected_lang=ca, letter_count 55-56, across
