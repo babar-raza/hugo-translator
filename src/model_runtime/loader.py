@@ -7,6 +7,7 @@ Manages loading, caching, and lifecycle of translation models across different b
 import gc
 import logging
 import re
+import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -204,6 +205,14 @@ class HuggingFaceBackend(ModelBackend):
         # Truncation detection (TR-02)
         self.last_truncation_detected = False
         self.truncation_count = 0
+        # TC-APT-044: GPU generation on one shared model instance genuinely
+        # needs serialization, but the lock belongs on this backend instance,
+        # not engine-wide in campaign_runner (which also serialized pure-I/O
+        # LLM API calls). Scope: the whole translate body, not just
+        # .generate() — the shared tokenizer's src_lang/tgt_lang mutation and
+        # the last_*_tokens/truncation counters are part of the same
+        # non-thread-safe shared state.
+        self._generation_lock = threading.RLock()
 
     def load(self) -> None:
         """Load HuggingFace model and tokenizer."""
@@ -354,6 +363,21 @@ class HuggingFaceBackend(ModelBackend):
         return translations
 
     def translate_with_token_counts(
+        self,
+        texts: list[str],
+        src_lang: str,
+        tgt_lang: str,
+        max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None,
+    ) -> tuple[list[str], int, int]:
+        # TC-APT-044: serialize on this backend instance (tokenizer language
+        # state, CUDA generation, and last_* counters are shared per-instance).
+        with self._generation_lock:
+            return self._translate_with_token_counts_impl(
+                texts, src_lang, tgt_lang, max_new_tokens, generation_params
+            )
+
+    def _translate_with_token_counts_impl(
         self,
         texts: list[str],
         src_lang: str,
@@ -902,6 +926,9 @@ class CTranslate2Backend(ModelBackend):
         self.translator = None
         self.tokenizer = None
         self.max_memory_mb = max_memory_mb
+        # TC-APT-044: same per-instance serialization as HuggingFaceBackend —
+        # translate() mutates the shared tokenizer's src_lang before encoding.
+        self._generation_lock = threading.RLock()
 
     def load(self) -> None:
         """Load CTranslate2 model."""
@@ -1006,6 +1033,20 @@ class CTranslate2Backend(ModelBackend):
         return nllb_map.get(lang_code, f"{lang_code}_Latn")
 
     def translate(
+        self,
+        texts: list[str],
+        src_lang: str,
+        tgt_lang: str,
+        max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None,
+    ) -> list[str]:
+        # TC-APT-044: serialize on this backend instance (see HuggingFaceBackend).
+        with self._generation_lock:
+            return self._translate_impl(
+                texts, src_lang, tgt_lang, max_new_tokens, generation_params
+            )
+
+    def _translate_impl(
         self,
         texts: list[str],
         src_lang: str,

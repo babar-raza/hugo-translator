@@ -332,3 +332,86 @@ def test_concurrent_translate_file_no_cross_contamination(tmp_path):
         assert beta_out.startswith("---") and "Beta presentations guide" in beta_out, (
             f"rep {rep}: beta frontmatter lost or corrupted"
         )
+
+
+# ---------------------------------------------------------------------------
+# TC-APT-044: the generation lock lives on the backend instance, not
+# engine-wide in campaign_runner. GPU backends must still serialize their
+# translate path (shared tokenizer src_lang state + CUDA generation + last_*
+# counters); the LLM backend must have no such lock; campaign_runner's old
+# process-wide _model_execution_lock must stay deleted.
+# ---------------------------------------------------------------------------
+
+
+def _assert_translate_serializes(backend, impl_attr, call):
+    import time as _time
+
+    overlap = {"current": 0, "max": 0}
+    overlap_lock = threading.Lock()
+    barrier = threading.Barrier(2)
+
+    def probe(*args, **kwargs):
+        with overlap_lock:
+            overlap["current"] += 1
+            overlap["max"] = max(overlap["max"], overlap["current"])
+        _time.sleep(0.05)
+        with overlap_lock:
+            overlap["current"] -= 1
+        return (["x"], 1, 1)
+
+    setattr(backend, impl_attr, probe)
+
+    def worker():
+        barrier.wait(timeout=5.0)
+        call(backend)
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10.0)
+    assert overlap["max"] == 1, (
+        f"generation ran {overlap['max']}-way concurrent; backend lock is broken"
+    )
+
+
+def test_huggingface_backend_translate_serializes_on_instance():
+    from src.model_runtime.loader import HuggingFaceBackend
+
+    backend = HuggingFaceBackend(Mock(), "cpu")
+    _assert_translate_serializes(
+        backend,
+        "_translate_with_token_counts_impl",
+        lambda b: b.translate_with_token_counts(["x"], "en", "es"),
+    )
+
+
+def test_ctranslate2_backend_translate_serializes_on_instance():
+    from src.model_runtime.loader import CTranslate2Backend
+
+    backend = CTranslate2Backend(Mock(), "cpu")
+    _assert_translate_serializes(
+        backend, "_translate_impl", lambda b: b.translate(["x"], "en", "es")
+    )
+
+
+def test_llm_backend_has_no_generation_lock():
+    import inspect
+
+    import src.model_runtime.llm_backend as llm_module
+
+    assert "_generation_lock" not in inspect.getsource(llm_module), (
+        "LLMModelBackend is pure I/O and must not serialize (TC-APT-044)"
+    )
+
+
+def test_campaign_runner_engine_wide_lock_stays_deleted():
+    import inspect
+
+    import src.workers.campaign_runner as campaign_runner_module
+
+    source = inspect.getsource(campaign_runner_module)
+    assert "self._model_execution_lock" not in source, (
+        "the engine-wide translate_file lock must not come back (TC-APT-044); "
+        "GPU serialization lives on the backend instances"
+    )

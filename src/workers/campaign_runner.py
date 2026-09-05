@@ -351,20 +351,15 @@ class CampaignRunner:
         # source/output paths, while these two maps provide only narrowly
         # scoped retry routing for the currently running job.
         self._engine_campaign_state_lock = threading.RLock()
-        # ModelLoader caches one mutable backend instance per model.  It has a
-        # load lock, but its generation call is not thread-safe on CUDA.  A
-        # campaign must fail closed rather than risk a native CUDA abort or
-        # cross-job sampling state.  Lightweight/fake engines remain fully
-        # parallel for qualification tests; real model-bearing engines share
-        # this lock across all CampaignRunner instances in the process.
-        self._model_execution_lock = None
-        if getattr(self.engine, "model_loader", None) is not None:
-            self._model_execution_lock = getattr(
-                self.engine, "_campaign_model_execution_lock", None
-            )
-            if self._model_execution_lock is None:
-                self._model_execution_lock = threading.RLock()
-                self.engine._campaign_model_execution_lock = self._model_execution_lock
+        # TC-APT-044: the former engine-wide _model_execution_lock (which
+        # serialized EVERY translate_file call, GPU or API alike, and silently
+        # defeated LLM concurrency) is deleted. GPU generation is now
+        # serialized where the hazard actually lives: each
+        # HuggingFaceBackend/CTranslate2Backend instance carries its own
+        # _generation_lock, which also covers a circuit-breaker reroute to the
+        # m2m100 fallback (the returned instance is locked no matter how it
+        # was resolved). The shared-parser hazard the old lock also papered
+        # over was fixed at the source by TC-APT-043.
 
     def _validated_resume_receipts(self) -> dict[str, dict[str, Any]]:
         receipts = self.ledger.receipts()
@@ -1755,15 +1750,9 @@ class CampaignRunner:
                     "trigger_type": "campaign",
                     "retry_budget_override": retry_budget,
                 }
-                if self._model_execution_lock is None:
-                    result = self.engine.translate_file(
-                        source.site_id, source_path, **translate_kwargs
-                    )
-                else:
-                    with self._model_execution_lock:
-                        result = self.engine.translate_file(
-                            source.site_id, source_path, **translate_kwargs
-                        )
+                result = self.engine.translate_file(
+                    source.site_id, source_path, **translate_kwargs
+                )
                 receipt = result.acceptance_receipts.get(locale)
                 if receipt is None:
                     receipt = self.ledger.receipts().get(expected_output)
