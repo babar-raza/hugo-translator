@@ -114,6 +114,13 @@ def main(argv: list[str] | None = None) -> int:
         help="VRAM budget for this process (TC-APT-047 dedicated GPU shard); "
         "omit to use config/global.yaml's hardware.max_gpu_memory_percent",
     )
+    parser.add_argument(
+        "--no-force-serialize",
+        action="store_true",
+        help="TC-APT-046 step 2 canary only: turn off the force_serialize_all_backends "
+        "rollback for THIS process, without flipping the shipped config for every other "
+        "session sharing this working tree",
+    )
     args = parser.parse_args(argv)
 
     translator_repo = Path.cwd().resolve()
@@ -135,6 +142,14 @@ def main(argv: list[str] | None = None) -> int:
         translator_repo=translator_repo,
         ledger_root=args.ledger_root,
     )
+    if args.no_force_serialize:
+        # Process-scoped, so a canary never changes what any concurrently running
+        # session sees. The shipped default stays the safe one (TC-APT-046 step 1).
+        runner._force_serialize = False
+        print(
+            f"[{manifest.campaign_id}] force_serialize_all_backends OFF for this process; "
+            f"max_parallel_jobs={manifest.execution_policy.get('max_parallel_jobs', 1)}"
+        )
     shard_ids = set(args.shard_id) if args.shard_id else None
     try:
         result = runner.run(resume=args.resume, shard_ids=shard_ids)
