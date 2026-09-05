@@ -85,3 +85,36 @@ rules:
       d'utilisation restrictions" / "Nu exista utilizare restrictii"), the same
       producer bug that rejected the other 11.
       See data/summaries/fp-softwrap-sentence-splitting-20260905.json
+  - id: RB-006
+    name: governed-term-preservation-failure
+    verdict: REJECT
+    scope: any
+    statement: >-
+      A term the portfolio has GOVERNED as preserve-in-source-language --
+      one carried in the site profile's preserve_patterns or
+      config/terminology.yaml -- that comes back translated instead of
+      preserved is a producer-side protection failure, not a terminology
+      preference, and is a REJECT. The mask either did not reach that
+      extraction path or was applied after the value was already
+      translated; either way a pending producer fix will change the
+      output, so RB-005's reasoning applies and the cell must not ship.
+      Fix the producer (extend the protection to the field/path that
+      missed it) and retrigger -- never hand-edit the output. This rule
+      is the inverse of RB-001/RB-002, which cover a protected term
+      wrongly left in the source language; neither reaches this case.
+      CARVE-OUT: a term that is merely conventional or undecided for this
+      portfolio is NOT governed, and translating it is ordinary
+      terminology variation under RB-003. Only a term with an actual
+      recorded decision behind it qualifies.
+      DIAGNOSTIC VALUE: when the same governed term is preserved in some
+      positions of one file and translated in others, the split localises
+      the gap in the protection path -- record which fields/node kinds
+      fall on each side, because that is the fix's actual scope.
+    evidence: >-
+      words-document-net fa, 2026-09-05 (gate5-words-doc-r3, the first run
+      ever to carry the TC-APT-069 'Document Object Model' mask): of the
+      source's 4 occurrences, the body H2 and the frontmatter summary were
+      correctly preserved in English while frontmatter title and seoTitle
+      came back translated. The split shows the mask reaches the body and
+      summary paths but not title/seoTitle.
+      See data/summaries/review-words-doc-r3-fa-20260905.json
