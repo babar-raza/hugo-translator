@@ -10,6 +10,7 @@ Orchestrates the complete translation workflow:
 6. Write output files
 """
 
+import difflib as _difflib
 import hashlib
 import logging
 import hashlib
@@ -106,6 +107,40 @@ _FRONTMATTER_TECHNICAL_SIGNAL_RE = re.compile(
     r"[A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+"
     r")(?![A-Za-z0-9_.])"
 )
+
+# TC-APT-090 (2026-09-06). Calibrated on the shipped corpus, 19 locales and 68
+# samples per length: langdetect accuracy on the signal residue is 66.2% at 6
+# alphabetic characters, 88.2% at 20, 91.2% at 25-30, 98.5% at 40 and 100% at
+# 70. Its confidence does NOT fall when it is wrong -- 87-91% of wrong answers
+# exceed the 0.80 threshold and the median confidence when wrong is 1.000 -- so
+# no confidence cut can help and length is the only usable lever.
+#
+# Below this floor the residue is page scaffolding rather than prose: on
+# introducing-cells-foss-rust the ENGLISH SOURCE seoTitle strips to
+# "for - Open-Source Excel Crate for" and reads en 0.70 / ro 0.30, which is why
+# cs, id, it, hi and ru were all rejected on that one page as Romanian while
+# genuine Romanian passed. The verdict tracked the page, not the translation.
+MIN_FRONTMATTER_SIGNAL_ALPHA = 40
+
+# Below the floor the guard still has a job -- catching a field that was never
+# translated -- but it must do it without naming a language. An untranslated
+# field's residue IS the source residue, so compare them directly.
+#
+# The threshold is exact identity, chosen from the 5,753 shipped pairs this rule
+# actually judges (residue below the floor; median similarity 0.308, p95 0.741).
+# False rejections of correct cells by threshold: 0.90 -> 76 (1.32%),
+# 0.95 -> 43, 0.98 -> 25, and 1.00 -> 25. The curve flattens at 0.98 because 25
+# correct cells have a residue byte-identical to the source -- legitimate
+# borrowings such as a residue that is itself a kept English term. Since nothing
+# below 1.0 buys any accuracy, take the value whose premise is literally true:
+# reject only when the text is unchanged.
+#
+# A first attempt used 0.90 on a corpus-wide 0.6% figure. That was wrong: the
+# aggregate included the long residues this rule never sees, and on
+# introducing-cells-foss-rust it would have rejected the reviewed and shipped de
+# (0.939) and nl (0.912) cells -- 2 of 23 on the page where the guard actually
+# fires. Measure the population the rule judges, not the corpus.
+FRONTMATTER_UNTRANSLATED_SIMILARITY = 1.0
 
 
 def _frontmatter_script_metrics(text: str, target_lang: str) -> dict[str, int | float]:
@@ -1778,7 +1813,9 @@ class TranslationEngine:
             },
         )
         validation_result.issues.extend(
-            self._check_frontmatter_language(translated_content, target_lang)
+            self._check_frontmatter_language(
+                translated_content, target_lang, source_content=source_content
+            )
         )
         if (
             getattr(validation_result, "error_count", 0) > 0
@@ -2041,7 +2078,9 @@ class TranslationEngine:
         except Exception:
             return []
 
-    def _check_frontmatter_language(self, translated_content: str, target_lang: str) -> list:
+    def _check_frontmatter_language(
+        self, translated_content: str, target_lang: str, source_content: str = ""
+    ) -> list:
         """Detect mixed-language corruption in translatable frontmatter fields.
 
         Checks title, description, seoTitle, and summary fields to ensure they
@@ -2078,6 +2117,25 @@ class TranslationEngine:
             fm_data = _yaml.safe_load(fm_match.group(1).strip()) or {}
         except Exception:
             return issues
+
+        # TC-APT-090: the SOURCE frontmatter, parsed the same way, so a residue can be
+        # compared against the text it was translated from. Absent or unparseable
+        # source frontmatter simply disables that comparison; it never fabricates a
+        # verdict.
+        source_fields: dict[str, str] = {}
+        if source_content:
+            source_match = _re.match(r"^---\s*\n(.*?)\n?---\s*\n", source_content, _re.DOTALL)
+            if source_match:
+                try:
+                    source_loaded = _yaml.safe_load(source_match.group(1).strip()) or {}
+                except Exception:
+                    source_loaded = {}
+                if isinstance(source_loaded, dict):
+                    source_fields = {
+                        key: value
+                        for key, value in source_loaded.items()
+                        if isinstance(value, str)
+                    }
 
         try:
             import langdetect as _ld
@@ -2151,6 +2209,41 @@ class TranslationEngine:
                 # the first place (see the `else` branch below, TC-APT-040).
                 signal_text = _frontmatter_language_signal_text(v_stripped)
                 signal_alpha_count = sum(character.isalpha() for character in signal_text)
+                # TC-APT-090 (2026-09-06): below the floor, langdetect carries no
+                # information, so an untranslated field is identified by comparing the
+                # residue with the SOURCE residue instead of by naming its language.
+                # TC-APT-090: a short residue cannot support a language verdict, but it
+                # CAN be compared with the source. When the source is available, judge by
+                # comparison; when it is not, fall through to the legacy language check
+                # rather than silently dropping the guard. Two callers in
+                # file_pipeline.py still pass no source, and the full suite caught that
+                # the first version of this change disarmed them.
+                source_value = source_fields.get(field)
+                if signal_alpha_count < MIN_FRONTMATTER_SIGNAL_ALPHA and source_value:
+                    source_signal = _frontmatter_language_signal_text(source_value.strip())
+                    similarity = _difflib.SequenceMatcher(
+                        None, source_signal.strip(), signal_text.strip()
+                    ).ratio()
+                    if similarity >= FRONTMATTER_UNTRANSLATED_SIMILARITY:
+                        issues.append(
+                            _ValIssue(
+                                severity=_ValSeverity.ERROR,
+                                validator="FrontmatterLanguageCheck",
+                                message=(
+                                    f"Frontmatter field '{field}' is unchanged from the "
+                                    f"source (residue similarity {similarity:.2f}), so it "
+                                    f"was not translated into '{target_lang}'."
+                                ),
+                                location=f"frontmatter.{field}",
+                                details={
+                                    "field": field,
+                                    "residue_similarity": round(similarity, 4),
+                                    "signal_alpha": signal_alpha_count,
+                                    "reason": "untranslated_frontmatter_field",
+                                },
+                            )
+                        )
+                    continue
                 if signal_alpha_count >= 6:
                     signal_langs = _ld.detect_langs(signal_text)
                     if signal_langs:
