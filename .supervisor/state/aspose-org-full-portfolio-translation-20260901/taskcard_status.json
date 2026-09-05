@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T20:07:35+00:00",
+  "updated_at": "2026-09-05T20:21:54+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1128,6 +1128,30 @@
       "evidence_path": "data/summaries/tc-apt-081-fp-sweep-pilot-classes.json",
       "commit": null,
       "last_updated": "2026-09-05T19:26:42+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-084": {
+      "status": "TODO",
+      "gate": null,
+      "owner": "loop",
+      "title": "Stray unmatched ']' emitted after a list-item link, rendering as a visible literal bracket. Measured on introducing-cells-foss-go: bracket balance 25/26 against source 25/25 in de, el, id, he; the other 8 locales balanced. Invisible to link-count checks because a stray ']' forms no link. Inferred mechanism (unverified): the tail-only link preserve_pattern hands the model an unbalanced '[', it closes the bracket after the placeholder, and restore expands to '](url)]'. Bracket-balance-vs-source is now in the mechanical pre-check.",
+      "depends_on": [],
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/review-cells-go-batchA-20260906.json",
+      "commit": null,
+      "last_updated": "2026-09-05T20:21:54+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-085": {
+      "status": "TODO",
+      "gate": null,
+      "owner": "loop",
+      "title": "Governed brand-navigation labels are unprotected on the LIST_ITEM extraction path. The same label inside a paragraph link survives 17/18 locales; alone in a list item, 8/18. The brand-nav-label check runs on the paragraph LINK path (text_unit_extractor.py:1759) but not on the full-sentence/LIST_ITEM path. 'API Reference' survives there only via its own terminology.yaml entry. Fix: apply the check on the LIST_ITEM path, or register the label shape in terminology.yaml so it routes through the derived governed-terms machinery.",
+      "depends_on": [],
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/review-cells-go-batchA-20260906.json",
+      "commit": null,
+      "last_updated": "2026-09-05T20:21:54+00:00",
       "blocker_type": null
     }
   },
