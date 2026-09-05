@@ -13,6 +13,27 @@ from .base import VerificationCheck, VerificationIssue
 
 logger = logging.getLogger(__name__)
 
+# TC-APT-040: near-identical language pairs langdetect confuses on short
+# technical text. Keep in sync with engine.py's _SIMILAR_LANG_MAP (the
+# engine-side FrontmatterLanguageCheck) — this is the write-time verification
+# layer's copy of the same acceptance.
+_SIMILAR_LANGUAGE_ACCEPTS: dict[str, frozenset[str]] = {
+    "sr": frozenset({"hr", "bs"}),
+    "hr": frozenset({"sr", "bs"}),
+    "bs": frozenset({"sr", "hr"}),
+    "pt": frozenset({"es", "gl"}),
+    "es": frozenset({"pt", "gl"}),
+    "ms": frozenset({"id"}),
+    "id": frozenset({"ms"}),
+    "uk": frozenset({"ru", "bg"}),
+    "bg": frozenset({"ru", "uk"}),
+    "sk": frozenset({"cs"}),
+    "cs": frozenset({"sk"}),
+    "no": frozenset({"da", "nb"}),
+    "nb": frozenset({"no", "da"}),
+    "da": frozenset({"no", "nb"}),
+}
+
 # Lazy import for langdetect to handle missing dependency gracefully
 _langdetect = None
 
@@ -484,7 +505,17 @@ class LanguageDetectionCheck(VerificationCheck):
         detected_base = detected.lower().split("-")[0]
         expected_base = expected.lower().split("-")[0]
 
-        return detected_base == expected_base
+        if detected_base == expected_base:
+            return True
+
+        # TC-APT-040 (4th manifestation, sibling-language false positives):
+        # langdetect cannot reliably separate near-identical language pairs on
+        # short technical fields — a correct Portuguese seoTitle read as
+        # Spanish at 100% confidence. Mirror the engine-side
+        # FrontmatterLanguageCheck's _SIMILAR_LANG_MAP; body-level purity
+        # checks still guard genuinely wrong-language content.
+        similar = _SIMILAR_LANGUAGE_ACCEPTS.get(expected_base, frozenset())
+        return detected_base in similar
 
     def is_enabled(self, context: dict[str, Any] | None = None) -> bool:
         """Check if language detection is enabled."""

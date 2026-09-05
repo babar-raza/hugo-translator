@@ -2086,6 +2086,13 @@ class TranslationEngine:
             "sr": {"hr", "bs"},  # South Slavic Latin-script
             "hr": {"sr", "bs"},
             "bs": {"sr", "hr"},
+            # TC-APT-040 (3rd manifestation): langdetect called a correct
+            # Portuguese seoTitle ("Biblioteca PDF de código aberto,
+            # licenciada sob MIT") Spanish at 100% on 61 letters — es/pt are
+            # too close for short technical fields. Body-level purity checks
+            # still guard against a genuinely wrong-language body.
+            "pt": {"es", "gl"},
+            "es": {"pt", "gl"},
             "ms": {"id"},  # Malay ↔ Indonesian
             "id": {"ms"},
             "uk": {"ru", "bg"},  # East Slavic Cyrillic
