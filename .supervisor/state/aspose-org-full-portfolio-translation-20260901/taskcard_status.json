@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T16:29:39+00:00",
+  "updated_at": "2026-09-05T16:37:28+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -991,8 +991,8 @@
       "owner": "loop",
       "blocking_reason": "Two of three character-level defects fixed and unit-tested on the mission branch (uncommitted at read time): (a) normalize_injected_invisibles() in segment_translator.py strips model-injected U+00AD SOFT HYPHEN and U+2011 NON-BREAKING HYPHEN before placeholder restore, conditional on the source not using them; (b) ast_renderer.py _preserve_punctuation() leading-punctuation branch gained a _starts_with_equivalent() check mirroring the existing trailing-side _ends_with_equivalent(), fixing RB-005: reproduced directly on current code that a leading ASCII comma + a translation naturally starting with U+060C produced the exact U+002C+U+060C doubled sequence found at ar:503/fa:503 on words-document-net. NOT yet DONE: neither fix has been reverified against the actual words-document-net output per the runbook RECURRENCE ESCALATION step 2 (retranslate the same source_path/target_lang the original ticket named and confirm the specific defect is gone) -- that still requires a live campaign/debug-harness run, not attempted this iteration. Code fix is real and unit-tested; production reverification is the remaining gate to DONE.",
       "evidence_path": "data/summaries/review-words-doc-20260905.json; tests/regression/test_native_terminal_punctuation_not_doubled.py::TestLeadingNativeTerminalsAreNotDoubled; tests/regression/test_injected_invisible_characters.py; data/summaries/fp-words-doc-page-not-shippable-20260905.json",
-      "commit": "f87e94a",
-      "last_updated": "2026-09-05T16:14:19+00:00",
+      "commit": "f87e94a, 0387e55",
+      "last_updated": "2026-09-05T16:37:28+00:00",
       "blocker_type": null,
       "provenance": "first written as TC-APT-063, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     },
@@ -1008,6 +1008,18 @@
       "last_updated": "2026-09-05T15:55:40+00:00",
       "blocker_type": null,
       "provenance": "Found incidentally while step 2.3 of project/loop-prompt.md (run mission_supervisor before selecting Track-B work) failed twice in a row; root-caused and fixed per plan SS10.1 (2nd failure -> first-principles record) before a 3rd attempt."
+    },
+    "TC-APT-075": {
+      "status": "TODO",
+      "gate": null,
+      "owner": "loop",
+      "title": "Structural: a page whose candidates were review-rejected can never be regenerated in the live tree. A fresh campaign id refuses because pre-existing untracked outputs are unreceipted (campaign_manifest.py:432, allow_existing_accepted comes only from the campaign's OWN ledger), and resuming the original id re-gates the existing bytes rather than re-translating (campaign_runner.py:405 on config_fingerprint advance). The only tree-cleaning move is deleting content, which is barred. Hit on 2 pages now (introducing-cells-foss-go 17 files, words-document-net 11), so it is structural, not incidental. Needs an operator-reviewed mechanism -- candidate: subtract declared replace_existing paths in the campaign_scoped branch as the sibling branch at campaign_manifest.py:393 already does, IF that asymmetry is an oversight.",
+      "depends_on": [],
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/fp-words-doc-r2-retrigger-blocked-20260905.json",
+      "commit": null,
+      "last_updated": "2026-09-05T16:37:28+00:00",
+      "blocker_type": null
     }
   },
   "gate_closures": {
@@ -1031,13 +1043,15 @@
   "loop_prompt_version_seen": "10.4 (2026-09-05)",
   "active_detached_runs": [
     {
-      "campaign_id": "gate5-words-doc-r2",
-      "launcher_pid": 24968,
-      "log": "logs\\gate5-words-doc-r2_launcher.log",
-      "launched_at": "2026-09-05T16:29:39+00:00",
+      "campaign_id": "gate5-words-doc-verify",
+      "launcher_pid": 63088,
+      "log": "logs/gate5-words-doc-verify_launcher.log",
+      "launched_at": "2026-09-05T16:37:28+00:00",
       "session": "9885eb20-6cef-4466-aade-b439a640006e",
       "taskcard": "TC-APT-073",
-      "purpose": "RECURRENCE step 2/3 reverification retrigger"
+      "purpose": "RECURRENCE step 2 reverification in an isolated scratch content repo",
+      "acceptance": "0 U+2011 and 0 U+00AD in all 10 regenerated locales (215 and 1 before); zh excluded as the untouched control",
+      "next_wake_action": "read data/campaigns/gate5-words-doc-verify/ receipts + measure the regenerated files in the scratch repo"
     }
   ]
 }
