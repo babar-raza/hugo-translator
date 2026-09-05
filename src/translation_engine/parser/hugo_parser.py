@@ -29,15 +29,26 @@ from .ast_nodes import (
     text_node,
 )
 
-# Module-level ruamel.yaml instance for comment/quote preservation
-_yaml_parser = YAML()
-
 # Pattern to detect and split Hugo shortcodes from surrounding text.
 # Matches {{< ... >}} (regular) and {{% ... %}} (markdown) shortcode forms.
 _SHORTCODE_RE = re.compile(r'({{[<%].*?[>%]}})', re.DOTALL)
-_yaml_parser.preserve_quotes = True
-_yaml_parser.width = 4096  # Prevent line wrapping
-_yaml_parser.allow_duplicate_keys = True  # Hugo files may have duplicate keys across sections
+
+
+def _build_yaml_parser() -> YAML:
+    """One ruamel.yaml instance per HugoParser (TC-APT-043).
+
+    ruamel's YAML object rewires its shared reader/scanner to each stream it
+    loads; a second thread wiring the same object mid-parse corrupts or blanks
+    the first thread's frontmatter. A module-level singleton here was the root
+    cause of the historical intermittent empty-frontmatter crash under
+    concurrency=2 (reproduced by tests/regression/
+    test_concurrent_translate_file_thread_safety.py on the pre-fix code).
+    """
+    yaml_parser = YAML()
+    yaml_parser.preserve_quotes = True
+    yaml_parser.width = 4096  # Prevent line wrapping
+    yaml_parser.allow_duplicate_keys = True  # Hugo files may have duplicate keys across sections
+    return yaml_parser
 
 
 def normalize_table_cells(text: str) -> str:
@@ -140,6 +151,7 @@ class HugoParser:
             self.md.enable("table")
 
         self._node_counter = 0
+        self._yaml_parser = _build_yaml_parser()
 
     def _generate_node_id(self) -> str:
         """Generate unique node ID."""
@@ -227,7 +239,7 @@ class HugoParser:
     def _parse_yaml_content(self, yaml_content: str) -> CommentedMap | dict[str, Any] | None:
         """Parse a YAML frontmatter payload using ruamel.yaml."""
         try:
-            result = _yaml_parser.load(StringIO(yaml_content))
+            result = self._yaml_parser.load(StringIO(yaml_content))
             return result if result is not None else CommentedMap()
         except Exception:
             return None

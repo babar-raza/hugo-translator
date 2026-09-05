@@ -15,6 +15,7 @@ import logging
 import hashlib
 import os
 import re
+import threading
 import time
 import unicodedata
 from pathlib import Path
@@ -206,6 +207,44 @@ class TranslationEngine:
     Integrates parser, extractor, TM, model loader, and reconstructor
     into a cohesive translation workflow.
     """
+
+    _parser_tls_lock = threading.Lock()
+
+    @property
+    def parser(self):
+        """One HugoParser per thread (TC-APT-043).
+
+        HugoParser carries per-parse mutable state (its ruamel.yaml instance,
+        ``_node_counter``, the MarkdownIt object), so a single shared instance
+        corrupts concurrent ``translate_file()`` calls. Call sites keep using
+        ``self.parser.parse_string(...)`` unchanged; each thread lazily gets
+        its own instance. An explicit assignment (engine_builder, tests) pins
+        that object for the assigning thread and its type as the factory for
+        other threads.
+        """
+        tls = self.__dict__.get("_parser_tls")
+        if tls is None:
+            with TranslationEngine._parser_tls_lock:
+                tls = self.__dict__.setdefault("_parser_tls", threading.local())
+        parser = getattr(tls, "parser", None)
+        if parser is None:
+            factory = self.__dict__.get("_parser_factory")
+            if factory is None:
+                from .parser import HugoParser as _HugoParser
+
+                factory = _HugoParser
+            parser = factory()
+            tls.parser = parser
+        return parser
+
+    @parser.setter
+    def parser(self, value):
+        tls = self.__dict__.get("_parser_tls")
+        if tls is None:
+            with TranslationEngine._parser_tls_lock:
+                tls = self.__dict__.setdefault("_parser_tls", threading.local())
+        tls.parser = value
+        self.__dict__["_parser_factory"] = type(value)
 
     def __init__(
         self,
