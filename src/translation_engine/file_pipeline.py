@@ -249,8 +249,12 @@ class FileTranslationPipeline:
                         result.validation_result = validation_result
 
                         # Check frontmatter language
+                        # TC-APT-090: pass the SOURCE so a short frontmatter residue can be
+                        # judged by comparison instead of by a language verdict it cannot
+                        # support. Without this the guard falls back to language detection
+                        # and reproduces the false positives (cs read as sl, it as ca).
                         _fm_issues = engine._check_frontmatter_language(
-                            translated_content, target_lang
+                            translated_content, target_lang, source_content=content
                         )
                         validation_result.issues.extend(_fm_issues)
 
@@ -372,8 +376,10 @@ class FileTranslationPipeline:
                                             )
                                         )
                                         result.validation_result = validation_result
+                                        # TC-APT-090: see the note on the first call site.
                                         _fm_issues = engine._check_frontmatter_language(
-                                            translated_content, target_lang
+                                            translated_content, target_lang,
+                                            source_content=content,
                                         )
                                         validation_result.issues.extend(_fm_issues)
                                         decision_result = engine.decision_engine.make_decision(
