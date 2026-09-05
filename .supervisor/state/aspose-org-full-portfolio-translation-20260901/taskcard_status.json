@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T13:19:23+00:00",
+  "updated_at": "2026-09-05T14:14:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -378,7 +378,7 @@
     "TC-APT-014": {
       "status": "IN_PROGRESS",
       "gate": 5,
-      "title": "Gate 5: pdf-foss-typescript CLOSED (3), note/python CLOSED (18/25) -- now running pdf/cpp/introducing-pdf-foss-cpp (25 langs)",
+      "title": "Gate 5: pdf-foss-typescript CLOSED (3), note/python CLOSED (18/25), pdf-foss-cpp 22/25 committed",
       "depends_on": [
         "TC-APT-013"
       ],
@@ -393,7 +393,7 @@
         "d999858843",
         "afb5dfdb00"
       ],
-      "last_updated": "2026-09-05T10:15:00+00:00",
+      "last_updated": "2026-09-05T14:14:00+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
@@ -559,12 +559,12 @@
       "title": "Fix short-field language-detection FP, Devanagari punctuation-duplication bug, CJK fidelity-judge inspection",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": "auto:FrontmatterLanguageCheck short-signal FP fixed (434eda1): when <6 alphabetic chars of prose survive stripping governed technical tokens (e.g. 'Aspose.Note FOSS for Python' -> 'for', 3 chars), the field is now skipped instead of falling through to raw-text detection on the full unstripped field (which always read as English regardless of actual translation). Verified: bare _index.md-shaped titles no longer flagged across fr/es/de/ja; 'Introducing Aspose.X FOSS for Y' titles (already-shipped shape, 3 commits) remain correctly checked and still catch genuinely untranslated English (regression tests: TestShortSignalFrontmatterExemption, test_lang_detection_write_guard.py). Targeted 114-test subset green; full-suite background verification could not complete within the mission's <=150s wake cadence (see fp-tc-apt-040-fullsuite-verification-20260904.json) -- relied on targeted subset + prior documented confirmation the suite's only other failure (test_content_type_router_frontmatter_wiring.py) is pre-existing/unrelated. Devanagari punctuation-duplication and CJK fidelity-judge inspection (this taskcard's other two original scope items) NOT yet addressed -- only the FrontmatterLanguageCheck short-signal FP (the RECURRENCE ESCALATION-mandated item, 25 open heal tickets) was in scope for v10.0's mandatory fix. Next: re-run note/python live per v10.0's 'attempted and tested' bar before opening a new Track-A page.",
+      "blocking_reason": null,
       "evidence_path": "data/summaries/fp-tc-apt-040-fullsuite-verification-20260904.json, tests/unit/translation_engine/test_lang_detection_write_guard.py::TestShortSignalFrontmatterExemption",
       "commit": "434eda1",
-      "last_updated": "2026-09-05T12:25:00+00:00",
+      "last_updated": "2026-09-05T14:14:00+00:00",
       "blocker_type": null,
-      "note": "Devanagari/CJK punctuation half CLOSED per v10.1: fix 5ba80d5 (FIX-C native-terminal equivalence), TM purged (462 entries), REVERIFIED on the exact original failing cell (fresh hi debug-harness run: 0 danda+period vs 11; gates green). Step 3 retrigger of hi/ja/zh pending the title-scrambling fix so the rerun can fully pass review. Title-template class: compound FOSS-name protection landed (eb89349), proven at TerminologyManager level; end-to-end BLOCKED on an open question -- two byte-identical scrambled seoTitles across a TM purge imply the frontmatter title path bypasses TerminologyManager OR the TC-TM-02 sibling l2_lmdb store serves reads. Trace next."
+      "note": "All manifested halves closed with live reverification: short-signal floor (434eda1), Devanagari/CJK punctuation doubling (5ba80d5, hi/ja/zh re-reviewed APPROVE + committed 7b260a3ccc), compound-name protection (806d207), es/pt sibling acceptance in both language-check layers (4e7e535-adjacent commit this session). Peer landed the prose-based frontmatter judgment (64eb5f2). introducing-pdf-foss-cpp: 22/25 committed; he MODEL_LIMITATION_DEFERRED, fa model_dropped_code_span, uk frontmatter_segment_not_applied open."
     },
     "TC-APT-042": {
       "status": "IN_PROGRESS",
