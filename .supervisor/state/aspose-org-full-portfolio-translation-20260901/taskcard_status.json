@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T10:24:43+00:00",
+  "updated_at": "2026-09-05T10:26:20+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -727,9 +727,9 @@
       "blocking_reason": null,
       "evidence_path": "tests/unit/workers/test_parallel_campaign_shard_launcher.py, tests/unit/workers/test_gate5_runner_vram_budget.py",
       "commit": "7be8f6e",
-      "last_updated": "2026-09-05T10:24:43+00:00",
+      "last_updated": "2026-09-05T10:26:20+00:00",
       "blocker_type": null,
-      "note": "LIVE PROOF RUNNING as of 2026-09-05T10:19Z: campaign gate5-cells-go-shard, launcher PID 18748, 3 concurrent OS-process children over 24 locales of cells/go/introducing-cells-foss-go (el excluded, already on disk -> Tier-1b missing set). First receipt at 10:21:36 confirms the children cleared verify(). Acceptance still to evaluate: duplicate_receipts() == {} and verify_concurrency_canary.py clean vs the recorded serial baseline. DESIGN FIX BEFORE LAUNCH (7be8f6e): the earlier one-shard-per-child/wave design would have been SLOWER than sequential, because each child pays 2.5-4 min of model+TM import; assign_shard_groups() deals every shard out once so startup is paid max_workers times, and all GPU-bound shards share one group so they cannot overlap by construction. PRIORITY: per data/summaries/fp-gate5-inprocess-concurrency-inert-20260905.json this is the ONLY throughput lever that engages at Gate 5/6, not the optional complement plan SS11 describes."
+      "note": "LIVE PROOF RUNNING as of 2026-09-05T10:19Z: campaign gate5-cells-go-shard, launcher PID 18748, 3 concurrent OS-process children over 24 locales of cells/go/introducing-cells-foss-go (el excluded, already on disk -> Tier-1b missing set). First receipt at 10:21:36 confirms the children cleared verify(). Acceptance still to evaluate: duplicate_receipts() == {} and verify_concurrency_canary.py clean vs the recorded serial baseline. DESIGN FIX BEFORE LAUNCH (7be8f6e): the earlier one-shard-per-child/wave design would have been SLOWER than sequential, because each child pays 2.5-4 min of model+TM import; assign_shard_groups() deals every shard out once so startup is paid max_workers times, and all GPU-bound shards share one group so they cannot overlap by construction. PRIORITY: per data/summaries/fp-gate5-inprocess-concurrency-inert-20260905.json this is the ONLY throughput lever that engages at Gate 5/6, not the optional complement plan SS11 describes. | CONCURRENCY PROVEN LIVE 10:24Z: all three children observed working disjoint locale groups inside the same ~2-min window -- group0 on de, group1 accepted ar (10:21:36), group2 on cs. Groups are disjoint by construction and the observed langs map 1:1 to their assigned child, so this is real OS-process concurrency, not one child racing ahead. duplicate_receipts() == {} and verify_concurrency_canary.py reports 0 violations so far (1 cell). Still open for DONE: both checks at run completion, plus the aggregate-throughput comparison against the sequential canary."
     },
     "TC-APT-054": {
       "status": "DONE",
