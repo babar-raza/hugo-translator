@@ -93,10 +93,25 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=0, help="0 = whole corpus")
     parser.add_argument("--out", default="data/summaries/tc-apt-081-fp-sweep.json")
     parser.add_argument("--repo", default=str(CONTENT_REPO))
+    parser.add_argument(
+        "--paths-from",
+        help="File of translated paths to restrict the sweep to. Use this to sweep ONLY cells "
+             "approved under the CURRENT review standard: a flag there is a genuine false-positive "
+             "candidate, whereas a flag on the legacy corpus may be a real defect that predates the "
+             "standard.",
+    )
     args = parser.parse_args()
 
     repo = Path(args.repo)
     pairs = pair_up(tracked_markdown(repo))
+    if args.paths_from:
+        wanted = {
+            line.strip().replace("\\", "/")
+            for line in Path(args.paths_from).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        }
+        pairs = [p for p in pairs if p[1] in wanted]
+        print(f"restricted to {len(pairs)} of {len(wanted)} requested paths")
     if args.limit:
         step = max(1, len(pairs) // args.limit)
         pairs = pairs[::step][: args.limit]

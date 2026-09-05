@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T19:20:30+00:00",
+  "updated_at": "2026-09-05T19:26:42+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1091,15 +1091,15 @@
       "plan_ref": "SS0.9 revision 16"
     },
     "TC-APT-081": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "gate": 6,
-      "title": "Proactive validator-FP calibration sweep: full ValidationSuite+gates over shipped-approved corpus (every flag = FP class) + stratified 200-cell battery; fix classes in one batch with fixtures PILOT 2026-09-06: sweep script built and run over 150 shipped cells -- 90.7% carry at least one flag, 146 classes. BUT the 'any flag on a shipped cell is a false positive' premise does not hold for this corpus: 94% of flags are folder-layout, the pairs were verified to be genuine translations (fences/headings align), and the list-item divergences (en 25 vs fa 7, en 32 vs id 2) are real missing content. The sweep is two inventories -- legacy defects AND false positives -- and must be separated per class. Restrict FP claims to cells shipped under the current review standard.",
+      "title": "Proactive validator-FP calibration sweep: full ValidationSuite+gates over shipped-approved corpus (every flag = FP class) + stratified 200-cell battery; fix classes in one batch with fixtures PILOT 2026-09-06: sweep script built and run over 150 shipped cells -- 90.7% carry at least one flag, 146 classes. BUT the 'any flag on a shipped cell is a false positive' premise does not hold for this corpus: 94% of flags are folder-layout, the pairs were verified to be genuine translations (fences/headings align), and the list-item divergences (en 25 vs fa 7, en 32 vs id 2) are real missing content. The sweep is two inventories -- legacy defects AND false positives -- and must be separated per class. Restrict FP claims to cells shipped under the current review standard. RESULT 2026-09-06: 0 flags across all 62 cells shipped under the CURRENT review standard (isolated via the mission's own commit convention, not a date range). No FP epidemic exists at this layer; the 90.7% rate is entirely legacy corpus, and those are real historical defects. The 'doubling amplifies undiscovered FP classes' risk is therefore measured at zero for the current standard.",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": "Run before or alongside the first TC-APT-080 wave doubling.",
-      "evidence_path": "data/summaries/tc-apt-081-fp-sweep-pilot-20260906.json",
+      "evidence_path": "data/summaries/tc-apt-081-current-standard-result-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T19:20:30+00:00",
+      "last_updated": "2026-09-05T19:26:42+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.9 revision 16"
     },
@@ -1115,6 +1115,20 @@
       "last_updated": "2026-09-05T19:16:31+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.9 revision 16"
+    },
+    "TC-APT-083": {
+      "status": "TODO",
+      "gate": null,
+      "owner": "loop",
+      "title": "Legacy-corpus defect backlog, found by the TC-APT-081 sweep: 90.7% of pre-mission shipped cells carry a structural flag (146 classes over 150 cells), dominated by list-item count divergence (en 25 vs fa 7, en 32 vs id 2) on pages whose code blocks and headings align -- verified to be genuine translations of the same page, so this is missing content in already-published translations, not validator noise. Distinct from TC-APT-081 (which found the CURRENT standard clean). Needs triage per class and a decision on whether retranslation is in mission scope.",
+      "depends_on": [
+        "TC-APT-081"
+      ],
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/tc-apt-081-fp-sweep-pilot-classes.json",
+      "commit": null,
+      "last_updated": "2026-09-05T19:26:42+00:00",
+      "blocker_type": null
     }
   },
   "gate_closures": {
@@ -1164,7 +1178,7 @@
   "wave_scale": {
     "value": 1,
     "initialised_at": "2026-09-05T19:16:31+00:00",
-    "last_decision": "HOLD at 1: step-up test MET on r3 (10/11 = 91%, KPI 34 >= 25) but TC-APT-081 is mid-flight and v10.5 requires it before/with the first doubling. The pilot changed 081's shape (legacy defects mixed with FPs), so the doubling waits for the separation, not for comfort.",
+    "last_decision": "HOLD at 1. KPI (34>=25) and last-wave acceptance (r3 10/11 = 91%) are MET, and TC-APT-081 now clears the FP-amplification risk with 0 flags on 62 current-standard cells. The recurrence gate is NOT met on the record: 8 classes have OPEN tickets across 2+ pages. Most have live fixes and read OPEN only because dispositions were never backfilled (TC-APT-060, TODO) -- but I am not declaring the gate clear by reinterpreting it in my own favour. Next action is the backfill with receipts, then the step to 2.",
     "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%",
     "evidence": {
       "last_closed_wave": "gate5-words-doc-r3",
