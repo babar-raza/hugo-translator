@@ -1460,6 +1460,46 @@ class CampaignRunner:
         locale_retry_hint = CampaignRunner._LOCALE_RETRY_HINTS.get(
             target_lang.lower().split("-")[0]
         )
+        if "TerminologyPreservationValidator" in validators:
+            # TC-APT-069: the frontmatter retry sends the UNMASKED original to the
+            # model, so placeholder protection cannot preserve a governed term
+            # there -- which is why seoTitle translated it in every locale
+            # measured. The retry path does carry retry_feedback through to the
+            # backend, so an explicit instruction is the channel that works where
+            # masking cannot. Term names come from config/terminology.yaml, never
+            # from a candidate, so this stays candidate-free.
+            governed_terms = sorted(
+                {
+                    str((getattr(issue, "details", None) or {}).get("term", ""))
+                    for issue in issues
+                    if str(getattr(issue, "validator", "")) == "TerminologyPreservationValidator"
+                    and (getattr(issue, "details", None) or {}).get("term")
+                }
+            )
+            preamble = (
+                "Reproduce these governed terms exactly as they appear in the source, "
+                "character for character, without translating or transliterating them"
+            )
+            if governed_terms:
+                term_text = ", ".join(f'"{term}"' for term in governed_terms)
+                instructions.append(
+                    f"{preamble}: {term_text}. "
+                    "They are protected portfolio terminology and must stay in the source language "
+                    "even when the surrounding sentence is fully translated. Translate everything "
+                    "around them normally."
+                )
+            else:
+                # Resume path: persisted failure metadata records the validator but
+                # NOT the term, because string detail values are deliberately kept
+                # out of fingerprints. A generic instruction is still actionable and
+                # is better than losing the guidance entirely on restart.
+                instructions.append(
+                    "Reproduce every governed portfolio term exactly as it appears in the source, "
+                    "character for character, without translating or transliterating it. Governed "
+                    "terms are protected terminology and must stay in the source language even when "
+                    "the surrounding sentence is fully translated. Translate everything around them "
+                    "normally."
+                )
         if "FrontmatterLanguageCheck" in validators:
             fields = sorted(
                 {
@@ -1593,6 +1633,8 @@ class CampaignRunner:
             validators.append("FrontmatterLanguageCheck")
         if "RepetitionDetectorValidator" in reason:
             validators.append("RepetitionDetectorValidator")
+        if "TerminologyPreservationValidator" in reason:
+            validators.append("TerminologyPreservationValidator")
         fields = re.findall(r"\bfield=(title|description|seoTitle|summary)\b", reason)
         issues = [
             SimpleNamespace(
