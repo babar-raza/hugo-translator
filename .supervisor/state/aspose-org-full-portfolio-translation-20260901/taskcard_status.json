@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T20:55:06+00:00",
+  "updated_at": "2026-09-05T21:06:47+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1134,24 +1134,24 @@
       "status": "DONE",
       "gate": null,
       "owner": "loop",
-      "title": "Stray unmatched ']' emitted after a list-item link, rendering as a visible literal bracket. Measured on introducing-cells-foss-go: bracket balance 25/26 against source 25/25 in de, el, id, he; the other 8 locales balanced. Invisible to link-count checks because a stray ']' forms no link. Inferred mechanism (unverified): the tail-only link preserve_pattern hands the model an unbalanced '[', it closes the bracket after the placeholder, and restore expands to '](url)]'. Bracket-balance-vs-source is now in the mechanical pre-check. FIXED 2026-09-06. Mechanism VERIFIED not inferred: two sites, and the L272 shape carried an orphan '{' -- a broken placeholder token, which only occurs when the model edits around a raw '[' beside a placeholder. Site 1 (brand label, de/el/id/he) is covered by TC-APT-085; site 2 (API Reference, pl/pt/ro) by a lookahead-scoped preserve_pattern that masks a link's opening bracket. Neutrality 14/14; prose and code brackets untouched. RETRIGGERED 2026-09-06 as heal-cells-go-w2 (20 cells). Masking verified on the real page first: 0 link lines hand the model a raw bracket.",
+      "title": "Stray unmatched ']' emitted after a list-item link, rendering as a visible literal bracket. Measured on introducing-cells-foss-go: bracket balance 25/26 against source 25/25 in de, el, id, he; the other 8 locales balanced. Invisible to link-count checks because a stray ']' forms no link. Inferred mechanism (unverified): the tail-only link preserve_pattern hands the model an unbalanced '[', it closes the bracket after the placeholder, and restore expands to '](url)]'. Bracket-balance-vs-source is now in the mechanical pre-check. FIXED 2026-09-06. Mechanism VERIFIED not inferred: two sites, and the L272 shape carried an orphan '{' -- a broken placeholder token, which only occurs when the model edits around a raw '[' beside a placeholder. Site 1 (brand label, de/el/id/he) is covered by TC-APT-085; site 2 (API Reference, pl/pt/ro) by a lookahead-scoped preserve_pattern that masks a link's opening bracket. Neutrality 14/14; prose and code brackets untouched. RETRIGGERED 2026-09-06 as heal-cells-go-w2 (20 cells). Masking verified on the real page first: 0 link lines hand the model a raw bracket. STEP 2 CONFIRMED 2026-09-06 on the original failing page: bracket balance 25/25 in 3 of 3 previously-broken cells (de, el, he were 25/26).",
       "depends_on": [],
       "blocking_reason": null,
-      "evidence_path": "data/summaries/fix-tc-apt-084-link-bracket-balance-20260906.json; data/summaries/retrigger-heal-cells-go-w2-20260906.json",
+      "evidence_path": "data/summaries/fix-tc-apt-084-link-bracket-balance-20260906.json; data/summaries/retrigger-heal-cells-go-w2-20260906.json; data/summaries/review-cells-go-w2-batch-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T20:55:06+00:00",
+      "last_updated": "2026-09-05T21:06:47+00:00",
       "blocker_type": null
     },
     "TC-APT-085": {
       "status": "DONE",
       "gate": null,
       "owner": "loop",
-      "title": "Governed brand-navigation labels are unprotected on the LIST_ITEM extraction path. The same label inside a paragraph link survives 17/18 locales; alone in a list item, 8/18. The brand-nav-label check runs on the paragraph LINK path (text_unit_extractor.py:1759) but not on the full-sentence/LIST_ITEM path. 'API Reference' survives there only via its own terminology.yaml entry. Fix: apply the check on the LIST_ITEM path, or register the label shape in terminology.yaml so it routes through the derived governed-terms machinery. FIXED 2026-09-06 via _whole_node_is_brand_navigation_link on the full-sentence path. First attempt was inert (tested raw markdown, not anchor text) and the real page caught it. RETRIGGERED 2026-09-06 as heal-cells-go-w2 (20 cells). Predicate verified True on the real page's brand list item before launch.",
+      "title": "Governed brand-navigation labels are unprotected on the LIST_ITEM extraction path. The same label inside a paragraph link survives 17/18 locales; alone in a list item, 8/18. The brand-nav-label check runs on the paragraph LINK path (text_unit_extractor.py:1759) but not on the full-sentence/LIST_ITEM path. 'API Reference' survives there only via its own terminology.yaml entry. Fix: apply the check on the LIST_ITEM path, or register the label shape in terminology.yaml so it routes through the derived governed-terms machinery. FIXED 2026-09-06 via _whole_node_is_brand_navigation_link on the full-sentence path. First attempt was inert (tested raw markdown, not anchor text) and the real page caught it. RETRIGGERED 2026-09-06 as heal-cells-go-w2 (20 cells). Predicate verified True on the real page's brand list item before launch. STEP 2 CONFIRMED 2026-09-06: the brand-nav label is preserved verbatim in all 10 regenerated cells, where it was lost in 16 of 21 before.",
       "depends_on": [],
       "blocking_reason": null,
-      "evidence_path": "data/summaries/fix-tc-apt-085-brand-nav-list-item-20260906.json; data/summaries/retrigger-heal-cells-go-w2-20260906.json",
+      "evidence_path": "data/summaries/fix-tc-apt-085-brand-nav-list-item-20260906.json; data/summaries/retrigger-heal-cells-go-w2-20260906.json; data/summaries/review-cells-go-w2-batch-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T20:55:06+00:00",
+      "last_updated": "2026-09-05T21:06:47+00:00",
       "blocker_type": null
     },
     "TC-APT-086": {
@@ -1164,6 +1164,42 @@
       "evidence_path": "data/summaries/retrigger-heal-cells-go-w2-20260906.json",
       "commit": null,
       "last_updated": "2026-09-05T20:55:06+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-087": {
+      "status": "TODO",
+      "gate": null,
+      "owner": "loop",
+      "title": "The governed label 'Aspose.Cells - Enterprise Product Family' is lost in a paragraph link in ar, held from the heal-cells-go-w2 commit 2026-09-06. Distinct from TC-APT-085, which fixed the LIST_ITEM path; this is the PARAGRAPH LINK path, measured earlier as surviving 17 of 18 locales with ar the exception. Pre-existing, not a regression: ar failed the same literal before the fix. Reproduce by comparing the exact em-dash literal against index.ar.md.",
+      "depends_on": [],
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/review-cells-go-w2-batch-20260906.json",
+      "commit": null,
+      "last_updated": "2026-09-05T21:06:47+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-088": {
+      "status": "TODO",
+      "gate": null,
+      "owner": "loop",
+      "title": "The content repo's 40-step hook suite exceeds the 120s harness tool timeout once a commit carries ~7 files; the 1-file nl commit fit inside it. Found 2026-09-06 when the w2 batch commit was moved to a background task mid-hook. Fix: either cap content commits at a smaller batch or invoke git commit OS-detached and verify HEAD on a later wake, which is the pattern already used for campaigns. Do not interrupt a commit mid-hook -- it risks a partial index and a stale index.lock.",
+      "depends_on": [],
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/review-cells-go-w2-batch-20260906.json",
+      "commit": null,
+      "last_updated": "2026-09-05T21:06:47+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-089": {
+      "status": "TODO",
+      "gate": null,
+      "owner": "loop",
+      "title": "TC-APT-081's shipped-corpus sweep cannot serve as a PRE-commit gate: it enumerates only already-committed cells, so pointing it at uncommitted output prints 'restricted to 0 of N paths' and 'distinct FP classes: 0', which reads as a pass but swept nothing. Found 2026-09-06. Either add an explicit mode that accepts uncommitted paths, or make the script exit non-zero when its restriction drops every requested path so the vacuous zero cannot be mistaken for a clean result.",
+      "depends_on": [],
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/review-cells-go-w2-batch-20260906.json",
+      "commit": null,
+      "last_updated": "2026-09-05T21:06:47+00:00",
       "blocker_type": null
     }
   },
