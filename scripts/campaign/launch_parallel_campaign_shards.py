@@ -30,6 +30,10 @@ from src.workers.campaign_runner import CampaignLedger
 # on the local GPU; every other locale is API-bound (`professionalize_llm`).
 GPU_PRIMARY_LOCALES = ("hu", "ja", "ro")
 
+# CampaignRunner.__init__'s own default; the legacy worker child cannot be told
+# anything else, so a non-default root is only valid for the gate5 child.
+DEFAULT_LEDGER_ROOT = Path("data/campaigns")
+
 
 def pending_shards(manifest: CampaignManifest, ledger_root: Path) -> list[dict[str, Any]]:
     """Return every deterministic, receipt-incomplete shard of the manifest."""
@@ -114,14 +118,39 @@ def _child_command(
     shard: dict[str, Any],
     config_root: Path,
     campaign_manifest: Path,
+    ledger_root: Path,
     device: str,
     max_gpu_memory_percent: int,
     gpu_shard_memory_percent: int,
     gpu_locales: tuple[str, ...],
+    child: str = "gate5",
 ) -> list[str]:
-    """Build one shard child's argv, budgeting VRAM only for the GPU-bound shard."""
+    """Build one shard child's argv, budgeting VRAM only for the GPU-bound shard.
+
+    The default ``gate5`` child is ``run_gate5_batch.py``, the same entry point every
+    committed cell of this mission has come through.  It matters that both children
+    are not merely "a campaign runner": the legacy worker builds its own
+    ``TranslationEngine`` and never receives ``--ledger-root`` (it has no such flag),
+    so a non-default ledger root would leave the parent verifying receipts in a
+    directory its children never wrote to.  ``gate5`` takes the flag and shares one
+    engine construction path, so process sharding changes only *where* a job runs.
+    """
     is_gpu_bound = str(shard["locale"]) in gpu_locales
     memory_percent = gpu_shard_memory_percent if is_gpu_bound else max_gpu_memory_percent
+    if child == "gate5":
+        return [
+            sys.executable,
+            "scripts/campaign/run_gate5_batch.py",
+            "--manifest",
+            str(campaign_manifest),
+            "--ledger-root",
+            str(ledger_root),
+            "--shard-id",
+            str(shard["shard_id"]),
+            "--resume",
+            "--max-gpu-memory-percent",
+            str(memory_percent),
+        ]
     return [
         sys.executable,
         "-m",
@@ -163,10 +192,12 @@ def _run_wave(
             shard=shard,
             config_root=config_root,
             campaign_manifest=args.campaign_manifest,
+            ledger_root=args.ledger_root,
             device=args.device,
             max_gpu_memory_percent=args.max_gpu_memory_percent,
             gpu_shard_memory_percent=args.gpu_shard_memory_percent,
             gpu_locales=gpu_locales,
+            child=args.child,
         )
         children.append(subprocess.Popen(command, cwd=translator_repo, creationflags=flags))
     exit_codes = [child.wait() for child in children]
@@ -206,6 +237,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Locales treated as GPU-bound; at most one such shard runs at a time",
     )
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
+    parser.add_argument(
+        "--child",
+        choices=("gate5", "worker"),
+        default="gate5",
+        help=(
+            "Shard child entry point. 'gate5' (default) is run_gate5_batch.py -- the same "
+            "engine every committed cell of this mission came through, and the only one that "
+            "accepts --ledger-root. 'worker' is the legacy autonomous worker."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--drain",
@@ -222,6 +263,11 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--max-workers must be 1..4")
     if not args.wait:
         raise SystemExit("--wait is required for governed campaign launches")
+    if args.child == "worker" and args.ledger_root != DEFAULT_LEDGER_ROOT:
+        # The legacy worker has no --ledger-root flag, so its CampaignRunner would
+        # silently fall back to the default while this parent verified receipts
+        # somewhere else.  Fail closed rather than report a phantom incomplete shard.
+        raise SystemExit("--ledger-root cannot reach the 'worker' child; use --child gate5")
     if args.gpu_shard_memory_percent is None:
         args.gpu_shard_memory_percent = args.max_gpu_memory_percent
     gpu_locales = tuple(str(locale) for locale in args.gpu_locales)

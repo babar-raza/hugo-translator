@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 
-def build_real_engine(translator_repo: Path):
+def build_real_engine(translator_repo: Path, max_gpu_memory_percent: int | None = None):
     from src.model_runtime.loader import ModelLoader
     from src.model_runtime.registry import ModelRegistry
     from src.tm import TranslationMemory
@@ -48,9 +48,24 @@ def build_real_engine(translator_repo: Path):
                 device = "cuda"
         except Exception:
             device = "cpu"
+    # TC-APT-047/065: a dedicated GPU shard process needs its own VRAM budget.
+    # Resolved percent -> MB exactly the way the legacy worker does it
+    # (autonomous_content_translation_worker.py:410-420) so both entry points
+    # enforce the same budget.  None keeps config/global.yaml's own default.
+    max_memory_mb = None
+    if max_gpu_memory_percent is not None and device.startswith("cuda"):
+        from src.hardware.vram_enforcer import VRAMEnforcer
+
+        max_memory_mb, budget = VRAMEnforcer().enforce_from_config(
+            {"enable_gpu": True, "max_gpu_memory_percent": max_gpu_memory_percent},
+            device=device,
+        )
+        if budget:
+            print(f"VRAM budget enforced: {max_memory_mb}MB ({budget.percent:.1f}% of total)")
     loader = ModelLoader(
         ModelRegistry(translator_repo / "config" / "model_registry.yaml"),
         device=device,
+        max_memory_mb=max_memory_mb,
         config=raw,
     )
     tm_data_dir = Path(raw.get("paths", {}).get("tm_data_dir", "data/tm"))
@@ -92,6 +107,13 @@ def main(argv: list[str] | None = None) -> int:
         help="run only this shard (repeatable) -- isolates one cell's failure from "
         "others in the same manifest; see data/summaries/fp-gate4-canary-TC-APT-013.json",
     )
+    parser.add_argument(
+        "--max-gpu-memory-percent",
+        type=int,
+        default=None,
+        help="VRAM budget for this process (TC-APT-047 dedicated GPU shard); "
+        "omit to use config/global.yaml's hardware.max_gpu_memory_percent",
+    )
     args = parser.parse_args(argv)
 
     translator_repo = Path.cwd().resolve()
@@ -106,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         f"primary={manifest.retry_policy['primary_model']}"
     )
 
-    engine = build_real_engine(translator_repo)
+    engine = build_real_engine(translator_repo, args.max_gpu_memory_percent)
     runner = CampaignRunner(
         manifest=manifest,
         translation_engine=engine,

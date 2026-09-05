@@ -11,10 +11,13 @@ from pathlib import Path
 
 import yaml
 
+import pytest
+
 from scripts.campaign.launch_parallel_campaign_shards import (
     GPU_PRIMARY_LOCALES,
     _child_command,
     duplicate_receipts,
+    main,
     partition_by_device,
     select_pending_shards,
 )
@@ -118,28 +121,74 @@ def test_selection_skips_shards_that_already_have_receipts(tmp_path):
     assert [s["locale"] for s in selected if s["locale"] in GPU_PRIMARY_LOCALES] == ["ja"]
 
 
-def test_gpu_shard_gets_its_own_vram_budget(tmp_path):
-    manifest = _load(tmp_path)
-    shards = {s["locale"]: s for s in manifest.shards(resume_receipts=set(), max_outputs=250)}
-    kwargs = dict(
+def _kwargs(tmp_path: Path, child: str) -> dict:
+    return dict(
         config_root=tmp_path / "config",
         campaign_manifest=tmp_path / "manifest.yaml",
+        ledger_root=tmp_path / "campaigns",
         device="cuda",
         max_gpu_memory_percent=50,
         gpu_shard_memory_percent=80,
         gpu_locales=GPU_PRIMARY_LOCALES,
+        child=child,
     )
+
+
+@pytest.mark.parametrize("child", ["gate5", "worker"])
+def test_gpu_shard_gets_its_own_vram_budget(tmp_path, child):
+    manifest = _load(tmp_path)
+    shards = {s["locale"]: s for s in manifest.shards(resume_receipts=set(), max_outputs=250)}
+    kwargs = _kwargs(tmp_path, child)
 
     gpu_command = _child_command(shard=shards["ja"], **kwargs)
     api_command = _child_command(shard=shards["de"], **kwargs)
 
     assert gpu_command[gpu_command.index("--max-gpu-memory-percent") + 1] == "80"
     assert api_command[api_command.index("--max-gpu-memory-percent") + 1] == "50"
-    # Every child still runs the governed zero-defect campaign path.
-    for command in (gpu_command, api_command):
-        assert "--validation-policy" in command
-        assert command[command.index("--validation-policy") + 1] == "zero-defect"
-        assert command[command.index("--campaign-shard") + 1]
+
+
+def test_worker_child_still_runs_the_governed_zero_defect_path(tmp_path):
+    manifest = _load(tmp_path)
+    shard = next(iter(manifest.shards(resume_receipts=set(), max_outputs=250)))
+
+    command = _child_command(shard=shard, **_kwargs(tmp_path, "worker"))
+
+    assert command[command.index("--validation-policy") + 1] == "zero-defect"
+    assert command[command.index("--campaign-shard") + 1] == shard["shard_id"]
+
+
+def test_gate5_child_receives_the_ledger_root_the_parent_verifies(tmp_path):
+    """The worker child has no --ledger-root flag; the gate5 child must carry it."""
+    manifest = _load(tmp_path)
+    shard = next(iter(manifest.shards(resume_receipts=set(), max_outputs=250)))
+    kwargs = _kwargs(tmp_path, "gate5")
+
+    command = _child_command(shard=shard, **kwargs)
+
+    assert command[1].endswith("run_gate5_batch.py")
+    assert Path(command[command.index("--ledger-root") + 1]) == kwargs["ledger_root"]
+    assert command[command.index("--shard-id") + 1] == shard["shard_id"]
+    assert "--resume" in command
+
+
+def test_worker_child_refuses_a_ledger_root_it_cannot_receive(tmp_path):
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(_manifest_dict(tmp_path)), encoding="utf-8")
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(
+            [
+                "--campaign-manifest",
+                str(manifest_path),
+                "--wait",
+                "--child",
+                "worker",
+                "--ledger-root",
+                str(tmp_path / "elsewhere"),
+            ]
+        )
+
+    assert "--child gate5" in str(excinfo.value)
 
 
 def test_duplicate_receipts_reports_a_double_accept(tmp_path):
