@@ -293,6 +293,17 @@ global:
 
   # Pattern-based matches: Regular expressions for dynamic terminology
   patterns:
+    # FOSS edition compound names must be protected as ONE span, and must be
+    # listed BEFORE the generic family pattern (protection consumes matches in
+    # order): protected separately, SOV/postpositional languages (hi/ja/ko/zh)
+    # interleave title text between the family name and FOSS, scrambling the
+    # product name ("Aspose.PDF C++ 的 FOSS", TC-APT-040 title-template class).
+    - pattern: "Aspose\\.\\S+ FOSS\\b"
+      category: product_family
+      description: "FOSS edition compound product names (Aspose.PDF FOSS, etc.)"
+      preserve_mode: protect
+      severity: error
+
     # Aspose product families (e.g., Aspose.Words, Aspose.Cells, Aspose.PDF, Aspose.3D)
     - pattern: "Aspose\\.\\S+"
       category: product_family
