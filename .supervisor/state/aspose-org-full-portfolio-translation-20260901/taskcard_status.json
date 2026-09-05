@@ -4,7 +4,7 @@
   "plan_revision": "13",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T08:22:00+00:00",
+  "updated_at": "2026-09-05T08:45:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -658,16 +658,17 @@
       "last_updated": "2026-09-05T12:10:00+00:00"
     },
     "TC-APT-043": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "gate": null,
       "title": "Reproduce + fix shared-mutable-state thread hazard (module-level YAML singleton in hugo_parser, shared HugoParser instance); Test A must reproduce BEFORE fix is trusted",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": "Root cause CONFIRMED by reproduction (Test A: shared module-level ruamel YAML object, thread-1 frontmatter -> None at rep 0 pre-fix) then fixed (b82b568): per-instance YAML in HugoParser.__init__ + threading.local-backed TranslationEngine.parser property. Test A clean post-fix (50 forced + 50 unforced reps); parser suite 90 passed; broad subset 1347 passed / 1 pre-existing failure. REMAINING before DONE: Test B (two real fixture files end-to-end through a real TranslationEngine with stubbed model backend, threading.Barrier(2), 50-200 reps, zero cross-contamination). Claim: claims.jsonl taskcard:TC-APT-043 session 442e200e.",
-      "evidence_path": null,
-      "commit": "b82b568",
-      "last_updated": "2026-09-05T08:22:00+00:00",
-      "blocker_type": null
+      "blocking_reason": null,
+      "evidence_path": "tests/regression/test_concurrent_translate_file_thread_safety.py",
+      "commit": "2215fbd",
+      "last_updated": "2026-09-05T08:45:00+00:00",
+      "blocker_type": null,
+      "note": "Root cause reproduced (Test A, rep-0 None corruption pre-fix), fixed b82b568 (per-instance YAML + threading.local engine.parser), Test A clean 50+50 reps, Test B clean 25 reps end-to-end (2215fbd). Both permanent regression tests. Next in dependency order: TC-APT-044 (backend-instance locks, delete engine-wide lock)."
     },
     "TC-APT-044": {
       "status": "TODO",
