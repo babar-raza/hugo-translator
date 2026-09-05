@@ -190,6 +190,39 @@ def _is_reviewed_identical_translation(source_text: str, target_lang: str) -> bo
     return normalized in _REVIEWED_IDENTICAL_TRANSLATIONS.get(target_lang.lower(), frozenset())
 
 
+def _has_translatable_residue(
+    source_text: str, preserve_patterns: list[str] | None, min_word_len: int = 4
+) -> bool:
+    """Whether a unit still contains a real translatable word once protected spans are masked.
+
+    TC-SAS-01 counts a unit as "unchanged" when the model returns it byte-identical.
+    That is only evidence of a failure to translate if there was something translatable
+    in the first place. Measured on words-document-net: the link text
+    "Aspose.Words for .NET" masks to "{PH} for .NET", whose entire translatable residue
+    is the preposition "for" -- so a model that leaves those three characters alone made
+    a whole 54-unit cell fail a 0%-tolerance gate. The ar cell of the same page did
+    localise it, so this is variance on three characters, not a quality signal.
+
+    Deliberately conservative, so it cannot mask a genuine miss: a unit counts as
+    judgeable if the masked residue holds ANY token of >= min_word_len alphabetic
+    characters that is not ALL-CAPS (i.e. plausibly a word rather than an identifier or
+    acronym). "The source code is available at" stays judgeable; "for .NET" does not.
+    This is the same reasoning as TC-APT-040's short-signal floor, applied to a
+    different gate, and it joins the exclusions this filter already carries for short
+    units, reviewed cognates and table cells.
+    """
+    residue = source_text or ""
+    for pattern in preserve_patterns or []:
+        try:
+            residue = re.sub(pattern, " ", residue)
+        except re.error:
+            continue
+    for token in re.findall(r"[^\W\d_]+", residue, flags=re.UNICODE):
+        if len(token) >= min_word_len and not token.isupper():
+            return True
+    return False
+
+
 def _same_as_source_fingerprints(units: list) -> str:
     """Return candidate-free source-unit metadata for autonomous diagnosis."""
     return ",".join(
@@ -2059,6 +2092,9 @@ class SegmentTranslator:
             _te_cfg_sas_site = getattr(site_profile, "translation_engine", None) or {}
             _te_cfg_sas = {**_te_cfg_sas_global, **_te_cfg_sas_site}
             _sas_min_len = int(_te_cfg_sas.get("same_as_source_min_length", 10))
+            # The site profile owns the protected-span patterns, so the residue floor
+            # sees exactly what the model saw after masking.
+            _sas_preserve_patterns = list(getattr(site_profile.body, "preserve_patterns", None) or [])
             _validation_policy_sas = getattr(engine, "validation_policy", "standard")
             _zero_defect_sas = _validation_policy_sas == "zero-defect"
             _sas_tolerance = _effective_same_as_source_tolerance(
@@ -2075,6 +2111,11 @@ class SegmentTranslator:
                 and u.translated_text.strip() == u.source_text.strip()
                 and len(u.source_text.strip()) > _sas_min_len
                 and not _is_reviewed_identical_translation(u.source_text, target_lang)
+                # TC-SAS-01 residue floor: the raw-length floor above measures the unit
+                # before protected spans are masked, so a unit made almost entirely of
+                # governed technical tokens clears it while offering nothing to
+                # translate. Judge only units that still hold a real word.
+                and _has_translatable_residue(u.source_text, _sas_preserve_patterns)
                 # TC-TBL-012 / Layer 2: Exclude table cells from SAS ratio.
                 # A table cell the model fails to translate stays as English text —
                 # bad for quality but handled by Gate 15 / purity check. Counting
