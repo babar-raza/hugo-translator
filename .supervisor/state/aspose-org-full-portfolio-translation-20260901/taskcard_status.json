@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T19:36:14+00:00",
+  "updated_at": "2026-09-05T19:47:47+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -708,7 +708,7 @@
     "TC-APT-046": {
       "status": "IN_PROGRESS",
       "gate": null,
-      "title": "Concurrency rollout: force_serialize_all_backends flag, canary at max_parallel_jobs=4, Test D permanent CI guard, sustained calibration before any ceiling raise",
+      "title": "Concurrency rollout: force_serialize_all_backends flag, canary at max_parallel_jobs=4, Test D permanent CI guard, sustained calibration before any ceiling raise CI GUARD LANDED 2026-09-06: tests/regression/ now runs in quality_gates_tests.yml. It was previously unguarded -- release_gate ran 2 files from it, quality_gates ran none -- so Test D's concurrency regression and every producer-fix guard from this mission only ran locally. Also fixed the stale import (scripts.e2e_verify_single_file -> scripts.e2e.*, moved by ddd1521) that had been deselected all session as a 'pre-existing failure'. Suite: 353 passed, 0 deselected. Remaining for this card: the max_parallel_jobs=4 canary and sustained calibration, both of which need the model envelope.",
       "depends_on": [
         "TC-APT-043",
         "TC-APT-044",
@@ -716,9 +716,9 @@
       ],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": "tests/unit/workers/test_campaign_serialization_rollback.py, tests/regression/test_backend_generation_concurrency.py, tests/unit/workers/test_concurrency_canary_verification.py",
+      "evidence_path": "tests/unit/workers/test_campaign_serialization_rollback.py, tests/regression/test_backend_generation_concurrency.py, tests/unit/workers/test_concurrency_canary_verification.py; data/summaries/tc-apt-046-ci-guard-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T10:10:42+00:00",
+      "last_updated": "2026-09-05T19:47:47+00:00",
       "blocker_type": null,
       "note": "Steps 1 and 3 DONE (a359a07). Step 2 verifier + serial baseline DONE (a108cf0). Step 2 CANARY ITSELF DEFERRED on evidence, not on time: max_parallel_jobs is structurally inert for single-source manifests (shards are keyed by locale, so 1 source x 25 locales = 25 shards of 1 job; _run_locked runs shards sequentially and parallelises only min(max_parallel_jobs, len(jobs)) = 1). Measured live on the canary manifest: shards=25, jobs per shard=[1]. Running the canary here would measure nothing and could wrongly license a schema-ceiling raise. The canary belongs on a MULTI-SOURCE (Gate 7 family) batch. See data/summaries/fp-gate5-inprocess-concurrency-inert-20260905.json. Step 4 unchanged (TODO)."
     },
@@ -1193,5 +1193,11 @@
     "note": "Heal tickets remain OPEN. A landed fix is not a reverification receipt; the gate is clear because the fixes exist, which is a different claim from the tickets being closed.",
     "pre_committed_ruling_on_r4": "Committed BEFORE r4 closes, so it cannot become a post-hoc rationalisation. r4 is a Tier-2 heal retrigger, and the runbook scopes Track A to include Tier-2 retranslation of heal-queue tickets, so r4 IS a Track-A wave and its acceptance counts for the ladder. If it closes below 60% -- it currently stands at 1/8 = 12.5% -- then wave_scale halves 2 -> 1 by the rule as written, undoing the step-up I just made. I am not exempting it.",
     "structural_concern_for_the_operator": "Flagging, not acting on: retriggers are by construction runs of cells already known to be defective, and they execute whatever code existed at launch (r4 predates three landed fixes). If such runs count toward the ladder, every rejected page generates a low-acceptance wave that pins wave_scale at 1 permanently -- the accelerator could never engage on a page that needed healing. The rule may want to measure only Tier-1a/1b waves, or to weight by cells attempted. That is the operator's call; I am applying the rule as written meanwhile."
+  },
+  "capacity_clause": {
+    "engaged": true,
+    "since": "2026-09-05T19:47:47+00:00",
+    "reason": "KPI 23 < floor 25 AND TC-APT-046/047 unlanded",
+    "effect": "no new-page Track-A attempts; wave-cells-rust-w1 blocked but built and env-verified; Track-B restricted to 043..047 in dependency order"
   }
 }

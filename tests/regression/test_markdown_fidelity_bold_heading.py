@@ -290,7 +290,10 @@ title: Test
 
 def test_verifier_integration(bold_only_fixture, correct_translation):
     """Test that the e2e_verify_single_file script detects fidelity issues."""
-    from scripts.e2e_verify_single_file import verify_ast_structural_fidelity
+    # Moved to scripts/e2e/ by ddd1521 (production-grade script reorganization);
+    # this import was never updated, which is why the test has been failing
+    # with ModuleNotFoundError rather than for any behavioural reason.
+    from scripts.e2e.e2e_verify_single_file import verify_ast_structural_fidelity
 
     # Test correct translation (should pass)
     result = verify_ast_structural_fidelity(bold_only_fixture, correct_translation)
