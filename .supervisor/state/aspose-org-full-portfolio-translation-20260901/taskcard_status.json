@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T19:54:27+00:00",
+  "updated_at": "2026-09-05T20:04:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -569,13 +569,13 @@
     "TC-APT-042": {
       "status": "IN_PROGRESS",
       "gate": 5,
-      "title": "Complex/idiomatic sentence structures produce recurring cross-language defects (parallel-negation-lists, verbed-noun idioms like 'round-trip', product-name+generic-noun link text)",
+      "title": "Complex/idiomatic sentence structures produce recurring cross-language defects (parallel-negation-lists, verbed-noun idioms like 'round-trip', product-name+generic-noun link text) STEP 2 EVIDENCE 2026-09-06 (heal-cells-go-w1): 4 regenerated cells show exact structural fidelity, 0 injected codepoints, and 0 duplicated-word runs at the recorded signature site. 4 receipts written; 14 of the class's 16 ticketed cells still lack one, and the module now reports that correctly.",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": "v10.1 step 1 (producer-side fix) LANDED (010a5d2): cross-field frontmatter residual repair (frontmatter_consistency.py + SegmentTranslator hook, 9 new unit tests) covering the dominant near-duplicate description/summary defect, plus fr \"Annotations\" cognate added to _REVIEWED_IDENTICAL_TRANSLATIONS (2nd page, live fr failure on pdf-foss-cpp). Steps 2-3 PENDING: reverify against the exact original failing files (introducing-words-foss-net ar/cs/de/el/es/fa/fr/he; introducing-pdf-foss-typescript cs/de/el/fa/he/hu/ko/nl/pl/ro/ru/sv/tr/th/vi), then retrigger those quarantined cells. NOT covered by this fix: the complex-sentence/idiom variance subset (parallel-negation lists, \"round-trip\" idiom) -- needs its own attempt or a documented full-body-review decision per the plan acceptance. Claim lease: claims.jsonl taskcard:TC-APT-042 session 442e200e.",
-      "evidence_path": "tests/regression/test_softwrap_sentence_integrity.py, data/summaries/reverify-softwrap-fix-real-content-20260905.json",
+      "evidence_path": "tests/regression/test_softwrap_sentence_integrity.py, data/summaries/reverify-softwrap-fix-real-content-20260905.json; data/summaries/fp-heal-queue-openness-bug-20260906.json",
       "commit": "c286492",
-      "last_updated": "2026-09-05T11:52:40+00:00",
+      "last_updated": "2026-09-05T20:04:00+00:00",
       "blocker_type": null,
       "note": "ROOT CAUSE FOUND AND FIXED. Not model quality: the extractor split a Markdown paragraph at its HARD LINE WRAPS whenever the paragraph also contained a LINK/STRONG/EMPHASIS (leaf-mode), translating each fragment with no knowledge of the others. Fix c286492 folds SOFT_BREAK into the surrounding text in HugoParser._parse_inline_content; output neutrality proven by A/B rendering 14 real files byte-identically. STEP-2 REVERIFICATION DONE ON REAL CONTENT: cells-spreadsheet-management-go carries the identical wrapped paragraph that broke 16/16 locales on the sibling page; in the first 3 post-fix cells (de/ar/fa) all four pre-fix defect signatures are gone (split noun phrase, duplicated/orphaned negation, spurious copula, scrambled product name). REMAINING: full 25-locale review of this page when the campaign finishes; and the 16 heal tickets on introducing-cells-foss-go still need their own retrigger, blocked on operator permission to clear rejected candidates from the content-repo tree."
     },
@@ -774,13 +774,13 @@
     "TC-APT-057": {
       "status": "DONE",
       "gate": null,
-      "title": "Reverification receipts (data/campaigns/reverification_receipts.jsonl) as the evidence standard for RECURRENCE step 2",
+      "title": "Reverification receipts (data/campaigns/reverification_receipts.jsonl) as the evidence standard for RECURRENCE step 2 BUG FOUND AND FIXED 2026-09-06 on first real use: heal_queue._counts_toward_quarantine required status=='OPEN', so 50 disposition-only tickets were invisible and recurrence_step2_satisfied() returned True having seen 0 of a class's 16 open tickets. Fixed to match the runbook's wording. First 4 receipts written.",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": "Built src/workers/reverification_receipts.py, backed by data/campaigns/reverification_receipts.jsonl (content-free rows: source_path, target_lang, root_cause_class, gates_passed, evidence_path, verified_at). record_receipt() appends one; has_passing_receipt() checks the MOST RECENT receipt for an exact cell (a later failing re-run can revoke an earlier pass, not leave it as stale evidence); missing_receipts_for_class() diffs a root_cause_classs OPEN heal tickets (via heal_queue.py.open_tickets_by_root_cause_class(), a new small public export added alongside this) against recorded passing receipts, returning exactly the (source_path, target_lang) pairs RECURRENCE step 2 still owes; recurrence_step2_satisfied() is that list being empty (vacuously true for a class with zero open tickets -- nothing left to reverify). This is precisely the runbooks own evidence standard: \"a row with gates_passed: true for every (source_path, target_lang) the classs original tickets name is the ONLY thing that lifts the obligation -- prose does not count,\" now checkable in code instead of by manual iteration-report inspection. 14 new tests plus 3 more for the heal_queue.py addition. Full tests/unit/workers suite: 649 passed, 1 skipped (was 632), no regressions. Claimed this taskcard and TC-APT-056 with the new work_claims.py helper. NOT done: nothing in the loop currently CALLS record_receipt() during a real reverification -- the mechanism exists but a reverification pass still has to be told to use it, same caveat as the qualification ledger.",
-      "evidence_path": "src/workers/reverification_receipts.py; tests/unit/workers/test_reverification_receipts.py; src/workers/heal_queue.py (open_tickets_by_root_cause_class)",
+      "evidence_path": "src/workers/reverification_receipts.py; tests/unit/workers/test_reverification_receipts.py; src/workers/heal_queue.py (open_tickets_by_root_cause_class); data/summaries/fp-heal-queue-openness-bug-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T18:50:20+00:00",
+      "last_updated": "2026-09-05T20:04:00+00:00",
       "blocker_type": null
     },
     "TC-APT-058": {

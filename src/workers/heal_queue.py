@@ -48,10 +48,26 @@ def _load_tickets(heal_queue_path: Path) -> list[dict[str, Any]]:
 
 
 def _counts_toward_quarantine(ticket: dict[str, Any]) -> bool:
-    if ticket.get("status") != "OPEN":
+    """Open unless terminally disposed, whichever field carries the state.
+
+    The runbook defines this directly (TC-APT-060): "OPEN means `disposition` is
+    absent or `OPEN`". It says nothing about a `status` field, and the heal queue
+    genuinely holds both shapes -- older rows carry only `disposition: "OPEN"`
+    while newer ones carry `status: "OPEN"`.
+
+    Requiring `status == "OPEN"` therefore made every disposition-only ticket
+    invisible to this module. Measured when found: all 16
+    producer_softwrap_sentence_split tickets read as zero open tickets, so
+    recurrence_step2_satisfied() returned True having verified nothing -- the
+    exact false-clearance the receipt standard exists to prevent -- and the
+    3-ticket quarantine threshold could never fire for those rows either.
+    """
+    if ticket.get("disposition") in _RESOLVED_DISPOSITIONS:
         return False
-    disposition = ticket.get("disposition")
-    return disposition is None or disposition not in _RESOLVED_DISPOSITIONS
+    status = ticket.get("status")
+    if status is not None and str(status).upper() != "OPEN":
+        return False
+    return True
 
 
 def open_tickets_by_root_cause_class(

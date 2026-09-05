@@ -168,3 +168,47 @@ class TestReQueueOnResolution:
             ],
         )
         assert not is_quarantined("ko", "auto:FrontmatterLanguageCheck", heal_queue_path=queue)
+
+
+# --- TC-APT-060 openness semantics -------------------------------------------
+# The runbook defines this directly: "OPEN means `disposition` is absent or
+# `OPEN`". The heal queue genuinely holds two shapes -- older rows carry only
+# `disposition: "OPEN"`, newer ones carry `status: "OPEN"` -- and requiring
+# status == "OPEN" made every disposition-only ticket invisible. Measured when
+# found: all 16 producer_softwrap_sentence_split tickets read as ZERO open, so
+# recurrence_step2_satisfied() returned True having verified nothing, and the
+# quarantine threshold could never fire for those rows.
+
+from src.workers.heal_queue import _counts_toward_quarantine
+
+
+def test_a_disposition_only_open_ticket_counts():
+    """The shape that was invisible: no status field at all."""
+    assert _counts_toward_quarantine({"disposition": "OPEN"}) is True
+
+
+def test_a_status_only_open_ticket_still_counts():
+    """Neutrality: the shape that already worked must keep working."""
+    assert _counts_toward_quarantine({"status": "OPEN"}) is True
+
+
+def test_a_ticket_with_neither_field_counts_as_open():
+    """'disposition is absent' is explicitly open per the rule."""
+    assert _counts_toward_quarantine({"root_cause_class": "x"}) is True
+
+
+def test_a_terminal_disposition_closes_it_even_when_status_says_open():
+    """45 real rows carry status OPEN with a terminal disposition.
+
+    Disposition is checked first precisely so the terminal verdict wins.
+    """
+    for terminal in ("FIXED_VERIFIED", "WAIVED_RUBRIC", "MODEL_LIMITATION_DEFERRED"):
+        assert _counts_toward_quarantine({"status": "OPEN", "disposition": terminal}) is False
+
+
+def test_a_non_open_status_closes_it():
+    assert _counts_toward_quarantine({"status": "CLOSED"}) is False
+
+
+def test_status_is_compared_case_insensitively():
+    assert _counts_toward_quarantine({"status": "open"}) is True
