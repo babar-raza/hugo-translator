@@ -542,15 +542,15 @@
       "blocker_type": null
     },
     "TC-APT-039": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": 5,
       "title": "Split primary routing (LLM 22 langs / m2m100 hu,ja,ro) + cross-model retry on review reject + production-review qualification ledger",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": null,
-      "evidence_path": null,
+      "blocking_reason": "Built the qualification ledger (src/workers/qualification_ledger.py), the piece plan SS11 calls \"the review-verdict -> per-cell qualification ledger wiring (TC-APT-034s cells.jsonl)\": record_verdict() appends content-free rows (site_id, source_path, target_lang, content_class, model, verdict, rubric_rules, recorded_at -- no candidate text) to data/campaigns/qualification/cells.jsonl. cross_model_retry_target() answers \"has the OTHER model been tried on this EXACT cell\" so a reject only quarantines after both models are tried (plan SS6.1). should_auto_flip_primary() implements the >20% reject rate over the last 20 cells rule (requires a FULL window of 20, not just some samples, per the plans own \"over its last 20\" wording). qualifies_for_stratified_sampling() implements the CURRENT operational threshold from project/loop-prompt.md SS4.2 (15 consecutive clean, with instant 100% reversion on any defect) rather than the original plan texts stale \"50\", per this missions own precedence rule that the runbook wins on what to do. 16 new tests cover cross-model retry (both-tried -> quarantine, different source_path does not count as tried), auto-flip (exact-threshold is NOT a flip since the plan says \"exceeds\", only the most recent window counts so an old bad patch does not haunt a since-fixed cell forever, independent per model), and stratified-sampling promotion (per content_class independently, single-defect reversion). Full tests/unit/workers suite: 621 passed, 1 skipped (was 605), no regressions. NOT done: config/global.yaml per-language routing table populated from mission_provider_comparison.json (TC-APT-006), campaign_runner.py wiring the cross-model retry into the live retry-escalation path (today it is still the loops manual per-iteration judgment call), and an actual review script/process calling record_verdict() -- reviews currently write ad hoc data/summaries/review-*.json files, not this ledger. The ledger is ready for that wiring but nothing calls it yet.",
+      "evidence_path": "src/workers/qualification_ledger.py; tests/unit/workers/test_qualification_ledger.py",
       "commit": null,
-      "last_updated": "2026-09-04T05:00:00+00:00",
+      "last_updated": "2026-09-05T18:01:30+00:00",
       "blocker_type": null
     },
     "TC-APT-040": {
