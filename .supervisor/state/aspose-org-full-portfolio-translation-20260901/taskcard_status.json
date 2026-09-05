@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T14:19:09+00:00",
+  "updated_at": "2026-09-05T14:27:38+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -798,16 +798,147 @@
     "TC-APT-059": {
       "status": "DONE",
       "gate": null,
+      "title": "Seed config/review_rubric.yaml from the 102 heal tickets + shipped corpus; every review verdict must cite a rule ID, and a judgment call the rubric does not cover requires adding a rule (a commit) before the verdict stands.",
+      "depends_on": [],
+      "owner": "operator",
+      "blocking_reason": null,
+      "evidence_path": "config/review_rubric.yaml -- RB-001..RB-005 present; RB-005 added 2026-09-05 from the live 5-of-5 same-position review lesson",
+      "commit": "0586294",
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
+    },
+    "TC-APT-060": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Heal tickets take terminal dispositions (FIXED_VERIFIED / WAIVED_RUBRIC / MODEL_LIMITATION_DEFERRED) and the RECURRENCE gate counts OPEN only; backfill the 48+ tickets of already-live-proven fixes as FIXED_VERIFIED once their reverification receipts exist.",
+      "depends_on": [],
+      "owner": "operator",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
+    },
+    "TC-APT-061": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Reviews fan out to parallel subagent reviewers; adjudicate disagreements and self-spot-check 20% of APPROVEs. Stratified sampling only after 15 consecutive rubric-clean cells (1-in-5 thereafter, instant 100% reversion on any defect).",
+      "depends_on": [],
+      "owner": "operator",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
+    },
+    "TC-APT-062": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Make TM purge transactional with the review verdict, so a rejected cell's TM cannot survive to poison later reruns and template-sibling pages (plan G-41, the 444-entry incident).",
+      "depends_on": [],
+      "owner": "operator",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
+    },
+    "TC-APT-063": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Batch commit policy: accumulate review-accepted cells and commit page-complete (one page's accepted languages = one commit) or family-scoped (<=250 outputs). Per-cell commits only for single-cell heal retriggers.",
+      "depends_on": [],
+      "owner": "operator",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
+    },
+    "TC-APT-064": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Sustained-load calibration, THEN the schema-ceiling raise -- burst calibration is not evidence of a sustained ceiling. Owns the real throughput ceiling; the measured 1.94x page-vs-page / 3.52x aggregate sharding numbers are directional only.",
+      "depends_on": [],
+      "owner": "operator",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
+    },
+    "TC-APT-065": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Dedicated saturated GPU shard for hu/ja/ro: one process owns the GPU, max_gpu_memory_percent 80 for that shard only, adaptive batching to its existing 20-25 ceiling, thermal watchdog active.",
+      "depends_on": [],
+      "owner": "operator",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
+    },
+    "TC-APT-066": {
+      "status": "TODO",
+      "gate": null,
+      "title": "TM warm-ordering: seed one language across a family's template-siblings before fanning out the rest; measure and report TM hit-rate per wave. Depends on TC-APT-062.",
+      "depends_on": [],
+      "owner": "operator",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
+    },
+    "TC-APT-067": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Packing A/B raise; adopt only on review-verdict parity.",
+      "depends_on": [],
+      "owner": "operator",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
+    },
+    "TC-APT-068": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Pipeline overlap: while batch N is in review, batch N+1's campaign may already run detached -- claims make the overlap collision-safe; the invariant is only that no batch commits before its own review completes.",
+      "depends_on": [],
+      "owner": "operator",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
+    },
+    "TC-APT-069": {
+      "status": "DONE",
+      "gate": null,
       "title": "'Document Object Model' governed as portfolio terminology, decided on published precedent (3 tracked localized pages in ar/nl/de keep it in English; 0 counter-examples across 3771 tracked localized files). Added to blog profile preserve_patterns AND to the frontmatter gate's technical-signal inventory -- two separate mechanisms I had previously conflated. seoTitle signal_alpha 22->3; the >=6 floor untouched and no tolerance moved.",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": null,
       "evidence_path": "data/summaries/decision-dom-terminology-20260905.json",
       "commit": "f87299f",
-      "last_updated": "2026-09-05T14:19:09+00:00",
-      "blocker_type": null
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "first written as TC-APT-059, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     },
-    "TC-APT-060": {
+    "TC-APT-070": {
       "status": "TODO",
       "gate": null,
       "title": "Protected-span/head-noun displacement reaches FRONTMATTER string fields (title/seoTitle/summary) -- found by review in el/fr/fa/hi; in fr it names a different entity than the source. Fix A (TC-APT-036) is body-AST only, so this is outside its scope and needs its own producer fix. Corrects my earlier field note that this page's frontmatter 'never went through the buggy leaf path' -- true for the soft-wrap class only.",
@@ -818,10 +949,11 @@
       "blocking_reason": null,
       "evidence_path": "data/summaries/review-words-doc-20260905.json",
       "commit": null,
-      "last_updated": "2026-09-05T14:19:09+00:00",
-      "blocker_type": null
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "first written as TC-APT-060, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     },
-    "TC-APT-061": {
+    "TC-APT-071": {
       "status": "TODO",
       "gate": null,
       "title": "A1 determiner-binding fix holds only for prepositional, verb-medial targets; in verb-final targets (fa, hi) the finite verb lands ahead of the link and strands the anchor. A new sub-class, not a regression -- the original source-determiner defect is gone in all 5 reviewed locales.",
@@ -832,10 +964,11 @@
       "blocking_reason": null,
       "evidence_path": "data/summaries/review-words-doc-20260905.json",
       "commit": null,
-      "last_updated": "2026-09-05T14:19:09+00:00",
-      "blocker_type": null
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "first written as TC-APT-061, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     },
-    "TC-APT-062": {
+    "TC-APT-072": {
       "status": "TODO",
       "gate": null,
       "title": "A2 head-noun reordering still emits source order in el at a protected span, though the 'noun inside the product name' shape is gone. Control: a second link in the same file with no protected span IS natively ordered in el, isolating the defect to protection, not the language.",
@@ -846,10 +979,11 @@
       "blocking_reason": null,
       "evidence_path": "data/summaries/review-words-doc-20260905.json",
       "commit": null,
-      "last_updated": "2026-09-05T14:19:09+00:00",
-      "blocker_type": null
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "first written as TC-APT-062, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     },
-    "TC-APT-063": {
+    "TC-APT-073": {
       "status": "TODO",
       "gate": null,
       "title": "Character-level emission defects at protected-span boundaries: doubled delimiter U+002C+U+060C byte-identical at ar:503 and fa:503 (RB-005; a delimiter de-dup fix, no retranslation needed); U+00AD injected word-interior at fr:443, invisible at render so it survives eyeball review; U+2011 substituted for ASCII hyphen 22x fr / 7x el, 0 in source.",
@@ -858,8 +992,9 @@
       "blocking_reason": null,
       "evidence_path": "data/summaries/review-words-doc-20260905.json",
       "commit": null,
-      "last_updated": "2026-09-05T14:19:09+00:00",
-      "blocker_type": null
+      "last_updated": "2026-09-05T14:27:38+00:00",
+      "blocker_type": null,
+      "provenance": "first written as TC-APT-063, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     }
   },
   "gate_closures": {
