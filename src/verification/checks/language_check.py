@@ -165,8 +165,19 @@ class LanguageDetectionCheck(VerificationCheck):
     # Korean.  Remove only syntax-shaped identifiers and the small governed
     # platform lexicon from the classifier input.  The untranslated-unit and
     # terminology gates still validate those tokens independently.
+    # TC-APT-069: governed portfolio terminology must be stripped here for the
+    # same reason ".NET" and "FOSS" are -- it is not prose and must not be
+    # counted as language evidence. This inventory is the FOURTH place the term
+    # has to be listed (profile preserve_patterns, engine.py's
+    # _FRONTMATTER_TECHNICAL_SIGNAL_RE, config/terminology.yaml, and here), and
+    # missing this one made seoTitle the dominant failure on words-document-net:
+    # the signal was "for - Document Object Model &" (22 alpha, checked and
+    # misdetected) instead of "for &" (3 alpha, correctly skipped by the
+    # TC-APT-052 floor below). Multi-word entries precede the single-token
+    # alternatives so they claim their span first.
     TECHNICAL_SIGNAL_RE = re.compile(
         r"(?<![A-Za-z0-9_])(?:"
+        r"Document Object Model|"
         r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
         r"\.NET|C\+\+|C#|"
         r"FOSS|SDK|API|HTTP|REST|JSON|XML|XLSX|PDF|DOCX|"
