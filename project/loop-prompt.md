@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 10.2 (2026-09-05)`
+`loop_prompt_version: 10.3 (2026-09-05)`
 
 ## 0. On reload — before anything else
 
@@ -108,7 +108,10 @@ Track A — ship translated pages:
   skipped across pages until fixed; keep shipping every other page and language.
 - **RECURRENCE ESCALATION (mandatory, overrides the Track A/B time split -- added v10.0 after the
   operator found this loop accumulating evidence without ever fixing it):** before opening a NEW
-  Track-A page, count `heal_queue.jsonl`'s OPEN tickets grouped by `root_cause_class`. If any class
+  Track-A page, count `heal_queue.jsonl`'s OPEN tickets grouped by `root_cause_class` — where OPEN
+  means `disposition` is absent or `OPEN` (TC-APT-060: FIXED_VERIFIED / WAIVED_RUBRIC /
+  MODEL_LIMITATION_DEFERRED tickets do not count toward the gate; backfill the 48+ tickets of
+  already-live-proven fixes as FIXED_VERIFIED once their reverification receipts exist). If any class
   has tickets from **2 or more different source pages** and its corresponding Track-B taskcard has
   never actually been implemented (only investigated/deferred), no new Track-A page opens until the
   FULL closed-loop sequence below has run, regardless of the normal Track A/B split:
@@ -195,9 +198,14 @@ surface. Implement, test, execute the acceptance criterion, mark DONE, commit to
    TC-APT-041 reads DONE in `taskcard_status.json`, the runner still aborts a shard's commit and
    the whole `run()` call on any single job failure — continue the current workaround (small,
    hand-constructed batches, one call per attempt) only until that taskcard lands.
-2. Review (plan §9): Block-Queue receipts (gate ids 31–35, 37–44, `llm_provider_failure`) at
-   batch-size 1 first; Accepted-Sample-Queue per §9.1; a (language, class) cell reaches stratified
-   sampling only after 50 consecutive clean accepted cells. A review that cannot complete is
+2. Review (plan §9, §0.7): Block-Queue receipts (gate ids 31–35, 37–44, `llm_provider_failure`) at
+   batch-size 1 first; Accepted-Sample-Queue per §9.1. **Every verdict cites rule IDs from
+   `config/review_rubric.yaml` (TC-APT-059); a judgment call the rubric does not cover requires
+   adding a rule (a commit) before the verdict stands — never an ad hoc call.** For multi-language
+   pages, fan reviews out to parallel subagent reviewers (one language batch each, rubric attached,
+   structured verdicts) and adjudicate disagreements + spot-check 20% of APPROVEs yourself
+   (TC-APT-061). A (language, class) cell reaches stratified sampling after **15** consecutive
+   rubric-clean cells (1-in-5 thereafter, instant 100% reversion on any defect). A review that cannot complete is
    `BLOCKED_EXTERNAL` with a reason, never a silent pass. Every Block-Queue verdict is also a gate
    false-positive data point — record it.
 3. Verdicts: APPROVE → commit (step 5). REJECT_ISOLATED on a cell whose other model is untried →
@@ -205,7 +213,11 @@ surface. Implement, test, execute the acceptance criterion, mark DONE, commit to
    after both models → plan §10 end to end (persist → earliest affected checkpoint → two-dimension
    root cause → regression fixture → producer-side fix, never an output patch → TM invalidation →
    `verify_fix`-style proof over the affected set → sentinel sample → resume); quarantine the
-   affected cells and keep shipping unaffected ones in the same iteration. BLOCKED_EXTERNAL → mark
+   affected cells and keep shipping unaffected ones in the same iteration. **TM purge is part of
+   the same step that records a review-reject or opens a heal ticket — purge that
+   (source_path, target_lang)'s TM entries before yielding, every time, until TC-APT-062 makes it
+   transactional; a review-rejected cell whose TM survives poisons every later rerun and sibling
+   page (plan G-41, the observed 444-entry incident).** BLOCKED_EXTERNAL → mark
    rows, notify once per new reason, continue; if you can remove the reason yourself, heal it.
 4. Never quarantine an unseen candidate: a write-blocked candidate is re-run once through the debug
    harness in-session so its text and the gate's complaint are actually seen (not persisted).
@@ -220,14 +232,19 @@ surface. Implement, test, execute the acceptance criterion, mark DONE, commit to
    fail); `PYTHONUTF8=1` for non-ASCII in Python snippets; `newline="\n"` when Python writes tracked
    text; `git checkout -- <path>` refreshes mtime (a restored target then looks "up to date").
 7. Wake cadence is capped at 3 minutes, so an iteration never blocks on a long step. Launch a
-   campaign batch or a qualification cell as a background process (`run_in_background`, or the
-   shard-process form the Gate-5 runner already uses) with checkpoint/`--resume` enabled; record
+   campaign batch or a qualification cell as a **real OS-detached subprocess only** (the
+   shard-process form the Gate-5 runner already uses — never harness-level `run_in_background`,
+   which does not survive a wake; §1 hard limit) with checkpoint/`--resume` enabled; record
    its PID and run id in `taskcard_status.json`; on the next wake check it (receipts written,
    process alive, log tail), review whatever has completed, commit approved batches, and yield
    again. Never re-launch a batch that is still running; never kill one to "restart cleanly".
 
 ## 5. Commit and record
 
+0. **Batch policy (operator directive, TC-APT-063): accumulate review-accepted cells and commit
+   page-complete (one page's accepted languages = one commit) or family-scoped (N pages of one
+   subdomain/family/platform, ≤250 outputs = one commit, `content(<family>)` scope). Per-cell
+   commits only for single-cell heal retriggers.**
 1. Content repo, per approved batch (plan §19.2, real CLIs under `scripts/pipeline/commands/`):
    `skill_run_manager.py create` (S-HT-02) before the batch; after APPROVE:
    `session_ledger.py adopt --files <exactly the receipt-listed paths>` → `candidates --format json`
@@ -309,5 +326,6 @@ most 3 minutes out — never longer**, regardless of how long the current step i
 - 2026-09-04: operator flagged, directly and correctly, that the self-healing design (find defect -> root-cause -> fix -> retranslate affected -> resume) is not converging: heal_queue.jsonl had 67 open tickets and 0 resolved at the time of the flag, with the two largest root-cause classes (auto:FrontmatterLanguageCheck, 25 tickets; the TC-APT-042 sentence-defect family, 28 tickets across 4+ pages) both fully evidenced with a plausible fix direction in TC-APT-040/042 for multiple prior iterations, yet never actually implemented -- each iteration re-hit the same wall on a new page, documented it again (sometimes usefully, with more evidence), and pivoted rather than fixing it. Root cause of the failure to converge: nothing in this runbook previously forced a stop; Track A always "has eligible cells" (there is always another untried page), so Track B's <=50%-of-iteration cap combined with no per-root-cause escalation meant a well-evidenced, multi-page-confirmed defect had the same priority as a same-iteration novel finding, and the latter kept opportunistically winning. v10.0 adds the RECURRENCE ESCALATION rule (§3) to close this gap structurally, not as a one-time manual redirect.
 - 2026-09-04: a governance-state commit (taskcard_status.json) landed ~10s after launching a background campaign and raced its verify() call — "translator repository is dirty" on the FIRST launch attempt even though the tree was clean at manifest-build time. verify() runs once, synchronously, near the very start of run(), but a slow-starting process (model/TM imports) can still be mid-startup when a later commit dirties the tree it hasn't checked yet. Fix: after launching a campaign in the background, avoid touching tracked files again until either the process has produced its first shard result or enough time has passed that verify() has clearly already run.
 - 2026-09-04: after TC-APT-049 landed, introducing-words-foss-net's fresh rerun still leaves the link text "API Reference" in English (ar/cs/de all confirmed) — this is NOT a bug, do not re-fix it. `config/terminology.yaml` explicitly protects "API Reference" (preserve_mode: protect, severity: error, category: api_phrase), and real already-shipped translations across the portfolio (scene-entities-in-net's de/fr/ru, pdf-annotations-forms-net's de, convert-obj-stl-gltf-dotnet's ru, slides-core-api-java's ru) all consistently leave "API Reference" in English too — a deliberate, curated, portfolio-wide site convention (same family as `_link_text_is_brand_navigation_label`'s "Aspose.X KB" cases), separate from the "Getting Started"/"Developer Guide" bug (which WAS real and is now fixed). Any future review of this page (or others using the same link-list convention) must not flag "API Reference" alone as a defect.
+- 2026-09-05 (v10.3): revision-14 "judgment layer" audit (plan §0.7, G-38..G-42, TC-APT-059..063). Live confirmations first: the capacity clause worked (043 landed test-first, 044 followed); watchdog v2 handed over to session 442e200e correctly. New rules now in force: verdicts cite review_rubric.yaml rule IDs (rubric to be seeded by TC-APT-059 from the 102 tickets + shipped corpus); heal tickets take terminal dispositions and the recurrence gate counts OPEN only; TM purge is mandatory in the same step as any reject/ticket until TC-APT-062 lands transactionally; reviews fan out to parallel subagent reviewers with a 15-consecutive/1-in-5 ramp; commits batch per page/family; §4 item 7's stale run_in_background recommendation corrected to OS-detached-only (it contradicted the §1 hard limit).
 - 2026-09-05 (v10.2): revision-13 audit ("runs unattended" vs "finishes unattended", plan §0.6) landed five structural additions: ops_queue.jsonl throughput-breach check first in §2 (TC-APT-055); receipt-based evidence standard for RECURRENCE step 2 (TC-APT-057); the CAPACITY CLAUSE making TC-APT-043..047 the exclusive Track-B work while the KPI is below floor (TC-APT-058 — sequential mode cannot finish the portfolio, this is arithmetic not preference); fleet work-claims before any page/taskcard (TC-APT-056); the harness-background-task substrate rule promoted from field note to §1 hard limit. Watchdog v2 (TC-APT-054, cold-boot fallback when resume stops producing progress) is implemented OS-side in scripts/ops/mission_watchdog.ps1 and does not need loop-side action. Immediate queue on next wake: TC-APT-053 steps 2-3 (reverify introducing-pdf-foss-cpp/cs against 4e5089e, retrigger), then the capacity clause takes effect.
 - 2026-09-05: operator tightened v10.0's RECURRENCE ESCALATION rule -- "fix, reverify against the exact file that showed the problem, then retrigger the campaign" is the required closed loop, not "fix and move on to a new page" (which is what every prior TC-APT-040/042 encounter actually did, unit tests notwithstanding). v10.1 spells out the 3 mandatory steps in §3: (1) fix the producer-side root cause, (2) re-translate the SAME source_path/target_lang the original heal ticket named and confirm the specific defect is gone by reading the actual output (a passing unit test alone does not satisfy this), (3) retrigger the campaign on every page/cell quarantined for that root cause and commit whatever now passes. Only after step 3 does a new, never-before-tried page become selectable again.
