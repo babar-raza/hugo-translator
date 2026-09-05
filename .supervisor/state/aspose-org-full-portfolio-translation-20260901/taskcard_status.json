@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T21:06:47+00:00",
+  "updated_at": "2026-09-05T21:07:59+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1138,8 +1138,8 @@
       "depends_on": [],
       "blocking_reason": null,
       "evidence_path": "data/summaries/fix-tc-apt-084-link-bracket-balance-20260906.json; data/summaries/retrigger-heal-cells-go-w2-20260906.json; data/summaries/review-cells-go-w2-batch-20260906.json",
-      "commit": null,
-      "last_updated": "2026-09-05T21:06:47+00:00",
+      "commit": "462b9c466e",
+      "last_updated": "2026-09-05T21:07:59+00:00",
       "blocker_type": null
     },
     "TC-APT-085": {
@@ -1150,8 +1150,8 @@
       "depends_on": [],
       "blocking_reason": null,
       "evidence_path": "data/summaries/fix-tc-apt-085-brand-nav-list-item-20260906.json; data/summaries/retrigger-heal-cells-go-w2-20260906.json; data/summaries/review-cells-go-w2-batch-20260906.json",
-      "commit": null,
-      "last_updated": "2026-09-05T21:06:47+00:00",
+      "commit": "462b9c466e",
+      "last_updated": "2026-09-05T21:07:59+00:00",
       "blocker_type": null
     },
     "TC-APT-086": {
