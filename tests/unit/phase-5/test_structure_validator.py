@@ -91,11 +91,14 @@ class TestStructureValidator:
         assert result.success is True
 
     def test_list_count_mismatch(self, validator):
-        """Test with different list item counts."""
+        """Test with a list item count drift beyond the tolerated +/-2 (TC-APT-053)."""
         source = """
 - Item 1
 - Item 2
 - Item 3
+- Item 4
+- Item 5
+- Item 6
 """
         translation = """
 - Élément 1
@@ -105,6 +108,31 @@ class TestStructureValidator:
 
         assert result.warning_count > 0
         assert any("list item count" in issue.message.lower() for issue in result.issues)
+
+    def test_list_count_small_drift_tolerated(self, validator):
+        """TC-APT-053: a translator splitting one list item into two (or merging
+        two into one) is ordinary stylistic variance, not lost/duplicated
+        content. Confirmed live on introducing-pdf-foss-cpp/cs: a genuinely
+        correct professionalize_llm translation (source 10 items, translation
+        11) was rejected outright for this alone, cascading into a cross-model
+        escalation that then badly corrupted the page's code blocks -- the
+        real defect was rejecting a fine translation over a 1-item drift.
+        """
+        source = """
+- Item 1
+- Item 2
+- Item 3
+"""
+        translation = """
+- Élément 1a
+- Élément 1b
+- Élément 2
+- Élément 3
+"""
+        result = validator.validate(source, translation)
+
+        assert result.success is True
+        assert not any("list item count" in issue.message.lower() for issue in result.issues)
 
     def test_code_block_preservation(self, validator):
         """Test code block preservation."""
