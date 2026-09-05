@@ -50,6 +50,13 @@ global:
       case_sensitive: true
       preserve_mode: both
       severity: error
+      # TC-APT-069: a partial loss (some occurrences translated, others kept)
+      # is the defect that actually occurs here -- measured in 8 of 10 locales --
+      # and it lands in the frequency-mismatch branch, which defaults to warning.
+      # This term opts that branch up to error so the gate fires on the real
+      # case. Deliberately NOT changed for other terms: a legitimate restructure
+      # can alter their counts.
+      frequency_severity: error
 
     - term: "Java"
       category: platform

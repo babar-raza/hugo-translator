@@ -112,3 +112,60 @@ def test_the_lowercase_prose_form_is_not_governed(validator):
     result = validator.validate(source, "Aspose.Words يوفر نموذج كائن المستند")
 
     assert not any(issue.details.get("term") == TERM for issue in _errors(result))
+
+
+def _severities(result, term):
+    return [
+        str(getattr(issue.severity, "value", issue.severity)).lower()
+        for issue in result.issues
+        if issue.details.get("term") == term
+    ]
+
+
+def test_partial_loss_of_the_governed_term_is_an_error(validator):
+    """The defect that actually occurs: some occurrences kept, others translated.
+
+    Measured on words-document-net, 8 of 10 locales lost SOME occurrences while
+    keeping at least one. That keeps translation_count > 0, so it lands in the
+    frequency-mismatch branch rather than the missing-entirely branch -- which
+    defaults to a warning, which is why the gate never fired on the real defect.
+    """
+    source = f"{TERM} appears here. And again: {TERM}."
+    partial = f"{TERM} appears here. And again: translated form."
+
+    assert "error" in _severities(validator.validate(source, partial), TERM)
+
+
+def test_full_preservation_still_passes(validator):
+    source = f"{TERM} appears here. And again: {TERM}."
+
+    assert _severities(validator.validate(source, source), TERM) == []
+
+
+def test_total_loss_is_still_an_error(validator):
+    """The pre-existing branch must keep working."""
+    source = f"Inside the {TERM}."
+
+    assert "error" in _severities(validator.validate(source, "Wholly translated."), TERM)
+
+
+def test_other_terms_keep_the_warning_default(validator):
+    """Neutrality: a legitimate restructure can change a brand's count.
+
+    Promoting every frequency mismatch to error would reject good translations,
+    so only a term that opts in via frequency_severity is tightened.
+    """
+    other = "Aspose"
+    source = f"{other} and {other} again."
+    partial = f"{other} only once."
+
+    severities = _severities(validator.validate(source, partial), other)
+
+    assert severities, "expected a frequency-mismatch issue for the control term"
+    assert "error" not in severities
+
+
+def test_only_the_governed_term_opted_in(validator):
+    opted = [t.get("term") for t in validator.exact_matches if t.get("frequency_severity")]
+
+    assert opted == [TERM]
