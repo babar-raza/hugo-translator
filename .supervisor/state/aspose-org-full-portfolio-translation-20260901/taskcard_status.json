@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T09:38:00+00:00",
+  "updated_at": "2026-09-05T09:49:49+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -671,7 +671,7 @@
       "note": "Root cause reproduced (Test A, rep-0 None corruption pre-fix), fixed b82b568 (per-instance YAML + threading.local engine.parser), Test A clean 50+50 reps, Test B clean 25 reps end-to-end (2215fbd). Both permanent regression tests. Next in dependency order: TC-APT-044 (backend-instance locks, delete engine-wide lock)."
     },
     "TC-APT-044": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "gate": null,
       "title": "Move generation lock onto resolved backend instance (HF/CT2 lock, LLM none); delete campaign_runner engine-wide _model_execution_lock",
       "depends_on": [
@@ -679,10 +679,11 @@
       ],
       "owner": "loop",
       "blocking_reason": "Code + regression tests landed (4197454): per-instance _generation_lock on HuggingFaceBackend/CTranslate2Backend (whole translate body -- tokenizer src_lang state is part of the hazard), LLMModelBackend lock-free (confirmed duck-typed, not ABC subclass), campaign_runner._model_execution_lock deleted. workers+backends suites 562 passed. gpu_cache_manager checked: empty_cache()-only, safe. Held at IN_PROGRESS because plan SS11 acceptance references Test D (K concurrent LLM calls ~ one latency), which is TC-APT-046 step 3 -- completes there.",
-      "evidence_path": null,
+      "evidence_path": "tests/regression/test_backend_generation_concurrency.py",
       "commit": "4197454",
-      "last_updated": "2026-09-05T09:15:00+00:00",
-      "blocker_type": null
+      "last_updated": "2026-09-05T09:49:49+00:00",
+      "blocker_type": null,
+      "note": "Code landed earlier (4197454): engine-wide _model_execution_lock deleted; per-instance _generation_lock on HuggingFaceBackend (loader.py:215/375) and CTranslate2Backend (931/1044). The card stayed IN_PROGRESS because its acceptance criterion IS TC-APT-046 Test D, which did not exist. Both halves now proven and permanent: Test D -- 4 concurrent LLMModelBackend calls complete in 0.205s (one call latency 0.20s), not 0.80s; counterpart -- 4 concurrent HuggingFaceBackend calls observe max_active==1 and take >=0.8x serialized time. Falsifiability checked directly: reintroducing an engine-wide lock drops LLM max_concurrent 4->1 and elapsed 0.205s->0.803s, so Test D would fail. Plan SS11 flagged as unconfirmed whether LLMModelBackend subclasses the ModelBackend ABC -- it does NOT (llm_backend.py:150 is a plain class) and correctly holds no lock; pinned by test_llm_backend_holds_no_generation_lock."
     },
     "TC-APT-045": {
       "status": "DONE",
@@ -701,7 +702,7 @@
       "note": "Both SS11 acceptance criteria met: Test C passes (10 reps, two concurrent translate_file calls with different model_id, zero cross-job bleed, each output provably from its own pinned backend) and no attribute-based model routing remains in the campaign path (source guard test). Regression file total: 11 passed (commit msg said 12, miscount). Known minor gap: BM-06 production_ingestor translation_model_used reports default for campaign runs; receipts model_fingerprint is authoritative."
     },
     "TC-APT-046": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": null,
       "title": "Concurrency rollout: force_serialize_all_backends flag, canary at max_parallel_jobs=4, Test D permanent CI guard, sustained calibration before any ceiling raise",
       "depends_on": [
@@ -711,10 +712,11 @@
       ],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": "tests/unit/workers/test_campaign_serialization_rollback.py, tests/regression/test_backend_generation_concurrency.py",
       "commit": null,
-      "last_updated": "2026-09-05T07:50:00+00:00",
-      "blocker_type": null
+      "last_updated": "2026-09-05T09:49:49+00:00",
+      "blocker_type": null,
+      "note": "Step 1 DONE: translation_engine.concurrency.force_serialize_all_backends (config/global.yaml, default true) is an instant code-free rollback of TC-APT-044, scoped to the campaign path only -- the deleted lock never covered the CLI parallel-language executor, so re-serializing that would be a new restriction, not a rollback. Fails safe to true on any config read error. Inert at max_parallel_jobs=1. Step 3 DONE: Test D is in the permanent suite. Steps 2 (real canary at max_parallel_jobs=4 with automated cross-contamination diff) and 4 (sustained-load calibration before any schema-ceiling raise) still TODO -- both need a campaign, blocked on the in-flight gate5-pdf-foss-cpp-r2. Side finding: test_campaign_parallel_jobs_share_engine_without_cross_job_state depended on an unstated default; it now names the switch state it exercises (assertion unchanged)."
     },
     "TC-APT-047": {
       "status": "IN_PROGRESS",

@@ -865,6 +865,11 @@ def test_campaign_parallel_jobs_share_engine_without_cross_job_state(tmp_path, m
         lambda **_kwargs: {**manifest.to_summary(), "accepted": 0, "remaining": 2},
     )
     monkeypatch.setattr(runner, "_commit_verified_outputs", lambda _shard: None)
+    # TC-APT-046: this test's subject is job overlap, so it must state which side of
+    # the rollback switch it exercises rather than inherit a default. The shipped
+    # default is the serialized (pre-TC-APT-044) behaviour until a canary at
+    # max_parallel_jobs > 1 has been reviewed.
+    monkeypatch.setattr(runner, "_force_serialize", False)
 
     summary = runner.run()
 

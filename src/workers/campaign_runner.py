@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -36,6 +37,25 @@ from .campaign_manifest import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _force_serialize_all_backends() -> bool:
+    """Read the TC-APT-046 rollback switch.
+
+    ``translation_engine.concurrency.force_serialize_all_backends`` defaults to
+    ``True``: until a real canary at ``max_parallel_jobs > 1`` has proven otherwise,
+    the campaign path behaves exactly as it did before TC-APT-044. Flipping the key
+    to ``false`` needs no code change. A missing/unreadable config must not silently
+    unserialize the run, so every failure resolves to ``True``.
+    """
+    try:
+        from src.utils.config_loader import get_global_config
+
+        config = get_global_config() or {}
+    except Exception:  # pragma: no cover - config load is exercised elsewhere
+        return True
+    concurrency = ((config.get("translation_engine") or {}).get("concurrency") or {})
+    return bool(concurrency.get("force_serialize_all_backends", True))
 
 
 class CampaignLedger:
@@ -360,6 +380,26 @@ class CampaignRunner:
         # m2m100 fallback (the returned instance is locked no matter how it
         # was resolved). The shared-parser hazard the old lock also papered
         # over was fixed at the source by TC-APT-043.
+        #
+        # TC-APT-046 step 1: an instant, code-free rollback to that old,
+        # fully-serialized behaviour, for the case where a canary at
+        # max_parallel_jobs > 1 shows something the regression tests do not.
+        # Scoped to the campaign path only -- the deleted lock never covered
+        # the CLI's parallel-language executor, so re-serializing that here
+        # would be a new restriction rather than a rollback. Inert while
+        # max_parallel_jobs is 1 (only one job is ever in flight), which is why
+        # it can default to the safe value without costing throughput today.
+        self._force_serialize_lock = threading.RLock()
+        self._force_serialize = _force_serialize_all_backends()
+
+    @contextmanager
+    def _rollback_serialization(self):
+        """Serialize engine calls when the TC-APT-046 rollback switch is on."""
+        if not self._force_serialize:
+            yield
+            return
+        with self._force_serialize_lock:
+            yield
 
     def _validated_resume_receipts(self) -> dict[str, dict[str, Any]]:
         receipts = self.ledger.receipts()
@@ -1751,9 +1791,10 @@ class CampaignRunner:
                     "retry_budget_override": retry_budget,
                     "model_id": phase_model_id,
                 }
-                result = self.engine.translate_file(
-                    source.site_id, source_path, **translate_kwargs
-                )
+                with self._rollback_serialization():
+                    result = self.engine.translate_file(
+                        source.site_id, source_path, **translate_kwargs
+                    )
                 receipt = result.acceptance_receipts.get(locale)
                 if receipt is None:
                     receipt = self.ledger.receipts().get(expected_output)

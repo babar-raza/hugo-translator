@@ -654,6 +654,13 @@ validation_defaults:
 # Mandatory validation settings to prevent corrupted/wrong-language translations in production
 # WARNING: Disabling these settings in production will result in quality degradation
 translation_engine:
+  # TC-APT-046 step 1: instant, code-free rollback of TC-APT-044's lock narrowing.
+  # true  = campaign translate_file calls are serialized process-wide (pre-044 behaviour).
+  # false = only the per-backend generation locks apply (LLM/API calls run concurrently).
+  # Stays true until a real canary at max_parallel_jobs > 1 has been run and reviewed;
+  # inert while max_parallel_jobs is 1, since only one job is ever in flight.
+  concurrency:
+    force_serialize_all_backends: true
   # TC-APT-004 LLM-HARDEN-001 (mission aspose-org-full-portfolio-translation-20260901).
   # Thresholds per TC-APT-028 calibration (2026-09-02): healthy endpoint showed 0 failures in
   # calibration; trip stays at 5 consecutive / 50% of last 20 calls; 60 s cooldown doubling to 10 min.
