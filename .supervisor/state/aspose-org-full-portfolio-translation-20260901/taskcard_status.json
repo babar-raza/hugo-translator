@@ -1,10 +1,10 @@
 {
   "mission_id": "aspose-org-full-portfolio-translation-20260901",
   "plan_path": "C:\\Users\\prora\\.claude\\plans\\hugo-translator-aspose-org-partitioned-kahn.md",
-  "plan_revision": "12",
+  "plan_revision": "13",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-04T06:05:00+00:00",
+  "updated_at": "2026-09-05T07:50:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -565,15 +565,15 @@
       "blocker_type": null
     },
     "TC-APT-042": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": 5,
       "title": "Complex/idiomatic sentence structures produce recurring cross-language defects (parallel-negation-lists, verbed-noun idioms like 'round-trip', product-name+generic-noun link text)",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": "Originally opened for cells-spreadsheet-management-go's parallel-negation-list/nested-conditional-before-link sentences. CONCLUSIVE evidence added from introducing-words-foss-net's full 8-language review (ar,cs,de,el,es,fa,fr,he -- ALL 8 rejected even after both real pipeline bugs TC-APT-041/049 were fixed and confirmed working in every one). Two recurring defects, both narrowly scoped to 1-2 specific sentences on this page: (1) round-trip verbed-idiom sentence mistranslated in 5/8 (de,cs,el,fa,he), fine in 2/8 (es,fr) -- genuine per-language model variance, no clear pipeline explanation found. (2) '[Aspose.Words FOSS for .NET repository]' link text scrambled in 6/8 (ar,cs,es,fa,fr,he), borderline in el, unclear in de -- this one has a PLAUSIBLE architectural explanation, not just model variance: `_extract_link` (text_unit_extractor.py) always extracts link text as its own isolated TextUnit (kind=LINK_TEXT), translated WITHOUT the surrounding sentence's context ('The full source is available on GitHub in the [...]'). Translating a bare product-name+generic-noun compound with no sentence context to signal the required case/preposition is inherently harder than translating it in full-sentence context -- plausibly related to TC-APT-036's underlying concern (link content losing full-sentence coherence), though TC-APT-036 is specifically about LEAF-fallback paragraph fragmentation, not link-text isolation, so this may need its own investigation: does LINK_TEXT translation ever receive surrounding-sentence context, and would passing it help. NOT attempted this session -- context-passing to link-text translation is an architecture-level change, same weight class as TC-APT-041/049, deserves its own dedicated iteration with proper regression tests, not a rushed attempt at the tail of an already-long session. Gate 5 pivoted off this page (see TC-APT-014) rather than continuing to spend review budget on already-conclusive 8/8 evidence.",
+      "blocking_reason": "v10.1 step 1 (producer-side fix) LANDED (010a5d2): cross-field frontmatter residual repair (frontmatter_consistency.py + SegmentTranslator hook, 9 new unit tests) covering the dominant near-duplicate description/summary defect, plus fr \"Annotations\" cognate added to _REVIEWED_IDENTICAL_TRANSLATIONS (2nd page, live fr failure on pdf-foss-cpp). Steps 2-3 PENDING: reverify against the exact original failing files (introducing-words-foss-net ar/cs/de/el/es/fa/fr/he; introducing-pdf-foss-typescript cs/de/el/fa/he/hu/ko/nl/pl/ro/ru/sv/tr/th/vi), then retrigger those quarantined cells. NOT covered by this fix: the complex-sentence/idiom variance subset (parallel-negation lists, \"round-trip\" idiom) -- needs its own attempt or a documented full-body-review decision per the plan acceptance. Claim lease: claims.jsonl taskcard:TC-APT-042 session 442e200e.",
       "evidence_path": "data/summaries/fp-gate5-cells-go-20260904.json, data/summaries/fp-gate5-words-foss-net-20260904.json",
       "commit": null,
-      "last_updated": "2026-09-04T14:45:00+00:00",
+      "last_updated": "2026-09-05T07:50:00+00:00",
       "blocker_type": null
     },
     "TC-APT-041": {
@@ -656,6 +656,135 @@
       "evidence_path": "debug harness output (cs: success=True, 0 issues) -- see this blocking_reason for the exact command",
       "commit": "4e5089e",
       "last_updated": "2026-09-05T12:10:00+00:00"
+    },
+    "TC-APT-043": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Reproduce + fix shared-mutable-state thread hazard (module-level YAML singleton in hugo_parser, shared HugoParser instance); Test A must reproduce BEFORE fix is trusted",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-044": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Move generation lock onto resolved backend instance (HF/CT2 lock, LLM none); delete campaign_runner engine-wide _model_execution_lock",
+      "depends_on": [
+        "TC-APT-043"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-045": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Close model_id_override shared-attribute race via call-scoped model_id parameter through translate_file",
+      "depends_on": [
+        "TC-APT-043",
+        "TC-APT-044"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-046": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Concurrency rollout: force_serialize_all_backends flag, canary at max_parallel_jobs=4, Test D permanent CI guard, sustained calibration before any ceiling raise",
+      "depends_on": [
+        "TC-APT-043",
+        "TC-APT-044",
+        "TC-APT-045"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-047": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Revive process-level shard parallelism (launch_parallel_campaign_shards.py) as fallback + GPU/API isolation (hu/ja/ro dedicated shard)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-054": {
+      "status": "DONE",
+      "gate": null,
+      "title": "Watchdog v2: cold-boot fresh session after 2 no-progress relaunches (mission_watchdog.ps1)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": "7dec906",
+      "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-055": {
+      "status": "DONE",
+      "gate": null,
+      "title": "Throughput KPI in watchdog (cells/24h floor 25, THROUGHPUT_BREACH rows to ops_queue.jsonl)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": "7dec906",
+      "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-056": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Fleet work-claims helper (claims.jsonl FileLock lease); interim atomic-append protocol in use",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-057": {
+      "status": "TODO",
+      "gate": null,
+      "title": "Reverification receipts (data/campaigns/reverification_receipts.jsonl) as the evidence standard for RECURRENCE step 2",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-058": {
+      "status": "DONE",
+      "gate": null,
+      "title": "Capacity forcing-function clause in runbook SS3 (landed in loop-prompt v10.2)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T07:50:00+00:00",
+      "blocker_type": null
     }
   },
   "gate_closures": {
