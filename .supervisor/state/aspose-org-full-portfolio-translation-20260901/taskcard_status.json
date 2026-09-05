@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T11:02:00+00:00",
+  "updated_at": "2026-09-05T11:52:40+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -571,10 +571,11 @@
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": "v10.1 step 1 (producer-side fix) LANDED (010a5d2): cross-field frontmatter residual repair (frontmatter_consistency.py + SegmentTranslator hook, 9 new unit tests) covering the dominant near-duplicate description/summary defect, plus fr \"Annotations\" cognate added to _REVIEWED_IDENTICAL_TRANSLATIONS (2nd page, live fr failure on pdf-foss-cpp). Steps 2-3 PENDING: reverify against the exact original failing files (introducing-words-foss-net ar/cs/de/el/es/fa/fr/he; introducing-pdf-foss-typescript cs/de/el/fa/he/hu/ko/nl/pl/ro/ru/sv/tr/th/vi), then retrigger those quarantined cells. NOT covered by this fix: the complex-sentence/idiom variance subset (parallel-negation lists, \"round-trip\" idiom) -- needs its own attempt or a documented full-body-review decision per the plan acceptance. Claim lease: claims.jsonl taskcard:TC-APT-042 session 442e200e.",
-      "evidence_path": "data/summaries/fp-gate5-cells-go-20260904.json, data/summaries/fp-gate5-words-foss-net-20260904.json",
-      "commit": null,
-      "last_updated": "2026-09-05T07:50:00+00:00",
-      "blocker_type": null
+      "evidence_path": "tests/regression/test_softwrap_sentence_integrity.py, data/summaries/reverify-softwrap-fix-real-content-20260905.json",
+      "commit": "c286492",
+      "last_updated": "2026-09-05T11:52:40+00:00",
+      "blocker_type": null,
+      "note": "ROOT CAUSE FOUND AND FIXED. Not model quality: the extractor split a Markdown paragraph at its HARD LINE WRAPS whenever the paragraph also contained a LINK/STRONG/EMPHASIS (leaf-mode), translating each fragment with no knowledge of the others. Fix c286492 folds SOFT_BREAK into the surrounding text in HugoParser._parse_inline_content; output neutrality proven by A/B rendering 14 real files byte-identically. STEP-2 REVERIFICATION DONE ON REAL CONTENT: cells-spreadsheet-management-go carries the identical wrapped paragraph that broke 16/16 locales on the sibling page; in the first 3 post-fix cells (de/ar/fa) all four pre-fix defect signatures are gone (split noun phrase, duplicated/orphaned negation, spurious copula, scrambled product name). REMAINING: full 25-locale review of this page when the campaign finishes; and the 16 heal tickets on introducing-cells-foss-go still need their own retrigger, blocked on operator permission to clear rejected candidates from the content-repo tree."
     },
     "TC-APT-041": {
       "status": "DONE",
