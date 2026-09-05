@@ -378,20 +378,22 @@
     "TC-APT-014": {
       "status": "IN_PROGRESS",
       "gate": 5,
-      "title": "Gate 5: pdf-foss-typescript CLOSED (3 committed), note/python CLOSED (2 committed, TC-APT-040 fix proven live) -- next page blocked pending TC-APT-051 live verification per RECURRENCE ESCALATION",
+      "title": "Gate 5: pdf-foss-typescript CLOSED (3 committed), note/python CLOSED (18/25 committed, TC-APT-040/051/052 all proven live) -- RECURRENCE ESCALATION satisfied for those 3 classes, next page selectable",
       "depends_on": [
         "TC-APT-013"
       ],
       "owner": "loop",
-      "blocking_reason": "pdf/typescript/introducing-pdf-foss-typescript CLOSED: 3 committed, 22 heal-ticketed, gate-close rule satisfied. note/python/_index.md RETRIED after TC-APT-040 landed (434eda1): title field now passes FrontmatterLanguageCheck in all 25 languages (0 occurrences vs 25/25 before) -- confirms the fix live. Result: 2/25 committed (th, vi; commit d4c43b1dc8), 23 quarantined with auto-heal tickets -- gate-close rule satisfied (scope exercised, every non-committed cell ticketed), CLOSED. Quarantine breakdown surfaced a NEW recurrence-escalation-qualifying finding: RepetitionDetectorValidator false-flagged 15/23 short-content cells (word-frequency ratio noise on <15-word segments) -- 2nd source page (also seen on introducing-pdf-foss-typescript/hi), fixed and unit-tested as TC-APT-051 (e77c633) but NOT YET proven live via a re-run. LanguageConsistencyValidator false-flagged the other 6/23 (fa,ja,ko,pt,ro,sv) -- root cause NOT YET investigated, single-page so far (does not yet cross the 2-page recurrence bar on its own). cells-foss-go's manifest (data/campaigns/gate5-cells-foss-go/manifest.yaml) still exists but its PID 46816/39960 is dead (stopped before v10.0 arrived) -- do NOT relaunch it or any new Track-A page until TC-APT-051 is proven live (re-run note/python or another short-content page) per the RECURRENCE ESCALATION rule.",
+      "blocking_reason": "pdf/typescript/introducing-pdf-foss-typescript CLOSED: 3 committed, 22 heal-ticketed. note/python/_index.md CLOSED at 18/25 committed across 3 commits (d4c43b1dc8: th,vi; d999858843: ar,de,el,fr,he,hi,hu,id,nl,ru,tr; afb5dfdb00: cs,es,it,pl,uk), 7 quarantined with heal tickets (fa,ja,ko,pt,ro,sv,zh -- all LanguageConsistencyValidator, single page so far, does not yet cross the 2-page recurrence bar). This page closed the FULL v10.1 3-step loop for THREE root-cause classes in sequence: TC-APT-040 (FrontmatterLanguageCheck short-signal floor, 434eda1) -- fix+reverify+retrigger all proven, 0/25 failures now vs 25/25 before. TC-APT-051 (RepetitionDetectorValidator word-frequency ratio noise on short segments, e77c633) -- fixed 11/16 targeted shards live, but 5 (cs,es,it,pl,uk) then hit a THIRD independent bug (TC-APT-052) before TC-APT-051's own loop could be called fully closed on those 5. TC-APT-052 (LanguageDetectionCheck short-signal floor 2->6 in the separate write-time VerificationAgent, 1c14467) -- reverified live, all 5 remaining shards now pass, retriggered+committed. Both TC-APT-051 and TC-APT-052 are DONE with all originally-quarantined note/python cells now resolved. TC-APT-052's OTHER heal-ticket source (introducing-cells-foss-go/cs) has NOT yet been retried -- that source page's own campaign state is unknown/stale (PID 46816/39960 dead) and needs its own manifest rebuild before v10.1's step 3 is fully satisfied for that page too; not blocking (note/python alone satisfies 'reverify+retrigger against the exact originating file', and cells-foss-go's ticket is the SAME code fix already proven, not a distinct unfixed defect). A genuinely new Track-A page IS now selectable.",
       "evidence_path": "data/summaries/fp-gate5-pdf-foss-typescript-20260904.json, data/campaigns/gate5-note-python/summary.json",
       "commit": [
         "b52c1bf674",
         "fc26b5fc93",
         "46be9275c4",
-        "d4c43b1dc8"
+        "d4c43b1dc8",
+        "d999858843",
+        "afb5dfdb00"
       ],
-      "last_updated": "2026-09-05T00:05:00+00:00",
+      "last_updated": "2026-09-05T10:15:00+00:00",
       "blocker_type": null
     },
     "TC-APT-015": {
@@ -621,15 +623,27 @@
       "blocker_type": null
     },
     "TC-APT-051": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "gate": 5,
       "title": "RepetitionDetectorValidator word-frequency false positive on short translation segments (RECURRENCE ESCALATION: 2nd source page)",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": "Found while live-verifying TC-APT-040 on note/python/_index.md: 15/23 quarantined cells failed on RepetitionDetectorValidator's word-frequency check, not FrontmatterLanguageCheck. Root cause: percentage ratio is noisy on short segments -- 2 occurrences among 9 filtered (non-stopword) words already reads as 22.2%, past the default 20% WARNING threshold; zero-defect validation_policy promotes warnings to blocking. Also seen on introducing-pdf-foss-typescript/hi (1 ticket) -- 2 source pages, qualifies for v10.0's RECURRENCE ESCALATION rule. Fixed (e77c633): below _MIN_FILTERED_WORDS_FOR_FREQUENCY_RATIO=15 filtered words, require an absolute repeat count (_MIN_ABSOLUTE_COUNT_FOR_SHORT_TEXT=4) before trusting the ratio -- mirrors the file's own pre-existing _MIN_SOURCE_WORDS_FOR_CEILING rationale for the source-side ceiling, now applied translation-side too. Unit-tested: tests/unit/validation/test_repetition_detector_validator.py (36 tests incl. 2 new TestShortSegmentWordFrequencyFloor regression tests) + tests/unit/validation/ + integration/test_realtime_repetition_detection.py (497 passed, 12 skipped), all green. NOT YET proven live -- needs a re-run of note/python (or another short-content page) to confirm the 15 previously-quarantined cells now pass, per the 'attempted and tested' bar. LanguageConsistencyValidator (the OTHER note/python failure class, 6/23 cells: fa,ja,ko,pt,ro,sv) is a separate, not-yet-investigated root cause -- single page so far, does not yet cross the recurrence threshold on its own.",
-      "evidence_path": "data/campaigns/gate5-note-python/failure_metadata.jsonl, tests/unit/validation/test_repetition_detector_validator.py::TestShortSegmentWordFrequencyFloor",
+      "blocking_reason": "Found while live-verifying TC-APT-040 on note/python/_index.md: 16/23 quarantined cells failed on RepetitionDetectorValidator's word-frequency check (2 source pages incl. introducing-pdf-foss-typescript/hi -- RECURRENCE ESCALATION). Root cause: percentage ratio is noisy on short segments -- 2 occurrences among 9 filtered words already reads as 22.2%, past the 20% WARNING threshold, promoted to blocking under zero-defect. Fixed (e77c633): below _MIN_FILTERED_WORDS_FOR_FREQUENCY_RATIO=15 filtered words, require an absolute repeat count (>=4) before trusting the ratio -- mirrors the file's own pre-existing _MIN_SOURCE_WORDS_FOR_CEILING rationale, now applied translation-side too. v10.1's full 3-step loop closed: unit-tested (36 tests green) -> reverified live by re-running the exact 16 quarantined note/python shards (11 passed clean, committed d999858843) -> the remaining 5 (cs,es,it,pl,uk) hit a SEPARATE, independent bug (TC-APT-052) before this loop's cells could commit; retriggered again after TC-APT-052 landed and all 16/16 now pass and are committed (afb5dfdb00). Fully closed for note/python; introducing-cells-foss-go's ticket for this class was NOT independently retried (its own campaign state is stale) but is the same already-proven code fix, not a distinct unresolved defect.",
+      "evidence_path": "data/campaigns/gate5-note-python/acceptance_receipts.jsonl (16/16 RepetitionDetectorValidator-quarantined shards now accepted), tests/unit/validation/test_repetition_detector_validator.py::TestShortSegmentWordFrequencyFloor",
       "commit": "e77c633",
-      "last_updated": "2026-09-05T00:05:00+00:00",
+      "last_updated": "2026-09-05T10:15:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-052": {
+      "status": "DONE",
+      "gate": 5,
+      "title": "LanguageDetectionCheck (write-time VerificationAgent) short-signal floor too low (2 chars) -- third independent occurrence of the TC-APT-040 pattern",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": "After TC-APT-051 fixed 11/16 note/python cells, the remaining 5 (cs,es,it,pl,uk) still WRITE BLOCKED, but on a DIFFERENT gate: verification:language_detection. Root cause: src/verification/checks/language_check.py's LanguageDetectionCheck is an independent implementation of the same strip-technical-tokens-then-detect pattern as engine.py's FrontmatterLanguageCheck (TC-APT-040), but its floor was only 2 alphabetic characters -- a bare _index.md title's stripped connector word ('dla'/'pro'/'para'/'per', 3-4 chars) cleared that floor easily, and langdetect is unreliable on a single short word. heal_queue.jsonl already had a ticket for this class on introducing-cells-foss-go/cs -- 2 source pages, RECURRENCE ESCALATION. Fixed (1c14467): raised the floor 2->6, matching TC-APT-040's already-proven value. v10.1's full 3-step loop closed: unit-tested (2 new TestShortSignalFloorTCAPT052 regression tests, 85 verification tests green) -> reverified live by re-running the exact 5 originating shards (all 5 now pass) -> retriggered and committed (afb5dfdb00). introducing-cells-foss-go/cs was NOT independently retried (stale campaign state) but is the same already-proven fix, not a distinct defect.",
+      "evidence_path": "data/campaigns/gate5-note-python/acceptance_receipts.jsonl (cs,es,it,pl,uk all accepted), tests/unit/verification/test_language_check.py::TestShortSignalFloorTCAPT052",
+      "commit": "1c14467",
+      "last_updated": "2026-09-05T10:15:00+00:00",
       "blocker_type": null
     }
   },
@@ -650,6 +664,6 @@
     }
   },
   "last_wake_summary": "data/summaries/aspose-org-wake-001-20260902.json",
-  "cells_committed_total": 28,
-  "loop_prompt_version_seen": "10.0 (2026-09-04)"
+  "cells_committed_total": 44,
+  "loop_prompt_version_seen": "10.1 (2026-09-05)"
 }
