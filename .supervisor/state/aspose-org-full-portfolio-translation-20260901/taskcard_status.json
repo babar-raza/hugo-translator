@@ -1074,6 +1074,47 @@
       "commit": null,
       "last_updated": "2026-09-05T19:02:51+00:00",
       "blocker_type": null
+    },
+    "TC-APT-080": {
+      "status": "TODO",
+      "gate": 6,
+      "title": "Scale step-up protocol -- double wave_scale on proof (recurrence clear + KPI>=floor + acceptance>=80%), halve on trouble; gates 6-8 close via the ladder",
+      "depends_on": [
+        "TC-APT-047"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T19:07:55.424085+00:00",
+      "blocker_type": null,
+      "plan_ref": "SS0.9 revision 16"
+    },
+    "TC-APT-081": {
+      "status": "TODO",
+      "gate": 6,
+      "title": "Proactive validator-FP calibration sweep: full ValidationSuite+gates over shipped-approved corpus (every flag = FP class) + stratified 200-cell battery; fix classes in one batch with fixtures",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": "Run before or alongside the first TC-APT-080 wave doubling.",
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T19:07:55.424085+00:00",
+      "blocker_type": null,
+      "plan_ref": "SS0.9 revision 16"
+    },
+    "TC-APT-082": {
+      "status": "TODO",
+      "gate": 6,
+      "title": "Governance compaction + state digest: archive >48h field notes, 40KB runbook hard cap, stamp-validated state_digest.json orientation",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-05T19:07:55.424085+00:00",
+      "blocker_type": null,
+      "plan_ref": "SS0.9 revision 16"
     }
   },
   "gate_closures": {
