@@ -59,6 +59,13 @@ def _qualifies(tokens: list[str]) -> bool:
     if "PLACEHOLDER" in phrase:
         return False
     alpha = _alpha_count(phrase)
+    if len(tokens) == 1:
+        # A single stranded compound (observed live: "MIT-licensed" surviving
+        # in el's summary while the sibling translated it). Require a real
+        # lowercase word component so bare acronyms/identifiers ("MIT",
+        # "C++20") never qualify on their own — protected terms are filtered
+        # by the asymmetry condition anyway, this just avoids noisy retries.
+        return alpha >= 8 and bool(re.search(r"[a-z]{4,}", tokens[0]))
     long_enough = (len(tokens) >= _MIN_TOKENS_LOOSE and alpha >= _MIN_ALPHA_LOOSE) or (
         len(tokens) >= _MIN_TOKENS_TIGHT and alpha >= _MIN_ALPHA_TIGHT
     )
@@ -93,7 +100,7 @@ def _longest_asymmetric_subrun(
     maximal shared run, not necessarily the whole of it.
     """
     total = len(run_tokens)
-    for length in range(total, _MIN_TOKENS_TIGHT - 1, -1):
+    for length in range(total, 0, -1):
         for start in range(0, total - length + 1):
             sub = run_tokens[start : start + length]
             if not _qualifies(sub):

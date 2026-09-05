@@ -85,6 +85,42 @@ class TestFindCrossFieldResiduals:
         ]
         assert find_cross_field_residuals(units) == []
 
+    def test_single_token_compound_residual_is_flagged(self):
+        # Live case (gate5-pdf-foss-cpp-r2, el): description translates the
+        # licence phrase, summary strands ONLY the one-token compound.
+        units = [
+            _fm_unit(
+                "description",
+                "A free, MIT-licensed C++20 library for editing PDF documents.",
+                "Μια δωρεάν βιβλιοθήκη C++20 με άδεια MIT για επεξεργασία εγγράφων PDF.",
+            ),
+            _fm_unit(
+                "summary",
+                "A free, MIT-licensed C++20 library for editing PDF documents quickly.",
+                "Μια δωρεάν, MIT-licensed βιβλιοθήκη C++20 για γρήγορη επεξεργασία εγγράφων PDF.",
+            ),
+        ]
+        residuals = find_cross_field_residuals(units)
+        assert len(residuals) == 1
+        assert residuals[0].field_name == "summary"
+        assert residuals[0].phrase == "MIT-licensed"
+
+    def test_bare_acronym_is_not_flagged_as_single_token(self):
+        # "MIT" alone (no lowercase word component) must never qualify.
+        units = [
+            _fm_unit(
+                "description",
+                "Uses the MIT licence for the library.",
+                "Χρησιμοποιεί την άδεια MIT για τη βιβλιοθήκη.",
+            ),
+            _fm_unit(
+                "summary",
+                "Uses the MIT licence for this library today.",
+                "Χρησιμοποιεί σήμερα την άδεια MIT για αυτή τη βιβλιοθήκη.",
+            ),
+        ]
+        assert find_cross_field_residuals(units) == []
+
     def test_short_function_word_overlap_is_not_flagged(self):
         units = [
             _fm_unit("description", "Learn more for the web today.", "Weitere Infos for the web."),

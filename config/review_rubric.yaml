@@ -21,6 +21,34 @@ rules:
       established mechanism, TC-APT-049) and retrigger; never hand-edit
       the output.
     evidence: TC-APT-053-gate5-pdf-foss-cpp "Encryption" 20/20 languages, 2026-09-05
+  - id: RB-003
+    name: minor-imperfection-approve-bar
+    verdict: APPROVE
+    scope: any
+    statement: >-
+      Meaning-preserving single-word defects — inflection/gender/article
+      errors, typos, over-literal word choices — and English technical
+      fragments of <=3 words adjacent to protected API identifiers (e.g.
+      "device classes") do NOT block an otherwise complete, accurate
+      translation. Record them as quality notes on the APPROVE verdict.
+      Rationale: the review bar rejects producer bugs and meaning damage,
+      not baseline MT imperfection; rejecting every inflection slip ships
+      nothing (mission history 2026-09-04).
+    evidence: gate5-pdf-foss-cpp-r2 ar/cs/de/hu approvals, 2026-09-05
+  - id: RB-004
+    name: garbled-or-meaning-damage-reject-bar
+    verdict: REJECT
+    scope: any
+    statement: >-
+      REJECT regardless of overall quality when any of: a garbled or
+      nonsense word (not a real word of the target language) in prose; a
+      meaning-changing or relationship-inverting rendering (including a
+      scrambled protected product-name phrase); a mechanical punctuation
+      artifact (e.g. Devanagari danda+period "|."); an untranslated prose
+      phrase in one frontmatter field whose sibling field translates the
+      same source phrase (asymmetric residual). These indicate producer
+      bugs or unacceptable meaning damage, not baseline MT imperfection.
+    evidence: gate5-pdf-foss-cpp-r2 el/hi rejects + he override, 2026-09-05
   - id: RB-002
     name: brand-navigation-label-exception
     verdict: APPROVE
