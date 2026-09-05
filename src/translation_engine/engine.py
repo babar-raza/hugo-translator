@@ -76,8 +76,22 @@ _TARGET_SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
     "zh": ((0x3400, 0x9FFF),),
 }
 
+# TC-APT-050 (2026-09-05): "Document Object Model" is a governed technical term
+# for this portfolio, decided on published precedent rather than convenience --
+# three tracked, genuinely localized pages keep it verbatim in English
+# (docs.aspose.org/ar, kb.aspose.org/nl, reference.aspose.org/de), against zero
+# counter-examples in 3771 tracked localized files. It is listed here for the
+# same reason ".NET" and "FOSS" are: it must not be counted as prose evidence
+# when attesting that a frontmatter field was translated. This does NOT lower
+# the >= 6 signal_alpha floor and does NOT relax the gate -- an untranslated
+# field whose residue is ordinary prose still fails, which is the property
+# pinned by tests/unit/translation_engine/
+# test_frontmatter_language_token_dominated_fields.py.
+# Multi-word entries must precede the single-token alternatives below so they
+# claim their span first (same ordering rule as the profile preserve_patterns).
 _FRONTMATTER_TECHNICAL_SIGNAL_RE = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
+    r"Document Object Model|"
     r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
     r"\.NET|C\+\+|C#|"
     r"FOSS|SDK|API|HTTP|REST|JSON|XML|XLSX|PDF|DOCX|"

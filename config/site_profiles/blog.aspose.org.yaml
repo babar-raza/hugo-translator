@@ -117,6 +117,14 @@ body:
   # titles/seoTitles in 4 languages. The AST path reads THIS list, not
   # config/terminology.yaml.
   - \bAspose(?:\.[A-Za-z0-9][A-Za-z0-9.]*)? FOSS\b
+  # TC-APT-050 (2026-09-05): governed terminology, not a gate workaround. The
+  # portfolio's own published translations keep this term in English in ar, nl
+  # and de (docs/kb/reference.aspose.org), with no counter-example across 3771
+  # tracked localized files. Masking it here stops the model being asked to
+  # translate a term the portfolio has already decided stays English -- which
+  # is what produced fully-English seoTitle output on words-document-net.
+  # Evidence: data/summaries/decision-dom-terminology-20260905.json
+  - '\bDocument Object Model\b'
   # Protect Aspose brand/product names as one cohesive unit (Aspose.Cells,
   # Aspose.3D, bare "Aspose", etc.) -- the previous bare-word-only pattern
   # only protected "Aspose" itself, leaving ".Cells"/".3D" etc. adjacent
