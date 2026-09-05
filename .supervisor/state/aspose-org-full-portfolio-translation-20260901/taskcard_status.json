@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T16:54:45+00:00",
+  "updated_at": "2026-09-05T17:04:57+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1019,6 +1019,20 @@
       "evidence_path": "src/workers/campaign_manifest.py; tests/unit/workers/test_campaign_manifest.py",
       "commit": null,
       "last_updated": "2026-09-05T16:59:00+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-076": {
+      "status": "TODO",
+      "gate": null,
+      "owner": "loop",
+      "title": "A paragraph containing a link is still leaf-split, because _has_technical_content (text_unit_extractor.py:2171-2173) returns True for any LINK child -- a second gate independent of _has_inline_formatting, which TC-APT-036 fixed. Measured on words-document-net: 15 paragraphs, 12 whole, 3 split, all 3 by technical-content alone, 0 by formatting. The model receives fragments (a dangling subordinator, a context-free anchor, a subjectless verb phrase) instead of sentences, which is consistent with the A1 determiner-binding and A2 head-noun review failures. Fix is a one-line deletion but changes segmentation portfolio-wide; needs the TC-APT-042 byte-identical render-neutrality proof before it is trusted.",
+      "depends_on": [
+        "TC-APT-036"
+      ],
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/fp-link-paragraph-still-leaf-split-20260905.json",
+      "commit": null,
+      "last_updated": "2026-09-05T17:04:57+00:00",
       "blocker_type": null
     }
   },
