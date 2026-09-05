@@ -33,6 +33,7 @@ import json
 import logging
 import os
 import tempfile
+import time
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -41,6 +42,29 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _QUEUE_FILE = Path("data/task_queue.jsonl")
+
+# TC-APT-074: os.replace() onto an open destination raises PermissionError
+# (WinError 5, ERROR_SHARING_VIOLATION) on Windows -- unlike POSIX rename(2),
+# which can replace a file another process still has open. This repo's
+# working tree is OneDrive-synced and this queue is written by multiple
+# concurrent mission sessions, either of which can hold the file open for a
+# few tens of milliseconds at the exact moment another session replaces it.
+# Reproduced live: two consecutive real mission_supervisor.py runs both hit
+# this on task_queue.jsonl within the same minute (fp-task-queue-permission-
+# 20260905.json). A bounded retry is the standard fix for this platform's
+# sharing-violation window; a lock genuinely held longer than the budget
+# still surfaces as a real PermissionError, it is not swallowed.
+_REPLACE_RETRY_DELAYS_S = (0.05, 0.1, 0.2, 0.4, 0.8)
+
+
+def _replace_with_retry(tmp_path: str, queue_file: Path) -> None:
+    for delay in _REPLACE_RETRY_DELAYS_S:
+        try:
+            os.replace(tmp_path, queue_file)
+            return
+        except PermissionError:
+            time.sleep(delay)
+    os.replace(tmp_path, queue_file)
 
 
 class TaskStatus(str, Enum):
@@ -83,7 +107,7 @@ def _write_entries(entries: list[dict[str, Any]], queue_file: Path) -> None:
         for entry in entries:
             tmp.write(json.dumps(entry, default=str) + "\n")
         tmp_path = tmp.name
-    os.replace(tmp_path, queue_file)
+    _replace_with_retry(tmp_path, queue_file)
 
 
 def add_task(

@@ -995,6 +995,19 @@
       "last_updated": "2026-09-05T15:06:07+00:00",
       "blocker_type": null,
       "provenance": "first written as TC-APT-063, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
+    },
+    "TC-APT-074": {
+      "status": "DONE",
+      "gate": null,
+      "title": "task_queue.py _write_entries() os.replace(tmp, task_queue.jsonl) raises PermissionError (WinError 5, ERROR_SHARING_VIOLATION) when the destination is transiently held open -- reproduced live on this OneDrive-synced, multi-session-written repo: two consecutive real mission_supervisor.py wake() calls both hit it within one minute, aborting the wake entirely.",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/fp-task-queue-permission-20260905.json; tests/unit/workers/test_task_queue_replace_retry.py; live reverification: python -m src.workers.mission_supervisor succeeded post-fix (phase=B decision=skip) after two real pre-fix failures",
+      "commit": null,
+      "last_updated": "2026-09-05T15:55:40+00:00",
+      "blocker_type": null,
+      "provenance": "Found incidentally while step 2.3 of project/loop-prompt.md (run mission_supervisor before selecting Track-B work) failed twice in a row; root-caused and fixed per plan SS10.1 (2nd failure -> first-principles record) before a 3rd attempt."
     }
   },
   "gate_closures": {
