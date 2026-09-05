@@ -26,6 +26,7 @@ from src.workers.git_provenance import (
     governed_subject_pattern,
     verify_governed_add,
 )
+from src.workers.heal_queue import is_quarantined
 
 from .campaign_manifest import (
     CampaignManifest,
@@ -1723,6 +1724,27 @@ class CampaignRunner:
             raise CampaignManifestError(
                 f"output routing mismatch: calculated={calculated}, expected={expected}"
             )
+        resolved_output = str(expected.resolve())
+
+        # TC-APT-038: a (target_lang, root_cause_class) pair with >=3 OPEN heal
+        # tickets anywhere in the portfolio is quarantined -- skip spending
+        # fresh retry attempts on this job (no manifest/retry_policy needed)
+        # and go straight to a (refreshed) ticket instead. Only applies to a
+        # job with prior failure history on THIS exact cell: an unseen
+        # candidate always gets its first attempt (plan §3 item 4 -- never
+        # quarantine an unseen candidate).
+        prior_failure = self.ledger.latest_failure(output_path=expected_output, target_lang=locale)
+        if prior_failure is not None:
+            prior_root_cause = f"auto:{prior_failure.get('gate')}"
+            if is_quarantined(
+                locale,
+                prior_root_cause,
+                heal_queue_path=self.ledger.root.parent / "heal_queue.jsonl",
+            ):
+                self._append_heal_ticket(
+                    shard=shard, source=source, locale=locale, expected_output=expected_output
+                )
+                return False, resolved_output
 
         primary_attempts = int(self.manifest.retry_policy["primary_attempts"])
         llm_attempts = int(self.manifest.retry_policy["llm_escalation_attempts"])
@@ -1730,7 +1752,6 @@ class CampaignRunner:
         llm_model = str(self.manifest.retry_policy["llm_model"])
         receipt = None
         result = None
-        resolved_output = str(expected.resolve())
         # TC-APT-031: governed replace-existing. An undeclared existing target is still a hard
         # stop (verify_environment). A declared one may be overwritten only while its current
         # bytes still hash to the declared expected_sha256 (no concurrent edit underneath).

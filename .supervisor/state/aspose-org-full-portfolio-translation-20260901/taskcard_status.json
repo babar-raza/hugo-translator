@@ -530,15 +530,15 @@
       "note": "LINK half LANDED and VALIDATED ON REAL CONTENT (2ddeeb3). Two halves, correct only together: the blog.aspose.org profile pattern narrowed from the whole [text](url) span to the ](url) TAIL, and LINK removed from _has_inline_formatting so a paragraph with a link extracts whole. The exclusion is CONDITIONAL via _link_syntax_is_protected() -- with preserve_patterns=[] (as in test fixtures) or on websites.aspose.org (no link pattern at all) it keeps the old leaf behaviour, so the raw URL is never carried into translatable text. Validation: same-locale same-construct comparison in Arabic -- pre-fix [Aspose.Words FOSS للـ مستودع .NET] (head noun displaced inside the product name) vs post-fix [مستودع Aspose.Words FOSS للـ .NET] (head noun first, correct order); 0 of 15 locales managed this before. Inflected preposition before the link, intact negation, single copula, contiguous product name all pass on that cell. 11 permanent regression tests. STRONG/EMPHASIS/IMAGE half still OPEN: nothing protects **bold** syntax so FIX-B guard remains load-bearing there. Rollout scope so far: blog.aspose.org only; 4 other in-scope profiles still carry the whole-span pattern."
     },
     "TC-APT-038": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": 5,
       "title": "Gate-close semantics: scope-exercised + quarantine-with-heal-ticket, never N/N",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": null,
-      "evidence_path": null,
+      "blocking_reason": "Implemented and unit-tested the core quarantine mechanism: src/workers/heal_queue.py counts OPEN (status==OPEN, disposition absent/unresolved) heal_queue.jsonl tickets by (target_lang, root_cause_class), quarantining a pair at >=3; wired into CampaignRunner._run_campaign_job as an early skip (before any manifest/retry_policy access) for a job with prior failure history whose pair is quarantined, appending a fresh heal ticket instead of burning retries -- an unseen candidate (no prior failure) is never quarantined, per plan SS3 item 4. Re-queue is automatic: a pair drops out the moment its OPEN count falls below threshold (ticket status=CLOSED or disposition in FIXED_VERIFIED/ WAIVED_RUBRIC/MODEL_LIMITATION_DEFERRED, forward-compatible with TC-APT-060). Proven live: tests/unit/workers full suite 603 passed (was 592) after this change, no regressions. NOT done: generalizing scripts/campaign/run_gate5_batch.py to run_track_a_batch.py (N pages), and computing pages_newly_live from the ledger -- both still open per plan SS11.",
+      "evidence_path": "src/workers/heal_queue.py; tests/unit/workers/test_heal_queue_quarantine.py; tests/unit/workers/test_campaign_runner_quarantine_skip.py",
       "commit": null,
-      "last_updated": "2026-09-04T05:00:00+00:00",
+      "last_updated": "2026-09-05T16:20:21+00:00",
       "blocker_type": null
     },
     "TC-APT-039": {
