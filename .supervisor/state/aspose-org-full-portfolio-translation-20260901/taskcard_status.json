@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T22:35:12+00:00",
+  "updated_at": "2026-09-05T22:39:56+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1170,12 +1170,12 @@
       "status": "TODO",
       "gate": null,
       "owner": "loop",
-      "title": "The governed label 'Aspose.Cells - Enterprise Product Family' is lost in a paragraph link in ar, held from the heal-cells-go-w2 commit 2026-09-06. Distinct from TC-APT-085, which fixed the LIST_ITEM path; this is the PARAGRAPH LINK path, measured earlier as surviving 17 of 18 locales with ar the exception. Pre-existing, not a regression: ar failed the same literal before the fix. Reproduce by comparing the exact em-dash literal against index.ar.md.",
+      "title": "The governed label 'Aspose.Cells - Enterprise Product Family' is lost in a paragraph link in ar, held from the heal-cells-go-w2 commit 2026-09-06. Distinct from TC-APT-085, which fixed the LIST_ITEM path; this is the PARAGRAPH LINK path, measured earlier as surviving 17 of 18 locales with ar the exception. Pre-existing, not a regression: ar failed the same literal before the fix. Reproduce by comparing the exact em-dash literal against index.ar.md. SIZED 2026-09-06: 346 of 8126 tracked source pages carry the label, so exposure is roughly 8650 future cells. Of the 38 shipped cells on those pages, 0 lose it -- but that 0% is BIASED, because shipped cells are pre-filtered by the RB-006 review gate and a losing cell never reaches that population (ar was held, not shipped). The only unbiased figure available is over produced-including-rejected cells: 1 of 21 on introducing-cells-foss-go, about 5%. Priority: after TC-APT-090, which is blocking whole cells at 78% of wave failures while this one is caught by review each time.",
       "depends_on": [],
       "blocking_reason": null,
-      "evidence_path": "data/summaries/review-cells-go-w2-batch-20260906.json",
+      "evidence_path": "data/summaries/review-cells-go-w2-batch-20260906.json; data/summaries/size-tc087-exposure-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T21:06:47+00:00",
+      "last_updated": "2026-09-05T22:39:56+00:00",
       "blocker_type": null
     },
     "TC-APT-088": {
