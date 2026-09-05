@@ -2168,9 +2168,35 @@ class TextUnitExtractor:
             if child.type is NodeType.CODE_BLOCK:
                 return True
 
-            # Check for links (URLs are technical)
-            if child.type == NodeType.LINK:
-                return True
+            # TC-APT-076: LINK deliberately NOT a fallback trigger, for the same
+            # reason CODE_SPAN is excluded above (TC-APT-013). The URL is never in
+            # translatable text -- it lives in node.attrs, and the profile's
+            # `](...)` preserve_pattern protects the link tail inside a
+            # full-sentence unit -- so forcing leaf extraction here bought no
+            # safety and cost sentence-level grammatical coherence.
+            #
+            # It cost a great deal of it. TC-APT-036 removed LINK from
+            # _has_inline_formatting's leaf-forcing set so link-bearing paragraphs
+            # would translate whole, but THIS second, independent gate kept
+            # splitting them anyway, so that half of TC-APT-036 never took effect.
+            # Measured on words-document-net: the paragraph became three units --
+            # a 453-char unit ENDING on a dangling subordinator, the 21-char anchor
+            # with no sentence context, and a 172-char unit STARTING with a
+            # subjectless verb phrase. The orphaned subordinator had nothing to
+            # attach to and survived untranslated into 4 of 11 locales at the same
+            # line; reviewers found all 3 in-prose links defective in fa.
+            #
+            # SEQUENCING (this is why the change is safe only now): removing this
+            # trigger was falsified on 2026-09-05 -- an identity round-trip over 14
+            # real pages went 14/14 -> 0/14 byte-identical, because re-parsing a
+            # whole translated paragraph dropped every link's URL ("[text]()"). That
+            # was a latent markdown-it-py 4.x bug in the renderer (Token.attrs is a
+            # dict, but the re-parse iterated it as (key, value) tuples, so the href
+            # lookup never matched), fixed separately in e065151. With that landed,
+            # the identity round-trip is 14/14 again WITH this trigger removed, so
+            # the extractor change is now output-neutral.
+            # See data/summaries/fp-link-paragraph-still-leaf-split-20260905.json
+            # and data/summaries/fp-tc-apt-076-falsified-20260905.json
 
             # Deliberately NOT checking child.type == TEXT fragments against
             # _is_technical_identifier here (TC-APT-013, confirmed by direct-read

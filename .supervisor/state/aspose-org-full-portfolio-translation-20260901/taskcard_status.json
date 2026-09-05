@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T18:33:25+00:00",
+  "updated_at": "2026-09-05T18:48:25+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1022,17 +1022,17 @@
       "blocker_type": null
     },
     "TC-APT-076": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "gate": null,
       "owner": "loop",
-      "title": "Link-bearing paragraphs are leaf-split by _has_technical_content (text_unit_extractor.py:2171-2173), so TC-APT-036's sentence-integrity half never took effect. CORRECTED 2026-09-05: the obvious one-line fix (delete the LINK trigger) is FALSIFIED -- it drops the URL from every link in a whole-extracted node (identity round-trip went 14/14 -> 0/14 byte-identical on real pages). Extraction and placeholder restore are both correct in isolation; the renderer emits the structural LINK child instead of the applied text and loses the URL. Fix the RENDERER first, re-run the neutrality harness to 14/14, and only then remove the extractor trigger. CONFIRMED ACROSS LOCALES 2026-09-05: the untranslated pre-link fragment recurs at line 431, identical position, in 4 of 11 locales (fa/he/sv/zh, three scripts, both directions); all 3 in-prose links in fa are defective. This is now the top producer defect blocking this page.",
+      "title": "Link-bearing paragraphs are leaf-split by _has_technical_content (text_unit_extractor.py:2171-2173), so TC-APT-036's sentence-integrity half never took effect. CORRECTED 2026-09-05: the obvious one-line fix (delete the LINK trigger) is FALSIFIED -- it drops the URL from every link in a whole-extracted node (identity round-trip went 14/14 -> 0/14 byte-identical on real pages). Extraction and placeholder restore are both correct in isolation; the renderer emits the structural LINK child instead of the applied text and loses the URL. Fix the RENDERER first, re-run the neutrality harness to 14/14, and only then remove the extractor trigger. CONFIRMED ACROSS LOCALES 2026-09-05: the untranslated pre-link fragment recurs at line 431, identical position, in 4 of 11 locales (fa/he/sv/zh, three scripts, both directions); all 3 in-prose links in fa are defective. This is now the top producer defect blocking this page. LANDED 2026-09-05. The falsification held until the renderer bug behind it was fixed: markdown-it-py 4.x Token.attrs is a dict but the re-parse iterated it as tuples, so every re-parsed link lost its URL (peer, e065151). With that in place the identity round-trip is 14/14 WITH the trigger removed, so the extractor change is output-neutral and is now landed. The target paragraph went from 3 fragments to ONE 664-char unit.",
       "depends_on": [
         "TC-APT-036"
       ],
       "blocking_reason": "RENDERER fixed (the step the card said to do first): root-caused precisely -- markdown-it-py 4.x Token.attrs is a dict (hugo_parser.py._get_attr already handles this dual-format case); ast_renderer.py._parse_inline_tokens_to_ast link_open branch iterated it as a list of (key, value) tuples, so attr[0] was a single CHARACTER of the key string, never the string \"href\" -- url was always empty. Reproduced directly (a whole-node paragraph with a real link rendered as [text]() before the fix), fixed to match hugo_parser.py's dict/list dual handling, verified the same repro now preserves the URL. Two new permanent tests in tests/regression/test_link_url_survives_whole_node_reparse.py. Full tests/unit/translation_engine/reconstructor + segment_translator + tests/regression: 454 passed, 1 pre-existing unrelated failure (missing scripts/e2e_verify_single_file.py). NOT done: the extractor trigger removal (text_unit_extractor.py:2171-2173) and the 14-real-page identity round-trip re-verification the card requires before that -- deliberately left to the peer session already equipped with real-content-repo harness methodology (fp-tc-apt-076-falsified-20260905.json), since a portfolio-wide segmentation change deserves that same rigor rather than a second, differently-scoped proof.",
-      "evidence_path": "tests/regression/test_link_url_survives_whole_node_reparse.py; data/summaries/fp-link-paragraph-still-leaf-split-20260905.json; data/summaries/fp-tc-apt-076-falsified-20260905.json",
-      "commit": null,
-      "last_updated": "2026-09-05T17:31:49+00:00",
+      "evidence_path": "tests/regression/test_link_url_survives_whole_node_reparse.py; data/summaries/fp-link-paragraph-still-leaf-split-20260905.json; data/summaries/fp-tc-apt-076-falsified-20260905.json; data/summaries/fix-tc-apt-076-landed-20260905.json",
+      "commit": "e065151 (renderer, peer) + this commit (extractor)",
+      "last_updated": "2026-09-05T18:48:25+00:00",
       "blocker_type": null
     },
     "TC-APT-077": {
