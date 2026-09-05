@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..observability.progress import get_progress_tracker
+from ..utils.log_sanitizer import sanitize_for_log
 from .engine import estimate_token_count
 from .exceptions import TranslationRetryableError
 from .extractor import SegmentExtractor, TextUnitKind
@@ -173,6 +174,11 @@ _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
             # AST text unit following the protected FilterOperatorType name;
             # French uses the same noun and punctuation.
             "conditions.",
+            # "Annotations" is spelled identically in English and French
+            # (confirmed cognate; TC-SAS-01 hard-failed the identical heading
+            # on two independent source pages: introducing-pdf-foss-typescript
+            # and introducing-pdf-foss-cpp).
+            "annotations",
         }
     ),
 }
@@ -602,6 +608,103 @@ class SegmentTranslator:
             if self._english_source_residue_count(source_text, chunk_candidate) < residue_before:
                 return chunk_candidate
         return translated_text
+
+    def _repair_cross_field_frontmatter_residuals(
+        self,
+        engine,
+        units: list,
+        primary_model,
+        source_lang: str,
+        target_lang: str,
+        stats: TranslationStats,
+    ) -> int:
+        """TC-APT-042: repair near-duplicate frontmatter fields that left a shared
+        phrase untranslated while a sibling field translated the same phrase.
+
+        The sibling's successful translation proves the phrase is translatable, so
+        the asymmetric English fragment is retried with corrective feedback naming
+        the fragment and the sibling's rendering for terminology consistency.  The
+        repaired bytes still traverse every downstream gate before acceptance.
+        """
+        from .frontmatter_consistency import _normalize, find_cross_field_residuals
+
+        residuals = find_cross_field_residuals(units)
+        if not residuals:
+            return 0
+        backend = primary_model if hasattr(primary_model, "translate_with_context") else None
+        if backend is None:
+            try:
+                with engine._model_lock:
+                    backend = engine.model_loader.load_model("professionalize_llm")
+            except Exception as load_error:
+                logger.warning(
+                    "TC-APT-042: %d cross-field frontmatter residual(s) found but no "
+                    "context-capable backend is available (%s); leaving for gate review",
+                    len(residuals),
+                    type(load_error).__name__,
+                )
+                return 0
+            if not hasattr(backend, "translate_with_context"):
+                return 0
+        repaired = 0
+        for residual in residuals[:4]:
+            unit = residual.unit
+            meta = unit.metadata or {}
+            original = meta.get("original_text") or unit.source_text
+            feedback = (
+                f"A previous attempt left the English phrase '{residual.phrase}' "
+                "untranslated. Translate the entire text into the target language, "
+                "including that phrase. For consistent terminology, the sibling "
+                f"frontmatter field '{residual.sibling_field}' translated "
+                f"'{residual.sibling_source[:200]}' as "
+                f"'{residual.sibling_translation[:200]}'."
+            )
+            try:
+                result = backend.translate_with_context(
+                    [str(original)],
+                    source_lang,
+                    target_lang,
+                    context_hint=f"frontmatter_{residual.field_name}",
+                    file_context=None,
+                    retry_feedback=feedback,
+                )
+            except Exception as repair_error:
+                logger.warning(
+                    "TC-APT-042: cross-field repair call failed for field '%s' (%s)",
+                    residual.field_name,
+                    type(repair_error).__name__,
+                )
+                continue
+            candidate = str(result[0]) if result and result[0] else ""
+            if (
+                not candidate.strip()
+                or candidate.strip() == str(original).strip()
+                or _normalize(residual.phrase) in _normalize(candidate)
+            ):
+                logger.info(
+                    "TC-APT-042: cross-field repair did not remove residual phrase "
+                    "'%s' from field '%s'; keeping prior candidate for gate review",
+                    sanitize_for_log(residual.phrase, 80),
+                    residual.field_name,
+                )
+                continue
+            unit.translated_text = _restore_required_seo_separator(
+                residual.field_name, str(original), candidate
+            )
+            if unit.metadata is None:
+                unit.metadata = {}
+            unit.metadata["cross_field_repair_phrase"] = residual.phrase
+            unit.metadata["cross_field_repair_sibling"] = residual.sibling_field
+            stats.llm_units_translated += 1
+            repaired += 1
+            logger.info(
+                "TC-APT-042: repaired untranslated shared phrase '%s' in frontmatter "
+                "field '%s' using sibling field '%s' as reference",
+                sanitize_for_log(residual.phrase, 80),
+                residual.field_name,
+                residual.sibling_field,
+            )
+        return repaired
 
     def _translate_fenced_code_prose_chunks(
         self,
@@ -1922,6 +2025,25 @@ class SegmentTranslator:
             logger.info(
                 f"AST DIAG: After batch translate: {len(_cb_after_batch)} code block units, {len(_cb_with_content)} with content"
             )
+
+            # TC-APT-042: near-duplicate frontmatter fields (description/summary)
+            # are translated as independent units; when one leaves a shared phrase
+            # in English while its sibling translated it, retry with the sibling
+            # as reference before validation sees the asymmetric residual.
+            try:
+                self._repair_cross_field_frontmatter_residuals(
+                    engine,
+                    translated_units,
+                    mt_model,
+                    site_profile.default_source_lang,
+                    target_lang,
+                    stats,
+                )
+            except Exception as _xf_error:
+                logger.warning(
+                    "TC-APT-042: cross-field frontmatter repair pass skipped (%s)",
+                    type(_xf_error).__name__,
+                )
 
             # TC-SAS-01: Detect translatable units the model returned unchanged (source-lang leakage).
             # do_not_translate=True units are intentionally excluded — they are preserved YAML

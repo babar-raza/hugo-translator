@@ -31,6 +31,10 @@ def test_reviewed_identical_translation_is_locale_scoped():
     assert not _is_reviewed_identical_translation("Introduction", "es")
     assert not _is_reviewed_identical_translation("conditions.", "de")
     assert not _is_reviewed_identical_translation("Getting Started", "fr")
+    # TC-SAS-01 cognate blind spot: "Annotations" is spelled identically in
+    # French; it hard-failed the identical heading on two source pages.
+    assert _is_reviewed_identical_translation("Annotations", "fr")
+    assert not _is_reviewed_identical_translation("Annotations", "de")
 
 
 def test_same_as_source_diagnostics_are_hashes_not_payloads():
