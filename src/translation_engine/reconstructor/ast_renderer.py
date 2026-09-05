@@ -11,6 +11,7 @@ from typing import Any
 
 from ..extractor.text_unit import TextUnit
 from ..parser.ast_nodes import ASTNode, NodeType
+from ..text_fidelity import normalize_injected_invisibles
 
 logger = logging.getLogger(__name__)
 
@@ -501,6 +502,14 @@ class ASTRenderer:
 
             # Sanitize language markers from frontmatter translations (FIX-BT-02)
             sanitized_translation = self._sanitize_language_markers(unit.translated_text)
+            # TC-APT-073: strip invisible/lookalike punctuation the model added
+            # that the source never had. Deliberately OUTSIDE the placeholder_map
+            # branch below: most injected characters sit in plain prose with no
+            # placeholders at all, and it must run BEFORE restoration so
+            # protected spans are still masked and cannot be rewritten.
+            sanitized_translation = normalize_injected_invisibles(
+                unit.source_text, sanitized_translation
+            )
             placeholder_map = unit.metadata.get('placeholder_map', {})
             if placeholder_map:
                 sanitized_translation = self._restore_placeholders(
@@ -634,6 +643,11 @@ class ASTRenderer:
             else:
                 # No translation or no source - use standard whitespace reattachment
                 final_text = unit.get_final_text()
+
+            # TC-APT-073: same normalization as the frontmatter path above, and
+            # for the same reasons -- before restoration, and not conditional on
+            # a placeholder_map existing.
+            final_text = normalize_injected_invisibles(unit.source_text, final_text)
 
             # Restore placeholders (if any were applied during extraction)
             placeholder_map = unit.metadata.get('placeholder_map', {})
