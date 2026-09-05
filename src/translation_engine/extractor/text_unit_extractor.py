@@ -266,6 +266,27 @@ _TITLE_CASE_OR_CAPS_WORD_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$|^[A-Z]{2,}$")
 _LEADING_SEPARATOR_RE = re.compile(r"^[\s—–|:-]+")
 
 
+_WHOLE_LINK_RE = re.compile(r"^\[(?P<anchor>[^\]]+)\]\([^)]*\)$")
+
+
+def _whole_node_is_brand_navigation_link(text: str) -> bool:
+    """True when a node's entire content is one link whose anchor is a brand label.
+
+    TC-APT-085. On the full-sentence extraction path the candidate text is the
+    RAW markdown -- ``[Aspose.Cells - Enterprise Blog](https://blog.aspose.com/)``
+    -- not the anchor text the LINK path sees, so testing the brand predicate
+    against it directly always fails on the leading bracket. Verified on the real
+    failing page before and after: the naive version left the unit translatable.
+
+    Requiring the link to be the WHOLE node keeps this narrow -- a list item
+    mixing prose with a nav link stays translatable prose.
+    """
+    match = _WHOLE_LINK_RE.match(text.strip())
+    if not match:
+        return False
+    return _link_text_is_brand_navigation_label(match.group("anchor"))
+
+
 def _link_text_is_brand_navigation_label(text: str) -> bool:
     """A link whose text is a brand token (``Aspose.3D``, ``Aspose.Slides``, ...)
     optionally followed by short Title-Case/ALL-CAPS words -- e.g. ``Aspose.3D KB``,
@@ -1823,7 +1844,18 @@ class TextUnitExtractor:
         # Check if non-translatable FIRST (before applying placeholders)
         do_not_translate = self._is_non_translatable(
             stripped_text, kind=kind, column_header=_col_header or None
-        )
+        ) or _whole_node_is_brand_navigation_link(stripped_text)
+        # TC-APT-085: the brand-navigation-label check ran ONLY on the LINK
+        # extraction path (_extract_link), so a governed label survived when it
+        # sat inside a paragraph but was translated when it stood alone in a
+        # list item, which routes here instead. Measured on
+        # introducing-cells-foss-go: the same label preserved 17/18 locales in a
+        # paragraph link, 8/18 alone in a list item. "API Reference" survived
+        # that position only because it has an independent terminology.yaml
+        # entry. The predicate is deliberately narrow -- brand prefix plus
+        # Title-Case/ALL-CAPS words only -- so ordinary prose mentioning a
+        # product ("Aspose.Words FOSS for .NET" has a lowercase "for") stays
+        # translatable.
 
         # Apply preserve_patterns protection (if configured and not already protected)
         placeholder_map = {}

@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T20:21:54+00:00",
+  "updated_at": "2026-09-05T20:30:17+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1143,15 +1143,15 @@
       "blocker_type": null
     },
     "TC-APT-085": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
       "owner": "loop",
-      "title": "Governed brand-navigation labels are unprotected on the LIST_ITEM extraction path. The same label inside a paragraph link survives 17/18 locales; alone in a list item, 8/18. The brand-nav-label check runs on the paragraph LINK path (text_unit_extractor.py:1759) but not on the full-sentence/LIST_ITEM path. 'API Reference' survives there only via its own terminology.yaml entry. Fix: apply the check on the LIST_ITEM path, or register the label shape in terminology.yaml so it routes through the derived governed-terms machinery.",
+      "title": "Governed brand-navigation labels are unprotected on the LIST_ITEM extraction path. The same label inside a paragraph link survives 17/18 locales; alone in a list item, 8/18. The brand-nav-label check runs on the paragraph LINK path (text_unit_extractor.py:1759) but not on the full-sentence/LIST_ITEM path. 'API Reference' survives there only via its own terminology.yaml entry. Fix: apply the check on the LIST_ITEM path, or register the label shape in terminology.yaml so it routes through the derived governed-terms machinery. FIXED 2026-09-06 via _whole_node_is_brand_navigation_link on the full-sentence path. First attempt was inert (tested raw markdown, not anchor text) and the real page caught it.",
       "depends_on": [],
       "blocking_reason": null,
-      "evidence_path": "data/summaries/review-cells-go-batchA-20260906.json",
+      "evidence_path": "data/summaries/fix-tc-apt-085-brand-nav-list-item-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T20:21:54+00:00",
+      "last_updated": "2026-09-05T20:30:17+00:00",
       "blocker_type": null
     }
   },
