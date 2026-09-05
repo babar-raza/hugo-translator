@@ -65,3 +65,23 @@ rules:
       "API Reference" phrase stay in English by curated portfolio-wide
       convention. Never flag these alone as defects.
     evidence: field notes 2026-09-04 (introducing-cells-foss-go false positives)
+  - id: RB-005
+    name: confirmed-producer-bug-overrides-approve-bar
+    verdict: REJECT
+    scope: any
+    statement: >-
+      A defect whose mechanism has been traced to a confirmed producer-side bug
+      is a REJECT even when, taken alone, it would qualify as a
+      meaning-preserving imperfection under RB-003. RB-003 exists to stop the
+      review bar rejecting baseline MT variance; it is not a licence to ship a
+      known machine artifact. Test: if the same defect recurs at the same
+      structural position across multiple locales of a page, it is not variance.
+      Reject, fix the producer, retrigger -- never approve a cell that carries a
+      defect a pending fix will change.
+    evidence: >-
+      cells/go/introducing-cells-foss-go, 2026-09-05: 3 independent reviewers
+      returned 5 APPROVE under RB-003, but all 5 carried the soft-wrap sentence
+      split at line 261 ("No hay uso restricciones" / "aucune restriction
+      d'utilisation restrictions" / "Nu exista utilizare restrictii"), the same
+      producer bug that rejected the other 11.
+      See data/summaries/fp-softwrap-sentence-splitting-20260905.json
