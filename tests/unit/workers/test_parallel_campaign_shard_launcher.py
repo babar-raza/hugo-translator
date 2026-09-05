@@ -16,6 +16,7 @@ import pytest
 from scripts.campaign.launch_parallel_campaign_shards import (
     GPU_PRIMARY_LOCALES,
     _child_command,
+    assign_shard_groups,
     duplicate_receipts,
     main,
     partition_by_device,
@@ -140,8 +141,8 @@ def test_gpu_shard_gets_its_own_vram_budget(tmp_path, child):
     shards = {s["locale"]: s for s in manifest.shards(resume_receipts=set(), max_outputs=250)}
     kwargs = _kwargs(tmp_path, child)
 
-    gpu_command = _child_command(shard=shards["ja"], **kwargs)
-    api_command = _child_command(shard=shards["de"], **kwargs)
+    gpu_command = _child_command(shards=[shards["ja"]], **kwargs)
+    api_command = _child_command(shards=[shards["de"]], **kwargs)
 
     assert gpu_command[gpu_command.index("--max-gpu-memory-percent") + 1] == "80"
     assert api_command[api_command.index("--max-gpu-memory-percent") + 1] == "50"
@@ -151,7 +152,7 @@ def test_worker_child_still_runs_the_governed_zero_defect_path(tmp_path):
     manifest = _load(tmp_path)
     shard = next(iter(manifest.shards(resume_receipts=set(), max_outputs=250)))
 
-    command = _child_command(shard=shard, **_kwargs(tmp_path, "worker"))
+    command = _child_command(shards=[shard], **_kwargs(tmp_path, "worker"))
 
     assert command[command.index("--validation-policy") + 1] == "zero-defect"
     assert command[command.index("--campaign-shard") + 1] == shard["shard_id"]
@@ -163,7 +164,7 @@ def test_gate5_child_receives_the_ledger_root_the_parent_verifies(tmp_path):
     shard = next(iter(manifest.shards(resume_receipts=set(), max_outputs=250)))
     kwargs = _kwargs(tmp_path, "gate5")
 
-    command = _child_command(shard=shard, **kwargs)
+    command = _child_command(shards=[shard], **kwargs)
 
     assert command[1].endswith("run_gate5_batch.py")
     assert Path(command[command.index("--ledger-root") + 1]) == kwargs["ledger_root"]
@@ -225,3 +226,70 @@ def test_duplicate_receipts_is_empty_for_a_clean_ledger(tmp_path):
 
     assert duplicate_receipts(ledger_root, "shard-launcher") == {}
     assert duplicate_receipts(ledger_root, "no-such-campaign") == {}
+
+
+def test_shard_groups_amortise_startup_across_one_child_each(tmp_path):
+    """Every pending shard is handed out once, so startup is paid max_workers times."""
+    manifest = _load(tmp_path)
+    shards = list(manifest.shards(resume_receipts=set(), max_outputs=250))
+
+    groups = assign_shard_groups(shards, max_workers=2)
+
+    assert len(groups) == 2
+    handed_out = [s["shard_id"] for group in groups for s in group]
+    assert sorted(handed_out) == sorted(s["shard_id"] for s in shards)
+    assert len(handed_out) == len(set(handed_out)), "a shard was handed to two children"
+
+
+def test_all_gpu_shards_land_in_one_group(tmp_path):
+    """Same process means sequential, which is how GPU shards never overlap."""
+    manifest = _load(tmp_path)
+    shards = list(manifest.shards(resume_receipts=set(), max_outputs=250))
+
+    groups = assign_shard_groups(shards, max_workers=3)
+
+    carrying_gpu = [
+        group for group in groups
+        if any(s["locale"] in GPU_PRIMARY_LOCALES for s in group)
+    ]
+    assert len(carrying_gpu) == 1
+    assert sorted(s["locale"] for s in carrying_gpu[0] if s["locale"] in GPU_PRIMARY_LOCALES) == [
+        "hu", "ja", "ro",
+    ]
+
+
+def test_gpu_group_is_not_also_given_the_largest_api_share(tmp_path):
+    """It carries the slow GPU work, so it gets no MORE API shards than any peer."""
+    manifest = _load(tmp_path)
+    shards = list(manifest.shards(resume_receipts=set(), max_outputs=250))
+
+    groups = assign_shard_groups(shards, max_workers=2)
+
+    def api_count(group):
+        return len([s for s in group if s["locale"] not in GPU_PRIMARY_LOCALES])
+
+    gpu_group = next(g for g in groups if any(s["locale"] in GPU_PRIMARY_LOCALES for s in g))
+    others = [g for g in groups if g is not gpu_group]
+    assert others, "expected more than one group"
+    assert api_count(gpu_group) <= min(api_count(g) for g in others)
+
+
+def test_a_group_child_gets_one_shard_id_argument_per_shard(tmp_path):
+    manifest = _load(tmp_path)
+    shards = list(manifest.shards(resume_receipts=set(), max_outputs=250))
+    group = [s for s in shards if s["locale"] in ("de", "es")]
+
+    command = _child_command(shards=group, **_kwargs(tmp_path, "gate5"))
+
+    assert command.count("--shard-id") == 2
+    passed = [command[i + 1] for i, token in enumerate(command) if token == "--shard-id"]
+    assert sorted(passed) == sorted(s["shard_id"] for s in group)
+
+
+def test_worker_child_refuses_a_group_it_cannot_run(tmp_path):
+    """The legacy worker takes one --campaign-shard; dropping the rest silently is worse."""
+    manifest = _load(tmp_path)
+    group = list(manifest.shards(resume_receipts=set(), max_outputs=250))[:2]
+
+    with pytest.raises(ValueError, match="one shard per process"):
+        _child_command(shards=group, **_kwargs(tmp_path, "worker"))

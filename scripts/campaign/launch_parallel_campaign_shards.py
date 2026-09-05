@@ -72,6 +72,35 @@ def select_pending_shards(
     return (gpu_bound[:1] + api_bound)[:max_workers]
 
 
+def assign_shard_groups(
+    shards: list[dict[str, Any]],
+    max_workers: int,
+    gpu_locales: tuple[str, ...] = GPU_PRIMARY_LOCALES,
+) -> list[list[dict[str, Any]]]:
+    """Split every pending shard across ``max_workers`` child processes, once.
+
+    One shard per child would be correct but slow: each child pays the model/TM
+    import before its first cell (measured at 1-3 minutes on this host), so a
+    wave-per-shard launcher pays that cost 25 times for a 25-locale page and ends
+    up slower than running sequentially in one process. Handing each child a whole
+    group of shards up front pays startup ``max_workers`` times in total.
+
+    Every GPU-bound shard goes to the same group, which is what keeps two GPU
+    shards from ever running at once: same process means sequential by construction.
+    API-bound shards are dealt round-robin starting after that group, so the group
+    carrying the slower GPU work is not also given the largest API share.
+    """
+    if max_workers < 1:
+        raise ValueError("max_workers must be >= 1")
+    gpu_bound, api_bound = partition_by_device(shards, gpu_locales)
+    groups: list[list[dict[str, Any]]] = [[] for _ in range(max_workers)]
+    groups[0].extend(gpu_bound)
+    start = 1 if (gpu_bound and max_workers > 1) else 0
+    for offset, shard in enumerate(api_bound):
+        groups[(start + offset) % max_workers].append(shard)
+    return [group for group in groups if group]
+
+
 def incomplete_shards(
     manifest: CampaignManifest,
     ledger_root: Path,
@@ -115,7 +144,7 @@ def duplicate_receipts(ledger_root: Path, campaign_id: str) -> dict[str, int]:
 
 def _child_command(
     *,
-    shard: dict[str, Any],
+    shards: list[dict[str, Any]],
     config_root: Path,
     campaign_manifest: Path,
     ledger_root: Path,
@@ -125,7 +154,7 @@ def _child_command(
     gpu_locales: tuple[str, ...],
     child: str = "gate5",
 ) -> list[str]:
-    """Build one shard child's argv, budgeting VRAM only for the GPU-bound shard.
+    """Build one child's argv for a whole GROUP of shards, VRAM-budgeted if it holds GPU work.
 
     The default ``gate5`` child is ``run_gate5_batch.py``, the same entry point every
     committed cell of this mission has come through.  It matters that both children
@@ -135,22 +164,30 @@ def _child_command(
     directory its children never wrote to.  ``gate5`` takes the flag and shares one
     engine construction path, so process sharding changes only *where* a job runs.
     """
-    is_gpu_bound = str(shard["locale"]) in gpu_locales
-    memory_percent = gpu_shard_memory_percent if is_gpu_bound else max_gpu_memory_percent
+    if not shards:
+        raise ValueError("a shard child needs at least one shard")
+    holds_gpu_work = any(str(shard["locale"]) in gpu_locales for shard in shards)
+    memory_percent = gpu_shard_memory_percent if holds_gpu_work else max_gpu_memory_percent
+    shard_ids = [str(shard["shard_id"]) for shard in shards]
     if child == "gate5":
-        return [
+        command = [
             sys.executable,
             "scripts/campaign/run_gate5_batch.py",
             "--manifest",
             str(campaign_manifest),
             "--ledger-root",
             str(ledger_root),
-            "--shard-id",
-            str(shard["shard_id"]),
             "--resume",
             "--max-gpu-memory-percent",
             str(memory_percent),
         ]
+        for shard_id in shard_ids:
+            command += ["--shard-id", shard_id]
+        return command
+    if len(shard_ids) > 1:
+        # The legacy worker takes a single --campaign-shard, so it cannot amortise
+        # startup across a group. Fail closed rather than silently drop shards.
+        raise ValueError("--child worker accepts one shard per process; use --child gate5")
     return [
         sys.executable,
         "-m",
@@ -162,7 +199,7 @@ def _child_command(
         "--campaign-manifest",
         str(campaign_manifest),
         "--campaign-shard",
-        str(shard["shard_id"]),
+        shard_ids[0],
         "--resume",
         "--validation-policy",
         "zero-defect",
@@ -177,19 +214,19 @@ def _child_command(
 
 def _run_wave(
     *,
-    shards: list[dict[str, Any]],
+    groups: list[list[dict[str, Any]]],
     manifest: CampaignManifest,
     args: argparse.Namespace,
     gpu_locales: tuple[str, ...],
     translator_repo: Path,
     config_root: Path,
 ) -> int:
-    """Launch one wave of isolated children and wait for all of them."""
+    """Launch one child per shard group and wait for all of them."""
     flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
     children: list[subprocess.Popen] = []
-    for shard in shards:
+    for group in groups:
         command = _child_command(
-            shard=shard,
+            shards=group,
             config_root=config_root,
             campaign_manifest=args.campaign_manifest,
             ledger_root=args.ledger_root,
@@ -201,18 +238,17 @@ def _run_wave(
         )
         children.append(subprocess.Popen(command, cwd=translator_repo, creationflags=flags))
     exit_codes = [child.wait() for child in children]
-    if any(code != 0 for code in exit_codes):
-        return 1
-    # Child process status is necessary but insufficient: a legacy worker
-    # could exit cleanly after a fail-closed preflight abort.  A supervised
-    # batch is successful only when every exact shard output has a receipt.
-    incomplete = incomplete_shards(
-        manifest, args.ledger_root, [str(shard["shard_id"]) for shard in shards]
-    )
+    launched = [str(shard["shard_id"]) for group in groups for shard in group]
+    # Child process status is necessary but insufficient: a child can exit
+    # cleanly after a fail-closed preflight abort, and a zero-defect campaign
+    # legitimately leaves a rejected cell unreceipted. Report both signals
+    # rather than collapsing them into one exit code.
+    incomplete = incomplete_shards(manifest, args.ledger_root, launched)
     if incomplete:
         print(f"Incomplete campaign shards: {', '.join(incomplete)}", file=sys.stderr)
+    if any(code != 0 for code in exit_codes):
         return 1
-    return 0
+    return 1 if incomplete else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -251,7 +287,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--drain",
         action="store_true",
-        help="Keep launching waves until no receipt-incomplete shard remains",
+        help="After a pass, launch another for any shard still receipt-incomplete "
+        "(a retry pass; each pass already hands every pending shard to a child)",
     )
     parser.add_argument(
         "--wait",
@@ -285,20 +322,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         launched_any = False
         while True:
-            shards = select_pending_shards(
-                manifest, args.ledger_root, args.max_workers, gpu_locales
-            )
-            if not shards:
+            pending = pending_shards(manifest, args.ledger_root)
+            if not pending:
                 if not launched_any:
                     print("No pending campaign shards")
                 break
-            for shard in shards:
-                print(shard["shard_id"])
+            groups = assign_shard_groups(pending, args.max_workers, gpu_locales)
+            for index, group in enumerate(groups):
+                print(f"child {index}: {', '.join(str(s['shard_id']) for s in group)}")
             if args.dry_run:
                 return 0
             launched_any = True
             wave_status = _run_wave(
-                shards=shards,
+                groups=groups,
                 manifest=manifest,
                 args=args,
                 gpu_locales=gpu_locales,
