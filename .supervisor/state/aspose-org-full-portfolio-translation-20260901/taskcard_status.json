@@ -772,15 +772,15 @@
       "blocker_type": null
     },
     "TC-APT-057": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
       "title": "Reverification receipts (data/campaigns/reverification_receipts.jsonl) as the evidence standard for RECURRENCE step 2",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": null,
-      "evidence_path": null,
+      "blocking_reason": "Built src/workers/reverification_receipts.py, backed by data/campaigns/reverification_receipts.jsonl (content-free rows: source_path, target_lang, root_cause_class, gates_passed, evidence_path, verified_at). record_receipt() appends one; has_passing_receipt() checks the MOST RECENT receipt for an exact cell (a later failing re-run can revoke an earlier pass, not leave it as stale evidence); missing_receipts_for_class() diffs a root_cause_classs OPEN heal tickets (via heal_queue.py.open_tickets_by_root_cause_class(), a new small public export added alongside this) against recorded passing receipts, returning exactly the (source_path, target_lang) pairs RECURRENCE step 2 still owes; recurrence_step2_satisfied() is that list being empty (vacuously true for a class with zero open tickets -- nothing left to reverify). This is precisely the runbooks own evidence standard: \"a row with gates_passed: true for every (source_path, target_lang) the classs original tickets name is the ONLY thing that lifts the obligation -- prose does not count,\" now checkable in code instead of by manual iteration-report inspection. 14 new tests plus 3 more for the heal_queue.py addition. Full tests/unit/workers suite: 649 passed, 1 skipped (was 632), no regressions. Claimed this taskcard and TC-APT-056 with the new work_claims.py helper. NOT done: nothing in the loop currently CALLS record_receipt() during a real reverification -- the mechanism exists but a reverification pass still has to be told to use it, same caveat as the qualification ledger.",
+      "evidence_path": "src/workers/reverification_receipts.py; tests/unit/workers/test_reverification_receipts.py; src/workers/heal_queue.py (open_tickets_by_root_cause_class)",
       "commit": null,
-      "last_updated": "2026-09-05T07:50:00+00:00",
+      "last_updated": "2026-09-05T18:50:20+00:00",
       "blocker_type": null
     },
     "TC-APT-058": {

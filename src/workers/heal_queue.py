@@ -54,6 +54,20 @@ def _counts_toward_quarantine(ticket: dict[str, Any]) -> bool:
     return disposition is None or disposition not in _RESOLVED_DISPOSITIONS
 
 
+def open_tickets_by_root_cause_class(
+    root_cause_class: str, *, heal_queue_path: Path | None = None
+) -> list[dict[str, Any]]:
+    """OPEN, unresolved tickets for one root_cause_class -- e.g. the exact set the
+    RECURRENCE ESCALATION rule (project/loop-prompt.md §3) needs a reverification
+    receipt for before a new Track-A page can open."""
+    path = heal_queue_path or _HEAL_QUEUE_FILE
+    return [
+        ticket
+        for ticket in _load_tickets(path)
+        if ticket.get("root_cause_class") == root_cause_class and _counts_toward_quarantine(ticket)
+    ]
+
+
 def open_ticket_counts_by_pair(
     *, heal_queue_path: Path | None = None
 ) -> dict[tuple[str, str], int]:

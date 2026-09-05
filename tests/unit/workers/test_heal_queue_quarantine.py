@@ -11,6 +11,7 @@ from src.workers.heal_queue import (
     QUARANTINE_THRESHOLD,
     is_quarantined,
     open_ticket_counts_by_pair,
+    open_tickets_by_root_cause_class,
     quarantined_pairs,
 )
 
@@ -84,6 +85,36 @@ class TestCountingAndThreshold:
         queue = tmp_path / "does_not_exist.jsonl"
         assert quarantined_pairs(heal_queue_path=queue) == set()
         assert open_ticket_counts_by_pair(heal_queue_path=queue) == {}
+
+
+class TestOpenTicketsByRootCauseClass:
+    def test_returns_only_open_tickets_of_the_named_class(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        _write_tickets(
+            queue,
+            [
+                _ticket("ar", "auto:StructureValidator", source_path="page1"),
+                _ticket("fa", "auto:StructureValidator", source_path="page2"),
+                _ticket("ar", "auto:TC-SAS-01", source_path="page3"),
+            ],
+        )
+        tickets = open_tickets_by_root_cause_class("auto:StructureValidator", heal_queue_path=queue)
+        assert {t["source_path"] for t in tickets} == {"page1", "page2"}
+
+    def test_resolved_tickets_of_the_class_are_excluded(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        _write_tickets(
+            queue,
+            [
+                _ticket("ar", "auto:StructureValidator", source_path="page1", disposition="FIXED_VERIFIED"),
+                _ticket("fa", "auto:StructureValidator", source_path="page2"),
+            ],
+        )
+        tickets = open_tickets_by_root_cause_class("auto:StructureValidator", heal_queue_path=queue)
+        assert {t["source_path"] for t in tickets} == {"page2"}
+
+    def test_missing_file_returns_empty_list(self, tmp_path):
+        assert open_tickets_by_root_cause_class("auto:X", heal_queue_path=tmp_path / "none.jsonl") == []
 
 
 class TestReQueueOnResolution:
