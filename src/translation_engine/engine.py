@@ -2151,7 +2151,20 @@ class TranslationEngine:
                     # too little independent prose left to make ANY reliable
                     # determination either way, so skip rather than misreport.
                     continue
-                detected_langs = _ld.detect_langs(v_stripped)
+                # TC-APT-040 (second manifestation, 2026-09-05): judge the fallback
+                # on the SIGNAL text, never on the full unstripped field. The <6-char
+                # branch above already refuses to re-detect `v_stripped` because it is
+                # "dominated by the very tokens just removed" -- that reasoning does not
+                # stop applying just because the field is long. Confirmed live on
+                # cells/go/introducing-cells-foss-go's `seoTitle`, where `de` exhausted
+                # all five attempts: a correct German rendering
+                # ("Aspose.Cells FOSS fuer Go -- Open-Source-Go-Excel-Bibliothek")
+                # attests de at only 0.43 in its prose because German compounds keep the
+                # English technical tokens, while the FULL field reads en at 0.999996 --
+                # the exact confidence the failure record logged. Detecting on prose keeps
+                # the guard's real job (an untranslated field still reads en at 0.99997
+                # here) without rejecting correct translations of token-dominated fields.
+                detected_langs = _ld.detect_langs(signal_text)
                 if detected_langs:
                     top = detected_langs[0]
                     # Accept linguistically near-identical languages that share script/vocabulary space.
