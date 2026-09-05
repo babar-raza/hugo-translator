@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T09:49:49+00:00",
+  "updated_at": "2026-09-05T09:57:27+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -712,11 +712,11 @@
       ],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": "tests/unit/workers/test_campaign_serialization_rollback.py, tests/regression/test_backend_generation_concurrency.py",
+      "evidence_path": "tests/unit/workers/test_campaign_serialization_rollback.py, tests/regression/test_backend_generation_concurrency.py, tests/unit/workers/test_concurrency_canary_verification.py",
       "commit": null,
-      "last_updated": "2026-09-05T09:49:49+00:00",
+      "last_updated": "2026-09-05T09:57:27+00:00",
       "blocker_type": null,
-      "note": "Step 1 DONE: translation_engine.concurrency.force_serialize_all_backends (config/global.yaml, default true) is an instant code-free rollback of TC-APT-044, scoped to the campaign path only -- the deleted lock never covered the CLI parallel-language executor, so re-serializing that would be a new restriction, not a rollback. Fails safe to true on any config read error. Inert at max_parallel_jobs=1. Step 3 DONE: Test D is in the permanent suite. Steps 2 (real canary at max_parallel_jobs=4 with automated cross-contamination diff) and 4 (sustained-load calibration before any schema-ceiling raise) still TODO -- both need a campaign, blocked on the in-flight gate5-pdf-foss-cpp-r2. Side finding: test_campaign_parallel_jobs_share_engine_without_cross_job_state depended on an unstated default; it now names the switch state it exercises (assertion unchanged)."
+      "note": "Steps 1 and 3 DONE (a359a07). Step 2 is now HALF done: its required automated verification exists as scripts/campaign/verify_concurrency_canary.py -- model routing vs manifest retry_policy, empty-frontmatter, cross-language AND cross-file body-identity bleed, plus receipt-integrity (accepted output whose on-disk bytes no longer match output_sha256 = cross-job overwrite). 11 tests: every check driven by a fixture carrying its own defect, plus a clean control. SERIAL BASELINE RECORDED: 0 violations across r2 10 accepted cells at max_parallel_jobs=1, so any violation in the concurrent run is attributable to concurrency. Remaining on step 2: run the canary itself at max_parallel_jobs=4 with force_serialize_all_backends=false. BLOCKED (not TRUE-external, transient): campaign verify() rejects a dirty translator repo and the working tree is shared with the fleet -- a peer held uncommitted edits this wake. Step 4 (sustained-load calibration before any schema-ceiling raise) still TODO."
     },
     "TC-APT-047": {
       "status": "IN_PROGRESS",
