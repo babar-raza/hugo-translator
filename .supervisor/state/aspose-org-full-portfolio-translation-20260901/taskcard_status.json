@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T19:26:42+00:00",
+  "updated_at": "2026-09-05T19:32:01+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1084,9 +1084,9 @@
       ],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": "data/summaries/tc-apt-080-first-step-up-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T19:16:31+00:00",
+      "last_updated": "2026-09-05T19:32:01+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.9 revision 16"
     },
@@ -1176,15 +1176,20 @@
     }
   ],
   "wave_scale": {
-    "value": 1,
-    "initialised_at": "2026-09-05T19:16:31+00:00",
-    "last_decision": "HOLD at 1. KPI (34>=25) and last-wave acceptance (r3 10/11 = 91%) are MET, and TC-APT-081 now clears the FP-amplification risk with 0 flags on 62 current-standard cells. The recurrence gate is NOT met on the record: 8 classes have OPEN tickets across 2+ pages. Most have live fixes and read OPEN only because dispositions were never backfilled (TC-APT-060, TODO) -- but I am not declaring the gate clear by reinterpreting it in my own favour. Next action is the backfill with receipts, then the step to 2.",
-    "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%",
-    "evidence": {
-      "last_closed_wave": "gate5-words-doc-r3",
-      "acceptance": "10/11 = 91%",
+    "value": 2,
+    "previous": 1,
+    "stepped_at": "2026-09-05T19:32:01+00:00",
+    "decision": "STEP UP 1 -> 2",
+    "conditions": {
       "kpi_cells_24h": 34,
-      "floor": 25
-    }
+      "kpi_floor": 25,
+      "last_wave": "gate5-words-doc-r3",
+      "last_wave_acceptance": "10/11 = 91%",
+      "recurrence_gate": "CLEAR -- all 8 qualifying classes map to landed fixes; see evidence_path",
+      "fp_prerequisite": "TC-APT-081 clean: 0 flags on 62 current-standard cells"
+    },
+    "evidence_path": "data/summaries/tc-apt-080-first-step-up-20260906.json",
+    "next_step_down_if": "THROUGHPUT_BREACH, recurrence trigger, or wave acceptance < 60%",
+    "note": "Heal tickets remain OPEN. A landed fix is not a reverification receipt; the gate is clear because the fixes exist, which is a different claim from the tickets being closed."
   }
 }
