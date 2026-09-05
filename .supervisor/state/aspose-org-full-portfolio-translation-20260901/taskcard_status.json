@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T19:02:51+00:00",
+  "updated_at": "2026-09-05T19:11:44+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1062,17 +1062,17 @@
       "blocker_type": null
     },
     "TC-APT-079": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
       "owner": "loop",
-      "title": "Governed terminology is duplicated across FOUR inventories that must agree but are edited independently: profile preserve_patterns, engine.py _FRONTMATTER_TECHNICAL_SIGNAL_RE, config/terminology.yaml, and verification/checks/language_check.py TECHNICAL_SIGNAL_RE. Governing one term took four commits across three iterations, and each miss produced a distinct live failure. The two regexes are near-copies that will keep drifting. Candidate fix: derive both signal regexes from the terminology config so there is one source of truth, or at minimum a test that fails when they disagree (one such test now exists for the single governed term).",
+      "title": "Governed terminology is duplicated across FOUR inventories that must agree but are edited independently: profile preserve_patterns, engine.py _FRONTMATTER_TECHNICAL_SIGNAL_RE, config/terminology.yaml, and verification/checks/language_check.py TECHNICAL_SIGNAL_RE. Governing one term took four commits across three iterations, and each miss produced a distinct live failure. The two regexes are near-copies that will keep drifting. Candidate fix: derive both signal regexes from the terminology config so there is one source of truth, or at minimum a test that fails when they disagree (one such test now exists for the single governed term). RESOLVED 2026-09-06: both signal regexes now derive their governed multi-word terms from config/terminology.yaml via translation_engine/governed_terms.py. The drift was 15 governed terms in config vs 1 in the regexes, so API Reference, REST API, QR Code, Data Matrix and the barcode symbologies were all counted as prose -- reaching reference.aspose.org and the barcode families, not just one page. A parametrized drift guard now fails if the two paths disagree about any governed term.",
       "depends_on": [
         "TC-APT-069"
       ],
       "blocking_reason": null,
-      "evidence_path": "data/summaries/fix-verification-governed-term-signal-20260906.json",
+      "evidence_path": "data/summaries/fix-governed-terms-single-source-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T19:02:51+00:00",
+      "last_updated": "2026-09-05T19:11:44+00:00",
       "blocker_type": null
     },
     "TC-APT-080": {

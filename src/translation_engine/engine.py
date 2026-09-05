@@ -58,6 +58,7 @@ from .validation import ValidationSuite
 from .validation.base import ValidationIssue as _ValIssue
 from .validation.base import ValidationSeverity as _ValSeverity
 from .validation.decision_engine import ValidationDecisionEngine
+from .governed_terms import governed_signal_alternation
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +92,12 @@ _TARGET_SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
 # claim their span first (same ordering rule as the profile preserve_patterns).
 _FRONTMATTER_TECHNICAL_SIGNAL_RE = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
-    r"Document Object Model|"
-    r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
+    # TC-APT-079: governed multi-word terms come from config/terminology.yaml,
+    # the single source of truth, instead of being hand-copied here and into
+    # verification/checks/language_check.py. Hand-copying is what let this list
+    # hold 1 of the config's 15 governed terms.
+    + governed_signal_alternation()
+    + r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
     r"\.NET|C\+\+|C#|"
     r"FOSS|SDK|API|HTTP|REST|JSON|XML|XLSX|PDF|DOCX|"
     r"Rust|Python|Java|JavaScript|Microsoft|Office|"

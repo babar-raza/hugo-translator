@@ -10,6 +10,7 @@ import re
 from typing import Any
 
 from .base import VerificationCheck, VerificationIssue
+from src.translation_engine.governed_terms import governed_signal_alternation
 
 logger = logging.getLogger(__name__)
 
@@ -177,8 +178,10 @@ class LanguageDetectionCheck(VerificationCheck):
     # alternatives so they claim their span first.
     TECHNICAL_SIGNAL_RE = re.compile(
         r"(?<![A-Za-z0-9_])(?:"
-        r"Document Object Model|"
-        r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
+        # TC-APT-079: derived from config/terminology.yaml rather than
+        # hand-copied, so this inventory cannot drift from engine.py's.
+        + governed_signal_alternation()
+        + r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
         r"\.NET|C\+\+|C#|"
         r"FOSS|SDK|API|HTTP|REST|JSON|XML|XLSX|PDF|DOCX|"
         r"Rust|Python|Java|JavaScript|Microsoft|Office|"
