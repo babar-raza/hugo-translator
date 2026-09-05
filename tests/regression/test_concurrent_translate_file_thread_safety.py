@@ -205,8 +205,11 @@ Beta second paragraph mentioning transitions and speaker notes for talks.
 class _MarkerBackend:
     """Deterministic, thread-safe stub: prefixes each text with a marker."""
 
+    def __init__(self, tag=None):
+        self.tag = tag
+
     def translate(self, texts, source_lang, target_lang):
-        return [f"[{target_lang.upper()}]{t}" for t in texts]
+        return [f"[{self.tag or target_lang.upper()}]{t}" for t in texts]
 
     def translate_with_token_counts(self, texts, source_lang, target_lang):
         translations = self.translate(texts, source_lang, target_lang)
@@ -414,4 +417,76 @@ def test_campaign_runner_engine_wide_lock_stays_deleted():
     assert "self._model_execution_lock" not in source, (
         "the engine-wide translate_file lock must not come back (TC-APT-044); "
         "GPU serialization lives on the backend instances"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test C (plan §11, TC-APT-045): the campaign model pin is call-scoped.
+# Two concurrent translate_file calls with different model_id values must each
+# resolve their OWN backend end-to-end — the former engine.model_id_override
+# attribute mutation could bleed one job's pin into the other.
+# ---------------------------------------------------------------------------
+
+
+def test_concurrent_model_id_no_cross_job_bleed(tmp_path):
+    engine, output_dir = _build_engine(tmp_path)
+    engine.model_loader.load_model = Mock(
+        side_effect=lambda model_id: _MarkerBackend(tag=model_id)
+    )
+    source_dir = tmp_path / "source"
+    source_dir.mkdir(exist_ok=True)
+    alpha_path = source_dir / "alpha.md"
+    beta_path = source_dir / "beta.md"
+    alpha_path.write_text(DOC_ALPHA, encoding="utf-8", newline="\n")
+    beta_path.write_text(DOC_BETA, encoding="utf-8", newline="\n")
+
+    for rep in range(10):
+        barrier = threading.Barrier(2)
+        outcomes = {}
+
+        def translate(key, path, model_id):
+            try:
+                barrier.wait(timeout=10.0)
+                outcomes[key] = engine.translate_file(
+                    site_id="test.site",
+                    file_path=path,
+                    target_langs=["es"],
+                    model_id=model_id,
+                )
+            except Exception as error:
+                outcomes[key] = error
+
+        threads = [
+            threading.Thread(target=translate, args=("alpha", alpha_path, "model-alpha")),
+            threading.Thread(target=translate, args=("beta", beta_path, "model-beta")),
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=60.0)
+
+        for key in ("alpha", "beta"):
+            outcome = outcomes.get(key)
+            assert not isinstance(outcome, Exception), f"rep {rep}: {key} raised {outcome!r}"
+            assert getattr(outcome, "success", False), f"rep {rep}: {key} failed: {outcome!r}"
+
+        alpha_out = (output_dir / "es" / "alpha.md").read_text(encoding="utf-8")
+        beta_out = (output_dir / "es" / "beta.md").read_text(encoding="utf-8")
+        assert "[model-alpha]" in alpha_out and "[model-beta]" not in alpha_out, (
+            f"rep {rep}: alpha translated with the wrong job's model pin"
+        )
+        assert "[model-beta]" in beta_out and "[model-alpha]" not in beta_out, (
+            f"rep {rep}: beta translated with the wrong job's model pin"
+        )
+
+
+def test_campaign_runner_no_attribute_model_pin_remains():
+    import inspect
+
+    import src.workers.campaign_runner as campaign_runner_module
+
+    source = inspect.getsource(campaign_runner_module)
+    assert "self.engine.model_id_override" not in source, (
+        "campaign jobs must pin the model via translate_file(model_id=...) "
+        "(TC-APT-045), never by mutating shared engine state"
     )

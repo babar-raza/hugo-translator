@@ -68,6 +68,9 @@ class LanguageTranslationContext:
     output_paths_cache: dict[str, Path]
     force_overwrite: bool = False
     llm_model_override: str | None = None
+    # TC-APT-045: call-scoped campaign model pin; escalation override wins,
+    # matching the precedence of the old engine.model_id_override attribute.
+    model_id_pin: str | None = None
 
 
 @dataclass
@@ -150,6 +153,7 @@ class FileTranslationPipeline:
         max_retry_attempts = ctx.max_retry_attempts
         output_paths_cache = ctx.output_paths_cache
         _llm_model_override = ctx.llm_model_override
+        _model_id_pin = ctx.model_id_pin
         campaign_feedback = getattr(engine, "_campaign_retry_feedback_by_output", {})
         retry_feedback = campaign_feedback.pop(str(output_path.resolve()), retry_feedback)
 
@@ -181,7 +185,7 @@ class FileTranslationPipeline:
                     stats=result.stats,
                     retry_feedback=retry_feedback,
                     retry_count=retry_count,
-                    model_id_override=_llm_model_override,
+                    model_id_override=_llm_model_override or _model_id_pin,
                     tm_write_buffer=_tm_write_buffer,
                 )
 
@@ -863,6 +867,7 @@ class FileTranslationPipeline:
                             site_id=site_id,
                             model_fingerprint=str(
                                 _llm_model_override
+                                or _model_id_pin
                                 or getattr(engine, "model_id_override", "")
                                 or getattr(site_profile, "default_model", "")
                                 or ""

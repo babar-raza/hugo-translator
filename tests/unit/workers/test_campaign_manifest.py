@@ -713,7 +713,9 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
                     escalated,
                     _kwargs.get("retry_budget_override"),
                     feedback,
-                    self.model_id_override,
+                    # TC-APT-045: the model pin arrives call-scoped, never via
+                    # a shared engine attribute.
+                    _kwargs.get("model_id"),
                 )
             )
             if len(self.calls) < 3:
@@ -769,7 +771,8 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     assert engine.calls[2][0:2] == (True, 0)
     assert "Regenerate the complete translation" in engine.calls[2][2]
     assert engine.calls[2][3] == "professionalize_llm"
-    assert engine.model_id_override is None
+    # TC-APT-045: the campaign must never create/mutate shared model state.
+    assert not hasattr(engine, "model_id_override")
     assert engine.decision_engine.max_retry_attempts == 99
     failure_log = runner.ledger.failures_path.read_text(encoding="utf-8")
     assert failure_log.count("\n") == 2

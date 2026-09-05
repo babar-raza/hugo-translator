@@ -965,6 +965,7 @@ class TranslationEngine:
         validate: bool | None = None,
         trigger_type: str = "cli",
         retry_budget_override: int | None = None,
+        model_id: str | None = None,
     ) -> TranslationResult:
         """
         Translate a single Hugo markdown file.
@@ -976,6 +977,9 @@ class TranslationEngine:
             force: If True, bypass TM and force retranslation
             validate: Whether to validate translation quality. If None, uses engine default.
             trigger_type: How translation was triggered ("cli", "scheduled", "web", etc.)
+            model_id: Call-scoped model pin (TC-APT-045). Replaces the racy
+                engine.model_id_override attribute mutation for campaign jobs;
+                an in-flight LLM escalation override still takes precedence.
 
         Returns:
             TranslationResult with outcomes for all target languages
@@ -1250,6 +1254,7 @@ class TranslationEngine:
                     max_retry_attempts=max_retry_attempts,
                     output_paths_cache=output_paths_cache,
                     llm_model_override=_llm_model_override,
+                    model_id_pin=model_id,
                 )
 
                 self._file_pipeline.translate_language(_lang_ctx, result)

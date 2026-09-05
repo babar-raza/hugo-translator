@@ -1686,7 +1686,6 @@ class CampaignRunner:
                     f"declared replacement pre-hash drift (concurrent change?): {expected_output}"
                 )
         with self._engine_campaign_state_lock:
-            prior_model_override = getattr(self.engine, "model_id_override", None)
             if declared:
                 self.engine.campaign_context.setdefault("replace_existing", {})[expected_output] = (
                     original_sha
@@ -1716,12 +1715,13 @@ class CampaignRunner:
         )
         try:
             for use_llm, retry_budget, attempt_number in phases:
+                # A manifest model pin takes precedence over the adaptive
+                # selector. TC-APT-045: the pin travels as a call-scoped
+                # translate_file(model_id=...) argument instead of the former
+                # engine.model_id_override attribute mutation, which raced
+                # concurrent jobs sharing this engine instance.
+                phase_model_id = llm_model if use_llm else primary_model
                 with self._engine_campaign_state_lock:
-                    # A manifest model pin takes precedence over the adaptive
-                    # selector.  The selector can otherwise silently replace
-                    # the governed M2M100 primary with another backend before
-                    # the controlled professionalize_llm escalation phase.
-                    self.engine.model_id_override = llm_model if use_llm else primary_model
                     if use_llm:
                         llm_paths.add(resolved_output)
                     if next_feedback:
@@ -1749,6 +1749,7 @@ class CampaignRunner:
                     "force_overwrite": bool(declared),
                     "trigger_type": "campaign",
                     "retry_budget_override": retry_budget,
+                    "model_id": phase_model_id,
                 }
                 result = self.engine.translate_file(
                     source.site_id, source_path, **translate_kwargs
@@ -1814,9 +1815,6 @@ class CampaignRunner:
                     (self.engine.campaign_context.get("replace_existing") or {}).pop(
                         expected_output, None
                     )
-                # Do not leak this campaign's model pin into later workers or
-                # ordinary translation calls sharing this engine instance.
-                self.engine.model_id_override = prior_model_override
 
         if receipt is None or not expected.is_file():
             return False, expected_output
