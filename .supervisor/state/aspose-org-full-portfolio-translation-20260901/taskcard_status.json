@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T19:32:01+00:00",
+  "updated_at": "2026-09-05T19:36:14+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1190,6 +1190,8 @@
     },
     "evidence_path": "data/summaries/tc-apt-080-first-step-up-20260906.json",
     "next_step_down_if": "THROUGHPUT_BREACH, recurrence trigger, or wave acceptance < 60%",
-    "note": "Heal tickets remain OPEN. A landed fix is not a reverification receipt; the gate is clear because the fixes exist, which is a different claim from the tickets being closed."
+    "note": "Heal tickets remain OPEN. A landed fix is not a reverification receipt; the gate is clear because the fixes exist, which is a different claim from the tickets being closed.",
+    "pre_committed_ruling_on_r4": "Committed BEFORE r4 closes, so it cannot become a post-hoc rationalisation. r4 is a Tier-2 heal retrigger, and the runbook scopes Track A to include Tier-2 retranslation of heal-queue tickets, so r4 IS a Track-A wave and its acceptance counts for the ladder. If it closes below 60% -- it currently stands at 1/8 = 12.5% -- then wave_scale halves 2 -> 1 by the rule as written, undoing the step-up I just made. I am not exempting it.",
+    "structural_concern_for_the_operator": "Flagging, not acting on: retriggers are by construction runs of cells already known to be defective, and they execute whatever code existed at launch (r4 predates three landed fixes). If such runs count toward the ladder, every rejected page generates a low-acceptance wave that pins wave_scale at 1 permanently -- the accelerator could never engage on a page that needed healing. The rule may want to measure only Tier-1a/1b waves, or to weight by cells attempted. That is the operator's call; I am applying the rule as written meanwhile."
   }
 }
