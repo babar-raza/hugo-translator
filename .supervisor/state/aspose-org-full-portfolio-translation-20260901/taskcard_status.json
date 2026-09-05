@@ -1,10 +1,10 @@
 {
   "mission_id": "aspose-org-full-portfolio-translation-20260901",
   "plan_path": "C:\\Users\\prora\\.claude\\plans\\hugo-translator-aspose-org-partitioned-kahn.md",
-  "plan_revision": "13",
+  "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T08:45:00+00:00",
+  "updated_at": "2026-09-05T09:15:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -652,10 +652,10 @@
       "title": "StructureValidator rejects a correct translation on ordinary +/-1 list-item-count stylistic drift, cascading into a destructive cross-model escalation",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": "Fix landed and unit-tested (4e5089e, 14/14 pass). Step 2 (reverify against the exact original file) DONE via debug harness (scripts/ops/debug_translate_one.py, also committed 4e5089e): re-translated introducing-pdf-foss-cpp/cs with professionalize_llm -- success=True, 0 issues, vs the pre-fix run's list-count-10-vs-11 WARNING reject. Confirmed the fix works. Step 3 (retrigger campaign, commit whatever passes) IN PROGRESS: rebuilt the manifest (2 more SHA-drift rebuilds needed as HEAD kept moving from this same iteration's own commits) and relaunched the FULL 25-language campaign with --resume (PID 12291, log logs/gate5-pdf-foss-cpp_run2.log). Also discovered mid-verification: 'de' hit a SEPARATE, already-documented issue (TC-SAS-01 same-as-source cognate blind spot, German 'Annotations' heading -- same class as the French case on introducing-pdf-foss-typescript) -- 2nd source page for that class now, not fixed this iteration (architectural, needs per-unit cognate-exemption logic). LESSON LEARNED THE HARD WAY: engine.translate_file() called directly (debug harness) writes REAL, properly-receipted acceptance_receipts.jsonl entries just like a real campaign -- NOT disposable test output. Accidentally deleted a real, valid, receipted 'de' translation via `rm -f` before realizing this; regenerated it (hit the cognate issue on regen, likely because the intervening 'cs' debug call cached an 'Annotations'->'Annotations' TM entry that de's retry then reused). Going forward: NEVER delete a debug harness output without checking data/campaigns/<campaign_id>/acceptance_receipts.jsonl for that exact (source_path, target_lang) first.",
+      "blocking_reason": "Step 3 retrigger run 1 (gate5-pdf-foss-cpp) finished PARTIAL_WITH_TICKETS 20 accepted / 5 failed (fa,fr,it,pt,uk) -- but pre-commit review caught a NEW deterministic producer defect in all 20: \"### Encryption\" heading English in every language (single-word PascalCase DNT false positive, TC-APT-049 class; also exposed TC-SAS-01 len>10 boundary blind spot -- \"Encryption\" is exactly 10 chars). Verdict REJECT per review_rubric.yaml RB-001. NOT committed. Registry fix landed (4416531), DNT(heading) verified False. TM purge not needed: DNT units never reach TM; page TM entries are correct translations. Rerun as campaign gate5-pdf-foss-cpp-r2 (fresh id -- resume would revalidate defective receipts and skip retranslation); also retries fa/fr/it/pt/uk (fr cognate fixed in 010a5d2).",
       "evidence_path": "debug harness output (cs: success=True, 0 issues) -- see this blocking_reason for the exact command",
       "commit": "4e5089e",
-      "last_updated": "2026-09-05T12:10:00+00:00"
+      "last_updated": "2026-09-05T09:15:00+00:00"
     },
     "TC-APT-043": {
       "status": "DONE",
@@ -671,17 +671,17 @@
       "note": "Root cause reproduced (Test A, rep-0 None corruption pre-fix), fixed b82b568 (per-instance YAML + threading.local engine.parser), Test A clean 50+50 reps, Test B clean 25 reps end-to-end (2215fbd). Both permanent regression tests. Next in dependency order: TC-APT-044 (backend-instance locks, delete engine-wide lock)."
     },
     "TC-APT-044": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": null,
       "title": "Move generation lock onto resolved backend instance (HF/CT2 lock, LLM none); delete campaign_runner engine-wide _model_execution_lock",
       "depends_on": [
         "TC-APT-043"
       ],
       "owner": "loop",
-      "blocking_reason": null,
+      "blocking_reason": "Code + regression tests landed (4197454): per-instance _generation_lock on HuggingFaceBackend/CTranslate2Backend (whole translate body -- tokenizer src_lang state is part of the hazard), LLMModelBackend lock-free (confirmed duck-typed, not ABC subclass), campaign_runner._model_execution_lock deleted. workers+backends suites 562 passed. gpu_cache_manager checked: empty_cache()-only, safe. Held at IN_PROGRESS because plan SS11 acceptance references Test D (K concurrent LLM calls ~ one latency), which is TC-APT-046 step 3 -- completes there.",
       "evidence_path": null,
-      "commit": null,
-      "last_updated": "2026-09-05T07:50:00+00:00",
+      "commit": "4197454",
+      "last_updated": "2026-09-05T09:15:00+00:00",
       "blocker_type": null
     },
     "TC-APT-045": {
@@ -806,5 +806,5 @@
   },
   "last_wake_summary": "data/summaries/aspose-org-wake-001-20260902.json",
   "cells_committed_total": 44,
-  "loop_prompt_version_seen": "10.2 (2026-09-05)"
+  "loop_prompt_version_seen": "10.4 (2026-09-05)"
 }

@@ -1,0 +1,34 @@
+# Review rubric (TC-APT-059, runbook v10.3 §4.2): every review verdict cites
+# rule IDs from this file. A judgment call not covered here requires adding a
+# rule (a commit) before the verdict stands. Seeded 2026-09-05 with the rule
+# needed by the first post-v10.3 verdict; TC-APT-059 extends it from the full
+# heal-queue corpus.
+version: 1
+rules:
+  - id: RB-001
+    name: untranslated-section-heading
+    verdict: REJECT
+    scope: body_heading
+    statement: >-
+      A section heading left byte-identical to its English source in a
+      non-English output is a defect UNLESS the identical form is a
+      reviewed cognate for that locale (_REVIEWED_IDENTICAL_TRANSLATIONS,
+      e.g. fr "Annotations"/"Introduction") or a protected brand/API term
+      (config/terminology.yaml, e.g. "API Reference"). Deterministic
+      recurrence across every language of a page indicates a
+      do_not_translate false positive (producer bug), not model variance:
+      fix the producer (i18n registry kind-scoped override is the
+      established mechanism, TC-APT-049) and retrigger; never hand-edit
+      the output.
+    evidence: TC-APT-053-gate5-pdf-foss-cpp "Encryption" 20/20 languages, 2026-09-05
+  - id: RB-002
+    name: brand-navigation-label-exception
+    verdict: APPROVE
+    scope: link_text
+    statement: >-
+      Link text matching the brand-navigation-label convention
+      (_link_text_is_brand_navigation_label: "Aspose.X KB",
+      "Aspose.X — Enterprise Product Family/Blog") and the protected
+      "API Reference" phrase stay in English by curated portfolio-wide
+      convention. Never flag these alone as defects.
+    evidence: field notes 2026-09-04 (introducing-cells-foss-go false positives)
