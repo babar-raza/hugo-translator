@@ -332,7 +332,62 @@ class HugoParser:
         if not inline_token.children:
             return [text_node(inline_token.content, self._generate_node_id())]
 
-        return self._parse_inline_tokens(inline_token.children, 0, None)[0]
+        return self._merge_soft_breaks(
+            self._parse_inline_tokens(inline_token.children, 0, None)[0]
+        )
+
+    def _merge_soft_breaks(self, nodes: list[ASTNode]) -> list[ASTNode]:
+        """Fold a soft line wrap into the surrounding text instead of a separate node.
+
+        TC-APT-042: a source paragraph wrapped mid-sentence produced one TEXT node per
+        source line with a SOFT_BREAK between them. When the paragraph also contains a
+        link/bold/emphasis, `_should_extract_full_sentence()` sends it down the
+        leaf-level path, which makes each TEXT sibling its own translation unit -- so
+        "There are no usage" and "restrictions, no runtime fees..." were translated
+        with no knowledge of each other. That produced split noun phrases, duplicated
+        tokens, spurious copulas and outright meaning inversion across 16/16 reviewed
+        locales of cells/go/introducing-cells-foss-go
+        (data/summaries/fp-softwrap-sentence-splitting-20260905.json).
+
+        Folding the break into the text is output-neutral: both ASTRenderer and the
+        extractor's `_collect_text_from_node` already render SOFT_BREAK as a single
+        space, and translated pages already emit each paragraph on one line. Only what
+        the model receives changes -- a whole sentence rather than fragments.
+
+        Deliberately conservative: TEXT nodes are joined ONLY across a SOFT_BREAK, never
+        merely because they are adjacent, and a break that does not sit between two TEXT
+        nodes leaves a trailing space on the preceding text (or the original node) so
+        rendering is byte-identical either way.
+        """
+        merged: list[ASTNode] = []
+        pending_space = False
+
+        for node in nodes:
+            if node.children:
+                node.children = self._merge_soft_breaks(node.children)
+
+            if node.type == NodeType.SOFT_BREAK:
+                if merged and merged[-1].type == NodeType.TEXT:
+                    pending_space = True
+                    continue
+                merged.append(node)
+                continue
+
+            if pending_space:
+                pending_space = False
+                if node.type == NodeType.TEXT:
+                    merged[-1].raw = f"{merged[-1].raw or ''} {node.raw or ''}"
+                    continue
+                # Next node is not text (e.g. a link): keep the space the soft break
+                # would have rendered, on the text that precedes it.
+                merged[-1].raw = f"{merged[-1].raw or ''} "
+
+            merged.append(node)
+
+        if pending_space and merged and merged[-1].type == NodeType.TEXT:
+            merged[-1].raw = f"{merged[-1].raw or ''} "
+
+        return merged
 
     def _parse_inline_tokens(
         self, tokens: list, start: int, close_type: str | None
