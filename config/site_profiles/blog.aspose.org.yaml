@@ -92,12 +92,23 @@ body:
   # HT-QUALITY-GATES-001 Part 22 (plan 5.3, closes 2.1.C's cited gap): this
   # site had NO markdown-link preserve_pattern at all (exposure specifically
   # in the legacy/non-AST reconstruction fallback path). Placed here, ahead
-  # of the brand-name pattern below, so it claims the WHOLE [text](url)
-  # span atomically before anything else can partially match content
-  # inside it (the exact ordering lesson from Part 1.1's brace-leak root
-  # cause -- a pattern matching inside an already-protected span creates a
-  # nested placeholder that restore()'s single sequential pass can't unwind).
-  - '\[([^\]]+)\]\(([^)]+)\)'
+  # of the brand-name pattern below, so it claims its span before anything
+  # else can partially match content inside it (the exact ordering lesson
+  # from Part 1.1's brace-leak root cause -- a pattern matching inside an
+  # already-protected span creates a nested placeholder that restore()'s
+  # single sequential pass can't unwind).
+  #
+  # TC-APT-036 (2026-09-05): narrowed from the WHOLE '[text](url)' span to the
+  # ']( url )' TAIL only, because LINK is no longer leaf-forcing in the AST path
+  # (text_unit_extractor._has_inline_formatting). Protecting the whole span there
+  # would mask the link TEXT too, so it would never be translated -- measured:
+  # the sentence came out as '...in the {PLACEHOLDER_0}.' Tail-only keeps the URL
+  # and the markdown punctuation safe while leaving the link text inside the
+  # translatable sentence, which is what lets the model order a trailing head
+  # noun correctly and inflect the preceding article. Narrower than the previous
+  # pattern, so it cannot create the nested-placeholder case warned about above.
+  # See data/summaries/design-tc-apt-036-link-placeholder-scheme-20260905.json
+  - '\]\(([^)]+)\)'
   # TC-APT-040 title-template class: FOSS edition compound names must mask as
   # ONE span, and must be listed BEFORE the generic brand pattern below
   # (patterns are consumed in order). Protected separately, SOV/postpositional

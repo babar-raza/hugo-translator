@@ -2010,13 +2010,58 @@ class TextUnitExtractor:
             )
             return False
 
+    _LINK_TAIL_PROBE = "](https://example.com/x)"
+
+    def _link_syntax_is_protected(self) -> bool:
+        """True when some preserve_pattern masks a markdown link tail.
+
+        TC-APT-036 lets a paragraph containing a link be extracted whole, which is
+        only safe if the "](url)" tail is placeholder-protected first. Deciding it
+        from the patterns actually configured keeps the guarantee local to this
+        object instead of resting on every site profile being edited correctly.
+        """
+        cached = getattr(self, "_link_protection_cache", None)
+        if cached is not None:
+            return cached
+        protected = False
+        for pattern in self.preserve_patterns or []:
+            try:
+                if re.search(pattern, self._LINK_TAIL_PROBE):
+                    protected = True
+                    break
+            except re.error:
+                continue
+        self._link_protection_cache = protected
+        return protected
+
     def _has_inline_formatting(self, node: ASTNode) -> bool:
         """Check if node contains inline formatting (strong/em/link/shortcodes/etc.)."""
         formatting_types = {
             NodeType.STRONG,
             NodeType.EMPHASIS,
-            NodeType.LINK,
             NodeType.IMAGE,
+            # LINK is excluded ONLY when a preserve_pattern actually protects link
+            # syntax (TC-APT-036, 2026-09-05), for the same
+            # reason as CODE_SPAN below: forcing leaf-level extraction split a
+            # sentence at each link boundary, so the prose fragment and the link
+            # text were translated with no knowledge of each other. Measured on
+            # cells-spreadsheet-management-go, where the source wraps as
+            # "...or cloud integration, the" / "[Aspose.Cells — Enterprise Product
+            # Family](...) is a": the fragment ended in a bare article governing a
+            # noun it never saw, so 11 of 23 locales emitted the English "the"
+            # verbatim, ru/fa substituted a demonstrative, and de/nl lost V2
+            # inversion. The head noun in "[<Product> repository]" was likewise
+            # unorderable, wrong in 15/15 locales of introducing-words-foss-net.
+            #
+            # Safe only because the site profile's markdown-link preserve_pattern
+            # was narrowed in the same change to the "](url)" TAIL: the URL and
+            # markdown punctuation stay protected while the link TEXT remains
+            # inside the translatable sentence. With the OLD whole-span pattern
+            # this exclusion would mask the link text entirely and it would never
+            # be translated -- verified before landing, both directions.
+            # STRONG/EMPHASIS/IMAGE stay in this set: no preserve_pattern protects
+            # `**bold**`/`*em*`/`![alt](src)` syntax, so FIX-B's markdown-loss
+            # fallback is still load-bearing for them.
             # INLINE_HTML intentionally excluded: shortcodes are self-contained leaf nodes
             # that _collect_text_from_node handles via node.raw. Excluding them allows
             # full-sentence extraction so placeholder_manager can protect inline shortcodes.
@@ -2036,6 +2081,14 @@ class TextUnitExtractor:
             # preserve_pattern protects `**bold**`/`*em*`/`[text](url)` syntax today, so
             # leaf-level extraction is still the safe choice for those.
         }
+
+        if not self._link_syntax_is_protected():
+            # No preserve_pattern shields "](url)" in this configuration, so a
+            # full-sentence unit would carry the raw URL into the model. Fall back
+            # to the old leaf behaviour rather than depend on an unenforced config
+            # invariant -- websites.aspose.org has no link pattern at all, and the
+            # extractor is constructed with preserve_patterns=[] in tests.
+            formatting_types = formatting_types | {NodeType.LINK}
 
         # Check children
         for child in node.children:
