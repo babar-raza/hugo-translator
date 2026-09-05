@@ -645,6 +645,17 @@
       "commit": "1c14467",
       "last_updated": "2026-09-05T10:15:00+00:00",
       "blocker_type": null
+    },
+    "TC-APT-053": {
+      "status": "IN_PROGRESS",
+      "gate": 5,
+      "title": "StructureValidator rejects a correct translation on ordinary +/-1 list-item-count stylistic drift, cascading into a destructive cross-model escalation",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": "Fix landed and unit-tested (4e5089e, 14/14 pass): tolerate +/-2 list-item drift, matching the existing bold/italic tolerance pattern. Per v10.1 RECURRENCE ESCALATION, step 1 (fix) is done; step 2 (reverify against the exact original file, introducing-pdf-foss-cpp/cs, confirming the list-count reject no longer fires and the cross-model escalation/code-block corruption does not recur) and step 3 (retrigger the campaign on that page) have NOT yet run. Next iteration must complete steps 2-3 before opening any new page.",
+      "evidence_path": null,
+      "commit": "4e5089e",
+      "last_updated": "2026-09-05T06:50:11.263565+00:00"
     }
   },
   "gate_closures": {
