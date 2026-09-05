@@ -1,10 +1,10 @@
 {
   "mission_id": "aspose-org-full-portfolio-translation-20260901",
   "plan_path": "C:\\Users\\prora\\.claude\\plans\\hugo-translator-aspose-org-partitioned-kahn.md",
-  "plan_revision": "15",
+  "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T19:11:44+00:00",
+  "updated_at": "2026-09-05T19:20:30+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1076,7 +1076,7 @@
       "blocker_type": null
     },
     "TC-APT-080": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": 6,
       "title": "Scale step-up protocol -- double wave_scale on proof (recurrence clear + KPI>=floor + acceptance>=80%), halve on trouble; gates 6-8 close via the ladder",
       "depends_on": [
@@ -1086,20 +1086,20 @@
       "blocking_reason": null,
       "evidence_path": null,
       "commit": null,
-      "last_updated": "2026-09-05T19:07:55.424085+00:00",
+      "last_updated": "2026-09-05T19:16:31+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.9 revision 16"
     },
     "TC-APT-081": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": 6,
-      "title": "Proactive validator-FP calibration sweep: full ValidationSuite+gates over shipped-approved corpus (every flag = FP class) + stratified 200-cell battery; fix classes in one batch with fixtures",
+      "title": "Proactive validator-FP calibration sweep: full ValidationSuite+gates over shipped-approved corpus (every flag = FP class) + stratified 200-cell battery; fix classes in one batch with fixtures PILOT 2026-09-06: sweep script built and run over 150 shipped cells -- 90.7% carry at least one flag, 146 classes. BUT the 'any flag on a shipped cell is a false positive' premise does not hold for this corpus: 94% of flags are folder-layout, the pairs were verified to be genuine translations (fences/headings align), and the list-item divergences (en 25 vs fa 7, en 32 vs id 2) are real missing content. The sweep is two inventories -- legacy defects AND false positives -- and must be separated per class. Restrict FP claims to cells shipped under the current review standard.",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": "Run before or alongside the first TC-APT-080 wave doubling.",
-      "evidence_path": null,
+      "evidence_path": "data/summaries/tc-apt-081-fp-sweep-pilot-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T19:07:55.424085+00:00",
+      "last_updated": "2026-09-05T19:20:30+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.9 revision 16"
     },
@@ -1112,7 +1112,7 @@
       "blocking_reason": null,
       "evidence_path": null,
       "commit": null,
-      "last_updated": "2026-09-05T19:07:55.424085+00:00",
+      "last_updated": "2026-09-05T19:16:31+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.9 revision 16"
     }
@@ -1135,7 +1135,7 @@
   },
   "last_wake_summary": "data/summaries/aspose-org-wake-001-20260902.json",
   "cells_committed_total": 48,
-  "loop_prompt_version_seen": "10.4 (2026-09-05)",
+  "loop_prompt_version_seen": "10.5 (2026-09-06)",
   "active_detached_runs": [
     {
       "campaign_id": "gate5-words-doc-r3",
@@ -1160,5 +1160,17 @@
       "acceptance": "governed term 4/4 in all 8 locales (baseline 20/32); nl/sv are untouched controls",
       "next_wake_action": "measure the term per field per locale; also confirm the fields are still translated (guard against over-preservation)"
     }
-  ]
+  ],
+  "wave_scale": {
+    "value": 1,
+    "initialised_at": "2026-09-05T19:16:31+00:00",
+    "last_decision": "HOLD at 1: step-up test MET on r3 (10/11 = 91%, KPI 34 >= 25) but TC-APT-081 is mid-flight and v10.5 requires it before/with the first doubling. The pilot changed 081's shape (legacy defects mixed with FPs), so the doubling waits for the separation, not for comfort.",
+    "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%",
+    "evidence": {
+      "last_closed_wave": "gate5-words-doc-r3",
+      "acceptance": "10/11 = 91%",
+      "kpi_cells_24h": 34,
+      "floor": 25
+    }
+  }
 }
