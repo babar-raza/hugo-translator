@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T17:55:50+00:00",
+  "updated_at": "2026-09-05T18:01:42+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -941,15 +941,15 @@
     "TC-APT-070": {
       "status": "TODO",
       "gate": null,
-      "title": "Protected-span/head-noun displacement reaches FRONTMATTER string fields (title/seoTitle/summary) -- found by review in el/fr/fa/hi; in fr it names a different entity than the source. Fix A (TC-APT-036) is body-AST only, so this is outside its scope and needs its own producer fix. Corrects my earlier field note that this page's frontmatter 'never went through the buggy leaf path' -- true for the soft-wrap class only. ROOT CAUSE LOCATED 2026-09-05 by the nl review: the profile's product-span pattern ENDS AT 'FOSS' and does not cover the trailing platform suffix, so a determiner can be inserted between the span and the following governed term. Confirmed in nl and el at the identical position. Candidate fix: extend the preserve_pattern over the suffix -- must pass the identity round-trip neutrality harness first.",
+      "title": "Protected-span/head-noun displacement reaches FRONTMATTER string fields (title/seoTitle/summary) -- found by review in el/fr/fa/hi; in fr it names a different entity than the source. Fix A (TC-APT-036) is body-AST only, so this is outside its scope and needs its own producer fix. Corrects my earlier field note that this page's frontmatter 'never went through the buggy leaf path' -- true for the soft-wrap class only. ROOT CAUSE LOCATED 2026-09-05 by the nl review: the profile's product-span pattern ENDS AT 'FOSS' and does not cover the trailing platform suffix, so a determiner can be inserted between the span and the following governed term. Confirmed in nl and el at the identical position. Candidate fix: extend the preserve_pattern over the suffix -- must pass the identity round-trip neutrality harness first. MASK-EXTENSION REMEDY DECLINED 2026-09-05 on measurement: 7 of 8 locales translate the platform preposition (about 70 correct instances), so masking the suffix would freeze it as English everywhere -- ~70 regressions to prevent 2 insertions. Note the extension PASSES the neutrality harness, so a masking change needs a does-the-portfolio-translate-this check too. Better direction: DETECTION (flag a determiner between a protected span and a following governed term) rather than prevention.",
       "depends_on": [
         "TC-APT-036"
       ],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": "data/summaries/review-words-doc-20260905.json; data/summaries/review-words-doc-r3-nl-20260905.json",
+      "evidence_path": "data/summaries/review-words-doc-20260905.json; data/summaries/review-words-doc-r3-nl-20260905.json; data/summaries/fp-tc-apt-070-mask-extension-declined-20260905.json",
       "commit": null,
-      "last_updated": "2026-09-05T17:55:50+00:00",
+      "last_updated": "2026-09-05T18:01:42+00:00",
       "blocker_type": null,
       "provenance": "first written as TC-APT-060, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     },
@@ -986,13 +986,13 @@
     "TC-APT-073": {
       "status": "DONE",
       "gate": null,
-      "title": "Character-level emission defects at protected-span boundaries: doubled delimiter U+002C+U+060C byte-identical at ar:503 and fa:503 (RB-005; a delimiter de-dup fix, no retranslation needed); U+00AD injected word-interior at fr:443, invisible at render so it survives eyeball review; U+2011 substituted for ASCII hyphen 22x fr / 7x el, 0 in source. CONFIRMED AND CLOSED 2026-09-05 on real output across 5 regenerated locales: U+2011 fa 1->0, ar 2->0, el 7->0, fr 22->0, nl 67->0 (99 -> 0 total), 0 U+00AD, 0 doubled delimiter. RECURRENCE step 2 satisfied against the exact failing files.",
+      "title": "Character-level emission defects at protected-span boundaries: doubled delimiter U+002C+U+060C byte-identical at ar:503 and fa:503 (RB-005; a delimiter de-dup fix, no retranslation needed); U+00AD injected word-interior at fr:443, invisible at render so it survives eyeball review; U+2011 substituted for ASCII hyphen 22x fr / 7x el, 0 in source. CONFIRMED AND CLOSED 2026-09-05 on real output across 5 regenerated locales: U+2011 fa 1->0, ar 2->0, el 7->0, fr 22->0, nl 67->0 (99 -> 0 total), 0 U+00AD, 0 doubled delimiter. RECURRENCE step 2 satisfied against the exact failing files. FINAL: all 8 regenerated locales measure 0 U+2011 (cumulative 195 -> 0).",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": "Two of three character-level defects fixed and unit-tested on the mission branch (uncommitted at read time): (a) normalize_injected_invisibles() in segment_translator.py strips model-injected U+00AD SOFT HYPHEN and U+2011 NON-BREAKING HYPHEN before placeholder restore, conditional on the source not using them; (b) ast_renderer.py _preserve_punctuation() leading-punctuation branch gained a _starts_with_equivalent() check mirroring the existing trailing-side _ends_with_equivalent(), fixing RB-005: reproduced directly on current code that a leading ASCII comma + a translation naturally starting with U+060C produced the exact U+002C+U+060C doubled sequence found at ar:503/fa:503 on words-document-net. NOT yet DONE: neither fix has been reverified against the actual words-document-net output per the runbook RECURRENCE ESCALATION step 2 (retranslate the same source_path/target_lang the original ticket named and confirm the specific defect is gone) -- that still requires a live campaign/debug-harness run, not attempted this iteration. Code fix is real and unit-tested; production reverification is the remaining gate to DONE.",
       "evidence_path": "data/summaries/review-words-doc-20260905.json; tests/regression/test_native_terminal_punctuation_not_doubled.py::TestLeadingNativeTerminalsAreNotDoubled; tests/regression/test_injected_invisible_characters.py; data/summaries/fp-words-doc-page-not-shippable-20260905.json; data/summaries/reverify-tc-apt-073-first-real-cell-20260905.json",
       "commit": "f87e94a, 0387e55",
-      "last_updated": "2026-09-05T17:55:50+00:00",
+      "last_updated": "2026-09-05T18:01:42+00:00",
       "blocker_type": null,
       "provenance": "first written as TC-APT-063, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     },
