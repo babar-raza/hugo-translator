@@ -44,11 +44,16 @@ rules:
       nonsense word (not a real word of the target language) in prose; a
       meaning-changing or relationship-inverting rendering (including a
       scrambled protected product-name phrase); a mechanical punctuation
-      artifact (e.g. Devanagari danda+period "|."); an untranslated prose
-      phrase in one frontmatter field whose sibling field translates the
-      same source phrase (asymmetric residual). These indicate producer
-      bugs or unacceptable meaning damage, not baseline MT imperfection.
-    evidence: gate5-pdf-foss-cpp-r2 el/hi rejects + he override, 2026-09-05
+      artifact (e.g. Devanagari danda+period "|." or CJK "。."); an
+      untranslated prose phrase in one frontmatter field whose sibling
+      field translates the same source phrase (asymmetric residual). These
+      indicate producer bugs or unacceptable meaning damage, not baseline
+      MT imperfection. CARVE-OUT: an established technical loanword of the
+      target language (e.g. vi "runtime"/"render", id "rendering raster")
+      is NOT an untranslated fragment even when the sibling field uses the
+      native calque — that asymmetry is RB-003-grade terminology
+      inconsistency, not a defect (vi adjudication 2026-09-05).
+    evidence: gate5-pdf-foss-cpp-r2 el/hi/nl/ja/ko rejects + he/vi overrides, 2026-09-05
   - id: RB-002
     name: brand-navigation-label-exception
     verdict: APPROVE
