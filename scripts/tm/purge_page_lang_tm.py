@@ -42,13 +42,14 @@ def main() -> int:
     page_text = Path(args.source_file).read_text(encoding="utf-8")
     tgt_langs = {lang.strip() for lang in args.tgt_langs.split(",") if lang.strip()}
 
-    # Match the live env's map geometry: on Windows, opening write-mode with a
-    # different map_size than another process's mapping fails with
-    # "user-mapped section open".
-    probe = lmdb.open(args.l2_path, readonly=True, lock=False)
-    map_size = probe.info()["map_size"]
-    probe.close()
-    env = lmdb.open(args.l2_path, max_dbs=0, map_size=map_size, readonly=not args.write, lock=True)
+    # Open through L2PersistentTM so the env geometry/flags are byte-identical
+    # to every live campaign process. A raw lmdb.open in write mode fails with
+    # "user-mapped section open" on Windows whenever its map_size differs from
+    # a live process's mapping (confirmed 2026-09-05: raw open failed 3x while
+    # this path deleted 462 entries alongside running campaigns).
+    from src.tm.l2_persistent import L2PersistentTM
+
+    env = L2PersistentTM(db_path=args.l2_path).env
     matched: list[bytes] = []
     scanned = 0
     with env.begin(write=False) as txn:
