@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T12:42:18+00:00",
+  "updated_at": "2026-09-05T13:19:23+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -517,16 +517,17 @@
       "blocker_type": null
     },
     "TC-APT-036": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": 4,
       "title": "Safe placeholder scheme for STRONG/LINK so full-sentence extraction can include bold/link content without losing translatability",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": "data/summaries/fp-gate4-canary-java-retry2-TC-APT-013.json",
-      "commit": null,
-      "last_updated": "2026-09-03T17:15:00+00:00",
-      "blocker_type": null
+      "evidence_path": "tests/regression/test_link_unit_sentence_integrity.py, data/summaries/validate-tc-apt-036-first-real-cell-20260905.json",
+      "commit": "2ddeeb3",
+      "last_updated": "2026-09-05T13:19:23+00:00",
+      "blocker_type": null,
+      "note": "LINK half LANDED and VALIDATED ON REAL CONTENT (2ddeeb3). Two halves, correct only together: the blog.aspose.org profile pattern narrowed from the whole [text](url) span to the ](url) TAIL, and LINK removed from _has_inline_formatting so a paragraph with a link extracts whole. The exclusion is CONDITIONAL via _link_syntax_is_protected() -- with preserve_patterns=[] (as in test fixtures) or on websites.aspose.org (no link pattern at all) it keeps the old leaf behaviour, so the raw URL is never carried into translatable text. Validation: same-locale same-construct comparison in Arabic -- pre-fix [Aspose.Words FOSS للـ مستودع .NET] (head noun displaced inside the product name) vs post-fix [مستودع Aspose.Words FOSS للـ .NET] (head noun first, correct order); 0 of 15 locales managed this before. Inflected preposition before the link, intact negation, single copula, contiguous product name all pass on that cell. 11 permanent regression tests. STRONG/EMPHASIS/IMAGE half still OPEN: nothing protects **bold** syntax so FIX-B guard remains load-bearing there. Rollout scope so far: blog.aspose.org only; 4 other in-scope profiles still carry the whole-span pattern."
     },
     "TC-APT-038": {
       "status": "TODO",
