@@ -108,6 +108,18 @@ body:
   # noun correctly and inflect the preceding article. Narrower than the previous
   # pattern, so it cannot create the nested-placeholder case warned about above.
   # See data/summaries/design-tc-apt-036-link-placeholder-scheme-20260905.json
+  # TC-APT-084: mask a link's OPENING bracket too, so the model never receives an
+  # unbalanced '['. The tail-only pattern below leaves '[Anchor{PLACEHOLDER}',
+  # and models close that bracket themselves: measured on
+  # introducing-cells-foss-go, de/el/id/he emitted a trailing ']' at L277 and
+  # pl/pt/ro emitted '[API Reference{](url)]' at L272 -- that orphan '{' is a
+  # BROKEN placeholder token, which is what proves the unbalanced-bracket
+  # handoff rather than leaving it inferred.
+  #
+  # Lookahead-scoped to '[' that actually opens a link, so brackets in prose and
+  # code spans are untouched. Placed BEFORE the tail pattern so it claims its
+  # own single character first and cannot nest inside the tail's span.
+  - '\[(?=[^\]]*\]\()'
   - '\]\(([^)]+)\)'
   # TC-APT-040 title-template class: FOSS edition compound names must mask as
   # ONE span, and must be listed BEFORE the generic brand pattern below

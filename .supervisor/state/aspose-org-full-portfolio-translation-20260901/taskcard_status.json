@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T20:30:17+00:00",
+  "updated_at": "2026-09-05T20:40:42+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1131,15 +1131,15 @@
       "blocker_type": null
     },
     "TC-APT-084": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
       "owner": "loop",
-      "title": "Stray unmatched ']' emitted after a list-item link, rendering as a visible literal bracket. Measured on introducing-cells-foss-go: bracket balance 25/26 against source 25/25 in de, el, id, he; the other 8 locales balanced. Invisible to link-count checks because a stray ']' forms no link. Inferred mechanism (unverified): the tail-only link preserve_pattern hands the model an unbalanced '[', it closes the bracket after the placeholder, and restore expands to '](url)]'. Bracket-balance-vs-source is now in the mechanical pre-check.",
+      "title": "Stray unmatched ']' emitted after a list-item link, rendering as a visible literal bracket. Measured on introducing-cells-foss-go: bracket balance 25/26 against source 25/25 in de, el, id, he; the other 8 locales balanced. Invisible to link-count checks because a stray ']' forms no link. Inferred mechanism (unverified): the tail-only link preserve_pattern hands the model an unbalanced '[', it closes the bracket after the placeholder, and restore expands to '](url)]'. Bracket-balance-vs-source is now in the mechanical pre-check. FIXED 2026-09-06. Mechanism VERIFIED not inferred: two sites, and the L272 shape carried an orphan '{' -- a broken placeholder token, which only occurs when the model edits around a raw '[' beside a placeholder. Site 1 (brand label, de/el/id/he) is covered by TC-APT-085; site 2 (API Reference, pl/pt/ro) by a lookahead-scoped preserve_pattern that masks a link's opening bracket. Neutrality 14/14; prose and code brackets untouched.",
       "depends_on": [],
       "blocking_reason": null,
-      "evidence_path": "data/summaries/review-cells-go-batchA-20260906.json",
+      "evidence_path": "data/summaries/fix-tc-apt-084-link-bracket-balance-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T20:21:54+00:00",
+      "last_updated": "2026-09-05T20:40:42+00:00",
       "blocker_type": null
     },
     "TC-APT-085": {
