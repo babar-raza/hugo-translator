@@ -55,6 +55,8 @@ class ASTRenderer:
         self._missing_node_count: int = 0
         # Counter for unreplaced placeholder tokens (stray {PLACEHOLDER_N} in output - blocking)
         self._placeholder_leak_count: int = 0
+        # TC-APT-078: source heading text -> its own translation, for cross-reference correction
+        self._heading_translations: dict[str, str] = {}
 
     @property
     def placeholder_leak_count(self) -> int:
@@ -559,6 +561,41 @@ class ASTRenderer:
 
         logger.info(f"Applied {applied_count} frontmatter translations")
 
+    def _build_heading_translation_map(self, units: list[TextUnit]) -> dict[str, str]:
+        """TC-APT-078: body prose sometimes names a section by its (English) heading
+        text -- "see Quick Start below" -- while the heading itself translates fine.
+        The reference and the heading are separate TextUnits translated in different
+        contexts, so nothing makes them agree on its own. Measured deterministic in
+        9/9 regenerated locales on words-document-net (RB-007).
+
+        Returns source heading text -> its own translation, skipping headings the
+        model left same-as-source (nothing to correct toward) and very short
+        headings (avoids over-matching a common short word elsewhere in prose).
+        """
+        mapping: dict[str, str] = {}
+        for unit in units:
+            kind_value = getattr(unit.kind, "value", unit.kind)
+            if kind_value != "heading_text":
+                continue
+            source = (unit.source_text or "").strip()
+            translated = (unit.translated_text or "").strip()
+            if len(source) < 4 or not translated or source == translated:
+                continue
+            mapping[source] = translated
+        return mapping
+
+    def _correct_cross_references(self, text: str) -> str:
+        """Replace a verbatim source-heading-text reference with that heading's own
+        translation. Word-boundary, case-sensitive matching only -- this corrects an
+        exact echo of the source heading name, not a loose paraphrase."""
+        if not text or not self._heading_translations:
+            return text
+        for source_heading, translated_heading in self._heading_translations.items():
+            pattern = r"\b" + re.escape(source_heading) + r"\b"
+            if re.search(pattern, text):
+                text = re.sub(pattern, translated_heading.replace("\\", "\\\\"), text)
+        return text
+
     def apply_translations(self, ast: list[ASTNode], units: list[TextUnit], frontmatter: dict[str, Any] | None = None) -> None:
         """
         Apply translated TextUnits back to AST nodes and frontmatter.
@@ -576,6 +613,7 @@ class ASTRenderer:
         self.applied_units = set()
         self._missing_node_count = 0  # Reset per call
         self._placeholder_leak_count = 0  # Reset per call
+        self._heading_translations = self._build_heading_translation_map(units)
 
         # Separate frontmatter and body units (FIX-BT-03)
         frontmatter_units = [u for u in units if u.node_addr and u.node_addr.startswith('frontmatter.')]
@@ -653,6 +691,13 @@ class ASTRenderer:
             # for the same reasons -- before restoration, and not conditional on
             # a placeholder_map existing.
             final_text = normalize_injected_invisibles(unit.source_text, final_text)
+
+            # TC-APT-078: fix a body reference that echoed a heading's SOURCE text
+            # verbatim after that heading itself was translated. Before placeholder
+            # restoration, same reasoning as the normalizer above.
+            kind_value = getattr(unit.kind, "value", unit.kind)
+            if kind_value != "heading_text":
+                final_text = self._correct_cross_references(final_text)
 
             # Restore placeholders (if any were applied during extraction)
             placeholder_map = unit.metadata.get('placeholder_map', {})

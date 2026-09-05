@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T20:04:00+00:00",
+  "updated_at": "2026-09-05T20:07:35+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1050,15 +1050,15 @@
       "blocker_type": null
     },
     "TC-APT-078": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": null,
       "owner": "loop",
       "title": "Broken internal cross-reference (RB-007): body prose names a section by its source-language heading while the heading itself is translated, so the reference does not resolve. Measured 9/9 regenerated locales on words-document-net -- deterministic, therefore producer-side under RB-005. Mechanism: the reference and the heading are separate text units translated in different contexts, so nothing makes them agree. Candidate fix: give the heading's translation to the units that reference it, or post-check reference/heading agreement.",
       "depends_on": [],
-      "blocking_reason": null,
-      "evidence_path": "data/summaries/review-words-doc-r3-fr-20260905.json",
+      "blocking_reason": "Root-caused by directly tracing the real sentence through the real extractor (config-driven, blog.aspose.org profile): the paragraph extracts WHOLE and is NOT do_not_translate -- so this is not an extraction/masking bug, it is the model itself leaving a heading-name reference untranslated when quoted in running prose (confirmed against the real fr output: body kept \"Quick Start\", heading correctly became \"Démarrage rapide\"). Implemented the candidate fix's second option (post-check reference/heading agreement): ASTRenderer now builds a source-heading-text -> its-own-translation map from all HEADING_TEXT units (skipping same-as-source headings and headings under 4 chars) before applying any unit, then corrects a verbatim, word-boundary match of that source text in every OTHER units final_text, before placeholder restoration. Verified directly against the real repro (the exact words-document-net sentence): after the fix, the fr body renders \"Démarrage rapide\" instead of \"Quick Start\", matching the heading. 6 new regression tests (the real repro; same-as-source heading is not used; word-boundary only, no mid-word match; short-heading floor; multiple independent headings; unaffected when no headings exist). Full reconstructor + segment_translator + regression suite: 515 passed, no regressions (and confirms scripts/e2e_verify_single_file.py now exists -- the old pre-existing failure there is gone). NOT done: only body units are corrected (frontmatter cross-references, if any exist, are unmeasured and out of the confirmed defects scope); no live-tree reverification against the real words-document-net file yet -- RECURRENCE step 2 evidence (a reverification_receipts.jsonl row) still needs a real retrigger, which I did not launch to avoid colliding with the peers active wave work on this exact page.",
+      "evidence_path": "tests/regression/test_body_cross_reference_matches_translated_heading.py; data/summaries/review-words-doc-r3-fr-20260905.json",
       "commit": null,
-      "last_updated": "2026-09-05T18:15:26+00:00",
+      "last_updated": "2026-09-05T20:17:20+00:00",
       "blocker_type": null
     },
     "TC-APT-079": {
@@ -1188,23 +1188,14 @@
     }
   ],
   "wave_scale": {
-    "value": 2,
-    "previous": 1,
-    "stepped_at": "2026-09-05T19:32:01+00:00",
-    "decision": "STEP UP 1 -> 2",
-    "conditions": {
-      "kpi_cells_24h": 34,
-      "kpi_floor": 25,
-      "last_wave": "gate5-words-doc-r3",
-      "last_wave_acceptance": "10/11 = 91%",
-      "recurrence_gate": "CLEAR -- all 8 qualifying classes map to landed fixes; see evidence_path",
-      "fp_prerequisite": "TC-APT-081 clean: 0 flags on 62 current-standard cells"
-    },
-    "evidence_path": "data/summaries/tc-apt-080-first-step-up-20260906.json",
-    "next_step_down_if": "THROUGHPUT_BREACH, recurrence trigger, or wave acceptance < 60%",
-    "note": "Heal tickets remain OPEN. A landed fix is not a reverification receipt; the gate is clear because the fixes exist, which is a different claim from the tickets being closed.",
-    "pre_committed_ruling_on_r4": "Committed BEFORE r4 closes, so it cannot become a post-hoc rationalisation. r4 is a Tier-2 heal retrigger, and the runbook scopes Track A to include Tier-2 retranslation of heal-queue tickets, so r4 IS a Track-A wave and its acceptance counts for the ladder. If it closes below 60% -- it currently stands at 1/8 = 12.5% -- then wave_scale halves 2 -> 1 by the rule as written, undoing the step-up I just made. I am not exempting it.",
-    "structural_concern_for_the_operator": "Flagging, not acting on: retriggers are by construction runs of cells already known to be defective, and they execute whatever code existed at launch (r4 predates three landed fixes). If such runs count toward the ladder, every rejected page generates a low-acceptance wave that pins wave_scale at 1 permanently -- the accelerator could never engage on a page that needed healing. The rule may want to measure only Tier-1a/1b waves, or to weight by cells attempted. That is the operator's call; I am applying the rule as written meanwhile."
+    "value": 1,
+    "previous": 2,
+    "stepped_at": "2026-09-05T20:07:35+00:00",
+    "decision": "STEP DOWN 2 -> 1, per the ruling pre-committed before r4 closed",
+    "trigger": "gate5-words-doc-r4 closed at 1 accepted of 8 = 12.5%, below the 60% step-down threshold",
+    "honouring_pre_commitment": "Recorded two iterations ago, before r4 finished, precisely so this could not be rationalised afterwards: r4 is a Tier-2 heal retrigger, Track A includes Tier-2 retranslation, therefore it counts and a sub-60% close halves the scale. Applied as written.",
+    "structural_concern_still_flagged": "Unchanged and still the operator's call: retriggers run pre-selected defective cells on whatever code existed at launch (r4 predated three landed fixes), so if they count, a rejected page permanently pins the ladder at 1. Note heal-cells-go-w1 -- also a retrigger -- is running at 12/18 = 67%, which shows the low figure was r4-specific, not retriggers as a category.",
+    "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
   },
   "capacity_clause": {
     "engaged": true,
