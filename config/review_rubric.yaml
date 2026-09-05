@@ -118,3 +118,30 @@ rules:
       came back translated. The split shows the mask reaches the body and
       summary paths but not title/seoTitle.
       See data/summaries/review-words-doc-r3-fa-20260905.json
+  - id: RB-007
+    name: broken-internal-cross-reference
+    verdict: REJECT
+    scope: body
+    statement: >-
+      Body prose that points the reader at a section by its SOURCE-language
+      heading text, where that heading was translated in the same document,
+      is a broken reference: the target page contains no section under the
+      name the reader is given. This is a document-internal consistency
+      failure, not a terminology preference, and it is visible to any
+      reader who tries to follow it.
+      CARVE-OUT: if the heading legitimately retains its source form -- a
+      protected brand/API term (RB-002) or a reviewed cognate (RB-001) --
+      then the reference still resolves and is NOT a defect. The test is
+      whether the named section can be found, not whether English appears.
+      DIAGNOSTIC: cross-reference divergence that recurs across locales is
+      producer-side, because the reference and the heading are separate
+      text units translated in different contexts, so RB-005 applies
+      alongside this rule and the fix is a producer fix, never a hand edit.
+    evidence: >-
+      words-document-net, gate5-words-doc-r3, 2026-09-05: the body's
+      "see Quick Start below" keeps the English section name in ALL NINE
+      regenerated locales (ar, el, fa, fr, he, hi, nl, ro, sv) while the
+      "## Quick Start" heading is translated in all nine. Raised
+      independently as UNCOVERED by three separate reviewers (fa, nl, fr)
+      before the rule existed.
+      See data/summaries/review-words-doc-r3-fr-20260905.json
