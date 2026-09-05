@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-09-05T21:05:33.831293+00:00",
+  "stamps": {
+    "loop_prompt_version": "10.5 (2026-09-06)",
+    "plan_revision": 16
+  },
+  "open_obligations": [
+    "TC-APT-004b",
+    "TC-APT-014",
+    "TC-APT-036",
+    "TC-APT-038",
+    "TC-APT-039",
+    "TC-APT-042",
+    "TC-APT-046",
+    "TC-APT-047",
+    "TC-APT-069",
+    "TC-APT-078",
+    "TC-APT-080"
+  ],
+  "active_clauses": {
+    "capacity_clause": {
+      "engaged": true,
+      "since": "2026-09-05T19:47:47+00:00",
+      "reason": "KPI 23 < floor 25 AND TC-APT-046/047 unlanded",
+      "effect": "no new-page Track-A attempts; wave-cells-rust-w1 blocked but built and env-verified; Track-B restricted to 043..047 in dependency order"
+    },
+    "wave_scale": {
+      "value": 1,
+      "previous": 2,
+      "stepped_at": "2026-09-05T20:07:35+00:00",
+      "decision": "STEP DOWN 2 -> 1, per the ruling pre-committed before r4 closed",
+      "trigger": "gate5-words-doc-r4 closed at 1 accepted of 8 = 12.5%, below the 60% step-down threshold",
+      "honouring_pre_commitment": "Recorded two iterations ago, before r4 finished, precisely so this could not be rationalised afterwards: r4 is a Tier-2 heal retrigger, Track A includes Tier-2 retranslation, therefore it counts and a sub-60% close halves the scale. Applied as written.",
+      "structural_concern_still_flagged": "Unchanged and still the operator's call: retriggers run pre-selected defective cells on whatever code existed at launch (r4 predated three landed fixes), so if they count, a rejected page permanently pins the ladder at 1. Note heal-cells-go-w1 -- also a retrigger -- is running at 12/18 = 67%, which shows the low figure was r4-specific, not retriggers as a category.",
+      "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
+    }
+  },
+  "next_action": "TC-APT-082 landed (governance compaction). Capacity clause is ENGAGED (KPI 23<25, TC-APT-046/047 unlanded) -- Track-B time belongs to 043..047 in dependency order; next session should check logs/watchdog_state.json before picking new Track-B work."
+}

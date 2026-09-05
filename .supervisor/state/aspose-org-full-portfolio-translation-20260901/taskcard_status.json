@@ -1104,15 +1104,15 @@
       "plan_ref": "SS0.9 revision 16"
     },
     "TC-APT-082": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 6,
       "title": "Governance compaction + state digest: archive >48h field notes, 40KB runbook hard cap, stamp-validated state_digest.json orientation",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": null,
-      "evidence_path": null,
+      "blocking_reason": "project/loop-prompt.md was 158938 bytes (486 lines, ~175 SS L field-note entries dating back to mission start) -- 4x over the 40KB cap. Moved every entry to the new project/loop-prompt-archive.md verbatim (referenced by date, never re-read at orientation per the plan); the live SS L section is now a short pointer to the archive and to this digest. New file lands at 27646 bytes. Built scripts/ops/write_state_digest.py (reusable, run at the end of an iteration) which reads taskcard_status.json + the live loop_prompt_version line and writes .supervisor/state/<mission>/state_digest.json: stamps (loop_prompt_version + plan_revision), open_obligations (every IN_PROGRESS taskcard), active_clauses (capacity_clause, wave_scale), next_action. A session compares stamps to its own last-seen values to decide whether a full re-read is needed, matching the acceptance criterion literally. Added tests/unit/scripts/test_runbook_size_cap.py as the mandatory-compaction-step enforcement (fails when the file exceeds 40KB, telling the next session exactly what to do) and tests/unit/scripts/test_write_state_digest.py (7 tests) for the digest builder. First real digest generated and committed alongside this change. NOT done: the digest is not yet wired into SS0s reload step as a literal shortcut (a session must still choose to read it instead of the full corpus); that behavioural adoption is left to the runbook text already pointing at it.",
+      "evidence_path": "project/loop-prompt-archive.md; scripts/ops/write_state_digest.py; tests/unit/scripts/test_runbook_size_cap.py; tests/unit/scripts/test_write_state_digest.py; .supervisor/state/aspose-org-full-portfolio-translation-20260901/state_digest.json",
       "commit": null,
-      "last_updated": "2026-09-05T19:16:31+00:00",
+      "last_updated": "2026-09-05T21:04:46+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.9 revision 16"
     },
