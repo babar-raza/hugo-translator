@@ -427,7 +427,22 @@ class CampaignManifest:
                     errors.append(
                         f"campaign source is dirty (translating a moving source is unsafe): {dirty_sources[:5]}"
                     )
-                dirty_candidates = sorted((dirty & all_outputs) - accepted_set)
+                # TC-APT-075: mirror the SHA-drift check above (line ~393), which already
+                # excludes `declared` -- a declared replacement's expected_sha256 is the
+                # CURRENT on-disk hash re-read at manifest-build time (build_campaign_manifest.py
+                # ::_declared_replacements), so the target being locally dirty relative to git
+                # HEAD is expected, not a hazard: it is either this campaign's own prior
+                # (possibly review-rejected, uncommitted) output for the exact same cell, or
+                # any other uncommitted edit already vetted by that hash. The real safety net is
+                # downstream and per-job: _run_campaign_job raises "declared replacement
+                # pre-hash drift" the instant a declared target's bytes no longer match
+                # expected_sha256, catching genuine concurrent modification between
+                # manifest-build and execution. Before this fix, a review-rejected page could
+                # never be regenerated in the live tree: its own prior (uncommitted) draft
+                # tripped this check on every relaunch, and neither a fresh campaign_id nor
+                # --resume could route around it (a fresh id can't attribute pre-existing
+                # untracked output; resume re-gates existing bytes instead of re-translating).
+                dirty_candidates = sorted((dirty & all_outputs) - accepted_set - set(declared))
                 if dirty_candidates:
                     errors.append(f"unreceipted campaign output is dirty: {dirty_candidates[:5]}")
             elif require_clean:

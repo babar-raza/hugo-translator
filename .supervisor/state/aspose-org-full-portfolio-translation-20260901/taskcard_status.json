@@ -1010,15 +1010,15 @@
       "provenance": "Found incidentally while step 2.3 of project/loop-prompt.md (run mission_supervisor before selecting Track-B work) failed twice in a row; root-caused and fixed per plan SS10.1 (2nd failure -> first-principles record) before a 3rd attempt."
     },
     "TC-APT-075": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
       "owner": "loop",
       "title": "Structural: a page whose candidates were review-rejected can never be regenerated in the live tree. A fresh campaign id refuses because pre-existing untracked outputs are unreceipted (campaign_manifest.py:432, allow_existing_accepted comes only from the campaign's OWN ledger), and resuming the original id re-gates the existing bytes rather than re-translating (campaign_runner.py:405 on config_fingerprint advance). The only tree-cleaning move is deleting content, which is barred. Hit on 2 pages now (introducing-cells-foss-go 17 files, words-document-net 11), so it is structural, not incidental. Needs an operator-reviewed mechanism -- candidate: subtract declared replace_existing paths in the campaign_scoped branch as the sibling branch at campaign_manifest.py:393 already does, IF that asymmetry is an oversight.",
       "depends_on": [],
-      "blocking_reason": "peer session is implementing the fix in campaign_manifest.py (declared-path exclusion at :432) with the expected_sha256 / per-job pre-hash-drift justification; uncommitted as of this iteration. Once it lands, the words-document-net retrigger runs in the LIVE tree and this card closes.",
-      "evidence_path": "data/summaries/fp-words-doc-r2-retrigger-blocked-20260905.json",
+      "blocking_reason": "Fixed: campaign_manifest.py verify_environment()'s campaign_scoped dirty check (the require_clean branch, ~line 432) now subtracts set(declared) in addition to accepted_set, mirroring the SHA-drift branch above it (~line 393) which already did this. Safety analysis: a declared replacement's expected_sha256 is the CURRENT on-disk hash re-read at manifest-build time (build_campaign_manifest.py _declared_replacements docstring), so a declared target being locally dirty relative to git HEAD is expected -- either this campaign's own prior (possibly review-rejected, uncommitted) draft for the exact same cell, or any other edit already vetted by that hash. The real safety net stays downstream and per-job: CampaignRunner._run_campaign_job still raises \"declared replacement pre-hash drift\" the instant a declared target's bytes stop matching expected_sha256 (genuine concurrent modification between manifest-build and execution). Two new regression tests in tests/unit/workers/test_campaign_manifest.py reproduce the real blocker directly (a declared, dirty target no longer blocks verify_environment) and prove the exclusion is narrow (an undeclared dirty output still blocks it). Full tests/unit/workers suite: 605 passed, 1 skipped (was 603), no regressions. NOT done by me: actually retriggering words-document-net in the live tree with this fix and confirming it ships -- that is the peer session's (9885eb20) next step, which their own 24f9cd4 commit says they are waiting on this fix to attempt.",
+      "evidence_path": "src/workers/campaign_manifest.py; tests/unit/workers/test_campaign_manifest.py",
       "commit": null,
-      "last_updated": "2026-09-05T16:54:45+00:00",
+      "last_updated": "2026-09-05T16:59:00+00:00",
       "blocker_type": null
     }
   },

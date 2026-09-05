@@ -227,6 +227,100 @@ def test_verify_environment_preserves_frozen_dirty_destination(tmp_path):
         )
 
 
+def _campaign_scoped_env(tmp_path: Path):
+    """Shared git/manifest setup for the TC-APT-075 declared-replacement tests below."""
+    content_repo = tmp_path / "content"
+    translator_repo = tmp_path / "translator"
+    for repo in (content_repo, translator_repo):
+        repo.mkdir()
+        subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+
+    source = content_repo / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    # fr's output file is deliberately never created here: verify_environment's
+    # per-source loop only checks a target that actually exists on disk, and
+    # these tests only care about the es target. A test that needs an
+    # undeclared dirty output creates fr_output itself.
+    es_output = content_repo / "content/docs.aspose.org/es/words/net/page.md"
+    fr_output = content_repo / "content/docs.aspose.org/fr/words/net/page.md"
+    es_output.parent.mkdir(parents=True)
+    fr_output.parent.mkdir(parents=True)
+    es_output.write_text("committed es", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=content_repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=content_repo, check=True)
+
+    registry = translator_repo / "config/model_registry.yaml"
+    registry.parent.mkdir(parents=True)
+    registry.write_text("models: []\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=translator_repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=translator_repo, check=True)
+
+    payload = _manifest(content_repo)
+    payload["execution_policy"] = {"dirty_scope": "campaign_paths"}
+    payload["content_repo_sha"] = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=content_repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    payload["translator_repo_sha"] = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=translator_repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    payload["model_fingerprints"] = {"model_registry": sha256_file(registry)}
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    return content_repo, translator_repo, payload, es_output, fr_output
+
+
+def test_declared_replacement_target_being_dirty_does_not_block_relaunch(tmp_path):
+    """TC-APT-075: a review-rejected page's own uncommitted (dirty) output must not
+    permanently block relaunching it -- mirrors the SHA-drift branch above (~line 393),
+    which already excludes `declared` replacement targets from its own equivalent check.
+    Reproduced the real blocker first: before this fix, this exact scenario raised
+    "unreceipted campaign output is dirty" and there was no way to retrigger a
+    review-rejected page at all (plan TC-APT-075, field notes 2026-09-05).
+    """
+    content_repo, translator_repo, payload, es_output, _fr_output = _campaign_scoped_env(tmp_path)
+
+    # Simulate a prior review-rejected (uncommitted) draft still sitting on disk.
+    es_output.write_text("rejected draft", encoding="utf-8")
+    payload["sources"][0]["replace_existing"] = {
+        "es": {"expected_sha256": sha256_file(es_output), "reason_code": "review_rejected_retry"}
+    }
+
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+
+    # Non-empty but unrelated to es/fr: only present so the (irrelevant to this
+    # test) TM-fingerprint check, gated on `not allow_existing_accepted`, is skipped.
+    manifest.verify_environment(
+        translator_repo=translator_repo,
+        require_clean=True,
+        allow_existing_accepted={"__unused_placeholder__"},
+    )
+
+
+def test_undeclared_dirty_output_still_blocks_relaunch_under_campaign_scope(tmp_path):
+    """Regression guard for the fix above: an output that is dirty but NOT declared
+    for replacement must still block the launch -- the fix narrows the exclusion to
+    exactly the campaign's own declared targets, it does not disable the check."""
+    content_repo, translator_repo, payload, es_output, fr_output = _campaign_scoped_env(tmp_path)
+
+    # es is declared and dirty (allowed); fr is dirty but undeclared (must still block).
+    es_output.write_text("rejected draft", encoding="utf-8")
+    fr_output.write_text("stray uncommitted edit", encoding="utf-8")
+    payload["sources"][0]["replace_existing"] = {
+        "es": {"expected_sha256": sha256_file(es_output), "reason_code": "review_rejected_retry"}
+    }
+
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+
+    with pytest.raises(CampaignManifestError, match="unreceipted campaign output is dirty"):
+        manifest.verify_environment(translator_repo=translator_repo, require_clean=True)
+
+
 def test_ledger_never_accepts_candidate_text(tmp_path):
     ledger = CampaignLedger(tmp_path, "pilot")
     with pytest.raises(ValueError, match="candidate text"):
