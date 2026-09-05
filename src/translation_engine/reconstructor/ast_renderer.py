@@ -423,12 +423,17 @@ class ASTRenderer:
                 i += 1
 
             elif token.type == "link_open":
-                # Extract link URL
-                url = ""
-                for attr in token.attrs or []:
-                    if attr[0] == "href":
-                        url = attr[1]
-                        break
+                # Extract link URL. TC-APT-076: markdown-it-py 4.x's Token.attrs is a
+                # dict (hugo_parser.py's _get_attr already handles this); iterating it
+                # as a list of (key, value) tuples silently yielded attr[0] == a single
+                # character of the key string, so `attr[0] == "href"` was always False
+                # and every re-parsed link lost its URL -- reproduced directly: a
+                # whole-node paragraph containing "[text](url)" rendered as "[text]()".
+                attrs = token.attrs or {}
+                if isinstance(attrs, dict):
+                    url = attrs.get("href", "")
+                else:
+                    url = next((value for key, value in attrs if key == "href"), "")
 
                 # Find matching link_close
                 children_tokens = []
