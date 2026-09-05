@@ -221,10 +221,22 @@ def _run_wave(
     translator_repo: Path,
     config_root: Path,
 ) -> int:
-    """Launch one child per shard group and wait for all of them."""
+    """Launch one child per shard group and wait for all of them.
+
+    Each child's stdout/stderr goes to its own log, and a failing child's tail is
+    printed here. Without that, a failed wave reported only "Incomplete campaign
+    shards" and the real cause had to be reproduced by hand -- three separate launch
+    failures on 2026-09-05 (an LMDB map-size mismatch, then a dirty unreceipted
+    output) were each diagnosed that way, at one wake apiece.
+    """
     flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+    log_dir = Path("logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+
     children: list[subprocess.Popen] = []
-    for group in groups:
+    child_logs: list[Path] = []
+    handles: list[Any] = []
+    for index, group in enumerate(groups):
         command = _child_command(
             shards=group,
             config_root=config_root,
@@ -236,8 +248,36 @@ def _run_wave(
             gpu_locales=gpu_locales,
             child=args.child,
         )
-        children.append(subprocess.Popen(command, cwd=translator_repo, creationflags=flags))
-    exit_codes = [child.wait() for child in children]
+        log_path = log_dir / f"{manifest.campaign_id}_child{index}.log"
+        handle = log_path.open("w", encoding="utf-8")
+        handles.append(handle)
+        child_logs.append(log_path)
+        children.append(
+            subprocess.Popen(
+                command,
+                cwd=translator_repo,
+                creationflags=flags,
+                stdout=handle,
+                stderr=subprocess.STDOUT,
+            )
+        )
+    try:
+        exit_codes = [child.wait() for child in children]
+    finally:
+        for handle in handles:
+            handle.close()
+
+    for index, (code, log_path) in enumerate(zip(exit_codes, child_logs)):
+        if code == 0:
+            continue
+        print(f"child {index} exited {code}; tail of {log_path}:", file=sys.stderr)
+        try:
+            tail = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-15:]
+        except OSError as exc:  # pragma: no cover - unreadable log is itself the report
+            tail = [f"(could not read child log: {exc})"]
+        for line in tail:
+            print(f"  | {line}", file=sys.stderr)
+
     launched = [str(shard["shard_id"]) for group in groups for shard in group]
     # Child process status is necessary but insufficient: a child can exit
     # cleanly after a fail-closed preflight abort, and a zero-defect campaign
@@ -246,6 +286,7 @@ def _run_wave(
     incomplete = incomplete_shards(manifest, args.ledger_root, launched)
     if incomplete:
         print(f"Incomplete campaign shards: {', '.join(incomplete)}", file=sys.stderr)
+        print(f"child logs: {', '.join(str(p) for p in child_logs)}", file=sys.stderr)
     if any(code != 0 for code in exit_codes):
         return 1
     return 1 if incomplete else 0
