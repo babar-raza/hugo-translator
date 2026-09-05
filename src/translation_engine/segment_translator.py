@@ -2286,7 +2286,9 @@ class SegmentTranslator:
             # Step 3: Apply translations to AST and frontmatter
             logger.info("AST Translation: Applying translations to AST and frontmatter")
             renderer = ASTRenderer()
-            renderer.apply_translations(doc.ast, translated_units, frontmatter=doc.frontmatter)
+            renderer.apply_translations(
+                doc.ast, translated_units, frontmatter=doc.frontmatter, target_lang=target_lang
+            )
 
             # P0-D: Placeholder leak = blocking failure
             if renderer.placeholder_leak_count > 0:

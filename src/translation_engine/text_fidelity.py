@@ -30,14 +30,35 @@ _INJECTED_INVISIBLES: dict[str, str] = {
     "⁠": "",   # WORD JOINER
 }
 
+# TC-APT-077: U+202F NARROW NO-BREAK SPACE is injected where the source has
+# none (measured: nl 2, fa 1) but is LEGITIMATE French typography (measured:
+# fr 21, used before ; : ! ?) -- unlike the characters above, stripping it
+# unconditionally would delete 21 correct French spaces to remove 3 injected
+# ones. The source is English/ASCII and never legitimately uses this
+# character itself, so "absent from source" (the test above) cannot
+# distinguish "injected" from "this locale's own normal typography" the way
+# it can for the source-symmetric characters above -- locale is the only
+# available signal. Same category as the U+00A0 exclusion, whose reasoning
+# this vindicates: a normalizer with no locale awareness cannot safely touch
+# a character multiple locales use correctly.
+_LOCALE_LEGITIMATE_INVISIBLES: dict[str, frozenset[str]] = {
+    " ": frozenset({"fr"}),
+}
 
-def normalize_injected_invisibles(source_text: str | None, translated_text: str | None) -> str | None:
+
+def normalize_injected_invisibles(
+    source_text: str | None, translated_text: str | None, target_lang: str | None = None
+) -> str | None:
     """Strip invisible/lookalike punctuation the model introduced on its own.
 
     Conditional on the source: a character the source itself uses is left
     alone, so this is a fidelity rule ("do not introduce what the source
     lacks") rather than a character ban, and a page that deliberately typesets
-    a non-breaking hyphen keeps it.
+    a non-breaking hyphen keeps it. A second class of character (currently
+    just U+202F) is additionally conditional on target_lang, for locales
+    where it is legitimate typography rather than an injection -- omitting
+    target_lang treats every locale as non-legitimate for that class, which
+    is the safe (strip) default when the caller cannot supply it.
 
     Call this on model output while protected spans are still masked, so code
     spans, links and shortcodes can never be rewritten by it.
@@ -49,4 +70,10 @@ def normalize_injected_invisibles(source_text: str | None, translated_text: str 
     for character, replacement in _INJECTED_INVISIBLES.items():
         if character in result and character not in source:
             result = result.replace(character, replacement)
+    for character, legitimate_locales in _LOCALE_LEGITIMATE_INVISIBLES.items():
+        if character not in result or character in source:
+            continue
+        if target_lang in legitimate_locales:
+            continue
+        result = result.replace(character, "")
     return result

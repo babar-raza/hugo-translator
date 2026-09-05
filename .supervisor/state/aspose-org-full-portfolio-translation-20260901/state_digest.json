@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-05T21:05:33.831293+00:00",
+  "generated_at": "2026-09-05T23:17:12.304535+00:00",
   "stamps": {
     "loop_prompt_version": "10.5 (2026-09-06)",
     "plan_revision": 16
@@ -15,14 +15,17 @@
     "TC-APT-047",
     "TC-APT-069",
     "TC-APT-078",
-    "TC-APT-080"
+    "TC-APT-080",
+    "TC-APT-090"
   ],
   "active_clauses": {
     "capacity_clause": {
-      "engaged": true,
+      "engaged": false,
       "since": "2026-09-05T19:47:47+00:00",
       "reason": "KPI 23 < floor 25 AND TC-APT-046/047 unlanded",
-      "effect": "no new-page Track-A attempts; wave-cells-rust-w1 blocked but built and env-verified; Track-B restricted to 043..047 in dependency order"
+      "effect": "no new-page Track-A attempts; wave-cells-rust-w1 blocked but built and env-verified; Track-B restricted to 043..047 in dependency order",
+      "released_at": "2026-09-05T23:16:13+00:00",
+      "release_reason": "Stale-state fix, found while orienting for TC-APT-077: logs/watchdog_state.json reads kpi_cells_24h=90 (floor 25), kpi_breach_open=false. The clauses own AND condition (TC-APT-043..047 unlanded AND KPI below floor) requires BOTH; KPI has not been below floor for a while (the peer already acted on this correctly for wave-cells-rust-w1, citing 'capacity clause released, KPI 43' -- this field just never caught up to that decision). TC-APT-046/047 remain unlanded, so a future KPI dip re-engages it automatically once checked against watchdog_state.json again."
     },
     "wave_scale": {
       "value": 1,
@@ -35,5 +38,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "TC-APT-082 landed (governance compaction). Capacity clause is ENGAGED (KPI 23<25, TC-APT-046/047 unlanded) -- Track-B time belongs to 043..047 in dependency order; next session should check logs/watchdog_state.json before picking new Track-B work."
+  "next_action": "TC-APT-077 landed (locale-aware U+202F normalization). Capacity clause corrected to disengaged (KPI healthy at 90). Peer is actively working wave-cells-rust-w1 and src/translation_engine/engine.py (uncommitted) -- avoid that file."
 }

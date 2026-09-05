@@ -1036,17 +1036,17 @@
       "blocker_type": null
     },
     "TC-APT-077": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
       "owner": "loop",
       "title": "U+202F NARROW NO-BREAK SPACE is injected where the source has none (nl 2, fa 1) but is LEGITIMATE typography in fr (21 occurrences, French uses it before ; : ! ?). normalize_injected_invisibles has no locale awareness, so adding U+202F would delete 21 correct French spaces to remove 3 injected ones. Needs locale-aware normalization or a review-level rule; deliberately not fixed blind. Same category as the U+00A0 exclusion, whose original reasoning this vindicates.",
       "depends_on": [
         "TC-APT-073"
       ],
-      "blocking_reason": null,
-      "evidence_path": "data/summaries/review-words-doc-r3-nl-20260905.json",
+      "blocking_reason": "normalize_injected_invisibles() now takes an optional target_lang parameter. A new _LOCALE_LEGITIMATE_INVISIBLES table (currently just U+202F -> {fr}) is checked in addition to the existing source-conditional test: U+202F is stripped only when absent from source AND target_lang is not in its legitimate-locale set, so fr keeps its 21 correct narrow spaces while nl/fa lose their 2/1 injected ones. Threaded target_lang through ASTRenderer.apply_translations() (new parameter, stored as self._target_lang, used at both the frontmatter and body call sites) and its two callers (file_reconstructor.reconstruct via its existing locale parameter; segment_translator._translate_body_ast via its existing target_lang parameter) -- both already had the language available, just were not passing it. Left segment_translator._restore_placeholders (the legacy non-AST path, not authoritative for any in-scope site per text_fidelity.pys own docstring) on the conservative default (target_lang=None -> strip for every locale, unchanged prior behaviour) since threading a locale through that older call chain is a larger, lower-value change for a path this mission does not use. 6 new tests (fr keeps it, nl/fa strip it, missing-target_lang defaults to strip, source-conditional rule still takes priority, other invisibles unaffected). Full reconstructor + segment_translator + file_reconstructor + regression suite: 542 passed, no regressions.",
+      "evidence_path": "tests/regression/test_locale_aware_narrow_nbsp.py; data/summaries/review-words-doc-r3-nl-20260905.json",
       "commit": null,
-      "last_updated": "2026-09-05T17:55:50+00:00",
+      "last_updated": "2026-09-05T23:16:13+00:00",
       "blocker_type": null
     },
     "TC-APT-078": {
@@ -1282,10 +1282,12 @@
     "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
   },
   "capacity_clause": {
-    "engaged": true,
+    "engaged": false,
     "since": "2026-09-05T19:47:47+00:00",
     "reason": "KPI 23 < floor 25 AND TC-APT-046/047 unlanded",
-    "effect": "no new-page Track-A attempts; wave-cells-rust-w1 blocked but built and env-verified; Track-B restricted to 043..047 in dependency order"
+    "effect": "no new-page Track-A attempts; wave-cells-rust-w1 blocked but built and env-verified; Track-B restricted to 043..047 in dependency order",
+    "released_at": "2026-09-05T23:16:13+00:00",
+    "release_reason": "Stale-state fix, found while orienting for TC-APT-077: logs/watchdog_state.json reads kpi_cells_24h=90 (floor 25), kpi_breach_open=false. The clauses own AND condition (TC-APT-043..047 unlanded AND KPI below floor) requires BOTH; KPI has not been below floor for a while (the peer already acted on this correctly for wave-cells-rust-w1, citing 'capacity clause released, KPI 43' -- this field just never caught up to that decision). TC-APT-046/047 remain unlanded, so a future KPI dip re-engages it automatically once checked against watchdog_state.json again."
   },
   "loop_prompt_version": "10.5 (2026-09-06)"
 }

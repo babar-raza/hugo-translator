@@ -57,6 +57,8 @@ class ASTRenderer:
         self._placeholder_leak_count: int = 0
         # TC-APT-078: source heading text -> its own translation, for cross-reference correction
         self._heading_translations: dict[str, str] = {}
+        # TC-APT-077: locale-aware invisible-character normalization needs the target language
+        self._target_lang: str | None = None
 
     @property
     def placeholder_leak_count(self) -> int:
@@ -515,7 +517,7 @@ class ASTRenderer:
             # placeholders at all, and it must run BEFORE restoration so
             # protected spans are still masked and cannot be rewritten.
             sanitized_translation = normalize_injected_invisibles(
-                unit.source_text, sanitized_translation
+                unit.source_text, sanitized_translation, self._target_lang
             )
             placeholder_map = unit.metadata.get('placeholder_map', {})
             if placeholder_map:
@@ -596,7 +598,13 @@ class ASTRenderer:
                 text = re.sub(pattern, translated_heading.replace("\\", "\\\\"), text)
         return text
 
-    def apply_translations(self, ast: list[ASTNode], units: list[TextUnit], frontmatter: dict[str, Any] | None = None) -> None:
+    def apply_translations(
+        self,
+        ast: list[ASTNode],
+        units: list[TextUnit],
+        frontmatter: dict[str, Any] | None = None,
+        target_lang: str | None = None,
+    ) -> None:
         """
         Apply translated TextUnits back to AST nodes and frontmatter.
 
@@ -604,6 +612,8 @@ class ASTRenderer:
             ast: The AST to update (modified in-place)
             units: Translated TextUnits with node addresses
             frontmatter: Optional frontmatter dictionary to update (FIX-BT-03)
+            target_lang: Target language code (TC-APT-077: locale-aware invisible-
+                character normalization; omit to get the conservative strip-always default)
 
         Raises:
             ValueError: If units cannot be applied (missing nodes, orphaned units)
@@ -614,6 +624,7 @@ class ASTRenderer:
         self._missing_node_count = 0  # Reset per call
         self._placeholder_leak_count = 0  # Reset per call
         self._heading_translations = self._build_heading_translation_map(units)
+        self._target_lang = target_lang
 
         # Separate frontmatter and body units (FIX-BT-03)
         frontmatter_units = [u for u in units if u.node_addr and u.node_addr.startswith('frontmatter.')]
@@ -690,7 +701,7 @@ class ASTRenderer:
             # TC-APT-073: same normalization as the frontmatter path above, and
             # for the same reasons -- before restoration, and not conditional on
             # a placeholder_map existing.
-            final_text = normalize_injected_invisibles(unit.source_text, final_text)
+            final_text = normalize_injected_invisibles(unit.source_text, final_text, self._target_lang)
 
             # TC-APT-078: fix a body reference that echoed a heading's SOURCE text
             # verbatim after that heading itself was translated. Before placeholder
