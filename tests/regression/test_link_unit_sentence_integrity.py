@@ -38,12 +38,20 @@ IN_PROSE_LINK = (
 
 
 def _units(markdown: str, patterns: list[str]) -> list[str]:
+    """Return only TRANSLATABLE unit texts.
+
+    do_not_translate units (code blocks, protected spans) never reach the model, so
+    including them made the URL-leak assertion below false-positive on any real page
+    with a URL inside a `git clone` block -- observed on words-document-net.
+    """
     parsed = HugoParser().parse_string(markdown)
     plan = TextUnitExtractor(preserve_patterns=patterns).extract_from_ast(
         parsed.ast, parsed.frontmatter or {}
     )
     texts = []
     for unit in getattr(plan, "units", plan):
+        if getattr(unit, "do_not_translate", False):
+            continue
         text = getattr(unit, "source_text", None) or getattr(unit, "text", "")
         if text and text.strip() and text.strip() != "t":
             texts.append(text)
@@ -134,3 +142,31 @@ def test_the_shipped_blog_profile_actually_protects_link_tails():
 def test_url_protection_holds_across_link_shapes(body):
     for unit in _units("---\ntitle: t\n---\n\n" + body, [TAIL_PATTERN]):
         assert "https://" not in unit, unit
+
+
+def test_a_url_inside_a_code_block_is_not_counted_as_a_leak():
+    """The distinction the leak assertion depends on, taken from real content.
+
+    words-document-net has `git clone https://.../x.git` in a fenced block. That unit
+    is do_not_translate and never reaches the model, so it is not a leak -- but a
+    naive scan over every unit would call it one.
+    """
+    markdown = "\n".join(
+        [
+            "---",
+            "title: t",
+            "---",
+            "",
+            "Clone it first.",
+            "",
+            "```bash",
+            "git clone https://github.com/aspose-words-foss/x.git",
+            "```",
+            "",
+        ]
+    )
+
+    translatable = _units(markdown, [TAIL_PATTERN])
+
+    assert all("https://" not in unit for unit in translatable), translatable
+    assert any("Clone it first" in unit for unit in translatable)
