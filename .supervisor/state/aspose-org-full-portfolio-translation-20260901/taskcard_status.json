@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T21:07:59+00:00",
+  "updated_at": "2026-09-05T21:15:30+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1200,6 +1200,18 @@
       "evidence_path": "data/summaries/review-cells-go-w2-batch-20260906.json",
       "commit": null,
       "last_updated": "2026-09-05T21:06:47+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-090": {
+      "status": "TODO",
+      "gate": null,
+      "owner": "loop",
+      "title": "introducing-cells-foss-go is 4 locales short and always has been: cs, it, sv and zh never produced output at all. They failed in campaign w1 -- cs, it and zh rejected by FrontmatterLanguageCheck, sv by LanguageConsistencyValidator -- and w2 targeted only the 20 cells that had produced DEFECTIVE output, so these four were never in its scope. Found 2026-09-06 while checking whether 'campaign complete' meant 'page complete'. It does not. Next step: reproduce the frontmatter rejection for one of cs/it/zh, since three of the four share a single validator and are likely one class.",
+      "depends_on": [],
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/review-cells-go-w2-final-20260906.json",
+      "commit": null,
+      "last_updated": "2026-09-05T21:15:30+00:00",
       "blocker_type": null
     }
   },
