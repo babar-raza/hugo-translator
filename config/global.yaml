@@ -51,7 +51,17 @@ tm_defaults:
   semantic_threshold: 0.80
   fallback_exact_only: false
   l1_cache_size: 10000
-  l2_max_size_mb: 1536  # 2026-04-17: 696K entries @ 878 MB used; 1536 MiB = 658 MiB headroom. Run scripts/compact_l2_lmdb.py with workers stopped to reclaim 2 GB pre-alloc.
+  # 2026-09-05: raised 1536 -> 4096 to match the on-disk mapping. A TM purge run
+  # through L2PersistentTM's DEFAULT max_size_mb (4096) grew data/tm/l2.lmdb/data.mdb
+  # to 4 GB; LMDB does not shrink, so every campaign opening at 1536 MB then failed
+  # with "cannot be performed on a file with a user-mapped section open" while a live
+  # campaign held the 4 GB mapping. Aligning the config with reality is the fix --
+  # lowering the file is not possible without stopping every worker and compacting.
+  # To go back to 1536: stop all workers, run scripts/compact_l2_lmdb.py, then lower
+  # this value and L2PersistentTM's default together so they cannot diverge again.
+  # See data/summaries/fp-lmdb-mapsize-mismatch-20260905.json.
+  # 2026-04-17 (historical): 696K entries @ 878 MB used; 1536 MiB = 658 MiB headroom.
+  l2_max_size_mb: 4096
   # Zero-defect semantic validation model. Qualified across all 25 campaign
   # locales (minimum good-pair cosine 0.634719) and available from the pinned
   # local Hugging Face snapshot; do not substitute the English-only L3 index

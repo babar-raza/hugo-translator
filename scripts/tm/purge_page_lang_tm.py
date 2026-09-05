@@ -42,14 +42,26 @@ def main() -> int:
     page_text = Path(args.source_file).read_text(encoding="utf-8")
     tgt_langs = {lang.strip() for lang in args.tgt_langs.split(",") if lang.strip()}
 
-    # Open through L2PersistentTM so the env geometry/flags are byte-identical
-    # to every live campaign process. A raw lmdb.open in write mode fails with
-    # "user-mapped section open" on Windows whenever its map_size differs from
-    # a live process's mapping (confirmed 2026-09-05: raw open failed 3x while
-    # this path deleted 462 entries alongside running campaigns).
+    # Open through L2PersistentTM AND with the map size campaigns actually use.
+    # A raw lmdb.open in write mode fails with "user-mapped section open" on
+    # Windows whenever its map_size differs from a live process's mapping
+    # (confirmed 2026-09-05: raw open failed 3x while this path deleted 462
+    # entries alongside running campaigns).
+    #
+    # Going through L2PersistentTM is necessary but NOT sufficient, and assuming
+    # otherwise broke every campaign launch on this host: the class default is
+    # max_size_mb=4096 while campaigns pass tm_defaults.l2_max_size_mb (1536)
+    # from global config, so a purge silently grew data.mdb to 4 GB and every
+    # later 1536 MB open collided with the live 4 GB mapping. Read the same
+    # config value here so a purge cannot change the geometry campaigns depend
+    # on. See data/summaries/fp-lmdb-mapsize-mismatch-20260905.json.
     from src.tm.l2_persistent import L2PersistentTM
+    from src.utils.config_loader import get_global_config
 
-    env = L2PersistentTM(db_path=args.l2_path).env
+    _tm_defaults = (get_global_config() or {}).get("tm_defaults") or {}
+    _campaign_map_size_mb = int(_tm_defaults.get("l2_max_size_mb", 1536))
+
+    env = L2PersistentTM(db_path=args.l2_path, max_size_mb=_campaign_map_size_mb).env
     matched: list[bytes] = []
     scanned = 0
     with env.begin(write=False) as txn:
