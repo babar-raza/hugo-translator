@@ -18,6 +18,7 @@ catch timing-only races.
 """
 
 import threading
+from unittest.mock import Mock
 
 import ruamel.yaml.main as ruamel_main
 
@@ -164,3 +165,170 @@ def test_unforced_concurrent_parses_are_stable():
         one, two = results.get("one"), results.get("two")
         assert isinstance(one, dict) and one.get("weight") == 10, f"rep {rep}: {one!r}"
         assert isinstance(two, dict) and two.get("weight") == 20, f"rep {rep}: {two!r}"
+
+
+# ---------------------------------------------------------------------------
+# Test B (plan §11, TC-APT-043): two real fixture files translated
+# concurrently end-to-end through one shared TranslationEngine — real parser,
+# extractor, and reconstructor; stubbed model backend — synchronized with a
+# threading.Barrier(2). No output may contain the other file's content, and
+# no output may lose its frontmatter (the historical corruption shape).
+# ---------------------------------------------------------------------------
+
+DOC_ALPHA = """---
+title: "Alpha spreadsheets guide"
+description: "Alpha covers workbook management in Go"
+weight: 10
+---
+
+# Alpha heading
+
+Alpha paragraph about workbook cells and styling in a spreadsheet library.
+
+Alpha second paragraph mentioning charts and pivot tables for reports.
+"""
+
+DOC_BETA = """---
+title: "Beta presentations guide"
+description: "Beta covers slide rendering in Java"
+weight: 20
+---
+
+# Beta heading
+
+Beta paragraph about slide masters and layout rendering in a deck library.
+
+Beta second paragraph mentioning transitions and speaker notes for talks.
+"""
+
+
+class _MarkerBackend:
+    """Deterministic, thread-safe stub: prefixes each text with a marker."""
+
+    def translate(self, texts, source_lang, target_lang):
+        return [f"[{target_lang.upper()}]{t}" for t in texts]
+
+    def translate_with_token_counts(self, texts, source_lang, target_lang):
+        translations = self.translate(texts, source_lang, target_lang)
+        return translations, len(texts), len(translations)
+
+
+def _build_engine(tmp_path):
+    from src.model_runtime import ModelLoader
+    from src.tm import TranslationMemory
+    from src.tm.models import LookupResult
+    from src.translation_engine import TranslationEngine
+    from src.utils.config_loader import ConfigService
+
+    output_dir = tmp_path / "output"
+    output_dir.mkdir(exist_ok=True)
+
+    body_rules = Mock()
+    body_rules.translate_markdown = True
+    body_rules.preserve_blocks = []
+    body_rules.preserve_patterns = []
+    body_rules.placeholder_syntax = []
+    body_rules.use_ast_body_reconstruction = True
+    body_rules.allow_legacy_reconstruction = False
+    body_rules.sort_segments_by_length = False
+    body_rules.ast_segmentation_strategy = "sentence_only"
+    body_rules.ast_batch_size = 32
+
+    profile = Mock()
+    profile.site_id = "test.site"
+    profile.default_source_lang = "en"
+    profile.target_langs = ["es"]
+    profile.body = body_rules
+    profile.frontmatter = {}
+    profile.tm_prefs = None
+    profile.output_dir = str(output_dir)
+    profile.default_model = None
+    output_layout = Mock()
+    output_layout.per_language_folders = False
+    output_layout.output_dir = str(output_dir)
+    output_layout.pattern = None
+    profile.output_layout = output_layout
+
+    config = Mock(spec=ConfigService)
+    config.get_config = Mock(return_value={})
+    config.get_site_profile = Mock(return_value=profile)
+    config.global_config = Mock()
+    config.global_config.tm_data_dir = str(tmp_path / "tm")
+    config.global_config.model_defaults = None
+
+    tm = Mock(spec=TranslationMemory)
+    tm.lookup = Mock(return_value=LookupResult(hit=False))
+    tm.batch_lookup = Mock(
+        side_effect=lambda requests, **kwargs: [LookupResult(hit=False) for _ in requests]
+    )
+    tm.store = Mock()
+    tm.set_override_mode = Mock()
+
+    loader = Mock(spec=ModelLoader)
+    loader.load_model = Mock(return_value=_MarkerBackend())
+    loader.get_tokenizer_for_counting = Mock(return_value=None)
+    loader.check_and_clear_cache = Mock(return_value=False)
+    loader.clear_cache_after_file = Mock()
+
+    engine = TranslationEngine(
+        config_service=config,
+        tm=tm,
+        model_loader=loader,
+        enable_telemetry=False,
+        enable_validation=False,
+    )
+    return engine, output_dir
+
+
+def test_concurrent_translate_file_no_cross_contamination(tmp_path):
+    engine, output_dir = _build_engine(tmp_path)
+    source_dir = tmp_path / "source"
+    source_dir.mkdir(exist_ok=True)
+    alpha_path = source_dir / "alpha.md"
+    beta_path = source_dir / "beta.md"
+    alpha_path.write_text(DOC_ALPHA, encoding="utf-8", newline="\n")
+    beta_path.write_text(DOC_BETA, encoding="utf-8", newline="\n")
+
+    reps = 25
+    for rep in range(reps):
+        barrier = threading.Barrier(2)
+        outcomes = {}
+
+        def translate(key, path):
+            try:
+                barrier.wait(timeout=10.0)
+                outcomes[key] = engine.translate_file(
+                    site_id="test.site", file_path=path, target_langs=["es"]
+                )
+            except Exception as error:
+                outcomes[key] = error
+
+        thread_one = threading.Thread(target=translate, args=("alpha", alpha_path))
+        thread_two = threading.Thread(target=translate, args=("beta", beta_path))
+        thread_one.start()
+        thread_two.start()
+        thread_one.join(timeout=60.0)
+        thread_two.join(timeout=60.0)
+        assert not thread_one.is_alive() and not thread_two.is_alive(), f"rep {rep}: hung"
+
+        for key in ("alpha", "beta"):
+            outcome = outcomes.get(key)
+            assert not isinstance(outcome, Exception), f"rep {rep}: {key} raised {outcome!r}"
+            assert getattr(outcome, "success", False), f"rep {rep}: {key} failed: {outcome!r}"
+
+        alpha_out = (output_dir / "es" / "alpha.md").read_text(encoding="utf-8")
+        beta_out = (output_dir / "es" / "beta.md").read_text(encoding="utf-8")
+
+        assert "Alpha" in alpha_out and "Beta" not in alpha_out, (
+            f"rep {rep}: alpha output cross-contaminated"
+        )
+        assert "Beta" in beta_out and "Alpha" not in beta_out, (
+            f"rep {rep}: beta output cross-contaminated"
+        )
+        # The historical corruption blanked frontmatter entirely.
+        assert alpha_out.startswith("---") and "Alpha spreadsheets guide" in alpha_out, (
+            f"rep {rep}: alpha frontmatter lost or corrupted"
+        )
+        assert beta_out.startswith("---") and "Beta presentations guide" in beta_out, (
+            f"rep {rep}: beta frontmatter lost or corrupted"
+        )
