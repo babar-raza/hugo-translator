@@ -760,15 +760,15 @@
       "blocker_type": null
     },
     "TC-APT-056": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
       "title": "Fleet work-claims helper (claims.jsonl FileLock lease); interim atomic-append protocol in use",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": null,
-      "evidence_path": null,
+      "blocking_reason": "src/workers/work_claims.py replaces the interim atomic-append-and-verify protocol with a real cross-process exclusion: acquire_claim()/release_claim()/active_claim() wrap the read-check-write sequence in src/utils/file_lock.py::FileLock (the same OS-level lock CampaignRunner.run() already uses), so two processes racing to claim the same work_key at the same instant cannot both win -- proven directly by externally holding the lock file and confirming acquire_claim() raises LockError rather than proceeding. Tolerant of the messy schema already on disk from the interim protocol (claimed_at vs acquired_at, missing ttl_minutes/action fields). 11 new tests. Full tests/unit/workers suite: 632 passed, 1 skipped (was 621), no regressions. Claimed THIS taskcard with the new helper itself (dogfooded, not just tested in isolation). NOT done: migrating every existing ad hoc claims.jsonl-append call site (this session's own prior manual claims in this conversation, and whatever peer sessions do) to call this module instead -- the interim protocol still works and is not incompatible, so nothing needs to change urgently, but the safety benefit only applies to callers that actually use this module.",
+      "evidence_path": "src/workers/work_claims.py; tests/unit/workers/test_work_claims.py",
       "commit": null,
-      "last_updated": "2026-09-05T07:50:00+00:00",
+      "last_updated": "2026-09-05T18:20:33+00:00",
       "blocker_type": null
     },
     "TC-APT-057": {
