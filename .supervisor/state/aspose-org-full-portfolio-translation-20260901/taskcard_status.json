@@ -4,7 +4,7 @@
   "plan_revision": 16,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T20:40:42+00:00",
+  "updated_at": "2026-09-05T20:55:06+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1134,24 +1134,36 @@
       "status": "DONE",
       "gate": null,
       "owner": "loop",
-      "title": "Stray unmatched ']' emitted after a list-item link, rendering as a visible literal bracket. Measured on introducing-cells-foss-go: bracket balance 25/26 against source 25/25 in de, el, id, he; the other 8 locales balanced. Invisible to link-count checks because a stray ']' forms no link. Inferred mechanism (unverified): the tail-only link preserve_pattern hands the model an unbalanced '[', it closes the bracket after the placeholder, and restore expands to '](url)]'. Bracket-balance-vs-source is now in the mechanical pre-check. FIXED 2026-09-06. Mechanism VERIFIED not inferred: two sites, and the L272 shape carried an orphan '{' -- a broken placeholder token, which only occurs when the model edits around a raw '[' beside a placeholder. Site 1 (brand label, de/el/id/he) is covered by TC-APT-085; site 2 (API Reference, pl/pt/ro) by a lookahead-scoped preserve_pattern that masks a link's opening bracket. Neutrality 14/14; prose and code brackets untouched.",
+      "title": "Stray unmatched ']' emitted after a list-item link, rendering as a visible literal bracket. Measured on introducing-cells-foss-go: bracket balance 25/26 against source 25/25 in de, el, id, he; the other 8 locales balanced. Invisible to link-count checks because a stray ']' forms no link. Inferred mechanism (unverified): the tail-only link preserve_pattern hands the model an unbalanced '[', it closes the bracket after the placeholder, and restore expands to '](url)]'. Bracket-balance-vs-source is now in the mechanical pre-check. FIXED 2026-09-06. Mechanism VERIFIED not inferred: two sites, and the L272 shape carried an orphan '{' -- a broken placeholder token, which only occurs when the model edits around a raw '[' beside a placeholder. Site 1 (brand label, de/el/id/he) is covered by TC-APT-085; site 2 (API Reference, pl/pt/ro) by a lookahead-scoped preserve_pattern that masks a link's opening bracket. Neutrality 14/14; prose and code brackets untouched. RETRIGGERED 2026-09-06 as heal-cells-go-w2 (20 cells). Masking verified on the real page first: 0 link lines hand the model a raw bracket.",
       "depends_on": [],
       "blocking_reason": null,
-      "evidence_path": "data/summaries/fix-tc-apt-084-link-bracket-balance-20260906.json",
+      "evidence_path": "data/summaries/fix-tc-apt-084-link-bracket-balance-20260906.json; data/summaries/retrigger-heal-cells-go-w2-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T20:40:42+00:00",
+      "last_updated": "2026-09-05T20:55:06+00:00",
       "blocker_type": null
     },
     "TC-APT-085": {
       "status": "DONE",
       "gate": null,
       "owner": "loop",
-      "title": "Governed brand-navigation labels are unprotected on the LIST_ITEM extraction path. The same label inside a paragraph link survives 17/18 locales; alone in a list item, 8/18. The brand-nav-label check runs on the paragraph LINK path (text_unit_extractor.py:1759) but not on the full-sentence/LIST_ITEM path. 'API Reference' survives there only via its own terminology.yaml entry. Fix: apply the check on the LIST_ITEM path, or register the label shape in terminology.yaml so it routes through the derived governed-terms machinery. FIXED 2026-09-06 via _whole_node_is_brand_navigation_link on the full-sentence path. First attempt was inert (tested raw markdown, not anchor text) and the real page caught it.",
+      "title": "Governed brand-navigation labels are unprotected on the LIST_ITEM extraction path. The same label inside a paragraph link survives 17/18 locales; alone in a list item, 8/18. The brand-nav-label check runs on the paragraph LINK path (text_unit_extractor.py:1759) but not on the full-sentence/LIST_ITEM path. 'API Reference' survives there only via its own terminology.yaml entry. Fix: apply the check on the LIST_ITEM path, or register the label shape in terminology.yaml so it routes through the derived governed-terms machinery. FIXED 2026-09-06 via _whole_node_is_brand_navigation_link on the full-sentence path. First attempt was inert (tested raw markdown, not anchor text) and the real page caught it. RETRIGGERED 2026-09-06 as heal-cells-go-w2 (20 cells). Predicate verified True on the real page's brand list item before launch.",
       "depends_on": [],
       "blocking_reason": null,
-      "evidence_path": "data/summaries/fix-tc-apt-085-brand-nav-list-item-20260906.json",
+      "evidence_path": "data/summaries/fix-tc-apt-085-brand-nav-list-item-20260906.json; data/summaries/retrigger-heal-cells-go-w2-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T20:30:17+00:00",
+      "last_updated": "2026-09-05T20:55:06+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-086": {
+      "status": "TODO",
+      "gate": null,
+      "owner": "loop",
+      "title": "Process censuses in this environment are unreliable in two independent ways, both found 2026-09-06. (1) wmic is NOT installed on Windows 11 26200, so any check built on wmic process observes nothing and reports a clean bill of health -- the same vacuous-true shape as the heal-queue openness bug. Use Get-CimInstance Win32_Process. (2) Every python.exe invocation in this venv re-execs an identical child, proven by one Popen of a trivial sleep yielding two rows, so every census DOUBLE-COUNTS and any oversubscription reading must halve or count parent-unique rows. Also: scripts/ops/rollback.bat:14 takes its backup timestamp from wmic os get localdatetime and would produce an empty timestamp on this box.",
+      "depends_on": [],
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/retrigger-heal-cells-go-w2-20260906.json",
+      "commit": null,
+      "last_updated": "2026-09-05T20:55:06+00:00",
       "blocker_type": null
     }
   },
@@ -1226,5 +1238,6 @@
     "since": "2026-09-05T19:47:47+00:00",
     "reason": "KPI 23 < floor 25 AND TC-APT-046/047 unlanded",
     "effect": "no new-page Track-A attempts; wave-cells-rust-w1 blocked but built and env-verified; Track-B restricted to 043..047 in dependency order"
-  }
+  },
+  "loop_prompt_version": "10.5 (2026-09-06)"
 }
