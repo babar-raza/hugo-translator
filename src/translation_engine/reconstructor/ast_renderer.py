@@ -101,6 +101,23 @@ class ASTRenderer:
         # Define punctuation characters to preserve
         LEADING_PUNCT = '.!?;:,‚„…'
         TRAILING_PUNCT = '.!?;:,‚„…'
+        # TC-APT-040 (Devanagari/CJK half): a translation that ends with the
+        # target script's OWN terminal already preserved the punctuation —
+        # appending the ASCII source char on top produced the recurring
+        # danda+period / fullwidth-stop+period / fullwidth-colon+colon
+        # artifacts (11+ per page in hi/ja/zh on introducing-pdf-foss-cpp).
+        EQUIVALENT_TERMINALS = {
+            ".": "।॥。．｡",
+            "!": "！",
+            "?": "？؟;",
+            ":": "：",
+            ";": "؛；",
+            ",": "，、،",
+        }
+
+        def _ends_with_equivalent(text: str, punct: str) -> bool:
+            equivalents = EQUIVALENT_TERMINALS.get(punct[-1], "")
+            return bool(equivalents) and bool(text) and text[-1] in equivalents
 
         # Check if source had leading punctuation but translation doesn't
         if source_text and translated_text:
@@ -130,7 +147,11 @@ class ASTRenderer:
                     break
 
             # Check if translation is missing trailing punctuation
-            if source_trailing_punct and not translated_text.endswith(source_trailing_punct):
+            if (
+                source_trailing_punct
+                and not translated_text.endswith(source_trailing_punct)
+                and not _ends_with_equivalent(translated_text, source_trailing_punct)
+            ):
                 logger.debug(
                     f"[FIX-C] Restoring trailing punctuation '{source_trailing_punct}' "
                     f"dropped by MT model. Source: {source_text[-30:]}, "
