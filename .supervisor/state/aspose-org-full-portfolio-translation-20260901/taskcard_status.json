@@ -4,7 +4,7 @@
   "plan_revision": "15",
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-05T09:57:27+00:00",
+  "updated_at": "2026-09-05T10:10:42+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -714,9 +714,9 @@
       "blocking_reason": null,
       "evidence_path": "tests/unit/workers/test_campaign_serialization_rollback.py, tests/regression/test_backend_generation_concurrency.py, tests/unit/workers/test_concurrency_canary_verification.py",
       "commit": null,
-      "last_updated": "2026-09-05T09:57:27+00:00",
+      "last_updated": "2026-09-05T10:10:42+00:00",
       "blocker_type": null,
-      "note": "Steps 1 and 3 DONE (a359a07). Step 2 is now HALF done: its required automated verification exists as scripts/campaign/verify_concurrency_canary.py -- model routing vs manifest retry_policy, empty-frontmatter, cross-language AND cross-file body-identity bleed, plus receipt-integrity (accepted output whose on-disk bytes no longer match output_sha256 = cross-job overwrite). 11 tests: every check driven by a fixture carrying its own defect, plus a clean control. SERIAL BASELINE RECORDED: 0 violations across r2 10 accepted cells at max_parallel_jobs=1, so any violation in the concurrent run is attributable to concurrency. Remaining on step 2: run the canary itself at max_parallel_jobs=4 with force_serialize_all_backends=false. BLOCKED (not TRUE-external, transient): campaign verify() rejects a dirty translator repo and the working tree is shared with the fleet -- a peer held uncommitted edits this wake. Step 4 (sustained-load calibration before any schema-ceiling raise) still TODO."
+      "note": "Steps 1 and 3 DONE (a359a07). Step 2 verifier + serial baseline DONE (a108cf0). Step 2 CANARY ITSELF DEFERRED on evidence, not on time: max_parallel_jobs is structurally inert for single-source manifests (shards are keyed by locale, so 1 source x 25 locales = 25 shards of 1 job; _run_locked runs shards sequentially and parallelises only min(max_parallel_jobs, len(jobs)) = 1). Measured live on the canary manifest: shards=25, jobs per shard=[1]. Running the canary here would measure nothing and could wrongly license a schema-ceiling raise. The canary belongs on a MULTI-SOURCE (Gate 7 family) batch. See data/summaries/fp-gate5-inprocess-concurrency-inert-20260905.json. Step 4 unchanged (TODO)."
     },
     "TC-APT-047": {
       "status": "IN_PROGRESS",
@@ -727,9 +727,9 @@
       "blocking_reason": null,
       "evidence_path": "tests/unit/workers/test_parallel_campaign_shard_launcher.py, tests/unit/workers/test_gate5_runner_vram_budget.py",
       "commit": "2111de5",
-      "last_updated": "2026-09-05T09:35:33+00:00",
+      "last_updated": "2026-09-05T10:10:42+00:00",
       "blocker_type": null,
-      "note": "Wave 2. Launcher now defaults its children to run_gate5_batch.py (--child gate5|worker): the legacy worker builds its own TranslationEngine and cannot receive --ledger-root, so a non-default root would have the parent verifying receipts where no child wrote -- now fail-closed. run_gate5_batch.py gained --max-gpu-memory-percent, resolved percent->MB via VRAMEnforcer exactly as the worker does (80 -> 13100 MB, 50 -> 8187 MB verified live), so the dedicated GPU shard has a real budget (TC-APT-065 hook). RESIDUAL RISK CLOSED BY MEASUREMENT: nvidia-smi against the live r2 campaign shows 0 MiB / 0% GPU for API-bound (professionalize_llm) work, so resource_governor.py reintegration is unnecessary by construction given one-GPU-shard-per-wave. 14 regression tests green. REMAINING for DONE: the live N-process concurrent run + duplicate_receipts()=={} proof, blocked only on the in-flight r2 campaign (7 accepted / 4 failures at 09:40Z) finishing so two campaigns do not contend for the content repo."
+      "note": "Wave 2. Launcher now defaults its children to run_gate5_batch.py (--child gate5|worker): the legacy worker builds its own TranslationEngine and cannot receive --ledger-root, so a non-default root would have the parent verifying receipts where no child wrote -- now fail-closed. run_gate5_batch.py gained --max-gpu-memory-percent, resolved percent->MB via VRAMEnforcer exactly as the worker does (80 -> 13100 MB, 50 -> 8187 MB verified live), so the dedicated GPU shard has a real budget (TC-APT-065 hook). RESIDUAL RISK CLOSED BY MEASUREMENT: nvidia-smi against the live r2 campaign shows 0 MiB / 0% GPU for API-bound (professionalize_llm) work, so resource_governor.py reintegration is unnecessary by construction given one-GPU-shard-per-wave. 14 regression tests green. REMAINING for DONE: the live N-process concurrent run + duplicate_receipts()=={} proof, blocked only on the in-flight r2 campaign (7 accepted / 4 failures at 09:40Z) finishing so two campaigns do not contend for the content repo. | 2026-09-05 PRIORITY CHANGE (evidence-based): 047 is not the optional complement plan SS11 describes. Because in-process concurrency is inert for single-source manifests, process sharding is the ONLY lever that parallelises a Gate 5/6 page (N OS processes owning different per-locale shards of the same page). Next concrete step: launch_parallel_campaign_shards.py --child gate5 --drain --max-workers 4 on a page, expecting wall-clock ~25/N x per-cell latency, with verify_concurrency_canary.py + duplicate_receipts() as the regression control."
     },
     "TC-APT-054": {
       "status": "DONE",
