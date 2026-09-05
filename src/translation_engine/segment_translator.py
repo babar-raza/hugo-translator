@@ -223,6 +223,45 @@ def _has_translatable_residue(
     return False
 
 
+# TC-APT-073: characters the model introduces that the source never had.
+# Measured on words-document-net: U+2011 NON-BREAKING HYPHEN appears in 7 of 7
+# accepted locales (147 occurrences: nl 67, he 37, fr 22, hi 11, el 7, ar 2,
+# fa 1) with ZERO in the source, and U+00AD SOFT HYPHEN appears word-interior in
+# fr. Both render like ordinary punctuation, so eyeball review misses them --
+# only two of the seven were caught by reviewers -- while they break copy,
+# search and diffing. By RB-005's recurrence test (same defect at the same
+# structural position across multiple locales) this is a producer bug, not
+# model variance.
+#
+# Normalization is conditional on the source: a character the source itself
+# uses is left alone, so a page that deliberately typesets a non-breaking
+# hyphen keeps it. RTL marks (U+200E/U+200F) are deliberately NOT listed --
+# they can be functionally necessary in ar/fa/he bidi text, and the same
+# measurement found zero of them injected.
+_INJECTED_INVISIBLES: dict[str, str] = {
+    "\u00ad": "",   # SOFT HYPHEN -- invisible; splits a word for search/copy
+    "\u2011": "-",  # NON-BREAKING HYPHEN -- renders as a hyphen, is not one
+    "\u200b": "",   # ZERO WIDTH SPACE
+    "\u2060": "",   # WORD JOINER
+}
+
+
+def normalize_injected_invisibles(source_text: str, translated_text: str) -> str:
+    """Strip invisible/lookalike punctuation the model added on its own.
+
+    Applied to the model's output while protected spans are still masked, so
+    code, links and shortcodes are never touched.
+    """
+    if not translated_text:
+        return translated_text
+    source = source_text or ""
+    result = translated_text
+    for character, replacement in _INJECTED_INVISIBLES.items():
+        if character in result and character not in source:
+            result = result.replace(character, replacement)
+    return result
+
+
 def _same_as_source_fingerprints(units: list) -> str:
     """Return candidate-free source-unit metadata for autonomous diagnosis."""
     return ",".join(
@@ -2421,7 +2460,9 @@ class SegmentTranslator:
         if not text:
             return text
 
-        result = text
+        # TC-APT-073: normalize BEFORE restoring, so protected spans are still
+        # masked and cannot be altered by it.
+        result = normalize_injected_invisibles(getattr(segment, "source_text", "") or "", text)
 
         # TRM-05: Restore terminology placeholders first
         if engine.terminology_manager and getattr(segment, "protected_terms", None):

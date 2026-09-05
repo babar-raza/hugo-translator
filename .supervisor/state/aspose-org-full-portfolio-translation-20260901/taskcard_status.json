@@ -984,15 +984,15 @@
       "provenance": "first written as TC-APT-062, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     },
     "TC-APT-073": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": null,
       "title": "Character-level emission defects at protected-span boundaries: doubled delimiter U+002C+U+060C byte-identical at ar:503 and fa:503 (RB-005; a delimiter de-dup fix, no retranslation needed); U+00AD injected word-interior at fr:443, invisible at render so it survives eyeball review; U+2011 substituted for ASCII hyphen 22x fr / 7x el, 0 in source.",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": null,
-      "evidence_path": "data/summaries/review-words-doc-20260905.json",
+      "blocking_reason": "Two of three character-level defects fixed and unit-tested on the mission branch (uncommitted at read time): (a) normalize_injected_invisibles() in segment_translator.py strips model-injected U+00AD SOFT HYPHEN and U+2011 NON-BREAKING HYPHEN before placeholder restore, conditional on the source not using them; (b) ast_renderer.py _preserve_punctuation() leading-punctuation branch gained a _starts_with_equivalent() check mirroring the existing trailing-side _ends_with_equivalent(), fixing RB-005: reproduced directly on current code that a leading ASCII comma + a translation naturally starting with U+060C produced the exact U+002C+U+060C doubled sequence found at ar:503/fa:503 on words-document-net. NOT yet DONE: neither fix has been reverified against the actual words-document-net output per the runbook RECURRENCE ESCALATION step 2 (retranslate the same source_path/target_lang the original ticket named and confirm the specific defect is gone) -- that still requires a live campaign/debug-harness run, not attempted this iteration. Code fix is real and unit-tested; production reverification is the remaining gate to DONE.",
+      "evidence_path": "data/summaries/review-words-doc-20260905.json; tests/regression/test_native_terminal_punctuation_not_doubled.py::TestLeadingNativeTerminalsAreNotDoubled; tests/regression/test_injected_invisible_characters.py",
       "commit": null,
-      "last_updated": "2026-09-05T14:27:38+00:00",
+      "last_updated": "2026-09-05T15:06:07+00:00",
       "blocker_type": null,
       "provenance": "first written as TC-APT-063, which the runbook had already allocated; re-filed here after reading the union of the runbook and status-file ID spaces"
     }

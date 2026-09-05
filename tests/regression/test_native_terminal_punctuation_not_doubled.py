@@ -7,6 +7,14 @@ ideographic full stop, or a Chinese label ending with the fullwidth colon all
 "lack" the ASCII char by that test — producing the recurring danda+period,
 fullwidth-stop+period, and fullwidth-colon+colon artifacts (11+ per page in
 hi/ja/zh on introducing-pdf-foss-cpp, plus one earlier page).
+
+TC-APT-073 (RB-005): the same bug existed on the LEADING side, undetected
+because no test covered it. Reproduced directly on current code: a segment
+whose source starts with ASCII "," and whose translation naturally starts
+with the script-appropriate comma (U+060C in ar/fa) produced U+002C
+immediately followed by U+060C -- byte-identical at ar:503 and fa:503 on
+words-document-net -- because the leading branch checked only
+`startswith(source_leading_punct)` with no equivalent-terminal fallback.
 """
 
 from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
@@ -34,6 +42,17 @@ class TestNativeTerminalsAreNotDoubled:
 
     def test_arabic_question_mark_satisfies_source_question(self):
         assert _render("Why?", "لماذا؟") == "لماذا؟"
+
+
+class TestLeadingNativeTerminalsAreNotDoubled:
+    def test_arabic_comma_satisfies_source_leading_comma(self):
+        assert _render(", and more text", "، and more text") == "، and more text"
+
+    def test_fullwidth_comma_satisfies_source_leading_comma(self):
+        assert _render(", and more text", "， and more text") == "， and more text"
+
+    def test_missing_leading_comma_is_still_prepended(self):
+        assert _render(", and more text", "and more text") == ",and more text"
 
 
 class TestGenuineDropsAreStillRestored:

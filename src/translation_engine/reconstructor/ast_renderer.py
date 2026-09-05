@@ -119,6 +119,17 @@ class ASTRenderer:
             equivalents = EQUIVALENT_TERMINALS.get(punct[-1], "")
             return bool(equivalents) and bool(text) and text[-1] in equivalents
 
+        # TC-APT-073 (RB-005): the leading-punctuation branch below had no
+        # equivalent check, unlike the trailing branch above. When a segment
+        # immediately after a protected span started with a source ASCII
+        # comma and the model naturally rendered the script-appropriate
+        # comma (e.g. U+060C in ar/fa), `startswith(",")` was False, so the
+        # ASCII comma got prepended in front of it -- U+002C followed by
+        # U+060C, byte-identical at ar:503 and fa:503 on words-document-net.
+        def _starts_with_equivalent(text: str, punct: str) -> bool:
+            equivalents = EQUIVALENT_TERMINALS.get(punct[0], "")
+            return bool(equivalents) and bool(text) and text[0] in equivalents
+
         # Check if source had leading punctuation but translation doesn't
         if source_text and translated_text:
             # Extract leading punctuation from source
@@ -130,7 +141,11 @@ class ASTRenderer:
                     break
 
             # Check if translation is missing this punctuation
-            if source_leading_punct and not translated_text.startswith(source_leading_punct):
+            if (
+                source_leading_punct
+                and not translated_text.startswith(source_leading_punct)
+                and not _starts_with_equivalent(translated_text, source_leading_punct)
+            ):
                 logger.debug(
                     f"[FIX-C] Restoring leading punctuation '{source_leading_punct}' "
                     f"dropped by MT model. Source: {source_text[:30]}, "
