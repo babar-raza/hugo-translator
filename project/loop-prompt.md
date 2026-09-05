@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 10.1 (2026-09-05)`
+`loop_prompt_version: 10.2 (2026-09-05)`
 
 ## 0. On reload — before anything else
 
@@ -42,6 +42,12 @@ memory of a previous iteration.
   it is checked, not waited for — so a long-running job is never a reason to schedule a longer wake.
   Before every `ScheduleWakeup` call this iteration, state the `delaySeconds` value out loud in the
   report and confirm it is <=180.
+- **Never span a wake boundary with a harness-level background task** (`run_in_background: true`
+  Bash tasks, Monitors): confirmed twice that they do NOT survive to a later wake (losses at ~80%
+  and ~21% of a test-suite run). Anything that must outlive this iteration — a campaign, a long
+  verification — runs as a real OS-detached subprocess (`subprocess.Popen` / `Start-Process`),
+  which demonstrably DOES survive wakes and watchdog relaunches; long foreground verification runs
+  within one turn (<=~600s tool timeout) are the fallback. (v10.2, plan §0.6 cause 6.)
 - Never push either repository to any remote; never merge the mission branch to `main`; never
   trigger `aspose.org-workflows` deployment. Local commits are required; remote publication is the
   operator's action, announced through push-ready checkpoints (§6).
@@ -62,6 +68,11 @@ memory of a previous iteration.
 
 ## 2. Orient (at most five minutes)
 
+0. Read `data/campaigns/ops_queue.jsonl` (treat a missing file as empty). An open
+   `THROUGHPUT_BREACH` row (written by the OS watchdog when <25 translation cells landed in the
+   content repo over a trailing 24h, sustained 6h — plan §0.6/TC-APT-055) outranks everything: write
+   a §10.1 first-principles record on the loop's own strategy (which assumption about the current
+   approach is false?), close the row by referencing that record, and only then continue.
 1. `git status --short` on the mission branch. Commit or revert only leftovers you authored; never
    discard work you did not author. Export `AGENT_SESSION_ID` from `taskcard_status.json` for every
    content-repo command (other sessions are live there; `session_ledger.py current` is ambiguous).
@@ -113,7 +124,31 @@ Track A — ship translated pages:
      commit whatever now passes review. Only once this step has run does a NEW, never-before-tried
      page become selectable again.
   Skipping straight from step 1 to a new page (or stopping after a unit test without step 2) is
-  exactly the failure pattern this rule exists to close. As of 2026-09-04 this already applies to
+  exactly the failure pattern this rule exists to close. Step 2's evidence standard: until
+  TC-APT-057's reverification receipts land, the iteration report must name the exact output file
+  read and quote the specific defect location now shown clean; once receipts exist, a
+  `data/campaigns/reverification_receipts.jsonl` row with `gates_passed: true` for every
+  `(source_path, target_lang)` the class's original tickets name is the ONLY thing that lifts the
+  obligation — prose does not count (plan §0.6/G-37).
+- **CAPACITY CLAUSE (v10.2, plan §0.6/TC-APT-058 — explicitly ordered so the forcing rules cannot
+  deadlock):** priority 1 is an open RECURRENCE ESCALATION obligation (above). Priority 2: **while
+  any of TC-APT-043..047 is unlanded AND the watchdog's throughput KPI is below floor
+  (`logs/watchdog_state.json`, or evidently true from a content-empty day), ALL Track-B time
+  belongs to TC-APT-043..047 in dependency order (043 → 044 → 045 → 046; 047 may run in parallel
+  as the process-level fallback), and Track A is limited to retriggering already-fixed pages — no
+  new-page attempts, no other Track-B work.** Sequential-mode arithmetic cannot finish this
+  portfolio (~117k missing cells × 40-70s+/cell ≥ 54-95 compute-days at an acceptance rate far
+  above the observed one); these five taskcards are the difference between "runs" and "finishes."
+  043's own mandatory first step stands: Test A must reproduce the corruption on current code
+  before any fix is trusted (plan §0.3). Priority 3: the normal Track A/B split.
+- **WORK CLAIMS (v10.2, plan §0.6/TC-APT-056):** this mission runs as a multi-session fleet. Before
+  opening a Track-A page or starting a majorTrack-B taskcard, acquire a lease in
+  `data/campaigns/claims.jsonl` (work_key `page:<source_path>` or `taskcard:TC-APT-###`,
+  ttl 45 min) under the ledger's cross-process FileLock pattern; skip work whose live claim another
+  session holds; reap expired claims. Until TC-APT-056's helper lands, approximate this with an
+  atomic append + read-back-and-verify on the same file — the point is that two sessions must
+  never both proceed on one key. Peer messages (ListAgents/SendMessage) remain for context, never
+  as the safety mechanism. As of 2026-09-04 this already applies to
   TC-APT-040 (`auto:FrontmatterLanguageCheck`, 25 open tickets) and TC-APT-042
   (`model_quality_complex_sentence_structure`/`model_quality_residual_phrase_defects`, 28 open
   tickets across at least 4 pages: cells-spreadsheet-management-go, introducing-words-foss-net,
@@ -274,4 +309,5 @@ most 3 minutes out — never longer**, regardless of how long the current step i
 - 2026-09-04: operator flagged, directly and correctly, that the self-healing design (find defect -> root-cause -> fix -> retranslate affected -> resume) is not converging: heal_queue.jsonl had 67 open tickets and 0 resolved at the time of the flag, with the two largest root-cause classes (auto:FrontmatterLanguageCheck, 25 tickets; the TC-APT-042 sentence-defect family, 28 tickets across 4+ pages) both fully evidenced with a plausible fix direction in TC-APT-040/042 for multiple prior iterations, yet never actually implemented -- each iteration re-hit the same wall on a new page, documented it again (sometimes usefully, with more evidence), and pivoted rather than fixing it. Root cause of the failure to converge: nothing in this runbook previously forced a stop; Track A always "has eligible cells" (there is always another untried page), so Track B's <=50%-of-iteration cap combined with no per-root-cause escalation meant a well-evidenced, multi-page-confirmed defect had the same priority as a same-iteration novel finding, and the latter kept opportunistically winning. v10.0 adds the RECURRENCE ESCALATION rule (§3) to close this gap structurally, not as a one-time manual redirect.
 - 2026-09-04: a governance-state commit (taskcard_status.json) landed ~10s after launching a background campaign and raced its verify() call — "translator repository is dirty" on the FIRST launch attempt even though the tree was clean at manifest-build time. verify() runs once, synchronously, near the very start of run(), but a slow-starting process (model/TM imports) can still be mid-startup when a later commit dirties the tree it hasn't checked yet. Fix: after launching a campaign in the background, avoid touching tracked files again until either the process has produced its first shard result or enough time has passed that verify() has clearly already run.
 - 2026-09-04: after TC-APT-049 landed, introducing-words-foss-net's fresh rerun still leaves the link text "API Reference" in English (ar/cs/de all confirmed) — this is NOT a bug, do not re-fix it. `config/terminology.yaml` explicitly protects "API Reference" (preserve_mode: protect, severity: error, category: api_phrase), and real already-shipped translations across the portfolio (scene-entities-in-net's de/fr/ru, pdf-annotations-forms-net's de, convert-obj-stl-gltf-dotnet's ru, slides-core-api-java's ru) all consistently leave "API Reference" in English too — a deliberate, curated, portfolio-wide site convention (same family as `_link_text_is_brand_navigation_label`'s "Aspose.X KB" cases), separate from the "Getting Started"/"Developer Guide" bug (which WAS real and is now fixed). Any future review of this page (or others using the same link-list convention) must not flag "API Reference" alone as a defect.
+- 2026-09-05 (v10.2): revision-13 audit ("runs unattended" vs "finishes unattended", plan §0.6) landed five structural additions: ops_queue.jsonl throughput-breach check first in §2 (TC-APT-055); receipt-based evidence standard for RECURRENCE step 2 (TC-APT-057); the CAPACITY CLAUSE making TC-APT-043..047 the exclusive Track-B work while the KPI is below floor (TC-APT-058 — sequential mode cannot finish the portfolio, this is arithmetic not preference); fleet work-claims before any page/taskcard (TC-APT-056); the harness-background-task substrate rule promoted from field note to §1 hard limit. Watchdog v2 (TC-APT-054, cold-boot fallback when resume stops producing progress) is implemented OS-side in scripts/ops/mission_watchdog.ps1 and does not need loop-side action. Immediate queue on next wake: TC-APT-053 steps 2-3 (reverify introducing-pdf-foss-cpp/cs against 4e5089e, retrigger), then the capacity clause takes effect.
 - 2026-09-05: operator tightened v10.0's RECURRENCE ESCALATION rule -- "fix, reverify against the exact file that showed the problem, then retrigger the campaign" is the required closed loop, not "fix and move on to a new page" (which is what every prior TC-APT-040/042 encounter actually did, unit tests notwithstanding). v10.1 spells out the 3 mandatory steps in §3: (1) fix the producer-side root cause, (2) re-translate the SAME source_path/target_lang the original heal ticket named and confirm the specific defect is gone by reading the actual output (a passing unit test alone does not satisfy this), (3) retrigger the campaign on every page/cell quarantined for that root cause and commit whatever now passes. Only after step 3 does a new, never-before-tried page become selectable again.
