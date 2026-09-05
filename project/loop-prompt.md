@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 10.3 (2026-09-05)`
+`loop_prompt_version: 10.4 (2026-09-05)`
 
 ## 0. On reload — before anything else
 
@@ -143,7 +143,15 @@ Track A — ship translated pages:
   portfolio (~117k missing cells × 40-70s+/cell ≥ 54-95 compute-days at an acceptance rate far
   above the observed one); these five taskcards are the difference between "runs" and "finishes."
   043's own mandatory first step stands: Test A must reproduce the corruption on current code
-  before any fix is trusted (plan §0.3). Priority 3: the normal Track A/B split.
+  before any fix is trusted (plan §0.3). Priority 3: the normal Track A/B split — within which
+  Track B's queue order is the §0.8 lever order: TC-APT-064 (sustained-load calibration, THEN the
+  schema-ceiling raise — burst calibration is not evidence of a sustained ceiling), 065 (dedicated
+  saturated GPU shard for hu/ja/ro: one process owns the GPU, max_gpu_memory_percent 80 for that
+  shard only, adaptive batching to its existing 20-25 ceiling, thermal watchdog active), 066 (TM
+  warm-ordering: seed one language across a family's template-siblings before fanning out the
+  rest; measure and report TM hit-rate per wave; depends on TC-APT-062), 067 (packing A/B raise,
+  adopt only on review-verdict parity), 068 (pipeline overlap, below). No lever relaxes any
+  quality control; a lever that fails its validation is dropped, not forced.
 - **WORK CLAIMS (v10.2, plan §0.6/TC-APT-056):** this mission runs as a multi-session fleet. Before
   opening a Track-A page or starting a majorTrack-B taskcard, acquire a lease in
   `data/campaigns/claims.jsonl` (work_key `page:<source_path>` or `taskcard:TC-APT-###`,
@@ -238,6 +246,10 @@ surface. Implement, test, execute the acceptance criterion, mark DONE, commit to
    its PID and run id in `taskcard_status.json`; on the next wake check it (receipts written,
    process alive, log tail), review whatever has completed, commit approved batches, and yield
    again. Never re-launch a batch that is still running; never kill one to "restart cleanly".
+   **Pipeline overlap (v10.4, TC-APT-068): while batch N is in review, batch N+1's campaign may
+   already run detached — claims make the overlap collision-safe; the invariant is only that no
+   batch commits before ITS OWN review completes. Do not leave the GPU or the API envelope idle
+   waiting on a review pass.**
 
 ## 5. Commit and record
 
@@ -326,6 +338,7 @@ most 3 minutes out — never longer**, regardless of how long the current step i
 - 2026-09-04: operator flagged, directly and correctly, that the self-healing design (find defect -> root-cause -> fix -> retranslate affected -> resume) is not converging: heal_queue.jsonl had 67 open tickets and 0 resolved at the time of the flag, with the two largest root-cause classes (auto:FrontmatterLanguageCheck, 25 tickets; the TC-APT-042 sentence-defect family, 28 tickets across 4+ pages) both fully evidenced with a plausible fix direction in TC-APT-040/042 for multiple prior iterations, yet never actually implemented -- each iteration re-hit the same wall on a new page, documented it again (sometimes usefully, with more evidence), and pivoted rather than fixing it. Root cause of the failure to converge: nothing in this runbook previously forced a stop; Track A always "has eligible cells" (there is always another untried page), so Track B's <=50%-of-iteration cap combined with no per-root-cause escalation meant a well-evidenced, multi-page-confirmed defect had the same priority as a same-iteration novel finding, and the latter kept opportunistically winning. v10.0 adds the RECURRENCE ESCALATION rule (§3) to close this gap structurally, not as a one-time manual redirect.
 - 2026-09-04: a governance-state commit (taskcard_status.json) landed ~10s after launching a background campaign and raced its verify() call — "translator repository is dirty" on the FIRST launch attempt even though the tree was clean at manifest-build time. verify() runs once, synchronously, near the very start of run(), but a slow-starting process (model/TM imports) can still be mid-startup when a later commit dirties the tree it hasn't checked yet. Fix: after launching a campaign in the background, avoid touching tracked files again until either the process has produced its first shard result or enough time has passed that verify() has clearly already run.
 - 2026-09-04: after TC-APT-049 landed, introducing-words-foss-net's fresh rerun still leaves the link text "API Reference" in English (ar/cs/de all confirmed) — this is NOT a bug, do not re-fix it. `config/terminology.yaml` explicitly protects "API Reference" (preserve_mode: protect, severity: error, category: api_phrase), and real already-shipped translations across the portfolio (scene-entities-in-net's de/fr/ru, pdf-annotations-forms-net's de, convert-obj-stl-gltf-dotnet's ru, slides-core-api-java's ru) all consistently leave "API Reference" in English too — a deliberate, curated, portfolio-wide site convention (same family as `_link_text_is_brand_navigation_label`'s "Aspose.X KB" cases), separate from the "Getting Started"/"Developer Guide" bug (which WAS real and is now fixed). Any future review of this page (or others using the same link-list convention) must not flag "API Reference" alone as a defect.
+- 2026-09-05 (v10.4): revision-15 throughput hardening (plan §0.8) — eight ordered levers, each behind its own validation gate, none relaxing quality controls. Track-B queue after the capacity clause completes: 064 sustained calibration→ceiling raise, 065 dedicated GPU shard (hu/ja/ro, memory budget 80 for that shard only), 066 TM warm-ordering (after 062), 067 packing A/B, 068 translate/review overlap (now permitted explicitly). Honest arithmetic in §0.8: API cells 3-7 compute-days at proven-sustained 12-16-way, GPU cells hours saturated; acceptance rate is the floor, which is why the quality gates stay untouched.
 - 2026-09-05 (v10.3): revision-14 "judgment layer" audit (plan §0.7, G-38..G-42, TC-APT-059..063). Live confirmations first: the capacity clause worked (043 landed test-first, 044 followed); watchdog v2 handed over to session 442e200e correctly. New rules now in force: verdicts cite review_rubric.yaml rule IDs (rubric to be seeded by TC-APT-059 from the 102 tickets + shipped corpus); heal tickets take terminal dispositions and the recurrence gate counts OPEN only; TM purge is mandatory in the same step as any reject/ticket until TC-APT-062 lands transactionally; reviews fan out to parallel subagent reviewers with a 15-consecutive/1-in-5 ramp; commits batch per page/family; §4 item 7's stale run_in_background recommendation corrected to OS-detached-only (it contradicted the §1 hard limit).
 - 2026-09-05 (v10.2): revision-13 audit ("runs unattended" vs "finishes unattended", plan §0.6) landed five structural additions: ops_queue.jsonl throughput-breach check first in §2 (TC-APT-055); receipt-based evidence standard for RECURRENCE step 2 (TC-APT-057); the CAPACITY CLAUSE making TC-APT-043..047 the exclusive Track-B work while the KPI is below floor (TC-APT-058 — sequential mode cannot finish the portfolio, this is arithmetic not preference); fleet work-claims before any page/taskcard (TC-APT-056); the harness-background-task substrate rule promoted from field note to §1 hard limit. Watchdog v2 (TC-APT-054, cold-boot fallback when resume stops producing progress) is implemented OS-side in scripts/ops/mission_watchdog.ps1 and does not need loop-side action. Immediate queue on next wake: TC-APT-053 steps 2-3 (reverify introducing-pdf-foss-cpp/cs against 4e5089e, retrigger), then the capacity clause takes effect.
 - 2026-09-05: operator tightened v10.0's RECURRENCE ESCALATION rule -- "fix, reverify against the exact file that showed the problem, then retrigger the campaign" is the required closed loop, not "fix and move on to a new page" (which is what every prior TC-APT-040/042 encounter actually did, unit tests notwithstanding). v10.1 spells out the 3 mandatory steps in §3: (1) fix the producer-side root cause, (2) re-translate the SAME source_path/target_lang the original heal ticket named and confirm the specific defect is gone by reading the actual output (a passing unit test alone does not satisfy this), (3) retrigger the campaign on every page/cell quarantined for that root cause and commit whatever now passes. Only after step 3 does a new, never-before-tried page become selectable again.
