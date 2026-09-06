@@ -1370,7 +1370,16 @@
   "last_wake_summary": "Wave 2 (wave_scale=2) completed: email/cpp 25/25 clean (title-only, page-complete, pages_newly_live_total 1->2), email/python 21/24 (zh gate-failed x3 no cross-model escalation; hi/hu/ja rejected for text adjacent to the FOSS-edition mask / unrelated fluency issues -- 4 heal tickets, 30 TM entries purged). Committed 4e93753027 (71 files) -- this ALSO recovered email/net (25 langs) after discovering its original commit fc101aa230 had been orphaned from HEAD ancestry during a concurrent multi-session window (reflog still had it; git log did not -- likely a peer git-reset in this shared single-checkout repo). Content was intact in the working tree/index (soft-reset shape), re-committed after confirming session_ledger candidates matched staged files exactly. Also hit the known transient stale-file-regression race twice more, both resolved by retry. cells_committed_total 96 -> 167. Flagged to the operator: multi-session single-checkout git setup can silently orphan commits -- worth per-session worktrees or a reflog integrity check.",
   "cells_committed_total": 167,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "run_id": "wave3-llm-retry2",
+      "pid": 58207,
+      "launched_at": "2026-09-06T13:29:57+00:00",
+      "manifest": "data/campaigns/wave3-llm/launch.yaml",
+      "log": "logs/wave3-llm-retry2_launcher.log",
+      "note": "Retries child3's 22 crashed cells (java/net/python/typescript x el,he,ko,ru,uk or cs,fa,id,pl,th,zh) plus python/tr's GATE36 failure, resume-based via acceptance_receipts.jsonl (65 already-accepted shards auto-skipped). Launched only after wave3-m2m fully exited (SHARD_SET_COMPLETE) -- do not launch any m2m100/GPU-bound campaign concurrently with this PID (see fp-wave3-m2m-crash-20260906.json). max-workers=4. Do not re-launch while this PID is alive."
+    }
+  ],
   "wave_scale": {
     "value": 4,
     "previous": 2,
