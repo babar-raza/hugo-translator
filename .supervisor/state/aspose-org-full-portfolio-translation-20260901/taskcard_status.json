@@ -1179,15 +1179,15 @@
       "blocker_type": null
     },
     "TC-APT-088": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
-      "owner": "loop",
+      "owner": "session-10942b65",
       "title": "The content repo's 40-step hook suite exceeds the 120s harness tool timeout once a commit carries ~7 files; the 1-file nl commit fit inside it. Found 2026-09-06 when the w2 batch commit was moved to a background task mid-hook. Fix: either cap content commits at a smaller batch or invoke git commit OS-detached and verify HEAD on a later wake, which is the pattern already used for campaigns. Do not interrupt a commit mid-hook -- it risks a partial index and a stale index.lock.",
       "depends_on": [],
       "blocking_reason": null,
-      "evidence_path": "data/summaries/review-cells-go-w2-batch-20260906.json",
-      "commit": null,
-      "last_updated": "2026-09-05T21:06:47+00:00",
+      "evidence_path": "scripts/ops/detached_git_commit.py + tests/unit/ops/test_detached_git_commit.py (4/4 passing against a real git repo)",
+      "commit": "PENDING",
+      "last_updated": "2026-09-06T02:28:36.719716+00:00",
       "blocker_type": null
     },
     "TC-APT-089": {
