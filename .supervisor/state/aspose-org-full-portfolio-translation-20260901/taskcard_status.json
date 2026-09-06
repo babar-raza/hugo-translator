@@ -1155,15 +1155,15 @@
       "blocker_type": null
     },
     "TC-APT-086": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
       "owner": "loop",
       "title": "Process censuses in this environment are unreliable in two independent ways, both found 2026-09-06. (1) wmic is NOT installed on Windows 11 26200, so any check built on wmic process observes nothing and reports a clean bill of health -- the same vacuous-true shape as the heal-queue openness bug. Use Get-CimInstance Win32_Process. (2) Every python.exe invocation in this venv re-execs an identical child, proven by one Popen of a trivial sleep yielding two rows, so every census DOUBLE-COUNTS and any oversubscription reading must halve or count parent-unique rows. Also: scripts/ops/rollback.bat:14 takes its backup timestamp from wmic os get localdatetime and would produce an empty timestamp on this box.",
       "depends_on": [],
-      "blocking_reason": null,
-      "evidence_path": "data/summaries/retrigger-heal-cells-go-w2-20260906.json",
+      "blocking_reason": "Fixed the one concrete committed-file bug the card named: scripts/ops/rollback.bat line 14 used \"wmic os get localdatetime\", which produces nothing on this Windows 11 26200 host, so TIMESTAMP came out blank -- replaced with a PowerShell Get-Date call, verified to produce the expected yyyyMMdd_HHmmss format directly. The wmic-based orientation-step process check and the double-counting fact are both ad hoc loop behavior, not committed script bugs to fix; both facts are already known and this card exists to formalize them, not to change code that does not exist. Confirmed the two daemon-worker scripts a full fix would also touch (check_worker_status.ps1, verify_workers.ps1 raw Get-Process counts) are not referenced anywhere in the active runbook or plan -- legacy from an earlier non-campaign architecture, not touched further. While investigating, found and fixed a MUCH more significant, previously unknown bug: tests/unit/scripts/test_check_worker_health_status.ps1 dot-sources a path that was moved (scripts/check_worker_health.ps1 -> scripts/ops/check_worker_health.ps1) and has been failing outright; fixing the path revealed the TARGET SCRIPT ITSELF could not be parsed at all by Windows PowerShell 5.1 -- confirmed directly via [System.Management.Automation.Language.Parser]::ParseFile, and confirmed the mechanism by writing a UTF-8-BOM copy of identical content, which parsed cleanly: a BOM-less UTF-8 .ps1 file containing non-ASCII bytes (an em dash here) gets misdecoded under the system codepage, corrupting the tokenizer unpredictably depending on where the corruption lands. Scanned every .ps1 file recursively under scripts/: 12 contain non-ASCII bytes, 3 were ACTUALLY unparseable right now (check_reference_sample.ps1, check_worker_health.ps1, verify_workers.ps1) and 9 more were at the same latent risk despite parsing today by chance -- including scripts/ops/mission_watchdog.ps1, this missions own OS-level watchdog. Added a UTF-8 BOM to all 12 (content-preserving, verified every one still parses correctly after). New tests/unit/scripts/test_powershell_scripts_have_bom_when_non_ascii.py enforces this invariant for every .ps1 file under scripts/ going forward (pure static byte check, no PowerShell invocation needed). tests/unit/scripts full run: 187 passed, 77 skipped, 1 pre-existing unrelated failure (the TC-APT-082 runbook-size-cap test correctly re-firing -- the runbook has grown past 40KB again from the peers TC-APT-090/091 field notes, a separate follow-up).",
+      "evidence_path": "tests/unit/scripts/test_powershell_scripts_have_bom_when_non_ascii.py; tests/unit/scripts/test_check_worker_health_status.ps1",
       "commit": null,
-      "last_updated": "2026-09-05T20:55:06+00:00",
+      "last_updated": "2026-09-06T01:13:42+00:00",
       "blocker_type": null
     },
     "TC-APT-087": {

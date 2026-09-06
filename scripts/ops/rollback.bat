@@ -10,9 +10,11 @@ REM   scripts\rollback.bat backup backups\20251121_120000
 
 setlocal enabledelayedexpansion
 
-REM Get timestamp
-for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set datetime=%%I
-set TIMESTAMP=%datetime:~0,8%_%datetime:~8,6%
+REM Get timestamp. TC-APT-086: wmic is not installed on Windows 11 26200, so
+REM the old `wmic os get localdatetime` loop silently set datetime to nothing
+REM and TIMESTAMP came out blank. PowerShell's Get-Date is available on every
+REM Windows version this script targets and needs no external dependency.
+for /f %%I in ('powershell -NoProfile -NonInteractive -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set TIMESTAMP=%%I
 
 REM Parse arguments
 set ACTION=%1

@@ -1,4 +1,4 @@
-# Hugo Translation System - Windows Setup Script
+﻿# Hugo Translation System - Windows Setup Script
 #
 # This script automates the installation and configuration of the Hugo Translation System.
 # It detects GPU capabilities and installs appropriate dependencies (CUDA or CPU mode).

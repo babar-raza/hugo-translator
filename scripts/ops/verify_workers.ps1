@@ -1,4 +1,4 @@
-# Verify-Fix-Verify Worker Test Script
+﻿# Verify-Fix-Verify Worker Test Script
 # Stops existing workers, starts test workers, and monitors execution
 
 param(

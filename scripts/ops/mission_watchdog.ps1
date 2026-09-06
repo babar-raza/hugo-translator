@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   TC-APT-048 + TC-APT-054/055 (v2) -- OS-level supervisor for the
   aspose-org-full-portfolio-translation-20260901 mission (plan §0.4/§0.6).

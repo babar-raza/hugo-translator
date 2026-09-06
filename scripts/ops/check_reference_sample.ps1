@@ -1,4 +1,4 @@
-$basePath = "D:\onedrive\Documents\GitHub\aspose.net\content\reference.aspose.net"
+﻿$basePath = "D:\onedrive\Documents\GitHub\aspose.net\content\reference.aspose.net"
 $families = @('cells', 'words', 'pdf', 'slides', 'email')
 $testLangs = @('en', 'fr', 'de', 'es', 'zh')
 

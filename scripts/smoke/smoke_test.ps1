@@ -1,4 +1,4 @@
-# Hugo Translation System - Smoke Test Script (Windows)
+﻿# Hugo Translation System - Smoke Test Script (Windows)
 #
 # This script runs basic smoke tests to verify the installation is working correctly.
 #

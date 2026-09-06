@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Single-process watchdog for reference.aspose.org governed retranslation.
     Runs ONE NLLB process at a time covering all 36 locales.

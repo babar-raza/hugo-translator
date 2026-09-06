@@ -7,7 +7,7 @@
 $ErrorActionPreference = "Stop"
 
 # Dot-source helpers without running the main body
-$ScriptPath = Join-Path $PSScriptRoot "..\..\..\scripts\check_worker_health.ps1"
+$ScriptPath = Join-Path $PSScriptRoot "..\..\..\scripts\ops\check_worker_health.ps1"
 . $ScriptPath -LoadHelpersOnly
 
 $pass = 0

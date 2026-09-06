@@ -1,4 +1,4 @@
-param([switch]$LoadHelpersOnly)
+﻿param([switch]$LoadHelpersOnly)
 
 # Read-only worker health check with auditable provenance
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
