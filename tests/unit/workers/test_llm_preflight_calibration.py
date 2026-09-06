@@ -170,3 +170,57 @@ def test_percentiles_and_rate_limit_detection():
 def test_translation_prompt_uses_production_template(lang, name):
     prompt = cal.LLMCalibrator.translation_prompt(lang)
     assert f"from English to {name}" in prompt and "Output ONLY the translation" in prompt
+
+
+class TestSustainedRamp:
+    """TC-APT-064: sustained_ramp() holds each level for a real duration, unlike
+    calibrate()'s concurrency_ramp which fires a fixed call count once per level."""
+
+    def test_holds_each_level_for_the_duration_and_multiple_calls_land(self, monkeypatch):
+        c = _calibrator(FakeProvider(), monkeypatch)
+        result = c.sustained_ramp(levels=(2, 4), seconds_per_level=0.08)
+
+        assert result["sustained_stop_reason"] is None
+        assert result["sustained_safe_ceiling"] == 4
+        ramp = {r["level"]: r for r in result["sustained_ramp"]}
+        # FakeProvider sleeps 0.01s/call; holding 0.08s must produce more than one
+        # call per worker, proving this is a sustained hold, not a single burst.
+        assert ramp[2]["calls_attempted"] > 2
+        assert ramp[4]["calls_attempted"] > 4
+        assert ramp[2]["error_rate"] == 0.0 and ramp[4]["error_rate"] == 0.0
+
+    def test_aborts_at_the_last_level_that_stayed_clean(self, monkeypatch):
+        c = _calibrator(FakeProvider(rate_limit_above=2), monkeypatch)
+        result = c.sustained_ramp(levels=(2, 4, 8), seconds_per_level=0.08)
+
+        assert result["sustained_safe_ceiling"] == 2
+        assert result["sustained_stop_reason"].startswith("level 4:")
+        ramp = {r["level"]: r for r in result["sustained_ramp"]}
+        assert ramp[2]["rate_limited"] == 0
+        assert ramp[4]["rate_limited"] > 0
+        assert 8 not in ramp  # never attempted once level 4 breached the abort threshold
+
+    def test_recommendation_is_set_even_without_a_prior_burst_calibrate(self, monkeypatch):
+        c = _calibrator(FakeProvider(), monkeypatch)
+        c.preflight(determinism_n=1)
+        result = c.sustained_ramp(levels=(2,), seconds_per_level=0.05)
+
+        assert c.report.recommendations["manifest_max_parallel_jobs_for_llm"] == result[
+            "sustained_safe_ceiling"
+        ]
+        assert c.report.recommendations["manifest_max_parallel_jobs_for_llm_basis"] == "sustained_ramp"
+
+    def test_sustained_result_overrides_the_burst_ramps_recommendation(self, monkeypatch):
+        c = _calibrator(FakeProvider(rate_limit_above=2), monkeypatch)
+        c.preflight(determinism_n=1)
+        burst = c.calibrate(latency_samples=1, levels=(1, 2, 4), calls_per_level=4, pack_size=2)
+        assert burst["safe_concurrency_ceiling"] == 2  # burst ceiling, pre-override
+
+        c.sustained_ramp(levels=(2,), seconds_per_level=0.05)
+
+        assert c.report.recommendations["manifest_max_parallel_jobs_for_llm"] == 2
+        assert c.report.recommendations["manifest_max_parallel_jobs_for_llm_basis"] == "sustained_ramp"
+        # calibrate()'s own findings stay on the report -- sustained only overrides the
+        # final recommendation field, it doesn't erase the burst evidence.
+        assert c.report.calibration["safe_concurrency_ceiling"] == 2
+        assert "sustained_ramp" in c.report.calibration

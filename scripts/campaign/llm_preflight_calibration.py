@@ -36,6 +36,7 @@ import json
 import os
 import statistics
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -486,6 +487,96 @@ class LLMCalibrator:
         self.report.recommendations = self._recommend(cal)
         return cal
 
+    # ------------------------------------------------------------- sustained (TC-APT-064)
+    def sustained_ramp(
+        self,
+        *,
+        levels: tuple[int, ...] = (16, 32, 48, 64),
+        seconds_per_level: float = 450.0,
+        error_rate_abort_threshold: float = 0.05,
+        rate_limited_abort_threshold: float = 0.02,
+    ) -> dict[str, Any]:
+        """Hold N concurrent in-flight calls for a FIXED WALL-CLOCK DURATION per level.
+
+        `calibrate()`'s concurrency ramp fires exactly `calls_per_level` calls once per
+        level (a burst) -- it proves the endpoint can absorb a momentary spike, not that
+        it holds up under sustained load, which is the plan's explicit distinction
+        ("16 was where the burst ramp *stopped*, not a found ceiling"). Each worker here
+        loops call-after-call for the full window so the level is genuinely held, not
+        just touched. Escalates only while both the error rate and the rate-limited rate
+        stay under threshold; a breach stops the ramp at the last level that held clean
+        (plan SS0.11 item 5 abort criteria), it never forces a higher level through.
+        """
+        results: list[dict[str, Any]] = []
+        stop_reason: str | None = None
+        safe_level = 0
+        for level in levels:
+            deadline = time.monotonic() + seconds_per_level
+            lock = threading.Lock()
+            counters = {"attempted": 0, "ok": 0, "failed": 0, "rate_limited": 0}
+            secs: list[float] = []
+            errors: list[str] = []
+
+            def worker() -> None:
+                while time.monotonic() < deadline:
+                    res = self.call(self.translation_prompt("fr"), long_prose(120))
+                    with lock:
+                        counters["attempted"] += 1
+                        if res.ok:
+                            counters["ok"] += 1
+                            secs.append(res.seconds)
+                        else:
+                            counters["failed"] += 1
+                            if res.rate_limited:
+                                counters["rate_limited"] += 1
+                            if len(errors) < 5:
+                                errors.append(res.error)
+
+            threads = [threading.Thread(target=worker) for _ in range(level)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            attempted = counters["attempted"]
+            error_rate = round(counters["failed"] / attempted, 4) if attempted else 1.0
+            rate_limited_rate = round(counters["rate_limited"] / attempted, 4) if attempted else 0.0
+            entry = {
+                "level": level,
+                "seconds_held": seconds_per_level,
+                "calls_attempted": attempted,
+                "calls_ok": counters["ok"],
+                "calls_failed": counters["failed"],
+                "rate_limited": counters["rate_limited"],
+                "error_rate": error_rate,
+                "rate_limited_rate": rate_limited_rate,
+                **_percentiles(secs),
+                "sample_errors": errors,
+            }
+            results.append(entry)
+            if error_rate > error_rate_abort_threshold or rate_limited_rate > rate_limited_abort_threshold:
+                stop_reason = (
+                    f"level {level}: error_rate={error_rate} "
+                    f"rate_limited_rate={rate_limited_rate} exceeded abort threshold "
+                    f"(error>{error_rate_abort_threshold} or rate_limited>{rate_limited_abort_threshold})"
+                )
+                break
+            safe_level = level
+        payload = {
+            "sustained_ramp": results,
+            "sustained_safe_ceiling": safe_level,
+            "sustained_stop_reason": stop_reason,
+        }
+        self.report.calibration["sustained_ramp"] = results
+        self.report.calibration["sustained_safe_ceiling"] = safe_level
+        self.report.calibration["sustained_stop_reason"] = stop_reason
+        # Sustained evidence supersedes the burst ramp's recommendation (plan TC-APT-064:
+        # "burst calibration is not evidence of a sustained ceiling"), whether or not
+        # calibrate() ran first in this invocation.
+        self.report.recommendations["manifest_max_parallel_jobs_for_llm"] = safe_level
+        self.report.recommendations["manifest_max_parallel_jobs_for_llm_basis"] = "sustained_ramp"
+        return payload
+
     def _recommend(self, cal: dict[str, Any]) -> dict[str, Any]:
         ramp = cal.get("concurrency_ramp", [])
         total_calls = sum(r["calls"] for r in ramp) + sum(
@@ -613,6 +704,24 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="collect throughput numbers even when preflight has hard stops (they stay recorded)",
     )
+    parser.add_argument(
+        "--sustained",
+        action="store_true",
+        help=(
+            "TC-APT-064: after the burst ramp, hold each --sustained-levels concurrency "
+            "level for --seconds-per-level continuously (not a fixed call count) -- the "
+            "plan's distinction between a burst spike and a proven sustained ceiling"
+        ),
+    )
+    parser.add_argument("--sustained-levels", default="16,32,48,64")
+    parser.add_argument(
+        "--seconds-per-level",
+        type=float,
+        default=450.0,
+        help="wall-clock seconds to hold each sustained level (default 450s x 4 levels = 30 min)",
+    )
+    parser.add_argument("--sustained-error-rate-abort", type=float, default=0.05)
+    parser.add_argument("--sustained-rate-limited-abort", type=float, default=0.02)
     args = parser.parse_args(argv)
 
     provider, config = build_provider(
@@ -657,6 +766,25 @@ def main(argv: list[str] | None = None) -> int:
                     "ramp_stop_reason": result["ramp_stop_reason"],
                     "token_cost": result["token_cost"],
                     "batch_packing": result["batch_packing"],
+                },
+                indent=2,
+                default=str,
+            )
+        )
+    if args.sustained:
+        sustained_levels = tuple(int(x) for x in args.sustained_levels.split(",") if x.strip())
+        sresult = cal.sustained_ramp(
+            levels=sustained_levels,
+            seconds_per_level=args.seconds_per_level,
+            error_rate_abort_threshold=args.sustained_error_rate_abort,
+            rate_limited_abort_threshold=args.sustained_rate_limited_abort,
+        )
+        print(
+            json.dumps(
+                {
+                    "sustained_safe_ceiling": sresult["sustained_safe_ceiling"],
+                    "sustained_stop_reason": sresult["sustained_stop_reason"],
+                    "sustained_ramp": sresult["sustained_ramp"],
                 },
                 indent=2,
                 default=str,
