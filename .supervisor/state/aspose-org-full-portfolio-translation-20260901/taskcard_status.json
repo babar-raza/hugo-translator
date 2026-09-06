@@ -1372,11 +1372,11 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [],
   "wave_scale": {
-    "value": 2,
-    "previous": 1,
-    "stepped_at": "2026-09-06T11:45:00+00:00",
-    "decision": "STEP UP 1 -> 2, per plan SS0.9/TC-APT-080",
-    "trigger": "email/net wave closed at 25/25 = 100% (>=80% threshold); RECURRENCE gate clear; KPI 94 >= floor 25 -- all three step-up conditions held simultaneously",
+    "value": 4,
+    "previous": 2,
+    "stepped_at": "2026-09-06T12:25:00+00:00",
+    "decision": "STEP UP 2 -> 4 per plan SS0.9/TC-APT-080",
+    "trigger": "wave2 closed at 71/74 attempted (95.9%, aggregating email/net recovery + email/cpp + email/python) >=80%; RECURRENCE gate clear; KPI 165 >= floor 25",
     "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
   },
   "capacity_clause": {
