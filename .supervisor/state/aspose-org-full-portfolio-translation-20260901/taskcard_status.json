@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-06T09:35:00.000000+00:00",
+  "updated_at": "2026-09-06T10:20:00.000000+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 7,
+  "wake_count": 8,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1335,7 +1335,7 @@
       "plan_ref": "SS0.10/SS0.11 revisions 17-18"
     },
     "TC-APT-100": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "gate": 6,
       "title": "Mask a brand-navigation-label LINK as ONE whole span (bracket+label+tail), not three adjacent placeholders -- closes the wrap-before-link determiner defect TC-APT-036 did not",
       "depends_on": [
@@ -1343,10 +1343,10 @@
         "TC-APT-087"
       ],
       "owner": "loop",
-      "blocking_reason": "Retrigger running: PID 95012, logs/heal-cells-mgmt-retry3_launcher.log, 14 langs on cells-spreadsheet-management-go. Check receipts/log next wake, review whatever completed, commit approved cells, then do RECURRENCE step 2 evidence (reverify the exact original file/langs the heal tickets named) before closing DONE.",
-      "evidence_path": "config/site_profiles/blog.aspose.org.yaml (new preserve_pattern); live extraction probe showed body.paragraph[14] source_text collapse from 3 adjacent placeholders to 1; live debug-harness retranslation of pl (article correctly omitted, Polish has no articles) and nl (V2 inversion now correct: \"vereist, is de [link]\") both clean at the target spot -- verification only, not governed campaign output (discarded, not committed).",
-      "commit": null,
-      "last_updated": "2026-09-06T09:05:00.000000+00:00",
+      "blocking_reason": null,
+      "evidence_path": "config/site_profiles/blog.aspose.org.yaml (new preserve_pattern); data/summaries/review-gate5-cells-mgmt-retry5-20260906.json (14/14 languages confirmed clean at the exact original defect position, 4-reviewer full-body read); data/campaigns/reverification_receipts.jsonl (14 rows); committed content/blog.aspose.org/cells/go/cells-spreadsheet-management-go/index.{cs,fa,he,id,nl,pl,ru,th,tr,uk,zh}.md (e7673eabce)",
+      "commit": "1ca263f",
+      "last_updated": "2026-09-06T10:20:00.000000+00:00",
       "blocker_type": null,
       "plan_ref": "RECURRENCE ESCALATION step 1 (fix) for heal-cells-mgmt-go-retry2-wrap-link-* tickets"
     }
@@ -1367,8 +1367,8 @@
       ]
     }
   },
-  "last_wake_summary": "Root-caused the wrap-before-link determiner defect precisely via live extraction instrumentation (TC-APT-087 methodology): the model was receiving 3 adjacent opaque placeholders (bracket+brand-label+url-tail) with ZERO visible text between \"the\" and the next real prose -- an interaction bug where TC-APT-087 (masking the whole brand-nav-label as one span) landed AFTER TC-APT-036 (which assumed link text stays visible) and silently defeated it. Fix (TC-APT-100): one new preserve_pattern masks the WHOLE \"[label](url)\" as a single placeholder instead of three. Verified live (debug-harness only, not committed): pl now correctly omits the article (Polish has none), nl now correctly applies V2 inversion (\"vereist, is de [link]\"). Retrigger launched as a real detached process (PID 95012) for all 14 affected languages through the governed campaign_runner path; check next wake.",
-  "cells_committed_total": 59,
+  "last_wake_summary": "heal-cells-mgmt-retry5 (5th launch attempt; first 4 failed on process/governance issues -- stale untracked outputs, then twice on translator-repo dirty/SHA-drift from my own mid-flight state edits -- not translation quality) completed clean: 14/14 accepted at the automated gate, 0 failures. 4-reviewer full-body review: 11/14 APPROVE (cs,fa,he,id,nl,pl,ru,th,tr,uk,zh), committed e7673eabce. TC-APT-100 CONFIRMED WORKING in all 14/14 languages retried without exception -- ZERO recurrences of the wrap-before-link determiner bug. TC-APT-100 -> DONE. 3 rejects (ja,ro,vi) are each a different, unrelated fresh defect, heal-ticketed (heal-cells-mgmt-go-retry3-*), TM purged (75 entries). 14 old wrap-link tickets -> FIXED_VERIFIED. Page total: 18/23 languages now committed. cells_committed_total 59 -> 70.",
+  "cells_committed_total": 70,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1405,19 +1405,6 @@
       ],
       "purpose": "RECURRENCE step 3 for the soft-wrap class: retrigger the 25 quarantined cells of introducing-cells-foss-go, permitted under the capacity clause as an already-fixed page",
       "next_wake_action": "check receipts; measure the soft-wrap signature on regenerated cells against the 16 tickets of that class"
-    },
-    {
-      "campaign_id": "heal-cells-mgmt-retry4",
-      "launcher_pid": 99040,
-      "log": "logs/heal-cells-mgmt-retry4_launcher.log",
-      "launched_at": "2026-09-06T09:35:00+00:00",
-      "taskcards": [
-        "TC-APT-100",
-        "TC-APT-036"
-      ],
-      "purpose": "RECURRENCE step 2/3: retrigger 14 langs of cells-spreadsheet-management-go with the TC-APT-100 whole-link-placeholder fix. Third launch attempt: retry3 (PID 95012) failed on unreceipted-dirty-output (stale untracked candidates, fixed with --existing replace); retry3b (PID 57468) failed on translator-repo SHA drift because state/runbook commits landed after the manifest pinned its SHA but before the children actually ran verify_environment. This build used --inventory-output to a scratch path (avoids the manifest-builder-dirties-the-tree side effect) and launched with a clean, fully-committed tree and NO further tracked-file commits until this run is checked -- confirmed 3 child PIDs actively accumulating CPU (translating), past verify_environment.",
-      "manifest": "data/campaigns/heal-cells-mgmt-retry4/launch.yaml",
-      "next_wake_action": "Check the log/receipts; verify the wrap-before-link spot is clean in each accepted language via full-body review against config/review_rubric.yaml, citing the exact heal-cells-mgmt-go-retry2-wrap-link-<lang> ticket it closes; commit whatever passes. ja/tr may still fail on the separate product-name-interleaving ticket -- expected, not a fix regression. LESSON: do not commit any git-tracked hugo-translator file between building a campaign manifest and confirming its children are past verify_environment (SHA/dirty-state is pinned at build time)."
     }
   ],
   "wave_scale": {
