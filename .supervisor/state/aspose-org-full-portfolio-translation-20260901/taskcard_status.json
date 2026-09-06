@@ -1372,12 +1372,12 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "wave4-llm",
-      "pid": 25756,
-      "launched_at": "2026-09-06T14:35:00+00:00",
+      "run_id": "wave4-llm-retry3",
+      "pid": 52603,
+      "launched_at": "2026-09-06T14:50:51+00:00",
       "manifest": "data/campaigns/wave4-llm/launch.yaml",
-      "log": "logs/wave4-llm_launcher.log",
-      "note": "TC-APT-099 wave4 (wave_scale=4): cells/java, cells/net, cells/python, cells/typescript, professionalize_llm primary, 22 langs x 4 pages = 88 cells, max-workers=4. Pages claimed in claims.jsonl. After this exits, launch wave4-m2m (hu/ja/ro) in isolation -- never concurrently with this PID (fp-wave3-m2m-crash-20260906.json). Do not re-launch while this PID is alive."
+      "log": "logs/wave4-llm-retry3_launcher.log",
+      "note": "TC-APT-099 wave4 (wave_scale=4): cells/java, cells/net, cells/python, cells/typescript, professionalize_llm primary, 22 langs x 4 pages = 88 cells. Attempt 1 (max-workers=4) failed instantly on ALL 4 children with MemoryError inside campaign_manifest.fingerprint_files() hashing data/tm/l2.lmdb/data.mdb (a 4GiB pre-allocated LMDB file) concurrently -- not yet root-caused (system had 16GB free at the time, so likely 4-way concurrent full-file-hash contention rather than true exhaustion; OneDrive-synced folder is a plausible contributing factor, not confirmed). Retry with max-workers=2 passed the startup check (no instant error) and is running. If this ALSO fails with MemoryError, that is failure 2 of the same root cause -- stop and write a SS10.1 first-principles record before a 3rd attempt, per plan. Pages claimed in claims.jsonl. After this exits, launch wave4-m2m (hu/ja/ro) in isolation -- never concurrently with this PID (fp-wave3-m2m-crash-20260906.json). Do not re-launch while this PID is alive."
     }
   ],
   "wave_scale": {
