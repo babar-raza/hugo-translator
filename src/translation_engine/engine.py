@@ -108,39 +108,17 @@ _FRONTMATTER_TECHNICAL_SIGNAL_RE = re.compile(
     r")(?![A-Za-z0-9_.])"
 )
 
-# TC-APT-090 (2026-09-06). Calibrated on the shipped corpus, 19 locales and 68
-# samples per length: langdetect accuracy on the signal residue is 66.2% at 6
-# alphabetic characters, 88.2% at 20, 91.2% at 25-30, 98.5% at 40 and 100% at
-# 70. Its confidence does NOT fall when it is wrong -- 87-91% of wrong answers
-# exceed the 0.80 threshold and the median confidence when wrong is 1.000 -- so
-# no confidence cut can help and length is the only usable lever.
-#
-# Below this floor the residue is page scaffolding rather than prose: on
-# introducing-cells-foss-rust the ENGLISH SOURCE seoTitle strips to
-# "for - Open-Source Excel Crate for" and reads en 0.70 / ro 0.30, which is why
-# cs, id, it, hi and ru were all rejected on that one page as Romanian while
-# genuine Romanian passed. The verdict tracked the page, not the translation.
-MIN_FRONTMATTER_SIGNAL_ALPHA = 40
-
-# Below the floor the guard still has a job -- catching a field that was never
-# translated -- but it must do it without naming a language. An untranslated
-# field's residue IS the source residue, so compare them directly.
-#
-# The threshold is exact identity, chosen from the 5,753 shipped pairs this rule
-# actually judges (residue below the floor; median similarity 0.308, p95 0.741).
-# False rejections of correct cells by threshold: 0.90 -> 76 (1.32%),
-# 0.95 -> 43, 0.98 -> 25, and 1.00 -> 25. The curve flattens at 0.98 because 25
-# correct cells have a residue byte-identical to the source -- legitimate
-# borrowings such as a residue that is itself a kept English term. Since nothing
-# below 1.0 buys any accuracy, take the value whose premise is literally true:
-# reject only when the text is unchanged.
-#
-# A first attempt used 0.90 on a corpus-wide 0.6% figure. That was wrong: the
-# aggregate included the long residues this rule never sees, and on
-# introducing-cells-foss-rust it would have rejected the reviewed and shipped de
-# (0.939) and nl (0.912) cells -- 2 of 23 on the page where the guard actually
-# fires. Measure the population the rule judges, not the corpus.
-FRONTMATTER_UNTRANSLATED_SIMILARITY = 1.0
+# TC-APT-090: the thresholds live in a leaf module because the write-time
+# verification layer enforces the same rule and previously carried a COPY of
+# engine.py's floor. Fixing one layer left the other rejecting the same cells,
+# which cost two retrigger cycles. Re-exported here so existing importers of
+# engine.MIN_FRONTMATTER_SIGNAL_ALPHA keep working.
+from .frontmatter_signal import (  # noqa: E402
+    FRONTMATTER_UNTRANSLATED_SIMILARITY,
+    MIN_FRONTMATTER_SIGNAL_ALPHA,
+    is_untranslated as _residue_is_untranslated,
+    residue_similarity as _residue_similarity,
+)
 
 
 def _frontmatter_script_metrics(text: str, target_lang: str) -> dict[str, int | float]:
@@ -2221,10 +2199,8 @@ class TranslationEngine:
                 source_value = source_fields.get(field)
                 if signal_alpha_count < MIN_FRONTMATTER_SIGNAL_ALPHA and source_value:
                     source_signal = _frontmatter_language_signal_text(source_value.strip())
-                    similarity = _difflib.SequenceMatcher(
-                        None, source_signal.strip(), signal_text.strip()
-                    ).ratio()
-                    if similarity >= FRONTMATTER_UNTRANSLATED_SIMILARITY:
+                    similarity = _residue_similarity(source_signal, signal_text)
+                    if _residue_is_untranslated(source_signal, signal_text):
                         issues.append(
                             _ValIssue(
                                 severity=_ValSeverity.ERROR,
