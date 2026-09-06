@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T23:09:02.227311+00:00",
+  "generated_at": "2026-09-06T23:11:12.760217+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -37,5 +37,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "TC-APT-101 landed+committed (d773422): FIX-C no longer doubles a substituted terminal punctuation mark. Detached retrigger heal-recur-punct-fix-pdfdocmgmt-cpp-20260907 (pid 88592) running against pdf-document-management-in-cpp es/pl/th. Next wake: check logs/heal-recur-punct-fix-pdfdocmgmt-cpp-20260907_launcher.log + candidate files, review, commit or re-ticket. ro/fa word-gluing tickets in the same class label are a DIFFERENT mechanism (placeholder-start spacing, not punctuation doubling) -- still open, needs live instrumentation, not yet attempted. No new Track-A page until this class's open tickets are resolved (RECURRENCE ESCALATION)."
+  "next_action": "TC-APT-101 committed (d773422). Retrigger take 2: heal-recur-punct-fix-pdfdocmgmt-cpp-20260907b (pid 87104) running against pdf-document-management-in-cpp es/pl/th, manifest rebuilt against current clean HEAD after take-1 failed on SHA drift. Next wake: check log + candidate files, review for the doubled '.:' defect being gone, commit or re-ticket. ro/fa word-gluing tickets in the same class label are a DIFFERENT mechanism (placeholder-start spacing) -- still open, not attempted. No new Track-A page until this class's open tickets are resolved (RECURRENCE ESCALATION)."
 }
