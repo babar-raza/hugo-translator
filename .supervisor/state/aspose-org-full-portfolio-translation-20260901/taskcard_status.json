@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-06T10:20:00.000000+00:00",
+  "updated_at": "2026-09-06T10:53:00.000000+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 8,
+  "wake_count": 9,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1367,46 +1367,10 @@
       ]
     }
   },
-  "last_wake_summary": "heal-cells-mgmt-retry5 (5th launch attempt; first 4 failed on process/governance issues -- stale untracked outputs, then twice on translator-repo dirty/SHA-drift from my own mid-flight state edits -- not translation quality) completed clean: 14/14 accepted at the automated gate, 0 failures. 4-reviewer full-body review: 11/14 APPROVE (cs,fa,he,id,nl,pl,ru,th,tr,uk,zh), committed e7673eabce. TC-APT-100 CONFIRMED WORKING in all 14/14 languages retried without exception -- ZERO recurrences of the wrap-before-link determiner bug. TC-APT-100 -> DONE. 3 rejects (ja,ro,vi) are each a different, unrelated fresh defect, heal-ticketed (heal-cells-mgmt-go-retry3-*), TM purged (75 entries). 14 old wrap-link tickets -> FIXED_VERIFIED. Page total: 18/23 languages now committed. cells_committed_total 59 -> 70.",
-  "cells_committed_total": 70,
+  "last_wake_summary": "heal-cells-mgmt-jaro-m2m (ja,ro via m2m100 primary) + heal-cells-mgmt-vi-llm (vi LLM resample) both completed. ja: m2m100 hard-failed frontmatter reconstruction x3 (ValueError frontmatter_segment_not_applied), LLM escalation succeeded 44/44 gates, reverified against the exact retry3-ja defect (doubled terminator '.:' in Add-a-Formula section, now a single colon) -- committed fc01a96cfc, ticket FIXED_VERIFIED. ro: m2m100 hard-rejected (StructureValidator, source_count=37 vs translation_count=23), LLM escalation passed the automated gate but re-review found the Ghiza->Ghid fix landed while a DIFFERENT residual defect in the SAME frontmatter summary field (wrong noun 'formularilor' instead of 'formulelor') survived -- REJECTED, not committed, ticket stays OPEN. vi: LLM resample did not fix the workbook/So-lam-viec terminology-consistency defect (recurred in both description and summary, now consistent with each other but inconsistent with body) -- REJECTED, not committed, ticket stays OPEN, next attempt should try m2m100 since vi has never had a clean pass from either model on this specific defect. TM purged (50 entries, ro+vi). Page total: 19/23 languages now committed. Stale active_detached_runs entries (gate5-words-doc-r3/r4, heal-cells-go-w1 -- all 3 processes confirmed gone) cleared; their outcomes were already captured in prior commits per 2026-09-06 field notes.",
+  "cells_committed_total": 71,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "campaign_id": "gate5-words-doc-r3",
-      "launcher_pid": 86168,
-      "log": "logs/gate5-words-doc-r3_launcher.log",
-      "launched_at": "2026-09-05T17:08:34+00:00",
-      "session": "9885eb20",
-      "taskcards": [
-        "TC-APT-073",
-        "TC-APT-069"
-      ],
-      "purpose": "LIVE-TREE retrigger of all 11 review-rejected locales: RECURRENCE step 2 + step 3",
-      "next_wake_action": "measure U+2011/U+00AD (expect 0, was 215/1), check the line-503 delimiter in ar/fa/zh, check whether 'Document Object Model' is preserved in English (first run ever to carry the TC-APT-069 mask), then review whatever the campaign accepts and commit what passes"
-    },
-    {
-      "campaign_id": "gate5-words-doc-r4",
-      "launcher_pid": 48884,
-      "log": "logs/gate5-words-doc-r4_launcher.log",
-      "launched_at": "2026-09-05T18:33:25+00:00",
-      "taskcard": "TC-APT-069",
-      "purpose": "RECURRENCE step 2 for the terminology gate + retry-preservation instruction",
-      "acceptance": "governed term 4/4 in all 8 locales (baseline 20/32); nl/sv are untouched controls",
-      "next_wake_action": "measure the term per field per locale; also confirm the fields are still translated (guard against over-preservation)"
-    },
-    {
-      "campaign_id": "heal-cells-go-w1",
-      "launcher_pid": 66352,
-      "log": "logs/heal-cells-go-w1_launcher.log",
-      "launched_at": "2026-09-05T19:54:27+00:00",
-      "taskcards": [
-        "TC-APT-042",
-        "TC-APT-075"
-      ],
-      "purpose": "RECURRENCE step 3 for the soft-wrap class: retrigger the 25 quarantined cells of introducing-cells-foss-go, permitted under the capacity clause as an already-fixed page",
-      "next_wake_action": "check receipts; measure the soft-wrap signature on regenerated cells against the 16 tickets of that class"
-    }
-  ],
+  "active_detached_runs": [],
   "wave_scale": {
     "value": 1,
     "previous": 2,
