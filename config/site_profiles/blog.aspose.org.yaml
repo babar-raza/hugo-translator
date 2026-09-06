@@ -189,6 +189,19 @@ body:
   # only protected "Aspose" itself, leaving ".Cells"/".3D" etc. adjacent
   # and unprotected, which could still get mistranslated/detached.
   - \bAspose(?:\.[A-Za-z0-9][A-Za-z0-9.]*)?\b
+  # TC-APT-099 wave3/wave4 (2026-09-06): m2m100_418m deterministically mistranslates
+  # the bare platform name "TypeScript" into Romanian as "tipografe" ("printing
+  # houses") -- a real Romanian word but a meaning-changing substitution (RB-004),
+  # not baseline MT variance. Reproduced identically on two independent, unrelated
+  # source pages (3d/typescript/_index.md and cells/typescript/_index.md), same
+  # position ("... FOSS pentru {platform}"), same wrong word, confirming a
+  # deterministic model behavior rather than sampling noise. No other bare platform
+  # name used across this same title template (Java, .NET, Python, C++, Go, Rust)
+  # has ever shown an analogous failure across dozens of language pairs, so this is
+  # scoped narrowly to the one proper noun with confirmed evidence rather than
+  # guessed broadly. See data/summaries/review-wave3-3d-20260906.json and the
+  # wave4-m2m recurrence.
+  - \bTypeScript\b
   # HT-QUALITY-GATES-001 Part 22 (plan 5.3, incremental scope): protect
   # hyphenated/slashed format & standard codes (UPC-E, EAN-13, PDF/A,
   # ISO-8859-1, UTF-8, AES-256) embedded in prose -- confirmed real
