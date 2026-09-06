@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-06T03:29:53.183532+00:00",
+  "generated_at": "2026-09-06T05:41:56.648168+00:00",
   "stamps": {
-    "loop_prompt_version": "10.6 (2026-09-06)",
+    "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 16
   },
   "open_obligations": [
@@ -38,5 +38,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "TC-APT-092 landed (2724de9); next BLITZ critical path: TC-APT-096 (LMDB nested-txn fix)"
+  "next_action": "TC-APT-094 landed (71ea7d6); BLITZ critical path 092->096->094 complete. Next: TC-APT-099 (blitz waves) or the hour-0 sustained-load probe if not yet run."
 }
