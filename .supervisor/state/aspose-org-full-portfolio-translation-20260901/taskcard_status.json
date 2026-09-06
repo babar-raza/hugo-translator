@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-06T10:53:00.000000+00:00",
+  "updated_at": "2026-09-06T11:40:00.000000+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 9,
+  "wake_count": 10,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1367,8 +1367,8 @@
       ]
     }
   },
-  "last_wake_summary": "heal-cells-mgmt-jaro-m2m (ja,ro via m2m100 primary) + heal-cells-mgmt-vi-llm (vi LLM resample) both completed. ja: m2m100 hard-failed frontmatter reconstruction x3 (ValueError frontmatter_segment_not_applied), LLM escalation succeeded 44/44 gates, reverified against the exact retry3-ja defect (doubled terminator '.:' in Add-a-Formula section, now a single colon) -- committed fc01a96cfc, ticket FIXED_VERIFIED. ro: m2m100 hard-rejected (StructureValidator, source_count=37 vs translation_count=23), LLM escalation passed the automated gate but re-review found the Ghiza->Ghid fix landed while a DIFFERENT residual defect in the SAME frontmatter summary field (wrong noun 'formularilor' instead of 'formulelor') survived -- REJECTED, not committed, ticket stays OPEN. vi: LLM resample did not fix the workbook/So-lam-viec terminology-consistency defect (recurred in both description and summary, now consistent with each other but inconsistent with body) -- REJECTED, not committed, ticket stays OPEN, next attempt should try m2m100 since vi has never had a clean pass from either model on this specific defect. TM purged (50 entries, ro+vi). Page total: 19/23 languages now committed. Stale active_detached_runs entries (gate5-words-doc-r3/r4, heal-cells-go-w1 -- all 3 processes confirmed gone) cleared; their outcomes were already captured in prior commits per 2026-09-06 field notes.",
-  "cells_committed_total": 71,
+  "last_wake_summary": "TC-APT-099 blitz-wave: first genuinely fresh Tier-1a page since the RECURRENCE gate cleared -- content/blog.aspose.org/email/net/_index.md, a minimal title-only page. Split-model routing per plan SS6.1 (22 langs professionalize_llm, hu/ja/ro m2m100_418m) both accepted 100% at the automated gate (25/25, 0 failures). Reviewed directly (entire translatable surface is one title field across 25 tiny files): all clean -- product name stays contiguous, correct natural grammar per language, linkTitle correctly left untranslated. Committed fc101aa230 -- FULL PAGE-COMPLETE, all 25 languages in one commit. pages_newly_live_total 0 -> 1. cells_committed_total 71 -> 96.",
+  "cells_committed_total": 96,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [],
   "wave_scale": {
@@ -1389,5 +1389,6 @@
     "released_at": "2026-09-05T23:16:13+00:00",
     "release_reason": "Stale-state fix, found while orienting for TC-APT-077: logs/watchdog_state.json reads kpi_cells_24h=90 (floor 25), kpi_breach_open=false. The clauses own AND condition (TC-APT-043..047 unlanded AND KPI below floor) requires BOTH; KPI has not been below floor for a while (the peer already acted on this correctly for wave-cells-rust-w1, citing 'capacity clause released, KPI 43' -- this field just never caught up to that decision). TC-APT-046/047 remain unlanded, so a future KPI dip re-engages it automatically once checked against watchdog_state.json again."
   },
-  "loop_prompt_version": "10.7 (2026-09-06)"
+  "loop_prompt_version": "10.7 (2026-09-06)",
+  "pages_newly_live_total": 1
 }
