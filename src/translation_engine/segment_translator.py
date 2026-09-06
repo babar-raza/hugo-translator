@@ -41,31 +41,38 @@ class _RetryFeedbackModel:
         self._feedback = feedback
 
     def translate(self, texts, src_lang: str, tgt_lang: str, **kwargs):
+        kwargs.setdefault("retry_feedback", self._feedback)
         return self._backend.translate_with_retry_feedback(
             texts,
             src_lang,
             tgt_lang,
-            retry_feedback=self._feedback,
             **kwargs,
         )
 
     def translate_with_token_counts(self, texts, src_lang: str, tgt_lang: str, **kwargs):
+        kwargs.setdefault("retry_feedback", self._feedback)
         return self._backend.translate_with_token_counts_and_retry_feedback(
             texts,
             src_lang,
             tgt_lang,
-            retry_feedback=self._feedback,
             **kwargs,
         )
 
     def translate_with_context(self, texts, src_lang: str, tgt_lang: str, **kwargs):
         # Keep campaign retry guidance attached to the field-aware LLM path
         # used for frontmatter escalation as well as to ordinary batches.
+        # setdefault (not an unconditional override): a caller that already
+        # built its own more specific retry_feedback -- e.g. TC-APT-042's
+        # cross-field frontmatter repair, which names the exact residual
+        # phrase and the sibling field's translation -- must win, not crash
+        # with "got multiple values for keyword argument 'retry_feedback'"
+        # (found live 2026-09-07, wave8: every retry pass silently ate the
+        # TypeError and burned ~2 minutes re-hitting it).
+        kwargs.setdefault("retry_feedback", self._feedback)
         return self._backend.translate_with_context(
             texts,
             src_lang,
             tgt_lang,
-            retry_feedback=self._feedback,
             **kwargs,
         )
 
