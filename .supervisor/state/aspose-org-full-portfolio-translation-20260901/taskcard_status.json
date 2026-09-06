@@ -866,10 +866,10 @@
       "title": "Sustained-load calibration, THEN the schema-ceiling raise -- burst calibration is not evidence of a sustained ceiling. Owns the real throughput ceiling; the measured 1.94x page-vs-page / 3.52x aggregate sharding numbers are directional only.",
       "depends_on": [],
       "owner": "session-10942b65",
-      "blocking_reason": "Harness built and test-first verified (commit bcb0558): LLMCalibrator.sustained_ramp() holds each concurrency level for a real wall-clock window via looping worker threads, instead of calibrate()'s existing concurrency_ramp which fires a fixed call count once per level (a burst, not sustained evidence, exactly the gap this taskcard exists to close). Escalates 16/32/48/64 only while error rate and rate-limited rate stay under threshold; result overrides the burst ramp's manifest_max_parallel_jobs_for_llm recommendation. NOT YET RUN against the live professionalize_llm endpoint: a real 30-minute, escalating-to-64-concurrent run against a paid production API has real cost and provider-standing risk that a code change does not, so pausing for an explicit operator go-ahead before spending that budget rather than launching it unprompted inside an interactive continuation of the mission.",
+      "blocking_reason": "Real sustained probe launched 2026-09-06 as a detached OS process: PID 52040, cmd \"llm_preflight_calibration --sustained --skip-calibration\", log logs/tc064_sustained_probe_20260906.log, output data/benchmark_corpus/results/professionalize_llm_calibration_tc064_sustained_20260906.json. Expected duration ~30-35 min (preflight + 4 levels x 450s). Check the log/output file on next wake before launching a second one -- do not relaunch while PID 52040 is still alive.",
       "evidence_path": "scripts/campaign/llm_preflight_calibration.py (sustained_ramp method + --sustained CLI flags); tests/unit/workers/test_llm_preflight_calibration.py (TestSustainedRamp, 4 new tests) -- full suite 12 passed.",
       "commit": "bcb0558",
-      "last_updated": "2026-09-06T06:05:00.000000+00:00",
+      "last_updated": "2026-09-06T06:35:00.000000+00:00",
       "blocker_type": null,
       "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
     },
