@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 10.5 (2026-09-06)`
+`loop_prompt_version: 10.6 (2026-09-06)`
 
 ## 0. On reload — before anything else
 
@@ -92,6 +92,35 @@ memory of a previous iteration.
    `git -C D:/onedrive/Documents/GitHub/aspose.org`; `litellm_key` is an OS env var — never print it.
 
 ## 3. Select (Track A first; Track B at most half the iteration while Track A has eligible cells)
+
+- **BLITZ CONTRACT (v10.6, plan §0.11 -- OPERATOR-CHOSEN, overrides every other selection rule
+  until TC-APT-099 completes):** the operator explicitly authorized ship-then-audit for PROVEN
+  cohorts only. (1) FIRST ACTION, before any blitz wave: the hour-0 sustained-load probe (30 min
+  at 16/32/48/64 concurrent, plan §0.11 item 3) plus TC-APT-096's LMDB check -- report the
+  measured sustained ceiling and the resulting 24h/48h band to the operator immediately via the
+  wake summary. (2) PROVEN cohorts (17 languages >=80% measured acceptance, from TC-APT-092's
+  backfilled cohort state) ship GATES-ONLY: the 44-gate zero-defect battery still blocks; the
+  full-body review is DEFERRED -- committed files carry `translation_review: pending` frontmatter
+  and enter the trailing 1-in-5 review/heal queue. (3) The tail (uk/pt/ja/zh/hi/ko + anything a
+  gate flags) keeps review-first, unchanged. (4) Critical path jumps every queue: TC-APT-092
+  (cohort backfill) -> 096 (LMDB nested-txn fix, test-first) -> 094 (GPU lane + slot semaphore +
+  family claims) -> 099 (blitz waves: non-reference sites first, then reference families by
+  measured TM hit-rate). (5) Hourly burn-rate checkpoints against the chosen band; two misses
+  step 24h->48h with a recorded reason. (6) ABORT (stop, fix, resume from receipts -- never ship
+  through): provider throttling beyond retry budget; gate-failure rate above pre-blitz baseline;
+  disk/VRAM/LMDB limits. (7) Per-cohort revocation: a cohort whose trailing review shows a
+  materially worse defect rate than its measured band drops back to review-first without
+  stopping the rest. Full design: plan §0.10 (cohort ladders, sampling determinism, mixed-page
+  tail-non-blocking delivery, single-committer handoff) and §0.11 (the contract).
+- **COHORT LADDERS (v10.6, plan §0.10/TC-APT-093): the global wave_scale is RETIRED.** Scale and
+  acceptance are tracked per (language, content-class, model) cohort: PROVEN -> family-scale
+  waves, 1-in-5 manifest-stamped sampling (hash(source_path, lang, wave_seed) % 5 == 0 -- never
+  worker-chosen); PROVISIONAL (60-80%) -> per-cohort doubling ladder, full review; PROBATION
+  (<60%) -> single-cell, 100% review, root-cause per reject. Tier pinned into the manifest at
+  wave launch. Tier-2 heal retriggers count toward NO ladder. Mixed-cohort pages ship their
+  PROVEN+PROVISIONAL languages; tail cells become heal tickets and never block page delivery.
+  THROUGHPUT_BREACH actuator: demote the worst-performing active cohort one tier + a §10.1
+  strategy record (global halving no longer exists).
 
 Track A — ship translated pages:
 - Scope comes from the work ledger in STRICT TIER ORDER (plan §17.1.0): **Tier 1a** pages with no
@@ -318,6 +347,7 @@ most 3 minutes out — never longer**, regardless of how long the current step i
 (operator rule, v8.2), and yield. A long step is resumed across wakes (§4 item 7), not waited for.
 
 ## L. Field notes (append-only, one dated line each; facts, not rules)
+- 2026-09-06 (v10.6): plan revisions 17+18 mirrored (§0.10 cohort industrialization, §0.11 the operator-chosen middle-path blitz). TC-APT-092..099 registered. Global wave_scale retired in favor of per-cohort ladders; BLITZ CONTRACT is the top selection priority until 099 completes -- hour-0 sustained probe FIRST, then critical path 092->096->094->099. Measured cohort evidence backing the split: 17 languages >=80% (tr/he/el/ar at 100%), tail uk/pt/ja/zh/hi/ko; inventory 117,059 cells over 8,370 pages, 91% in templated reference.aspose.org; qualification_ledger.py and work_claims.py were implemented-but-unwired (TC-APT-098 audits for more).
 
 TC-APT-082 (2026-09-06): every entry recorded before this line moved to
 `project/loop-prompt-archive.md` to bring this file back under its 40KB hard
