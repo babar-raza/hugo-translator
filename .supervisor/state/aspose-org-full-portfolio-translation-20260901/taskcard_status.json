@@ -1372,12 +1372,12 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "wave6-llm",
-      "pid": 55481,
-      "launched_at": "2026-09-06T17:01:30+00:00",
-      "manifest": "data/campaigns/wave6-llm/launch.yaml",
-      "log": "logs/wave6-llm_launcher.log",
-      "note": "TC-APT-099 wave6 (wave_scale=4): slides/cpp, slides/java, slides/net, slides/python (title-only shape, same proven pattern as 3d/cells/pdf). professionalize_llm primary, 22 langs x 4 pages = 88 cells, max-workers=2. Pages claimed. After this exits, launch wave6-m2m (hu/ja/ro) in isolation -- never concurrently with this PID (fp-wave3-m2m-crash-20260906.json)."
+      "run_id": "wave6-m2m",
+      "pid": 7710,
+      "launched_at": "2026-09-06T17:15:03+00:00",
+      "manifest": "data/campaigns/wave6-m2m/launch.yaml",
+      "log": "logs/wave6-m2m_launcher.log",
+      "note": "TC-APT-099 wave6: slides/cpp, slides/java, slides/net, slides/python LLM shard landed clean, 88/88 (88818544fa). This run: m2m100_418m for hu/ja/ro (12 cells), launched in isolation only after wave6-llm's process fully exited. Do not launch any concurrent GPU-bound/LLM campaign while this PID is alive."
     }
   ],
   "wave_scale": {
