@@ -88,7 +88,7 @@ def signature_of(issue) -> str:
     return re.sub(r"\s+", " ", message).strip()
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=0, help="0 = whole corpus")
     parser.add_argument("--out", default="data/summaries/tc-apt-081-fp-sweep.json")
@@ -100,7 +100,7 @@ def main() -> int:
              "candidate, whereas a flag on the legacy corpus may be a real defect that predates the "
              "standard.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     repo = Path(args.repo)
     pairs = pair_up(tracked_markdown(repo))
@@ -112,6 +112,21 @@ def main() -> int:
         }
         pairs = [p for p in pairs if p[1] in wanted]
         print(f"restricted to {len(pairs)} of {len(wanted)} requested paths")
+        if wanted and not pairs:
+            # TC-APT-089: this sweep only enumerates git-TRACKED content (`tracked_markdown`
+            # runs `git ls-files`). Pointing --paths-from at uncommitted output silently drops
+            # every requested path here, and the sweep below then reports "swept 0 shipped
+            # cells" / "distinct FP classes: 0" with exit code 0 -- a vacuous pass a caller
+            # checking only the exit code (or skimming "0 FP classes") would read as "clean,"
+            # when in fact nothing was ever checked. Refuse instead of reporting it as a pass.
+            print(
+                "ERROR: every requested --paths-from path was dropped by this restriction. "
+                "Commonly this means the paths are uncommitted (this sweep only enumerates "
+                "git-tracked content) or misspelled/mis-normalized -- see TC-APT-089. "
+                "This is NOT a clean pass; refusing to report a vacuous 'distinct FP classes: 0'.",
+                file=sys.stderr,
+            )
+            return 1
     if args.limit:
         step = max(1, len(pairs) // args.limit)
         pairs = pairs[::step][: args.limit]

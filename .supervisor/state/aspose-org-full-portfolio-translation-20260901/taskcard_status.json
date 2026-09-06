@@ -1191,15 +1191,15 @@
       "blocker_type": null
     },
     "TC-APT-089": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
       "owner": "loop",
       "title": "TC-APT-081's shipped-corpus sweep cannot serve as a PRE-commit gate: it enumerates only already-committed cells, so pointing it at uncommitted output prints 'restricted to 0 of N paths' and 'distinct FP classes: 0', which reads as a pass but swept nothing. Found 2026-09-06. Either add an explicit mode that accepts uncommitted paths, or make the script exit non-zero when its restriction drops every requested path so the vacuous zero cannot be mistaken for a clean result.",
       "depends_on": [],
-      "blocking_reason": null,
-      "evidence_path": "data/summaries/review-cells-go-w2-batch-20260906.json",
+      "blocking_reason": "Chose the simpler of the cards two options: refuse rather than add an uncommitted-paths mode. scripts/quality/sweep_shipped_corpus_false_positives.py now exits 1 with a clear stderr message when --paths-from restricts pairs to zero while wanted was non-empty (every requested path dropped -- the exact vacuous shape found on 2026-09-06), instead of proceeding to print \"distinct FP classes: 0\" with exit code 0. A PARTIAL restriction (some requested paths tracked, some not) still proceeds normally -- only a TOTAL wipeout is refused. main() now takes an optional argv for testability. 3 new tests using a real temp git repo (total wipeout -> exit 1 + no report written; partial restriction -> proceeds; no restriction at all -> unaffected). tests/unit/quality full run: 9 pre-existing unrelated failures (confirmed identical on HEAD via git stash -- test_brand_name_preserve_patterns.py and test_products_org_governed_retranslate_shards.py, nothing to do with this sweep script), 293 passed otherwise, no regressions from this change.",
+      "evidence_path": "tests/unit/quality/test_sweep_shipped_corpus_false_positives.py",
       "commit": null,
-      "last_updated": "2026-09-05T21:06:47+00:00",
+      "last_updated": "2026-09-06T00:44:53+00:00",
       "blocker_type": null
     },
     "TC-APT-090": {
