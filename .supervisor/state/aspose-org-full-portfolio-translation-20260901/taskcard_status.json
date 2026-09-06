@@ -1372,12 +1372,12 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "wave5-llm",
-      "pid": 47799,
-      "launched_at": "2026-09-06T15:41:19+00:00",
-      "manifest": "data/campaigns/wave5-llm/launch.yaml",
-      "log": "logs/wave5-llm_launcher.log",
-      "note": "TC-APT-099 wave5: wave4 fully landed (88 LLM cells 2d19d2aa89 + 11/12 m2m100 cells; cells/typescript/ro heal-ticketed, same TypeScript-mistranslation-then-langdetect-block pattern as 3d/typescript/ro -- see the RECURRENCE fix below). Between waves: fixed and verified the recurring m2m100 TypeScript->tipografe (Romanian) mistranslation via a new preserve_pattern (commit landed) -- live-instrumented with force=True TM bypass to confirm the raw model output is now correct ('{PLACEHOLDER} pentru {PLACEHOLDER}'); the remaining block on both typescript/ro cells is a DIFFERENT, already-tracked short-field-language-detection false-positive (TC-APT-040 class, 2 new tickets filed, not a fresh recurrence). This run: pdf/go, pdf/java, pdf/net, pdf/typescript (title+paragraph shape, more body text than the pure title-only pages of waves 3-4), professionalize_llm, 22 langs x 4 pages = 88 cells, max-workers=2 (post-MemoryError mitigation). Pages claimed."
+      "run_id": "wave5-m2m",
+      "pid": 3121,
+      "launched_at": "2026-09-06T16:14:02+00:00",
+      "manifest": "data/campaigns/wave5-m2m/launch.yaml",
+      "log": "logs/wave5-m2m_launcher.log",
+      "note": "TC-APT-099 wave5: pdf/go, pdf/java, pdf/net, pdf/typescript LLM shard landed clean, 88/88 (b327ef4768). Also recovered a HEAD-orphaning incident on the wave4-llm commit (peer git reset in the shared single-checkout repo; re-committed as 6546a25101 alongside the pending wave4-m2m batch). This run: m2m100_418m for hu/ja/ro (12 cells), launched in isolation only after wave5-llm's process fully exited. Do not launch any concurrent GPU-bound/LLM campaign while this PID is alive."
     }
   ],
   "wave_scale": {
