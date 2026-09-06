@@ -116,6 +116,25 @@ body:
   # BROKEN placeholder token, which is what proves the unbalanced-bracket
   # handoff rather than leaving it inferred.
   #
+  # TC-APT-100 (2026-09-06): mask a brand-navigation-label LINK as ONE whole
+  # span, not three adjacent ones. Live extraction probe on
+  # cells-spreadsheet-management-go (professionalize_llm, pl) showed the
+  # bracket/label/tail patterns below each claim their own slice of
+  # "[Aspose.Cells -- Enterprise Product Family](url)" independently, so the
+  # unit text becomes "the {PLACEHOLDER_0}{PLACEHOLDER_2}{PLACEHOLDER_1} is a
+  # separate..." -- three back-to-back opaque tokens with NO visible word
+  # between "the" and the next real prose. Confirmed as the root cause of a
+  # defect recurring in 14/16 reviewed locales at this exact structural
+  # position (bare "the", wrong demonstrative, or lost V2 inversion) --
+  # data/summaries/review-gate5-cells-mgmt-retry2-20260906.json. The model has
+  # no gender/number/category cue left to inflect or even translate the
+  # determiner against. This pattern claims the WHOLE "[label](url)" as one
+  # placeholder instead, giving the model a single clean substitution token
+  # ("the {PLACEHOLDER} is a separate...") -- the ordinary, well-handled
+  # placeholder shape, rather than three concatenated ones. Must be listed
+  # BEFORE the generic bracket-lookahead/tail patterns immediately below
+  # (patterns are consumed in order) so it claims the span first.
+  - '\[Aspose(?:\.[A-Za-z0-9][A-Za-z0-9.]*)?\s+(?:—|--|-)\s+Enterprise(?:\s[A-Z][A-Za-z]*){1,3}\]\([^)]+\)'
   # Lookahead-scoped to '[' that actually opens a link, so brackets in prose and
   # code spans are untouched. Placed BEFORE the tail pattern so it claims its
   # own single character first and cannot nest inside the tail's span.

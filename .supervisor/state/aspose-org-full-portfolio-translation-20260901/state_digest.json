@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T08:40:22.007370+00:00",
+  "generated_at": "2026-09-06T09:16:42.538071+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -16,7 +16,8 @@
     "TC-APT-078",
     "TC-APT-080",
     "TC-APT-090",
-    "TC-APT-098"
+    "TC-APT-098",
+    "TC-APT-100"
   ],
   "active_clauses": {
     "capacity_clause": {
@@ -38,5 +39,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "cells-spreadsheet-management-go: 7/23 languages now committed (ar,es,hi,pt,de,fr,it); 16 heal-ticketed for the still-unfixed wrap-before-link determiner bug (producer_wrap_before_link_determiner, 14 langs) and product-name interleaving (producer_product_name_interleaving, el/ko). Before another fix attempt on either: instrument text_unit_extractor.py on a live engine.translate_file(force=True) call to see the actual unit text sent to the model (TC-APT-087 methodology) -- do not patch blind. Otherwise: TC-APT-099 blitz-wave planning on a fresh Tier-1a page (3d/java, barcode/python, cells/cpp all have zero existing coverage) using the measured sustained_safe_ceiling=64 band."
+  "next_action": "Check heal-cells-mgmt-retry3 (PID 95012, logs/heal-cells-mgmt-retry3_launcher.log) -- 14-lang retrigger of cells-spreadsheet-management-go with TC-APT-100's whole-link-placeholder fix. Review each against config/review_rubric.yaml + the specific heal-cells-mgmt-go-retry2-wrap-link-<lang> ticket it should close; commit what passes. ja/tr may still show the separate product-name-interleaving defect (unfixed, different ticket) even if the wrap-link spot is now clean."
 }
