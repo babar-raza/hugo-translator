@@ -1370,7 +1370,16 @@
   "last_wake_summary": "Wave 2 (wave_scale=2) completed: email/cpp 25/25 clean (title-only, page-complete, pages_newly_live_total 1->2), email/python 21/24 (zh gate-failed x3 no cross-model escalation; hi/hu/ja rejected for text adjacent to the FOSS-edition mask / unrelated fluency issues -- 4 heal tickets, 30 TM entries purged). Committed 4e93753027 (71 files) -- this ALSO recovered email/net (25 langs) after discovering its original commit fc101aa230 had been orphaned from HEAD ancestry during a concurrent multi-session window (reflog still had it; git log did not -- likely a peer git-reset in this shared single-checkout repo). Content was intact in the working tree/index (soft-reset shape), re-committed after confirming session_ledger candidates matched staged files exactly. Also hit the known transient stale-file-regression race twice more, both resolved by retry. cells_committed_total 96 -> 167. Flagged to the operator: multi-session single-checkout git setup can silently orphan commits -- worth per-session worktrees or a reflog integrity check.",
   "cells_committed_total": 167,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "run_id": "wave7-pdf-graphics-cpp",
+      "pid": 21000,
+      "launched_at": "2026-09-06T17:37:52+00:00",
+      "manifest": "data/campaigns/wave7-pdf-graphics-cpp/launch.yaml",
+      "log": "logs/wave7-pdf-graphics-cpp_launcher.log",
+      "note": "TC-APT-099 wave7: DELIBERATE single-page pilot, not a full wave_scale=4 batch. First full-article Tier-1a page this session (310 lines: title/seoTitle/description/summary frontmatter + 7 headings + several C++/CMake code blocks + a markdown table + brand-nav links) -- qualitatively different from the title-only pages of waves 1-6 (all near-100% acceptance). Calibrating acceptance on this content shape before deciding whether to scale to a full family (pdf/cpp has 3 more pages: pdf-annotations-in-cpp, pdf-document-management-in-cpp, pdf-pdf-cpp). professionalize_llm, 22 langs x 1 page = 22 cells, max-workers=2. Page claimed."
+    }
+  ],
   "wave_scale": {
     "value": 4,
     "previous": 2,
