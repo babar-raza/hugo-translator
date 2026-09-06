@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T14:29:54.525806+00:00",
+  "generated_at": "2026-09-06T16:37:38.952695+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "wave3 closed: pages_newly_live_total=5 (3d/java, 3d/net, 3d/python page-complete). 3d/typescript/ro open (both models rejected, heal-ticketed, needs live instrumentation). Fixed a real backfill_provenance governance bug (manual REJECT verdicts were being silently reverted) -- see hugo-translator commit b407d6a. Next: continue TC-APT-099 blitz on new Tier-1a pages (barcode/python, cells/cpp, and others still zero-coverage), or invest in typescript/ro's language-detection root cause. wave_scale stays 4 pending next wave's acceptance."
+  "next_action": "wave5 closed: pages_newly_live_total=11 (3d/java,net,python; cells/java,net,python; pdf/go,java,net all page-complete). 3d/typescript, cells/typescript, pdf/typescript all sit at 24/25, each missing only their ro cell for different reasons (all heal-ticketed, ledger-corrected to MANUAL_REVIEW_REJECTED so they survive reconciliation). TypeScript preserve_pattern fix (blog.aspose.org.yaml) confirmed working across 3 waves. Fixed a real backfill_provenance governance bug (b407d6a) and recovered one HEAD-orphaning incident (6546a25101). Next: continue TC-APT-099 blitz -- remaining zero-coverage Tier-1a candidates now skew toward real body prose (pdf/*/pdf-*-in-<platform>, cells/cpp/*, html/python/*) rather than bare title-only index pages, expect more review effort per cell. wave_scale stays 4 pending next wave's acceptance rate."
 }
