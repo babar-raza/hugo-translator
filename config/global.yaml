@@ -687,6 +687,13 @@ translation_engine:
     min_window_calls: 10
     cooldown_seconds: 60
     cooldown_cap_seconds: 600
+  # TC-APT-094: cross-process cap on in-flight LLM API calls across the whole K-launcher
+  # fleet (plan SS0.10) -- a per-process limit alone multiplies with launcher count into
+  # an uncapped fleet-wide burst. capacity stays at 8 until TC-APT-064's sustained-load
+  # calibration proves a higher ceiling.
+  llm_slot_semaphore:
+    capacity: 8
+    ttl_seconds: 120
   llm_fallback_model: m2m100_418m             # automatic reroute target when the LLM breaker is open (plan 6.1)
   llm_health_log_dir: data/runtime/llm_health  # redacted per-call telemetry (never the key value)
   # TC-APT-021: model-identity drift detector (the endpoint exposes no version-locked id, so

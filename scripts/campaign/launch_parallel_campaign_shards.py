@@ -11,18 +11,34 @@ the three the plan's §6.1 model policy keeps on ``m2m100_418m``) are separable 
 the API-bound ones by construction.  At most ONE GPU-bound shard is ever launched
 per wave, so two children never contend for the same VRAM, independent of whether
 TC-APT-043-046's in-process fix fully succeeds.
+
+TC-APT-094 (plan SS0.10, BLITZ critical path 3 of 3) extends this to K
+INDEPENDENT launcher processes, one per product family (campaign_id = family),
+running concurrently against DIFFERENT campaign manifests. The GPU exclusivity
+above only ever covered shards within ONE launcher's own manifest -- two such
+launchers, each unaware of the other, could each decide to run their own
+hu/ja/ro shard on the same GPU at once. `try_acquire_gpu_lane` closes that gap
+with one lock file shared by every campaign under `ledger_root` (not
+per-campaign), so at most one launcher process anywhere holds GPU-bound work
+at a time; a launcher that cannot get the lane defers its GPU-bound shards
+to whichever launcher does hold it, rather than blocking or running anyway.
+This also wires `work_claims.py` (TC-APT-056) for real: a launcher refuses to
+start without first holding the `family:<campaign_id>` claim, renewed every
+wave so a long `--drain` run does not let the 45-minute TTL lapse mid-campaign.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 from src.utils.file_lock import FileLock, LockError
+from src.workers import work_claims
 from src.workers.campaign_manifest import CampaignManifest
 from src.workers.campaign_runner import CampaignLedger
 
@@ -33,6 +49,11 @@ GPU_PRIMARY_LOCALES = ("hu", "ja", "ro")
 # CampaignRunner.__init__'s own default; the legacy worker child cannot be told
 # anything else, so a non-default root is only valid for the gate5 child.
 DEFAULT_LEDGER_ROOT = Path("data/campaigns")
+
+# TC-APT-094: one lock shared by every campaign under a ledger root -- NOT
+# per-campaign like `parallel-launcher.lock` -- so it actually serializes GPU
+# access across independent launcher processes running different manifests.
+GPU_LANE_LOCK_NAME = "gpu_lane.lock"
 
 
 def pending_shards(manifest: CampaignManifest, ledger_root: Path) -> list[dict[str, Any]]:
@@ -56,11 +77,49 @@ def partition_by_device(
     return gpu_bound, api_bound
 
 
+def gpu_lane_lock_path(ledger_root: Path) -> Path:
+    return ledger_root / GPU_LANE_LOCK_NAME
+
+
+def try_acquire_gpu_lane(ledger_root: Path) -> FileLock | None:
+    """Non-blocking attempt at the one global GPU lane (TC-APT-094).
+
+    Returns the held `FileLock` (caller must `.release()` it when done with
+    GPU-bound work) if acquired, or None if another launcher process anywhere
+    already holds it -- the caller must defer its GPU-bound shards, never run
+    them anyway.
+    """
+    lock = FileLock(gpu_lane_lock_path(ledger_root), timeout=0)
+    return lock if lock.acquire(blocking=False) else None
+
+
+def partition_for_wave(
+    pending: list[dict[str, Any]],
+    gpu_locales: tuple[str, ...],
+    *,
+    gpu_lane_available: bool,
+) -> list[dict[str, Any]]:
+    """Drop GPU-bound shards from this wave when the GPU lane is not ours.
+
+    TC-APT-094: without this, K concurrent launcher processes each partition
+    and schedule GPU-bound shards from their OWN manifest, with no shared view
+    of whether another process already has one running -- two hu/ja/ro shards
+    can land on the GPU at once. Excluded shards simply stay pending; whichever
+    launcher does hold the lane picks them up on its own next wave.
+    """
+    if gpu_lane_available:
+        return pending
+    _gpu_bound, api_bound = partition_by_device(pending, gpu_locales)
+    return api_bound
+
+
 def select_pending_shards(
     manifest: CampaignManifest,
     ledger_root: Path,
     max_workers: int,
     gpu_locales: tuple[str, ...] = GPU_PRIMARY_LOCALES,
+    *,
+    gpu_lane_available: bool = True,
 ) -> list[dict[str, Any]]:
     """Return the next wave of shards: at most one GPU-bound shard, rest API-bound.
 
@@ -68,7 +127,10 @@ def select_pending_shards(
     only reordering is that the single admissible GPU-bound shard leads the wave,
     which is what keeps GPU shards from ever overlapping each other.
     """
-    gpu_bound, api_bound = partition_by_device(pending_shards(manifest, ledger_root), gpu_locales)
+    pending = partition_for_wave(
+        pending_shards(manifest, ledger_root), gpu_locales, gpu_lane_available=gpu_lane_available
+    )
+    gpu_bound, api_bound = partition_by_device(pending, gpu_locales)
     return (gpu_bound[:1] + api_bound)[:max_workers]
 
 
@@ -336,6 +398,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Wait for every isolated child and return nonzero if any shard fails",
     )
+    parser.add_argument(
+        "--session-id",
+        default=None,
+        help=(
+            "Fleet session id for the family work claim (TC-APT-056/094). Defaults to "
+            "$AGENT_SESSION_ID, then a pid-derived id."
+        ),
+    )
     args = parser.parse_args(argv)
     if not 1 <= args.max_workers <= 4:
         raise SystemExit("--max-workers must be 1..4")
@@ -353,35 +423,76 @@ def main(argv: list[str] | None = None) -> int:
     manifest = CampaignManifest.load(args.campaign_manifest)
     translator_repo = Path(__file__).resolve().parents[2]
     config_root = translator_repo / "config"
+
+    # TC-APT-094: refuse to start without holding this family's fleet-visible
+    # claim -- unlike the per-campaign parallel-launcher.lock below (a bare OS
+    # mutex no other session can see), claims.jsonl lets peer sessions across
+    # the fleet know this campaign is already being worked before they try it.
+    session_id = args.session_id or os.environ.get("AGENT_SESSION_ID") or f"launcher-pid{os.getpid()}"
+    family_key = f"family:{manifest.campaign_id}"
+    claims_path = args.ledger_root / "claims.jsonl"
+    if not work_claims.acquire_claim(
+        family_key,
+        session_id,
+        purpose=f"K-launcher fan-out for {manifest.campaign_id}",
+        claims_path=claims_path,
+    ):
+        print(f"Another session holds the family claim for {family_key}", file=sys.stderr)
+        return 1
+
     lock_path = args.ledger_root / manifest.campaign_id / "parallel-launcher.lock"
     try:
         launcher_lock = FileLock(lock_path, timeout=1)
         launcher_lock.acquire()
     except LockError:
         print("A governed campaign launcher is already active", file=sys.stderr)
+        work_claims.release_claim(family_key, session_id, claims_path=claims_path)
         return 1
     try:
         launched_any = False
         while True:
-            pending = pending_shards(manifest, args.ledger_root)
-            if not pending:
-                if not launched_any:
-                    print("No pending campaign shards")
-                break
-            groups = assign_shard_groups(pending, args.max_workers, gpu_locales)
-            for index, group in enumerate(groups):
-                print(f"child {index}: {', '.join(str(s['shard_id']) for s in group)}")
-            if args.dry_run:
-                return 0
-            launched_any = True
-            wave_status = _run_wave(
-                groups=groups,
-                manifest=manifest,
-                args=args,
-                gpu_locales=gpu_locales,
-                translator_repo=translator_repo,
-                config_root=config_root,
+            # Renew every pass: a long --drain run must not let the 45-minute
+            # claim TTL lapse mid-campaign and let another session start in.
+            work_claims.acquire_claim(
+                family_key,
+                session_id,
+                purpose=f"K-launcher fan-out for {manifest.campaign_id}",
+                claims_path=claims_path,
             )
+
+            pending_all = pending_shards(manifest, args.ledger_root)
+            gpu_bound, _api_bound = partition_by_device(pending_all, gpu_locales)
+            gpu_lane_lock = try_acquire_gpu_lane(args.ledger_root) if gpu_bound else None
+            try:
+                pending = partition_for_wave(
+                    pending_all, gpu_locales, gpu_lane_available=gpu_lane_lock is not None
+                )
+                if gpu_bound and gpu_lane_lock is None:
+                    print(
+                        f"GPU lane held by another launcher; deferring "
+                        f"{len(gpu_bound)} GPU-bound shard(s)"
+                    )
+                if not pending:
+                    if not launched_any:
+                        print("No pending campaign shards")
+                    break
+                groups = assign_shard_groups(pending, args.max_workers, gpu_locales)
+                for index, group in enumerate(groups):
+                    print(f"child {index}: {', '.join(str(s['shard_id']) for s in group)}")
+                if args.dry_run:
+                    return 0
+                launched_any = True
+                wave_status = _run_wave(
+                    groups=groups,
+                    manifest=manifest,
+                    args=args,
+                    gpu_locales=gpu_locales,
+                    translator_repo=translator_repo,
+                    config_root=config_root,
+                )
+            finally:
+                if gpu_lane_lock is not None:
+                    gpu_lane_lock.release()
             if wave_status != 0:
                 return wave_status
             if not args.drain:
@@ -394,6 +505,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     finally:
         launcher_lock.release()
+        work_claims.release_claim(family_key, session_id, claims_path=claims_path)
 
 
 if __name__ == "__main__":

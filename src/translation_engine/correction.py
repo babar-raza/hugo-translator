@@ -165,7 +165,13 @@ def attempt_correction(
             "You are a translation quality fixer. Fix only the issues listed. "
             "Output only the corrected translation text, nothing else."
         )
-        response, _in_tok, _out_tok = backend._provider.generate(correction_system_prompt, prompt)
+        # TC-APT-094: this bypasses LLMModelBackend.translate()/translate_batch(),
+        # so it must acquire the cross-process slot itself or it evades the
+        # fleet-wide cap on in-flight professionalize_llm calls.
+        with backend._llm_slot():
+            response, _in_tok, _out_tok = backend._provider.generate(
+                correction_system_prompt, prompt
+            )
         if not response or not response.strip():
             logger.warning("Correction pass: empty response from LLM")
             return None

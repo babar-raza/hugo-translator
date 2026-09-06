@@ -186,10 +186,17 @@ Adapted Translation:"""
         if not self._provider:
             raise RuntimeError("LLM provider not initialized")
 
-        result, _, _ = self._provider.generate(
-            system_prompt="You are a professional translator.",
-            user_text=prompt,
-        )
+        # TC-APT-094: this client is also pointed at the shared professionalize_llm
+        # endpoint (see config/global.yaml tm_improvement.llm) by the TM improvement
+        # worker, independently of the K-launcher fleet -- it must acquire the same
+        # cross-process slot or it evades the fleet-wide in-flight-call cap.
+        from src.workers.llm_slot_semaphore import slot_from_config
+
+        with slot_from_config():
+            result, _, _ = self._provider.generate(
+                system_prompt="You are a professional translator.",
+                user_text=prompt,
+            )
         return result
 
     def unload_from_server(self) -> None:

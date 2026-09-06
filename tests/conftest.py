@@ -208,6 +208,9 @@ def _isolate_llm_runtime_state(tmp_path, monkeypatch):
     """
     monkeypatch.setenv("HT_CIRCUIT_BREAKER_DIR", str(tmp_path / "_cb"))
     monkeypatch.setenv("HT_LLM_HEALTH_DIR", str(tmp_path / "_llm_health"))
+    # TC-APT-094: same isolation for the cross-process LLM call slot semaphore --
+    # every LLM-translating call site now acquires a slot in this file.
+    monkeypatch.setenv("HT_LLM_SLOTS_PATH", str(tmp_path / "_llm_slots.json"))
     try:
         from src.model_runtime import circuit_breaker as _cb
 

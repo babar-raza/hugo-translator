@@ -90,6 +90,9 @@ class TestAttemptCorrection:
         )
         assert result == "Corrected translation"
         mock_backend.load.assert_called_once()
+        # TC-APT-094: the correction call must go through the cross-process
+        # LLM slot semaphore, not straight to the provider.
+        mock_backend._llm_slot.assert_called_once()
 
     @patch("src.model_runtime.registry.ModelRegistry")
     def test_unknown_model_returns_none(self, mock_registry_cls):

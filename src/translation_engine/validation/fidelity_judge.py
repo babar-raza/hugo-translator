@@ -249,9 +249,14 @@ def judge_fidelity(
                 source=source_chunk,
                 translation=target_chunk,
             )
-            response, _in_tok, _out_tok = backend._provider.generate(
-                _JUDGE_SYSTEM_PROMPT, prompt
-            )
+            # TC-APT-094: this bypasses LLMModelBackend.translate()/translate_batch(),
+            # so it must acquire the cross-process slot itself or it evades the
+            # fleet-wide cap on in-flight professionalize_llm calls -- material here
+            # since review fans out per-language across parallel subagents (plan SS9).
+            with backend._llm_slot():
+                response, _in_tok, _out_tok = backend._provider.generate(
+                    _JUDGE_SYSTEM_PROMPT, prompt
+                )
             score, issues, parsed_ok = _parse_response(response)
             if score is None:
                 logger.warning(

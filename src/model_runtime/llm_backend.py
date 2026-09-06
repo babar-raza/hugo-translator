@@ -28,6 +28,8 @@ from .llm_providers import BaseLLMProvider, create_provider
 from .loader import repair_mojibake
 from .registry import ModelInfo
 
+from src.workers.llm_slot_semaphore import DEFAULT_CAPACITY, DEFAULT_TTL_SECONDS, LLMSlot
+
 logger = logging.getLogger(__name__)
 
 # HT-QUALITY-GATES-001 Part 22 (root cause B, LLM prompt-context race):
@@ -196,6 +198,30 @@ class LLMModelBackend:
         except Exception:
             self._max_hallucination_ratio = 4.0
             self._hallucination_ratio_overrides = {}
+
+        # TC-APT-094: cross-process cap on in-flight LLM API calls across the
+        # whole K-launcher fleet (plan SS0.10) -- a per-process limit alone
+        # multiplies with launcher count into an uncapped fleet-wide burst.
+        try:
+            from src.utils.config_loader import get_global_config
+
+            _slot_cfg = get_global_config().get("translation_engine", {}).get(
+                "llm_slot_semaphore", {}
+            )
+            self._llm_slot_capacity: int = int(_slot_cfg.get("capacity", DEFAULT_CAPACITY))
+            self._llm_slot_ttl_seconds: float = float(
+                _slot_cfg.get("ttl_seconds", DEFAULT_TTL_SECONDS)
+            )
+        except Exception:
+            self._llm_slot_capacity = DEFAULT_CAPACITY
+            self._llm_slot_ttl_seconds = DEFAULT_TTL_SECONDS
+
+    def _llm_slot(self) -> LLMSlot:
+        # getattr-defaulted: several existing tests construct this class via
+        # __new__ (bypassing __init__) and set only the attributes they need.
+        capacity = getattr(self, "_llm_slot_capacity", DEFAULT_CAPACITY)
+        ttl_seconds = getattr(self, "_llm_slot_ttl_seconds", DEFAULT_TTL_SECONDS)
+        return LLMSlot(capacity=capacity, ttl_seconds=ttl_seconds)
 
     def _model_id_str(self) -> str | None:
         return getattr(self.model_info, "model_id", None) if self.model_info is not None else None
@@ -609,10 +635,11 @@ class LLMModelBackend:
             protected = tm.protect(text) if tm else None
             input_text = protected.protected_text if protected else text
 
-            result, inp_tokens, out_tokens = self._provider.generate(
-                system_prompt=system_prompt,
-                user_text=input_text,
-            )
+            with self._llm_slot():
+                result, inp_tokens, out_tokens = self._provider.generate(
+                    system_prompt=system_prompt,
+                    user_text=input_text,
+                )
 
             # TC-HT-003: reject prompt-echo/refusal responses before any
             # other processing — a rule-echo must never reach output, even
@@ -746,10 +773,11 @@ class LLMModelBackend:
         packed_input = "\n".join(lines)
 
         try:
-            result, inp_tokens, out_tokens = self._provider.generate(
-                system_prompt=system_prompt,
-                user_text=packed_input,
-            )
+            with self._llm_slot():
+                result, inp_tokens, out_tokens = self._provider.generate(
+                    system_prompt=system_prompt,
+                    user_text=packed_input,
+                )
 
             # Parse numbered outputs
             parsed = self._parse_packed_output(result, len(indices))
