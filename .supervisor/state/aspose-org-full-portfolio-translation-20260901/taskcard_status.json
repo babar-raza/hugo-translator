@@ -1327,7 +1327,7 @@
         "TC-APT-094"
       ],
       "owner": "loop",
-      "blocking_reason": "wave1 (email/net) + wave2 (email/cpp, email/python) + wave3 (3d/java, 3d/net, 3d/python page-complete) + wave4 (cells/java, cells/net, cells/python page-complete) landed; wave_scale 1->2->4. pages_newly_live_total 2->8. RECURRENCE fixed: m2m100 deterministically mistranslated platform name 'TypeScript' as Romanian 'tipografe' (RB-004) on TWO independent pages (3d/typescript, cells/typescript) -- fixed with a new preserve_pattern (\\bTypeScript\\b) in blog.aspose.org.yaml; live force=True TM-bypass instrumentation confirmed the raw model output is now correct ('{PLACEHOLDER} pentru {PLACEHOLDER}'). Both typescript/ro cells remain uncommitted for a DIFFERENT, pre-existing, already-tracked reason: write_gate's short-field language detector classifies the correct-but-short Romanian title as English (TC-APT-040 class, 2 new tickets, not a fresh recurrence) -- ledger corrected to MANUAL_REVIEW_REJECTED for both (survives backfill_provenance re-runs). Also found and fixed a real governance bug: backfill_provenance.py silently reverted a manual REJECTED verdict back to UP_TO_DATE on every reconciliation run (receipt-only precedence, never consulted claude_review_result) -- fixed in b407d6a, verified live and covered by a regression test. Separately recovered a HEAD-orphaning incident (peer session's git reset in the shared single-checkout content repo orphaned this session's wave4-llm commit 2d19d2aa89; reflog-confirmed, working tree/index intact, re-committed as 6546a25101 alongside the pending wave4-m2m batch). wave5 (pdf/go, pdf/java, pdf/net, pdf/typescript) landed: 88/88 LLM cells (b327ef4768) + 11/12 m2m100 cells (5e550846c9) -- pdf/go, pdf/java, pdf/net page-complete. pages_newly_live_total 8->11. TypeScript preserve_pattern fix reconfirmed correct on a fresh cell (pdf/typescript/ro title). pdf/typescript/ro hit a NEW, unrelated defect: body reconstruction glues 'pentru'+'TypeScript' into one word (missing space around a restored placeholder), isolated to this occurrence -- heal-ticketed as reconstruction_punctuation_duplication (heal-pdf-typescript-ro-word-gluing), ledger corrected to MANUAL_REVIEW_REJECTED. Three families now fully mined for Tier-1a zero-coverage bare _index.md pages (3d, cells, pdf); remaining zero-coverage candidates include content pages with real body prose (pdf/*/pdf-*-in-<platform>/index.md, cells/cpp/*, html/python/*) -- next wave should expect more real prose and correspondingly more review effort per cell.",
+      "blocking_reason": "waves 1-6 landed (email, 3d, cells, pdf go/java/net/typescript, slides families); wave_scale 1->2->4; pages_newly_live_total 2->15. Full per-wave detail lives in git log (hugo-translator + content-repo commit messages) and data/summaries/*.json, not duplicated here. Standing facts still load-bearing: (1) TypeScript preserve_pattern fix (blog.aspose.org.yaml, commit eca736e) confirmed correct across 3 waves -- do not re-diagnose 'TypeScript'-as-mistranslation as a new bug; (2) 3 cells remain MANUAL_REVIEW_REJECTED in the ledger for 3 DIFFERENT already-ticketed reasons (3d/typescript/ro, cells/typescript/ro: short-field language-detection false positive, TC-APT-040 class; pdf/typescript/ro: body reconstruction word-gluing) -- these survive backfill_provenance reconciliation by design, do not 'fix' them by resetting eligibility_state; (3) backfill_provenance.py now chains eligibility.reclassify_ledger (commit b407d6a) so a manual REJECTED verdict is durable; (4) three families (3d, cells, pdf go/java/net/typescript, slides) are now fully mined for bare title-only _index.md pages -- remaining zero-coverage Tier-1a candidates skew toward real body prose (pdf/*/pdf-*-in-<platform>/index.md, cells/cpp/*, html/python/*), expect more review effort per cell.",
       "evidence_path": "data/summaries/review-wave3-3d-20260906.json",
       "commit": "228f78eb18",
       "last_updated": "2026-09-06T13:20:00.000000+00:00",
@@ -1370,16 +1370,7 @@
   "last_wake_summary": "Wave 2 (wave_scale=2) completed: email/cpp 25/25 clean (title-only, page-complete, pages_newly_live_total 1->2), email/python 21/24 (zh gate-failed x3 no cross-model escalation; hi/hu/ja rejected for text adjacent to the FOSS-edition mask / unrelated fluency issues -- 4 heal tickets, 30 TM entries purged). Committed 4e93753027 (71 files) -- this ALSO recovered email/net (25 langs) after discovering its original commit fc101aa230 had been orphaned from HEAD ancestry during a concurrent multi-session window (reflog still had it; git log did not -- likely a peer git-reset in this shared single-checkout repo). Content was intact in the working tree/index (soft-reset shape), re-committed after confirming session_ledger candidates matched staged files exactly. Also hit the known transient stale-file-regression race twice more, both resolved by retry. cells_committed_total 96 -> 167. Flagged to the operator: multi-session single-checkout git setup can silently orphan commits -- worth per-session worktrees or a reflog integrity check.",
   "cells_committed_total": 167,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "run_id": "wave6-m2m",
-      "pid": 7710,
-      "launched_at": "2026-09-06T17:15:03+00:00",
-      "manifest": "data/campaigns/wave6-m2m/launch.yaml",
-      "log": "logs/wave6-m2m_launcher.log",
-      "note": "TC-APT-099 wave6: slides/cpp, slides/java, slides/net, slides/python LLM shard landed clean, 88/88 (88818544fa). This run: m2m100_418m for hu/ja/ro (12 cells), launched in isolation only after wave6-llm's process fully exited. Do not launch any concurrent GPU-bound/LLM campaign while this PID is alive."
-    }
-  ],
+  "active_detached_runs": [],
   "wave_scale": {
     "value": 4,
     "previous": 2,
@@ -1397,5 +1388,5 @@
     "release_reason": "Stale-state fix, found while orienting for TC-APT-077: logs/watchdog_state.json reads kpi_cells_24h=90 (floor 25), kpi_breach_open=false. The clauses own AND condition (TC-APT-043..047 unlanded AND KPI below floor) requires BOTH; KPI has not been below floor for a while (the peer already acted on this correctly for wave-cells-rust-w1, citing 'capacity clause released, KPI 43' -- this field just never caught up to that decision). TC-APT-046/047 remain unlanded, so a future KPI dip re-engages it automatically once checked against watchdog_state.json again."
   },
   "loop_prompt_version": "10.7 (2026-09-06)",
-  "pages_newly_live_total": 11
+  "pages_newly_live_total": 15
 }
