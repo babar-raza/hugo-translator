@@ -137,6 +137,34 @@ body:
   # is what produced fully-English seoTitle output on words-document-net.
   # Evidence: data/summaries/decision-dom-terminology-20260905.json
   - '\bDocument Object Model\b'
+  # TC-APT-087 (2026-09-06): governed site-navigation labels of the shape
+  # "Aspose.X -- Enterprise Y" (e.g. "Aspose.Cells -- Enterprise Product
+  # Family", "Aspose.Cells -- Enterprise Blog") are a fixed convention
+  # _link_text_is_brand_navigation_label already recognizes on the LINK_TEXT
+  # and whole-node-link extraction paths (TC-APT-085) -- but a paragraph that
+  # embeds this link alongside OTHER prose ("...the [Aspose.Cells --
+  # Enterprise Product Family](url) is a...") extracts as one full-sentence
+  # unit (TC-APT-036/078's link-in-sentence path), where only the bare
+  # "Aspose.Cells" brand token is masked (the generic pattern below) and "--
+  # Enterprise Product Family" is left as ordinary translatable prose.
+  # Confirmed LIVE, not inferred: instrumented segment_translator.py and ran
+  # engine.translate_file(force=True) on the real page with
+  # professionalize_llm -- the unit at body.paragraph[14] carries source text
+  # "...the {PLACEHOLDER_0}{PLACEHOLDER_2} -- Enterprise Product
+  # Family{PLACEHOLDER_1} is a..." (brand token and URL tail masked, label
+  # suffix exposed) and the model duly translates it into Arabic on every
+  # attempt (2 different Arabic renderings across 2 live runs). A synthetic
+  # unit test using a hand-built TextUnitExtractor without this exact
+  # constructor's preserve_patterns/mt_model kwargs produced a MISLEADING
+  # leaf-split result and briefly looked like a false alarm -- only the live,
+  # fully-configured engine call reproduces the real segmentation. Must be
+  # listed BEFORE the generic brand pattern below so it claims the WHOLE
+  # label as one span (patterns are consumed in order) -- same ordering rule
+  # as the FOSS-edition pattern above. Evidence: 0 pages on any other
+  # in-scope site use this "Enterprise" shape (docs/kb/reference/products/
+  # websites.aspose.org all searched, zero hits), so scoped to this profile
+  # rather than the global baseline.
+  - \bAspose(?:\.[A-Za-z0-9][A-Za-z0-9.]*)?\s+(?:—|--|-)\s+Enterprise(?:\s[A-Z][A-Za-z]*){1,3}\b
   # Protect Aspose brand/product names as one cohesive unit (Aspose.Cells,
   # Aspose.3D, bare "Aspose", etc.) -- the previous bare-word-only pattern
   # only protected "Aspose" itself, leaving ".Cells"/".3D" etc. adjacent

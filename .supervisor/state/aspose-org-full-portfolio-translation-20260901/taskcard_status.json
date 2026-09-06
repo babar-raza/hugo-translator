@@ -1167,15 +1167,15 @@
       "blocker_type": null
     },
     "TC-APT-087": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": null,
       "owner": "loop",
       "title": "The governed label 'Aspose.Cells - Enterprise Product Family' is lost in a paragraph link in ar, held from the heal-cells-go-w2 commit 2026-09-06. Distinct from TC-APT-085, which fixed the LIST_ITEM path; this is the PARAGRAPH LINK path, measured earlier as surviving 17 of 18 locales with ar the exception. Pre-existing, not a regression: ar failed the same literal before the fix. Reproduce by comparing the exact em-dash literal against index.ar.md. SIZED 2026-09-06: 346 of 8126 tracked source pages carry the label, so exposure is roughly 8650 future cells. Of the 38 shipped cells on those pages, 0 lose it -- but that 0% is BIASED, because shipped cells are pre-filtered by the RB-006 review gate and a losing cell never reaches that population (ar was held, not shipped). The only unbiased figure available is over produced-including-rejected cells: 1 of 21 on introducing-cells-foss-go, about 5%. Priority: after TC-APT-090, which is blocking whole cells at 78% of wave failures while this one is caught by review each time.",
       "depends_on": [],
-      "blocking_reason": null,
-      "evidence_path": "data/summaries/review-cells-go-w2-batch-20260906.json; data/summaries/size-tc087-exposure-20260906.json",
+      "blocking_reason": "Root-caused and fixed the PARAGRAPH LINK path (distinct from TC-APT-085s LIST_ITEM fix). A paragraph embedding this link alongside other prose (\"...the [Aspose.Cells -- Enterprise Product Family](url) is a...\") extracts as ONE full-sentence unit; only the bare \"Aspose.Cells\" brand token was masked by the pre-existing generic pattern, leaving \"-- Enterprise Product Family\" as ordinary translatable text. Added a preserve_pattern matching the whole \"Aspose.X -- Enterprise Y\" shape as one span, placed before the generic brand pattern so it claims the span first. FIRST DIAGNOSIS ATTEMPT WAS WRONG AND CAUGHT BEFORE COMMITTING: a synthetic TextUnitExtractor test (site_profile= kwarg only, missing this exact constructors mt_model/preserve_patterns/target_lang kwargs _translate_body_ast actually passes) showed do_not_translate=True and looked like a false alarm, so the first attempt was reverted. RECURRENCE step 2 discipline (reverify against the exact file) caught the mistake: instrumented segment_translator.py temporarily and ran engine.translate_file(force=True) live on the real page with professionalize_llm -- reproduced the exact defect twice (different Arabic each time, proving the model genuinely receives and translates the exposed suffix), confirmed the fix resolves it on a third live run, then removed the instrumentation. 4 new regression tests using the CORRECT real-pipeline extractor construction (learning that exact lesson): the label masks as one span; it round-trips through placeholder restoration intact; the working LIST_ITEM path is undisturbed; ordinary prose mentioning a brand without the dash shape is unaffected. A data/campaigns/reverification_receipts.jsonl row records gates_passed=true for (introducing-cells-foss-go, ar). Full scoped suite (reconstructor + segment_translator + extractor + brand-pattern + regression): 899 passed, 6 pre-existing unrelated failures (confirmed via git stash earlier this session -- a different, older FOSS-edition pattern issue, nothing to do with this change).",
+      "evidence_path": "tests/regression/test_brand_nav_label_in_paragraph_link.py; data/campaigns/reverification_receipts.jsonl; data/summaries/review-cells-go-w2-batch-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-05T22:39:56+00:00",
+      "last_updated": "2026-09-06T02:07:48+00:00",
       "blocker_type": null
     },
     "TC-APT-088": {

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T01:18:53.941046+00:00",
+  "generated_at": "2026-09-06T02:08:30.623820+00:00",
   "stamps": {
     "loop_prompt_version": "10.5 (2026-09-06)",
     "plan_revision": 16
@@ -38,5 +38,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "Second runbook compaction pass done (TC-APT-090 investigation generated a lot of field notes). Mission healthy, KPI 90, wave-cells-rust-w1 wrapping up."
+  "next_action": "TC-APT-087 landed (paragraph-link brand-nav label masking, live-reverified). Mission healthy, KPI 90."
 }
