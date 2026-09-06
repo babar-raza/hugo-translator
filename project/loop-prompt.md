@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 10.6 (2026-09-06)`
+`loop_prompt_version: 10.7 (2026-09-06)`
 
 ## 0. On reload — before anything else
 
@@ -359,3 +359,4 @@ never re-read at routine orientation. Routine orientation instead reads
 only re-reads full documents when a stamp there has changed. When this file
 next exceeds 40KB, archive the oldest entries below first -- rules never
 move, only dated facts. Keep new entries terse.
+- 2026-09-06: CONFIRMED (recurred across 3 consecutive `-p` relaunches of the same session, each producing zero commit on otherwise-finished TC-APT-094 code): a one-shot `-p` iteration that launches a verification step and then tries to asynchronously "wait for the background task notification" gets NO further turns to receive that notification -- it just ends, having committed nothing, and the next relaunch starts cold with the same uncommitted diff. This is distinct from the earlier-documented "harness `run_in_background` doesn't survive a wake" issue (§1) -- this is about `-p` mode having no cross-turn continuation at all, not about background-task survival specifically. Verified root cause was needless in this case: both new test files (`test_llm_slot_semaphore.py`, `test_launcher_gpu_lane_and_family_claims.py`) pass in 10 seconds flat when run directly -- there was no reason to background them. RULE: in a `-p` one-shot iteration, run verification synchronously in the foreground (up to the ~600s tool timeout) whenever it plausibly fits; only use a real OS-detached subprocess (never harness `run_in_background`) for something that genuinely cannot finish in one turn, and in that case commit nothing until the NEXT relaunch confirms the detached process's result on disk -- never end a turn "waiting" for anything.
