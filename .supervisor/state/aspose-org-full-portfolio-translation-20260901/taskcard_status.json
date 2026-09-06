@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-06T07:30:00.000000+00:00",
+  "updated_at": "2026-09-06T08:15:00.000000+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 4,
+  "wake_count": 5,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -572,10 +572,10 @@
       "title": "Complex/idiomatic sentence structures produce recurring cross-language defects (parallel-negation-lists, verbed-noun idioms like 'round-trip', product-name+generic-noun link text) STEP 2 EVIDENCE 2026-09-06 (heal-cells-go-w1): 4 regenerated cells show exact structural fidelity, 0 injected codepoints, and 0 duplicated-word runs at the recorded signature site. 4 receipts written; 14 of the class's 16 ticketed cells still lack one, and the module now reports that correctly.",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": "v10.1 step 1 (producer-side fix) LANDED (010a5d2): cross-field frontmatter residual repair (frontmatter_consistency.py + SegmentTranslator hook, 9 new unit tests) covering the dominant near-duplicate description/summary defect, plus fr \"Annotations\" cognate added to _REVIEWED_IDENTICAL_TRANSLATIONS (2nd page, live fr failure on pdf-foss-cpp). Steps 2-3 PENDING: reverify against the exact original failing files (introducing-words-foss-net ar/cs/de/el/es/fa/fr/he; introducing-pdf-foss-typescript cs/de/el/fa/he/hu/ko/nl/pl/ro/ru/sv/tr/th/vi), then retrigger those quarantined cells. NOT covered by this fix: the complex-sentence/idiom variance subset (parallel-negation lists, \"round-trip\" idiom) -- needs its own attempt or a documented full-body-review decision per the plan acceptance. Claim lease: claims.jsonl taskcard:TC-APT-042 session 442e200e.",
+      "blocking_reason": "v10.1 step 1 (producer-side fix) LANDED (010a5d2): cross-field frontmatter residual repair (frontmatter_consistency.py + SegmentTranslator hook, 9 new unit tests) covering the dominant near-duplicate description/summary defect, plus fr \"Annotations\" cognate added to _REVIEWED_IDENTICAL_TRANSLATIONS (2nd page, live fr failure on pdf-foss-cpp). Steps 2-3 PENDING: reverify against the exact original failing files (introducing-words-foss-net ar/cs/de/el/es/fa/fr/he; introducing-pdf-foss-typescript cs/de/el/fa/he/hu/ko/nl/pl/ro/ru/sv/tr/th/vi), then retrigger those quarantined cells. NOT covered by this fix: the complex-sentence/idiom variance subset (parallel-negation lists, \"round-trip\" idiom) -- needs its own attempt or a documented full-body-review decision per the plan acceptance. Claim lease: claims.jsonl taskcard:TC-APT-042 session 442e200e. | 2026-09-06: model_quality_complex_sentence_structure (the parallel-negation-list / nested-conditional-before-link sub-pattern) CLOSED via RECURRENCE step 2 reverification, not a code fix -- 13 fresh regenerations across both named pages/12+ languages showed the named defect does not reproduce on current code; both heal tickets set disposition=MODEL_LIMITATION_DEFERRED (data/campaigns/reverification_receipts.jsonl, data/summaries/fp-recurrence-gate-audit-20260906.json). model_quality_residual_phrase_defects remains open and IN_PROGRESS: frontmatter_consistency.py (already landed) misses 2-token runs below the 4-alpha-char substantive-token floor (e.g. \"for .NET\") -- a real, scoped follow-on, not yet done.",
       "evidence_path": "tests/regression/test_softwrap_sentence_integrity.py, data/summaries/reverify-softwrap-fix-real-content-20260905.json; data/summaries/fp-heal-queue-openness-bug-20260906.json",
       "commit": "c286492",
-      "last_updated": "2026-09-05T20:04:00+00:00",
+      "last_updated": "2026-09-06T08:15:00.000000+00:00",
       "blocker_type": null,
       "note": "ROOT CAUSE FOUND AND FIXED. Not model quality: the extractor split a Markdown paragraph at its HARD LINE WRAPS whenever the paragraph also contained a LINK/STRONG/EMPHASIS (leaf-mode), translating each fragment with no knowledge of the others. Fix c286492 folds SOFT_BREAK into the surrounding text in HugoParser._parse_inline_content; output neutrality proven by A/B rendering 14 real files byte-identically. STEP-2 REVERIFICATION DONE ON REAL CONTENT: cells-spreadsheet-management-go carries the identical wrapped paragraph that broke 16/16 locales on the sibling page; in the first 3 post-fix cells (de/ar/fa) all four pre-fix defect signatures are gone (split noun phrase, duplicated/orphaned negation, spurious copula, scrambled product name). REMAINING: full 25-locale review of this page when the campaign finishes; and the 16 heal tickets on introducing-cells-foss-go still need their own retrigger, blocked on operator permission to clear rejected candidates from the content-repo tree."
     },
@@ -1351,7 +1351,7 @@
       ]
     }
   },
-  "last_wake_summary": "TC-APT-064 sustained probe read DONE (ceiling>=64, 0 errors/3611 calls) -- reported to operator. Found+finished an interrupted commit: 8 already-reviewed, already-adopted pdf/cpp introducing-pdf-foss-cpp languages (el/hi/it/ja/ko/nl/pt/zh) staged since 2026-09-05T14:07Z, never committed by the session that adopted them. Verified candidates==staged==8, path_guard pass, spot-read clean; committed 04548cceb1 in D:/onedrive/Documents/GitHub/aspose.org. Also finalized an orphaned skill-run record (20260905-201508-sht02) against its already-landed commit 7e486c46eb. gate5-words-doc-r3/r4 remain unresolved (see field note) -- not touched this wake beyond diagnosis.",
+  "last_wake_summary": "decide()=SKIP (Track A queue empty) -> Track B: audited heal_queue.jsonl per RECURRENCE ESCALATION before any new Track-A page. Found 8 root-cause classes with open tickets from 2+ pages; only model_quality_complex_sentence_structure (TC-APT-042) was genuinely gating (zero code ever attempted). Reverified against the exact original files/languages (13 checks, current code, no fix applied) -- the defect (duplication/scramble/semantic-inversion) did not reproduce. Dispositioned MODEL_LIMITATION_DEFERRED with receipts. The other 7 classes are either auto:-prefixed validator/gate names already routed through the implemented cross-model retry + quarantine flow, or (residual_phrase_defects) have real landed TC-APT-042 code for their identified sub-pattern. RECURRENCE gate is now CLEAR; a new Track-A page (TC-APT-099 blitz-wave work) may open next wake. No content commit this wake -- this wakes deliverable was clearing a mandatory gate that was blocking ALL future new-page Track A work, recorded per the output invariants first-principles-record branch (data/summaries/fp-recurrence-gate-audit-20260906.json).",
   "cells_committed_total": 56,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [

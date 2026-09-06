@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T07:29:39.541770+00:00",
+  "generated_at": "2026-09-06T07:59:48.171151+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -38,5 +38,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "TC-APT-099 (blitz waves) is now fully unblocked (092/096/094/064 all DONE); the hour-0 sustained probe measured sustained_safe_ceiling=64 with 0 errors, so report the 24h/48h band and begin wave planning. gate5-words-doc-r3/r4 (blog.aspose.org/words/net/words-document-net) have an orphaned RECURRENCE thread: r4's fr shard produced an untracked candidate file never reviewed (not in this session's ledger -- needs a fresh claim+review, do not commit without re-review), r3/r4's ar/tr/ro/fa/hi/el/he shards errored out (write-blocked or same-as-source) and were never ticketed."
+  "next_action": "RECURRENCE gate is CLEAR (see data/summaries/fp-recurrence-gate-audit-20260906.json) -- open next: TC-APT-099 blitz-wave planning on a Tier-1a page, using the measured sustained_safe_ceiling=64 band. gate5-words-doc-r4's fr shard still needs a fresh claim+review before commit (unowned candidate). Low-priority follow-on found but not done: frontmatter_consistency.py's cross-field residual detector misses 2-token runs below its 4-alpha-char substantive-token floor (e.g. 'for .NET')."
 }
