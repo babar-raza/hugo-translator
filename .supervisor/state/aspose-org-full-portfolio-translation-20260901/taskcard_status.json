@@ -1186,7 +1186,7 @@
       "depends_on": [],
       "blocking_reason": null,
       "evidence_path": "scripts/ops/detached_git_commit.py + tests/unit/ops/test_detached_git_commit.py (4/4 passing against a real git repo)",
-      "commit": "PENDING",
+      "commit": "35c4150",
       "last_updated": "2026-09-06T02:28:36.719716+00:00",
       "blocker_type": null
     },
