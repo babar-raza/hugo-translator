@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T01:16:23.346032+00:00",
+  "generated_at": "2026-09-06T01:18:53.941046+00:00",
   "stamps": {
     "loop_prompt_version": "10.5 (2026-09-06)",
     "plan_revision": 16
@@ -38,5 +38,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "TC-APT-086 landed (ps1 BOM encoding bug, rollback.bat wmic fix). project/loop-prompt.md is back over 40KB (peer TC-APT-090/091 field notes) -- next compaction pass needed."
+  "next_action": "Second runbook compaction pass done (TC-APT-090 investigation generated a lot of field notes). Mission healthy, KPI 90, wave-cells-rust-w1 wrapping up."
 }
