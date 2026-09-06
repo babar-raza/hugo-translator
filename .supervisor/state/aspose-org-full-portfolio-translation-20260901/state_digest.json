@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T11:35:54.604046+00:00",
+  "generated_at": "2026-09-06T12:14:32.516149+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -28,15 +28,13 @@
       "release_reason": "Stale-state fix, found while orienting for TC-APT-077: logs/watchdog_state.json reads kpi_cells_24h=90 (floor 25), kpi_breach_open=false. The clauses own AND condition (TC-APT-043..047 unlanded AND KPI below floor) requires BOTH; KPI has not been below floor for a while (the peer already acted on this correctly for wave-cells-rust-w1, citing 'capacity clause released, KPI 43' -- this field just never caught up to that decision). TC-APT-046/047 remain unlanded, so a future KPI dip re-engages it automatically once checked against watchdog_state.json again."
     },
     "wave_scale": {
-      "value": 1,
-      "previous": 2,
-      "stepped_at": "2026-09-05T20:07:35+00:00",
-      "decision": "STEP DOWN 2 -> 1, per the ruling pre-committed before r4 closed",
-      "trigger": "gate5-words-doc-r4 closed at 1 accepted of 8 = 12.5%, below the 60% step-down threshold",
-      "honouring_pre_commitment": "Recorded two iterations ago, before r4 finished, precisely so this could not be rationalised afterwards: r4 is a Tier-2 heal retrigger, Track A includes Tier-2 retranslation, therefore it counts and a sub-60% close halves the scale. Applied as written.",
-      "structural_concern_still_flagged": "Unchanged and still the operator's call: retriggers run pre-selected defective cells on whatever code existed at launch (r4 predated three landed fixes), so if they count, a rejected page permanently pins the ladder at 1. Note heal-cells-go-w1 -- also a retrigger -- is running at 12/18 = 67%, which shows the low figure was r4-specific, not retriggers as a category.",
+      "value": 2,
+      "previous": 1,
+      "stepped_at": "2026-09-06T11:45:00+00:00",
+      "decision": "STEP UP 1 -> 2, per plan SS0.9/TC-APT-080",
+      "trigger": "email/net wave closed at 25/25 = 100% (>=80% threshold); RECURRENCE gate clear; KPI 94 >= floor 25 -- all three step-up conditions held simultaneously",
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "pages_newly_live_total is now 1 (email/net/_index page-complete, fc101aa230). Gate 5 (one Tier-1a page x 25 languages) is now satisfied -- check plan SS12 gate-close criteria and advance to Gate 6 (one Tier-1a page per in-scope site) if not already tracked. Continue TC-APT-099 blitz-wave momentum: pick another fresh Tier-1a page (3d/*, barcode/python, cells/cpp, email/cpp, email/python all still zero-coverage) using the same split-manifest pattern (LLM 22 / m2m100 hu-ja-ro) that just worked cleanly."
+  "next_action": "wave2 done: pages_newly_live_total=2 (email/net, email/cpp both page-complete), email/python 21/24 with 4 heal tickets (zh gate-fail, hi/hu/ja review-reject). wave_scale stays 2 (wave was 46/46 on the two clean pages = 100%, but 21/24=87.5% on email/python if counted per-page -- aggregate wave acceptance 71/75=94.7% >=80%, so next wave may step to 4). Continue TC-APT-099 blitz on more Tier-1a pages (3d/*, barcode/python, cells/cpp all zero-coverage), or retry email/python's 4 tickets with cross-model escalation. IMPORTANT: flag to operator the discovered HEAD-orphaning risk in the shared single-checkout content repo (see loop-prompt.md field note)."
 }
