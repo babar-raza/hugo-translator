@@ -1372,12 +1372,12 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "wave8-llm-retry2",
-      "pid": 7061,
-      "launched_at": "2026-09-07T01:22:57+00:00",
+      "run_id": "wave8-llm-retry4",
+      "pid": 27948,
+      "launched_at": "2026-09-07T01:54:55+00:00",
       "manifest": "data/campaigns/wave8-llm/launch.yaml",
-      "log": "logs/wave8-llm-retry2_launcher.log",
-      "note": "TC-APT-099 wave8: first attempt (PID 91764, killed) was severely bottlenecked by a real code bug found live -- TC-APT-042's cross-field frontmatter repair crashed on _RetryFeedbackModel with 'got multiple values for keyword argument retry_feedback', silently swallowed, burning ~2min per hit, repeatedly. Fixed in commit 8286ff2 (kwargs.setdefault instead of unconditional override), verified with a regression test + full translation_engine suite (1356 passed, 2 pre-existing unrelated failures confirmed via git stash). Relaunched fresh (resume-based, picked up the 9 cells already completed by the killed attempt) -- should now run at wave7-pilot speed. pdf-annotations-in-cpp, pdf-document-management-in-cpp, pdf-pdf-cpp, professionalize_llm, 22 langs x 3 pages = 66 cells, max-workers=2."
+      "log": "logs/wave8-llm-retry4_launcher.log",
+      "note": "TC-APT-099 wave8: fixed a real _RetryFeedbackModel duplicate-kwarg crash (commit 8286ff2). Separately found pdf-pdf-cpp (the 3rd page originally in this wave) genuinely fails BOTH models for unrelated reasons -- professionalize_llm hits a frontmatter dual-path placement-check false positive (likely, title has a colon), m2m100 catastrophically loses inline code spans (92->30) on this identifier-dense page. See data/summaries/fp-pdf-pdf-cpp-dual-model-failure-20260907.json and heal-pdf-pdf-cpp-dual-model-failure -- pulled OUT of this wave, needs live instrumentation before another attempt, claim released. This run: pdf-annotations-in-cpp + pdf-document-management-in-cpp only (the 2 pages with no evidence of either failure mode), same campaign_id 'wave8-llm' so it correctly resumes the 10 cells already completed before the split (do NOT use a different campaign_id for the same manifest scope -- it makes already-good receipted output look like unrecognized dirty files, as the wave8b-llm attempt just demonstrated). professionalize_llm, 22 langs x 2 pages = 44 cells, max-workers=2."
     }
   ],
   "wave_scale": {
