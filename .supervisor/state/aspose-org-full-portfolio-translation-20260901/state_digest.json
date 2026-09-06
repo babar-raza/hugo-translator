@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T03:11:01.277093+00:00",
+  "generated_at": "2026-09-06T03:29:19.136123+00:00",
   "stamps": {
     "loop_prompt_version": "10.6 (2026-09-06)",
     "plan_revision": 16
@@ -38,5 +38,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "TC-APT-091 landed (44f3174); next: resume Track-A support or pick next unclaimed Track-B card"
+  "next_action": "TC-APT-092 landed (ledger hardened+backfilled, 274 rows); next BLITZ critical path: TC-APT-096 (LMDB nested-txn fix)"
 }

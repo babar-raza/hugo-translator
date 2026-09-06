@@ -1227,15 +1227,15 @@
       "blocker_type": null
     },
     "TC-APT-092": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 5,
       "title": "Wire+backfill qualification ledger; per-(language,class,model) cohort state (FileLock, timestamp-sorted, verdict-vs-gate semantics, heal_retrigger flag, indexed reads)",
       "depends_on": [],
-      "owner": "loop",
-      "blocking_reason": "BLITZ CRITICAL PATH 1 of 3. Plan SS0.10.",
-      "evidence_path": null,
-      "commit": null,
-      "last_updated": "2026-09-06T03:00:01.239991+00:00",
+      "owner": "session-10942b65",
+      "blocking_reason": "Hardened record_verdict with the missing FileLock (bare append before) and an mtime-invalidated in-memory index (was a full linear re-parse per query -- quadratic after backfill); added heal_retrigger:bool, excluded from all cohort ladder math (rolling_reject_rate/consecutive_clean_count/qualifies_for_stratified_sampling) so a burst of heal-retry verdicts cannot manufacture a false PROVEN streak or sink a cohort on cells outside its normal flow. Built scripts/ops/backfill_qualification_ledger.py and ran it for real: 274 rows from every campaign dirs acceptance_receipts.jsonl, timestamp-sorted. Confirmed empirically (all 478 rows across every failure_metadata.jsonl) that gate-only failures are NEVER review verdicts -- every gate value is a structural validator/gate name (FrontmatterLanguageCheck, TC-SAS-01, RepetitionDetectorValidator, StructureValidator, LanguageConsistencyValidator, verification:language_detection, GATE36/44) -- so failure_metadata.jsonl is excluded from the backfill entirely rather than converted to REJECT, which is what would have biased acceptance rates the taskcard warns against. Genuine review verdicts come from heal_queue.jsonls tier:review_reject tickets (the only place a real per-cell rubric verdict is recorded today, e.g. the words-document-net RB-004/RB-005 citations); each is paired, in chronological order per cell (not any-match), against the specific acceptance attempt it followed -- words-document-net/fa was rejected, retried, and re-accepted, and the pairing correctly attributes the reject to the first attempt only. tier:review_hold (1 ticket: content HELD, never shipped, no model recorded) is excluded, noted as a known small gap. NOT verified: the ~150 heal_queue tickets with neither an auto: nor a tier:review_reject/review_hold marker (producer_link_unit_splitting, model_quality_residual_phrase_defects, etc.) -- spot-checking showed several of these are ONE systemic defect logged once per affected language from a single investigation, not independent per-cell review events, so folding them in naively would double-count; resolving this needs the actual data/summaries/review-*.json batch files parsed for true per-cell verdicts, which this pass does not do. Measured on the conservative slice this DOES cover: 261/274 = 95.3% overall; this is NOT directly comparable to the plans earlier 198/53=79% figure (different, unknown methodology) and should not be read as confirming or refuting the claimed per-language bimodal split. NOT done: wiring record_verdict into a real call site -- investigated and confirmed no code call site exists anywhere (review is agent-narrated per plan SS9, not a deterministic function), so full automatic wiring needs either an operator amendment to loop-prompt.md SS4/SS5 (rules there are operator-only per SS0.3) or a follow-on unification with heal_queue ticket writing (itself read-only today, TC-APT-060 territory) so opening a review-reject ticket also calls record_verdict. The tool is built, tested, and real backfilled data exists for TC-APT-093/096/094/099 to consume; invoking it per future verdict remains a manual step until one of those two paths lands.",
+      "evidence_path": "src/workers/qualification_ledger.py; scripts/ops/backfill_qualification_ledger.py; tests/unit/workers/test_qualification_ledger.py; tests/unit/ops/test_backfill_qualification_ledger.py; data/campaigns/qualification/cells.jsonl (274 rows backfilled: 261 APPROVE / 13 REJECT, real run)",
+      "commit": "PENDING",
+      "last_updated": "2026-09-06T03:29:12.151650+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.10/SS0.11 revisions 17-18"
     },

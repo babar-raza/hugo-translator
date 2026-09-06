@@ -5,12 +5,17 @@ retried on the LLM (and vice versa) before quarantine; the routing table and
 per-cell ledger are populated from live verdicts; a test proves the auto-flip."
 """
 
+import json
+import os
+import time
+
 import pytest
 
 from src.workers.qualification_ledger import (
     AUTO_FLIP_THRESHOLD,
     AUTO_FLIP_WINDOW,
     STRATIFIED_SAMPLING_THRESHOLD,
+    _lock_path,
     consecutive_clean_count,
     cross_model_retry_target,
     models_tried,
@@ -55,6 +60,7 @@ class TestRecordVerdict:
             "model",
             "verdict",
             "rubric_rules",
+            "heal_retrigger",
             "recorded_at",
         }
 
@@ -223,3 +229,77 @@ class TestStratifiedSamplingPromotion:
         assert not qualifies_for_stratified_sampling(
             SITE, LANG, "docs_page", "professionalize_llm", ledger_path=ledger
         )
+
+
+class TestHealRetriggerExcludedFromLadderMath:
+    """TC-APT-092: a heal-queue retrigger measures "did the targeted fix
+    work," not ordinary cohort throughput -- mixing the two would let a
+    burst of heal retries manufacture a false PROVEN streak or sink a
+    cohort's rate on cells that were never part of its normal flow."""
+
+    def test_heal_retrigger_reject_does_not_count_toward_reject_rate(self, tmp_path):
+        ledger = tmp_path / "cells.jsonl"
+        for i in range(AUTO_FLIP_WINDOW):
+            record_verdict(
+                site_id=SITE, source_path=f"p{i}.md", target_lang=LANG, content_class=CLASS,
+                model="m2m100_418m", verdict="APPROVE", ledger_path=ledger,
+            )
+        # A flood of heal-retrigger REJECTs must not tip the rate over threshold.
+        for i in range(10):
+            record_verdict(
+                site_id=SITE, source_path=f"heal{i}.md", target_lang=LANG, content_class=CLASS,
+                model="m2m100_418m", verdict="REJECT", heal_retrigger=True, ledger_path=ledger,
+            )
+        assert rolling_reject_rate(SITE, LANG, CLASS, "m2m100_418m", ledger_path=ledger) == 0.0
+        assert not should_auto_flip_primary(SITE, LANG, CLASS, "m2m100_418m", ledger_path=ledger)
+
+    def test_heal_retrigger_approve_does_not_inflate_consecutive_clean_count(self, tmp_path):
+        ledger = tmp_path / "cells.jsonl"
+        record_verdict(
+            site_id=SITE, source_path="p0.md", target_lang=LANG, content_class=CLASS,
+            model="m2m100_418m", verdict="REJECT", ledger_path=ledger,
+        )
+        for i in range(STRATIFIED_SAMPLING_THRESHOLD):
+            record_verdict(
+                site_id=SITE, source_path=f"heal{i}.md", target_lang=LANG, content_class=CLASS,
+                model="m2m100_418m", verdict="APPROVE", heal_retrigger=True, ledger_path=ledger,
+            )
+        assert consecutive_clean_count(SITE, LANG, CLASS, "m2m100_418m", ledger_path=ledger) == 0
+        assert not qualifies_for_stratified_sampling(
+            SITE, LANG, CLASS, "m2m100_418m", ledger_path=ledger
+        )
+
+
+class TestIndexCache:
+    """TC-APT-092: cells.jsonl is re-read on every query in the naive
+    implementation -- quadratic after backfill. The cache must stay correct
+    (never serve stale data) while avoiding a full reparse when nothing
+    changed."""
+
+    def test_a_query_after_an_external_append_sees_the_new_row(self, tmp_path):
+        ledger = tmp_path / "cells.jsonl"
+        record_verdict(
+            site_id=SITE, source_path=PATH, target_lang=LANG, content_class=CLASS,
+            model="m2m100_418m", verdict="APPROVE", ledger_path=ledger,
+        )
+        assert consecutive_clean_count(SITE, LANG, CLASS, "m2m100_418m", ledger_path=ledger) == 1
+
+        # Simulate a DIFFERENT process appending directly (bypassing this
+        # process's record_verdict, so its own cache-invalidation-on-write
+        # cannot be what makes this pass).
+        row = {
+            "site_id": SITE, "source_path": PATH, "target_lang": LANG,
+            "content_class": CLASS, "model": "m2m100_418m", "verdict": "APPROVE",
+            "rubric_rules": [], "heal_retrigger": False, "recorded_at": "2026-01-01T00:00:00+00:00",
+        }
+        # Ensure a distinct mtime on filesystems with coarse timestamp resolution.
+        time.sleep(0.01)
+        with ledger.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row) + "\n")
+        os.utime(ledger, None)
+
+        assert consecutive_clean_count(SITE, LANG, CLASS, "m2m100_418m", ledger_path=ledger) == 2
+
+    def test_lock_file_uses_the_established_sibling_suffix_convention(self, tmp_path):
+        ledger = tmp_path / "cells.jsonl"
+        assert _lock_path(ledger) == tmp_path / "cells.jsonl.lock"

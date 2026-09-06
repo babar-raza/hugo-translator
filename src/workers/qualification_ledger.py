@@ -33,18 +33,32 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from src.utils.file_lock import FileLock
+
 _LEDGER_FILE = Path("data/campaigns/qualification/cells.jsonl")
 AUTO_FLIP_WINDOW = 20
 AUTO_FLIP_THRESHOLD = 0.20
 STRATIFIED_SAMPLING_THRESHOLD = 15
 _VALID_VERDICTS = frozenset({"APPROVE", "REJECT"})
 
+# TC-APT-092: in-memory index cache, keyed by resolved ledger path, holding
+# (mtime, rows) so repeated queries in one process don't re-read and re-parse
+# the whole file every call -- quadratic once cells.jsonl is backfilled from
+# every campaign dir's receipts (hundreds of thousands of rows). Invalidated
+# by mtime, not a TTL: correct the instant another process's append lands,
+# never stale by a fixed window, and only one stat() call on a cache hit.
+_index_cache: dict[Path, tuple[float, list[dict[str, Any]]]] = {}
+
 
 def _ledger_path(override: Path | None) -> Path:
     return override or _LEDGER_FILE
 
 
-def _load_rows(ledger_path: Path) -> list[dict[str, Any]]:
+def _lock_path(ledger_path: Path) -> Path:
+    return ledger_path.with_suffix(ledger_path.suffix + ".lock")
+
+
+def _parse_rows(ledger_path: Path) -> list[dict[str, Any]]:
     if not ledger_path.exists():
         return []
     rows: list[dict[str, Any]] = []
@@ -59,6 +73,23 @@ def _load_rows(ledger_path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _load_rows(ledger_path: Path) -> list[dict[str, Any]]:
+    """Cached read: reparses only when the file's mtime has moved since the
+    last load in THIS process. A cache miss (first call, or another process
+    appended since) costs one full parse; every other call costs one stat()."""
+    try:
+        mtime = ledger_path.stat().st_mtime
+    except FileNotFoundError:
+        _index_cache.pop(ledger_path, None)
+        return []
+    cached = _index_cache.get(ledger_path)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+    rows = _parse_rows(ledger_path)
+    _index_cache[ledger_path] = (mtime, rows)
+    return rows
+
+
 def record_verdict(
     *,
     site_id: str,
@@ -68,10 +99,21 @@ def record_verdict(
     model: str,
     verdict: str,
     rubric_rules: tuple[str, ...] = (),
+    heal_retrigger: bool = False,
     ledger_path: Path | None = None,
     recorded_at: str | None = None,
 ) -> dict[str, Any]:
-    """Append one review verdict row. Never pass candidate/translated text here."""
+    """Append one review verdict row. Never pass candidate/translated text here.
+
+    heal_retrigger (TC-APT-092): True when this verdict comes from retrying a
+    cell already sitting in the heal queue (a Tier-2 fix-verify pass), not
+    from first-look production review. Cohort ladder math (rolling_reject_rate,
+    consecutive_clean_count, qualifies_for_stratified_sampling) must exclude
+    these -- a heal retrigger measures "did the targeted fix work," not "is
+    this cohort's ordinary throughput reliable," and mixing the two would let
+    a burst of heal retries either manufacture a false PROVEN streak or sink
+    a cohort's rate on cells that were never part of its normal flow.
+    """
     if verdict not in _VALID_VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(_VALID_VERDICTS)}, got {verdict!r}")
     path = _ledger_path(ledger_path)
@@ -84,10 +126,13 @@ def record_verdict(
         "model": model,
         "verdict": verdict,
         "rubric_rules": list(rubric_rules),
+        "heal_retrigger": bool(heal_retrigger),
         "recorded_at": recorded_at or datetime.now(timezone.utc).isoformat(),
     }
-    with path.open("a", encoding="utf-8", newline="\n") as f:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    with FileLock(_lock_path(path), timeout=10):
+        with path.open("a", encoding="utf-8", newline="\n") as f:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    _index_cache.pop(path, None)
     return row
 
 
@@ -146,6 +191,7 @@ def _rolling_verdicts(
         and row.get("content_class") == content_class
         and row.get("model") == model
         and row.get("verdict") in _VALID_VERDICTS
+        and not row.get("heal_retrigger")
     ]
     return matches[-window:] if window else matches
 
