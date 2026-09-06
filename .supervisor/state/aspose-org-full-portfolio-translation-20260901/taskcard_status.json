@@ -1305,15 +1305,15 @@
       "plan_ref": "SS0.10/SS0.11 revisions 17-18"
     },
     "TC-APT-098": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": 6,
       "title": "Wiring audit: sweep DONE taskcards for implemented-but-unwired artifacts; rule: acceptance must name a production call site",
       "depends_on": [],
-      "owner": "loop",
-      "blocking_reason": "qualification_ledger.py and work_claims.py already found unwired. Plan SS0.10.",
-      "evidence_path": null,
+      "owner": "session-10942b65",
+      "blocking_reason": "Pass 1 done (data/summaries/tc098-wiring-audit-pass1-20260906.json): swept 20 src/scripts modules named in DONE taskcards evidence_path. Confirmed properly wired: work_claims.py, llm_slot_semaphore.py (both this session, TC-APT-094), correction.py, fidelity_judge.py, heal_queue.py, l2_persistent.py, campaign_manifest.py, llm_backend.py, language_consistency_validator.py. Two real gaps found: (1) qualification_ledger.record_verdict() only called from the one-time backfill script -- TC-APT-092 did the backfill half, never the wire half, so new verdicts silently stop being recorded; (2) reverification_receipts.py (TC-APT-057) is never called from ANY production code path -- its 13 real rows were almost certainly hand-written via ad-hoc python -c calls, and mission_supervisor.py's derive_blockers() has zero automated check for RECURRENCE ESCALATION (loop-prompt.md SS3) -- that rule has NO code-level backstop today, enforced entirely by session discipline. Neither gap fixed yet: both need a real design decision (a verdict-recording CLI + runbook wiring; a root_cause_class->taskcard registry design) rather than a rushed patch. Only 20 of 62 DONE taskcards evidence-path-swept so far.",
+      "evidence_path": "data/summaries/tc098-wiring-audit-pass1-20260906.json",
       "commit": null,
-      "last_updated": "2026-09-06T03:00:01.239991+00:00",
+      "last_updated": "2026-09-06T06:56:00.000000+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.10/SS0.11 revisions 17-18"
     },
