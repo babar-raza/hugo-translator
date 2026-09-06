@@ -1349,6 +1349,18 @@
       "last_updated": "2026-09-06T10:20:00.000000+00:00",
       "blocker_type": null,
       "plan_ref": "RECURRENCE ESCALATION step 1 (fix) for heal-cells-mgmt-go-retry2-wrap-link-* tickets"
+    },
+    "TC-APT-101": {
+      "status": "IN_PROGRESS",
+      "gate": 5,
+      "title": "reconstruction_punctuation_duplication: FIX-C appends source trailing punctuation even when the model already ended the sentence with a DIFFERENT valid terminal mark (not a drop, a substitution) -- reproduced directly on pdf-document-management-in-cpp es/pl/th Quick Start sentences (model rendered a colon-before-code-block source as its own period; FIX-C then appended the source colon anyway, producing doubled \".:\"). RECURRENCE ESCALATION trigger: this root_cause_class had 4 open-ticket pages (pdf/typescript/_index.md ro, pdf-annotations-in-cpp fa, pdf-document-management-in-cpp fa+es/pl/th, scene-entities-in-net hi) though TC-APT-040/073 had already fixed two OTHER manifestations (native-terminal-equivalents, leading-side doubling) of the same class -- so no new Track-A page opens until this closed-loop sequence runs.",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": "Step 1 (fix) DONE: ast_renderer.py _preserve_punctuation trailing branch now also skips the append when translated_text already ends with ANY terminal punctuation mark (own or native-equivalent set), not just the source-specific one -- an already-terminated sentence should never get a second terminal appended regardless of which mark the model chose. Step 2 (reverify against exact original file): confirmed directly by reading the actual rejected candidate files on disk (content repo, untracked from the wave8 run) -- es \"...aspose_pdf_foss`.:\" / \"...guarda el resultado.:\", pl and th identical shape -- and proving via a new regression test built from those EXACT strings that the fixed code no longer reproduces the double punctuation (also confirmed the OLD code DOES fail these same 3 tests via git-stash bisection). Step 3 (retrigger campaign) IN PROGRESS: manifest data/campaigns/manifests/heal-recur-punct-fix-pdfdocmgmt-cpp-20260907.yaml built (--existing replace, 1 source x es/pl/th), launched detached (see active_detached_runs). NOT yet done: the ro pentruTypeScript and fa description-field word-gluing tickets in this SAME class label look like a DIFFERENT mechanism (a missing space at a placeholder START boundary, not punctuation duplication) -- explicitly NOT touched this iteration; the mission has a standing precedent (placeholder_manager.py Finnish case-suffix comment) that blindly inserting spaces around placeholders is unsafe (agglutinative-language suffixes legitimately glue onto a placeholders END with no space), so this needs its own live-instrumentation investigation before any fix, not a blind extension of this one. Full regression+reconstructor suite (525 tests) passes with the fix, 0 regressions.",
+      "evidence_path": "tests/regression/test_native_terminal_punctuation_not_doubled.py (TestSubstitutedTerminalsAreNotDoubled); data/campaigns/manifests/heal-recur-punct-fix-pdfdocmgmt-cpp-20260907.yaml",
+      "commit": null,
+      "last_updated": "2026-09-07T00:00:00.000000+00:00",
+      "blocker_type": null
     }
   },
   "gate_closures": {

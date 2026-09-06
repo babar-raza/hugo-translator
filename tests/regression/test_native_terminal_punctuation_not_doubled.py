@@ -55,6 +55,35 @@ class TestLeadingNativeTerminalsAreNotDoubled:
         assert _render(", and more text", "and more text") == ",and more text"
 
 
+class TestSubstitutedTerminalsAreNotDoubled:
+    """TC-APT-042 (reconstruction_punctuation_duplication, quickstart-punctuation-corruption).
+
+    Reproduced directly on pdf-document-management-in-cpp es/pl/th: the model
+    rewrote a colon-before-code-block sentence to end in its own period rather
+    than a colon, and FIX-C appended the source's colon on top anyway because
+    a period is neither the source char nor a registered *equivalent* of it --
+    producing "...aspose_pdf_foss`.:" and "...guarda el resultado.:" in the
+    committed candidate files. The translation's terminal is a different valid
+    mark, not a dropped one; appending on top of it is always wrong.
+    """
+
+    def test_spanish_period_satisfies_source_colon(self):
+        assert _render(
+            "Link against the `aspose_pdf_foss` target:",
+            "Enlaza contra el objetivo `aspose_pdf_foss`.",
+        ) == "Enlaza contra el objetivo `aspose_pdf_foss`."
+
+    def test_polish_period_satisfies_source_colon(self):
+        assert _render(
+            "and save the result:", "a nastepnie zapisz wynik."
+        ) == "a nastepnie zapisz wynik."
+
+    def test_thai_period_satisfies_source_colon(self):
+        assert _render(
+            "and save the result:", "และบันทึกผลลัพธ์."
+        ) == "และบันทึกผลลัพธ์."
+
+
 class TestGenuineDropsAreStillRestored:
     def test_missing_ascii_period_is_still_appended(self):
         assert _render("This is a sentence.", "Dies ist ein Satz") == "Dies ist ein Satz."

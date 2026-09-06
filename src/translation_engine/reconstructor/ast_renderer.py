@@ -135,6 +135,21 @@ class ASTRenderer:
             equivalents = EQUIVALENT_TERMINALS.get(punct[0], "")
             return bool(equivalents) and bool(text) and text[0] in equivalents
 
+        # TC-APT-042 (reconstruction_punctuation_duplication, quickstart-punctuation-corruption
+        # ticket): the model sometimes rewrites the sentence to end in a DIFFERENT valid terminal
+        # mark than the source's (e.g. a colon-before-code-block source rendered as a period —
+        # confirmed directly on pdf-document-management-in-cpp es/pl/th: "...aspose_pdf_foss`.:"
+        # and "...guarda el resultado.:", the model's own period plus FIX-C's appended source
+        # colon). Neither the exact-match nor the equivalence check above catches this because the
+        # translation's mark is a genuinely different (not source-equivalent) terminal punctuation
+        # character, not a dropped one. Appending on top of an already-present terminal mark is
+        # always wrong, so once the translation ends in ANY terminal punctuation, treat the source's
+        # as preserved rather than doubling it.
+        _ALL_TERMINALS = set(TRAILING_PUNCT) | {c for chars in EQUIVALENT_TERMINALS.values() for c in chars}
+
+        def _ends_with_any_terminal(text: str) -> bool:
+            return bool(text) and text[-1] in _ALL_TERMINALS
+
         # Check if source had leading punctuation but translation doesn't
         if source_text and translated_text:
             # Extract leading punctuation from source
@@ -171,6 +186,7 @@ class ASTRenderer:
                 source_trailing_punct
                 and not translated_text.endswith(source_trailing_punct)
                 and not _ends_with_equivalent(translated_text, source_trailing_punct)
+                and not _ends_with_any_terminal(translated_text)
             ):
                 logger.debug(
                     f"[FIX-C] Restoring trailing punctuation '{source_trailing_punct}' "
