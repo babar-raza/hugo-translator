@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T09:16:42.538071+00:00",
+  "generated_at": "2026-09-06T09:38:30.388465+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -39,5 +39,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "Check heal-cells-mgmt-retry3 (PID 95012, logs/heal-cells-mgmt-retry3_launcher.log) -- 14-lang retrigger of cells-spreadsheet-management-go with TC-APT-100's whole-link-placeholder fix. Review each against config/review_rubric.yaml + the specific heal-cells-mgmt-go-retry2-wrap-link-<lang> ticket it should close; commit what passes. ja/tr may still show the separate product-name-interleaving defect (unfixed, different ticket) even if the wrap-link spot is now clean."
+  "next_action": "Check heal-cells-mgmt-retry4 (PID 99040, logs/heal-cells-mgmt-retry4_launcher.log) -- 14-lang retrigger of cells-spreadsheet-management-go, 3rd launch attempt (first two failed on dirty-state/SHA-drift checks, not translation quality -- see active_detached_runs history). Review each against config/review_rubric.yaml + the exact heal-cells-mgmt-go-retry2-wrap-link-<lang> ticket; commit what passes. Do NOT commit any tracked hugo-translator file until this campaign's outcome is confirmed (a mid-run commit already broke one attempt via SHA drift)."
 }
