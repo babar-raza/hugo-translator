@@ -140,7 +140,7 @@ class TestMixedLanguageDetectionFixes:
 
             result = validator.validate(
                 source="",
-                translation="Text that causes detection failure",
+                translation="This is a longer piece of text that causes detection failure",
                 context={"target_lang": "de"},
             )
 
@@ -178,7 +178,7 @@ class TestMixedLanguageDetectionFixes:
                 return [mock_result]
 
         # Create text with 100 sentences
-        german_sentences = ["Dies ist ein deutscher Satz über Technologie. "] * 100
+        german_sentences = ["Dies ist ein deutscher Satz über Technologie und Innovation. "] * 100
         text = " ".join(german_sentences)
 
         with patch(
@@ -224,7 +224,7 @@ class TestMixedLanguageDetectionFixes:
                 return [mock_result]
 
         # Create text with 100 sentences
-        german_sentences = ["Dies ist ein deutscher Satz über Technologie. "] * 100
+        german_sentences = ["Dies ist ein deutscher Satz über Technologie und Innovation. "] * 100
         text = " ".join(german_sentences)
 
         with patch(
@@ -269,7 +269,7 @@ class TestMixedLanguageDetectionFixes:
                 return [mock_result]
 
         # Create 100 sentences
-        sentences = ["Dette er en dansk sætning om teknologi. "] * 100
+        sentences = ["Dette er en dansk sætning om teknologi og innovation. "] * 100
         text = " ".join(sentences)
 
         with patch(

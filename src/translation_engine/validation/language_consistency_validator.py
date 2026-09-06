@@ -88,6 +88,17 @@ _SCRIPT_MIX_MIN_LINE_LEN = 15
 # Fraction of content lines that may contain a forbidden script before flagging
 _SCRIPT_MIX_THRESHOLD = 0.06
 
+# TC-APT-091: minimum alphabetic-character signal before a whole document is
+# considered reliable enough to run through per-sentence langdetect at all.
+# Same calibration TC-APT-090 established for frontmatter residues (measured
+# on real cells-go/note-python content): accuracy on a short residue is only
+# 66.2% at 6 alphabetic characters, 88.2% at 20, 98.5% at 40 -- confidence
+# does NOT drop when the answer is wrong, so no confidence cut substitutes
+# for this floor. Below it, a minimal page (e.g. a heading plus one governed
+# do_not_translate link, TC-APT-085/087) has too little independent prose to
+# judge and must be skipped rather than misreported.
+_MIN_DOCUMENT_SIGNAL_ALPHA = 40
+
 
 class LanguageConsistencyValidator(PostTranslationValidator):
     """Validates that translated content is in the correct target language.
@@ -180,8 +191,9 @@ class LanguageConsistencyValidator(PostTranslationValidator):
 
         # Clean text for detection
         cleaned_text = self._clean_text_for_detection(translation)
+        signal_alpha = sum(1 for char in cleaned_text if char.isalpha())
 
-        if len(cleaned_text) < 20:
+        if len(cleaned_text) < 20 or signal_alpha < _MIN_DOCUMENT_SIGNAL_ALPHA:
             issues.append(
                 ValidationIssue(
                     validator="LanguageConsistencyValidator",
@@ -190,8 +202,14 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                     location="translation",
                 )
             )
+            # "Too short" only means the sentence-purity check is skipped --
+            # it must not silently discard an ERROR the script-mixing check
+            # (which runs first, unconditionally) already found. Pre-existing
+            # bug, exposed by TC-APT-091 raising this floor: success was
+            # hardcoded True here regardless of `issues` already containing
+            # a script-mixing ERROR for a short-but-contaminated snippet.
             return ValidationResult(
-                success=True,
+                success=len([i for i in issues if i.severity == ValidationSeverity.ERROR]) == 0,
                 issues=issues,
             )
 
@@ -207,6 +225,21 @@ class LanguageConsistencyValidator(PostTranslationValidator):
             for i, sentence in enumerate(sentences):
                 # Skip very short sentences as they're unreliable for language detection
                 if len(sentence.strip()) < self.min_sentence_length:
+                    continue
+
+                # TC-APT-091: min_sentence_length (default 8, config-driven,
+                # counts raw characters) only filters near-empty fragments --
+                # it does not clear the calibrated reliability floor. Measured
+                # directly on SHIPPED, REVIEWED Swedish content: per-sentence
+                # detection is 100% accurate at 40+ alphabetic characters but
+                # only 83% at 20-39 and 39% below 20. A per-sentence floor at
+                # raw length 8 admits sentences (short headings, bullets)
+                # deep in that unreliable range, which is why wrong answers
+                # were scattered across unrelated languages (id, hu, ro, so,
+                # tr, en) on human-approved Swedish output rather than
+                # clustering on Swedish's actual near-neighbors.
+                sentence_alpha = sum(1 for char in sentence if char.isalpha())
+                if sentence_alpha < _MIN_DOCUMENT_SIGNAL_ALPHA:
                     continue
 
                 total_sentences += 1
@@ -434,8 +467,22 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         # Remove inline code (`...`)
         text = re.sub(r"`[^`]+`", "", text)
 
-        # Remove markdown links but keep text (BEFORE removing URLs to preserve link text)
-        text = re.sub(r"\[([^\]]+)\]\([^\)]*\)", r"\1", text)
+        # Remove markdown links ENTIRELY, including their link text (TC-APT-091).
+        # Link text is frequently a governed brand/navigation label that stays in
+        # English by design (do_not_translate, TC-APT-085/087) -- keeping it as
+        # ordinary prose merges it with surrounding text into one blended
+        # "sentence" whenever no sentence-ending punctuation separates them
+        # (e.g. a heading immediately followed by a list-item link), which then
+        # fails detection outright. Confirmed live: on a minimal `_index.md`
+        # page (just a heading + one governed nav link), the translated
+        # Romanian heading plus the untouched English label collapsed into a
+        # single 39-char pseudo-sentence detected as French at 100% confidence,
+        # tanking purity to 0% and rejecting an otherwise-correct translation.
+        # A real untranslated link (one that SHOULD have been translated) is
+        # still caught more precisely elsewhere -- TC-SAS-01's same-as-source
+        # ratio flags any unit, including LINK_TEXT, that came back identical
+        # to its source.
+        text = re.sub(r"\[[^\]]+\]\([^\)]*\)", "", text)
 
         # Remove URLs
         text = re.sub(r"https?://\S+", "", text)

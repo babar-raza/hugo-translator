@@ -244,13 +244,22 @@ class TestLanguageConsistencyValidator:
         assert "SHORTCODE_3" not in cleaned
         assert "deutscher Text" in cleaned or "deutschen Kontext" in cleaned
 
-    def test_markdown_links_text_preserved(self) -> None:
-        """Test that markdown link text is preserved but URLs removed."""
+    def test_markdown_links_removed_entirely(self) -> None:
+        """TC-APT-091: markdown links (text AND url) are stripped entirely,
+        not just the url. Link text is frequently a governed brand/navigation
+        label that stays in English by design (do_not_translate), so keeping
+        it as ordinary prose can merge it with adjacent text into one blended
+        pseudo-sentence that fails language detection outright -- confirmed
+        live on a minimal `_index.md` page (heading + one governed nav link)
+        where this collapsed purity to 0% and rejected an otherwise-correct
+        translation. A real untranslated link is still caught more precisely
+        by TC-SAS-01's same-as-source ratio, which flags any unit --
+        including LINK_TEXT -- that came back identical to its source."""
         validator = LanguageConsistencyValidator()
         text = "Dies ist [deutscher Linktext](https://example.com) im Text."
 
         cleaned = validator._clean_text_for_detection(text)
-        assert "deutscher Linktext" in cleaned
+        assert "deutscher Linktext" not in cleaned
         assert "https://example.com" not in cleaned
         assert "[" not in cleaned
         assert "]" not in cleaned
@@ -296,7 +305,8 @@ class TestLanguageConsistencyValidator:
 
         # Should contain German text
         assert "deutscher" in cleaned or "deutschen" in cleaned
-        assert "Softwareentwicklung" in cleaned
+        # TC-APT-091: link text is now stripped along with the link, not kept
+        assert "Softwareentwicklung" not in cleaned
 
     def test_language_detection_exception_handling(self) -> None:
         """Test that language detection exceptions are handled gracefully."""
@@ -371,7 +381,7 @@ class TestLanguageConsistencyValidator:
     def test_high_confidence_threshold(self) -> None:
         """Test validator with very high confidence threshold (threshold stored but purity drives result)."""
         validator = LanguageConsistencyValidator(confidence_threshold=0.99)
-        german_text = "Dies ist ein deutscher Text."
+        german_text = "Dies ist ein deutscher Text über Technologie und Innovation."
         result = validator.validate("", german_text, {"target_lang": "de"})
 
         # Should detect correct language — purity check passes single-sentence German
@@ -406,7 +416,7 @@ class TestLanguageConsistencyValidator:
     def test_source_parameter_ignored(self) -> None:
         """Test that source parameter is ignored (signature compatibility)."""
         validator = LanguageConsistencyValidator()
-        german_text = "Dies ist ein deutscher Text über Technologie."
+        german_text = "Dies ist ein deutscher Text über Technologie und Innovation."
 
         # Source should be ignored
         result1 = validator.validate("English source", german_text, {"target_lang": "de"})
@@ -419,7 +429,7 @@ class TestLanguageConsistencyValidator:
     def test_context_extensibility(self) -> None:
         """Test that extra context fields don't break validation."""
         validator = LanguageConsistencyValidator()
-        german_text = "Dies ist ein deutscher Text über Technologie."
+        german_text = "Dies ist ein deutscher Text über Technologie und Innovation."
 
         # Context with extra fields
         context = {
@@ -469,7 +479,7 @@ class TestLanguageConsistencyValidator:
         assert result1.error_count == 0
 
         # Wrong language - 1 error
-        english_text = "This is English text about technology."
+        english_text = "This is English text about technology and innovation."
         result2 = validator.validate("", english_text, {"target_lang": "de"})
         assert result2.error_count == 1
 
@@ -484,3 +494,99 @@ class TestLanguageConsistencyValidator:
         # Should pass even if there are warnings
         if result.warning_count > 0:
             assert result.success is True  # Warnings don't fail validation
+
+
+class TestGovernedLinkLabelDoesNotContaminatePurity:
+    """TC-APT-091: recurrence-escalation fix. 15 open heal_queue tickets shared
+    root_cause_class auto:LanguageConsistencyValidator; 9 traced to the SAME
+    page (blog.aspose.org/note/python/_index.md, real body reproduced below)
+    across 7 target languages. Live-reproduced with the real validator
+    method: the page's only body content is a heading plus one governed
+    do_not_translate nav link (TC-APT-085/087), so once translated the
+    heading and the untouched English label had no sentence-ending
+    punctuation between them and collapsed into a single blended
+    pseudo-sentence -- detected as French at ~100% confidence regardless of
+    target_lang, tanking purity to 0% and rejecting an otherwise-correct
+    translation on every run.
+    """
+
+    REAL_MINIMAL_BODY = (
+        "## Resurse conexe\n\n"
+        "- [Aspose.Note — Enterprise Blog](https://blog.aspose.com/)\n"
+    )
+
+    def test_minimal_page_with_only_a_governed_link_is_not_rejected(self) -> None:
+        validator = LanguageConsistencyValidator()
+        result = validator.validate(
+            source="", translation=self.REAL_MINIMAL_BODY, context={"target_lang": "ro"}
+        )
+        assert result.success is True
+        assert result.error_count == 0
+
+    def test_heading_and_link_no_longer_merge_into_one_contaminated_sentence(self) -> None:
+        validator = LanguageConsistencyValidator()
+        cleaned = validator._clean_text_for_detection(self.REAL_MINIMAL_BODY)
+        assert "Enterprise Blog" not in cleaned
+        assert "Aspose.Note" not in cleaned
+
+    def test_genuine_untranslated_prose_is_still_caught(self) -> None:
+        """Regression guard: this fix must not silently weaken the check for
+        real defects -- plain untranslated prose (not link text) must still
+        fail exactly as before."""
+        validator = LanguageConsistencyValidator()
+        english_prose = (
+            "This is a long paragraph of English prose that was never "
+            "translated into the target language at all, describing a "
+            "feature in detail across several sentences for good measure."
+        )
+        result = validator.validate("", english_prose, {"target_lang": "de"})
+        assert result.success is False
+        assert result.error_count >= 1
+
+
+class TestShortSentencesBelowCalibratedFloorAreSkipped:
+    """TC-APT-091, second half: the taskcard's own prior investigation had
+    already measured per-sentence langdetect accuracy directly on SHIPPED,
+    REVIEWED Swedish content -- 100% at 40+ alphabetic characters, only 83%
+    at 20-39, 39% below 20 -- and found sv failing a page at 77% purity (67
+    of 87 sentences) with wrong answers scattered across unrelated languages
+    (id, hu, ro, so, tr, en), the same arbitrary-misdetection signature as
+    five languages being called Romanian on one page. min_sentence_length
+    (default 8, config-driven, raw character count) only filters near-empty
+    fragments; it does not clear that reliability floor, so short headings
+    and bullets deep in the unreliable range were being individually judged
+    and were the actual source of the scattered wrong answers.
+    """
+
+    def test_short_sentence_below_floor_does_not_count_against_purity(self) -> None:
+        """A single short (~30 alphabetic char) sentence embedded in an
+        otherwise-consistent, longer document must not tip total_sentences
+        or purity_percentage -- it should be silently excluded, not counted
+        as either correct or wrong."""
+        validator = LanguageConsistencyValidator()
+        # ~30 alphabetic chars -- inside the measured 20-39 char, 83%-accurate
+        # band, deliberately below the 40-char calibrated floor.
+        short_heading = "Wichtige neue Funktionen heute."
+        long_correct_sentence = (
+            "Dies ist ein langer deutscher Satz, der ausführlich eine neue "
+            "Funktion der Software beschreibt und mehr als vierzig Buchstaben enthält."
+        )
+        text = f"{short_heading} {long_correct_sentence}"
+
+        result = validator.validate("", text, {"target_lang": "de"})
+        assert result.success is True
+        # Only the long sentence should have been judged.
+        assert result.metadata["total_sentences"] == 1
+
+    def test_long_sentence_at_or_above_floor_is_still_judged(self) -> None:
+        """Regression guard: this fix must not silently stop checking
+        legitimate wrong-language content once it's long enough to be a
+        reliable signal (40+ alphabetic characters)."""
+        validator = LanguageConsistencyValidator()
+        long_wrong_language_sentence = (
+            "This is a long sentence written entirely in English that was "
+            "never translated into German at all, despite being the target."
+        )
+        result = validator.validate("", long_wrong_language_sentence, {"target_lang": "de"})
+        assert result.success is False
+        assert result.metadata["total_sentences"] == 1
