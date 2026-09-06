@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T18:26:45.241573+00:00",
+  "generated_at": "2026-09-06T19:19:41.756763+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "wave7 pilot closed: pdf-graphics-in-cpp 20/22=90.9% acceptance on first full-article content shape (reviewed via 3 parallel subagents, not grep). Validates scaling pdf/cpp family (3 more pages) in a future wave. 4 cells now MANUAL_REVIEW_REJECTED total (3d/typescript/ro, cells/typescript/ro, pdf/typescript/ro, pdf-graphics-in-cpp/th), each a distinct already-ticketed root cause. pages_newly_live_total still 15 (no new page-complete this wave -- pdf-graphics-in-cpp needs hu/ja/ro + th retry). Next: either finish pdf-graphics-in-cpp's hu/ja/ro, or scale to pdf/cpp's remaining 3 pages, or continue exploring new families (html/python, barcode/python, words/net word-*-in-net). Full-article pages need per-language subagent review, not grep spot-checks -- budget more time per wave. wave_scale stays 4 for the title-only cohort; full-article cohort not yet assigned a scale (single-page pilots recommended until a track record builds)."
+  "next_action": "pdf-graphics-in-cpp is page-complete (25/25, first full-article page this session, 90.9% first-pass acceptance across all attempts). pages_newly_live_total=16. Validates scaling to pdf/cpp's remaining 3 pages (pdf-annotations-in-cpp, pdf-document-management-in-cpp, pdf-pdf-cpp) as a full wave next, OR continue exploring new families (html/python, barcode/python, words/net word-*-in-net, cells/cpp). Full-article pages need per-language subagent review (3 parallel reviewers worked well), not grep spot-checks. 4 cells remain MANUAL_REVIEW_REJECTED for 4 distinct already-ticketed reasons, none blocking. wave_scale=4 still applies to the title-only cohort; full-article cohort now has 1 successful full page as a track record -- reasonable to try a full 4-page wave next if continuing this family."
 }
