@@ -1372,13 +1372,11 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [],
   "wave_scale": {
-    "value": 1,
-    "previous": 2,
-    "stepped_at": "2026-09-05T20:07:35+00:00",
-    "decision": "STEP DOWN 2 -> 1, per the ruling pre-committed before r4 closed",
-    "trigger": "gate5-words-doc-r4 closed at 1 accepted of 8 = 12.5%, below the 60% step-down threshold",
-    "honouring_pre_commitment": "Recorded two iterations ago, before r4 finished, precisely so this could not be rationalised afterwards: r4 is a Tier-2 heal retrigger, Track A includes Tier-2 retranslation, therefore it counts and a sub-60% close halves the scale. Applied as written.",
-    "structural_concern_still_flagged": "Unchanged and still the operator's call: retriggers run pre-selected defective cells on whatever code existed at launch (r4 predated three landed fixes), so if they count, a rejected page permanently pins the ladder at 1. Note heal-cells-go-w1 -- also a retrigger -- is running at 12/18 = 67%, which shows the low figure was r4-specific, not retriggers as a category.",
+    "value": 2,
+    "previous": 1,
+    "stepped_at": "2026-09-06T11:45:00+00:00",
+    "decision": "STEP UP 1 -> 2, per plan SS0.9/TC-APT-080",
+    "trigger": "email/net wave closed at 25/25 = 100% (>=80% threshold); RECURRENCE gate clear; KPI 94 >= floor 25 -- all three step-up conditions held simultaneously",
     "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
   },
   "capacity_clause": {
