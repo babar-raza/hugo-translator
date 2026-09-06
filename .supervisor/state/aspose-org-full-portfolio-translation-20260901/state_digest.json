@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T17:23:40.021200+00:00",
+  "generated_at": "2026-09-06T18:26:45.241573+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "wave6 closed: pages_newly_live_total=15 (added slides/cpp,java,net,python page-complete this wave). 3 cells remain MANUAL_REVIEW_REJECTED (3d/typescript/ro, cells/typescript/ro, pdf/typescript/ro), each a different already-ticketed root cause, not blocking. Three families (3d, cells, pdf, slides) fully mined for bare title-only Tier-1a pages. Next: remaining zero-coverage candidates have real body prose (pdf/*/pdf-*-in-<platform>/index.md, cells/cpp/*, html/python/*, barcode/python/*, words/net/words-*-in-net/index.md) -- expect more review effort per cell than the title-only waves. wave_scale stays 4 pending next wave's acceptance rate."
+  "next_action": "wave7 pilot closed: pdf-graphics-in-cpp 20/22=90.9% acceptance on first full-article content shape (reviewed via 3 parallel subagents, not grep). Validates scaling pdf/cpp family (3 more pages) in a future wave. 4 cells now MANUAL_REVIEW_REJECTED total (3d/typescript/ro, cells/typescript/ro, pdf/typescript/ro, pdf-graphics-in-cpp/th), each a distinct already-ticketed root cause. pages_newly_live_total still 15 (no new page-complete this wave -- pdf-graphics-in-cpp needs hu/ja/ro + th retry). Next: either finish pdf-graphics-in-cpp's hu/ja/ro, or scale to pdf/cpp's remaining 3 pages, or continue exploring new families (html/python, barcode/python, words/net word-*-in-net). Full-article pages need per-language subagent review, not grep spot-checks -- budget more time per wave. wave_scale stays 4 for the title-only cohort; full-article cohort not yet assigned a scale (single-page pilots recommended until a track record builds)."
 }
