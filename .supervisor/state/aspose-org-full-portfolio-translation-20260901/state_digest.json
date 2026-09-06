@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T07:59:48.171151+00:00",
+  "generated_at": "2026-09-06T08:40:22.007370+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -38,5 +38,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "RECURRENCE gate is CLEAR (see data/summaries/fp-recurrence-gate-audit-20260906.json) -- open next: TC-APT-099 blitz-wave planning on a Tier-1a page, using the measured sustained_safe_ceiling=64 band. gate5-words-doc-r4's fr shard still needs a fresh claim+review before commit (unowned candidate). Low-priority follow-on found but not done: frontmatter_consistency.py's cross-field residual detector misses 2-token runs below its 4-alpha-char substantive-token floor (e.g. 'for .NET')."
+  "next_action": "cells-spreadsheet-management-go: 7/23 languages now committed (ar,es,hi,pt,de,fr,it); 16 heal-ticketed for the still-unfixed wrap-before-link determiner bug (producer_wrap_before_link_determiner, 14 langs) and product-name interleaving (producer_product_name_interleaving, el/ko). Before another fix attempt on either: instrument text_unit_extractor.py on a live engine.translate_file(force=True) call to see the actual unit text sent to the model (TC-APT-087 methodology) -- do not patch blind. Otherwise: TC-APT-099 blitz-wave planning on a fresh Tier-1a page (3d/java, barcode/python, cells/cpp all have zero existing coverage) using the measured sustained_safe_ceiling=64 band."
 }

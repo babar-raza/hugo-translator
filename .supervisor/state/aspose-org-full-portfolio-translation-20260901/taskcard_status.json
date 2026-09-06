@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-06T08:15:00.000000+00:00",
+  "updated_at": "2026-09-06T08:45:00.000000+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 5,
+  "wake_count": 6,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -525,9 +525,9 @@
       "blocking_reason": null,
       "evidence_path": "tests/regression/test_link_unit_sentence_integrity.py, data/summaries/validate-tc-apt-036-first-real-cell-20260905.json",
       "commit": "2ddeeb3",
-      "last_updated": "2026-09-05T13:19:23+00:00",
+      "last_updated": "2026-09-06T08:45:00.000000+00:00",
       "blocker_type": null,
-      "note": "LINK half LANDED and VALIDATED ON REAL CONTENT (2ddeeb3). Two halves, correct only together: the blog.aspose.org profile pattern narrowed from the whole [text](url) span to the ](url) TAIL, and LINK removed from _has_inline_formatting so a paragraph with a link extracts whole. The exclusion is CONDITIONAL via _link_syntax_is_protected() -- with preserve_patterns=[] (as in test fixtures) or on websites.aspose.org (no link pattern at all) it keeps the old leaf behaviour, so the raw URL is never carried into translatable text. Validation: same-locale same-construct comparison in Arabic -- pre-fix [Aspose.Words FOSS للـ مستودع .NET] (head noun displaced inside the product name) vs post-fix [مستودع Aspose.Words FOSS للـ .NET] (head noun first, correct order); 0 of 15 locales managed this before. Inflected preposition before the link, intact negation, single copula, contiguous product name all pass on that cell. 11 permanent regression tests. STRONG/EMPHASIS/IMAGE half still OPEN: nothing protects **bold** syntax so FIX-B guard remains load-bearing there. Rollout scope so far: blog.aspose.org only; 4 other in-scope profiles still carry the whole-span pattern."
+      "note": "LINK half LANDED and VALIDATED ON REAL CONTENT (2ddeeb3). Two halves, correct only together: the blog.aspose.org profile pattern narrowed from the whole [text](url) span to the ](url) TAIL, and LINK removed from _has_inline_formatting so a paragraph with a link extracts whole. The exclusion is CONDITIONAL via _link_syntax_is_protected() -- with preserve_patterns=[] (as in test fixtures) or on websites.aspose.org (no link pattern at all) it keeps the old leaf behaviour, so the raw URL is never carried into translatable text. Validation: same-locale same-construct comparison in Arabic -- pre-fix [Aspose.Words FOSS للـ مستودع .NET] (head noun displaced inside the product name) vs post-fix [مستودع Aspose.Words FOSS للـ .NET] (head noun first, correct order); 0 of 15 locales managed this before. Inflected preposition before the link, intact negation, single copula, contiguous product name all pass on that cell. 11 permanent regression tests. STRONG/EMPHASIS/IMAGE half still OPEN: nothing protects **bold** syntax so FIX-B guard remains load-bearing there. Rollout scope so far: blog.aspose.org only; 4 other in-scope profiles still carry the whole-span pattern. | 2026-09-06: RE-TESTED on cells-spreadsheet-management-go (the page this fix predicted it would resolve) using post-fix candidates. NOT closed for the wrap-before-link determiner case: 14/16 fresh-reviewed rejects still show the identical defect at the identical structural position (bare \"the\"/wrong demonstrative/V2 loss). See data/summaries/review-gate5-cells-mgmt-retry2-20260906.json. Two competing hypotheses recorded, neither confirmed: extraction not reaching full-sentence mode in practice vs. model still mishandling a determiner adjacent to a masked placeholder even with full context. Needs live engine instrumentation (TC-APT-087 methodology) before another fix attempt."
     },
     "TC-APT-038": {
       "status": "IN_PROGRESS",
@@ -1351,8 +1351,8 @@
       ]
     }
   },
-  "last_wake_summary": "decide()=SKIP (Track A queue empty) -> Track B: audited heal_queue.jsonl per RECURRENCE ESCALATION before any new Track-A page. Found 8 root-cause classes with open tickets from 2+ pages; only model_quality_complex_sentence_structure (TC-APT-042) was genuinely gating (zero code ever attempted). Reverified against the exact original files/languages (13 checks, current code, no fix applied) -- the defect (duplication/scramble/semantic-inversion) did not reproduce. Dispositioned MODEL_LIMITATION_DEFERRED with receipts. The other 7 classes are either auto:-prefixed validator/gate names already routed through the implemented cross-model retry + quarantine flow, or (residual_phrase_defects) have real landed TC-APT-042 code for their identified sub-pattern. RECURRENCE gate is now CLEAR; a new Track-A page (TC-APT-099 blitz-wave work) may open next wake. No content commit this wake -- this wakes deliverable was clearing a mandatory gate that was blocking ALL future new-page Track A work, recorded per the output invariants first-principles-record branch (data/summaries/fp-recurrence-gate-audit-20260906.json).",
-  "cells_committed_total": 56,
+  "last_wake_summary": "RECURRENCE gate was clear, so opened Track A: found 23 untracked-but-adopted candidate languages already sitting on disk for cells-spreadsheet-management-go (a page with 4/23 already committed, 19 REJECTed 2026-09-05) -- regenerated after TC-APT-036 LINK-half landed. Claimed the page, dispatched 4 parallel reviewers against the exact prior defect list. Result: de/fr/it APPROVE (committed b9dfc3c0fc, cells_committed_total 56->59); 16 REJECT, TM-purged (687 entries). Headline finding: TC-APT-036 did NOT close the wrap-before-link determiner defect it targeted -- it recurs in 14/16 rejects at the identical structural position. 16 heal tickets written with precise per-language manifestation; did not attempt a sixth fix in this family (036/070/076/078/087 already landed narrow fixes for related cases) without live-model instrumentation first -- recommended as the next action.",
+  "cells_committed_total": 59,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
