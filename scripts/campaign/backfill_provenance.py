@@ -267,6 +267,40 @@ def backfill_site(
     return rows, tracker, facts
 
 
+def carry_forward_manual_rejections(
+    rows: list[dict[str, Any]], ledger: WorkLedger
+) -> list[dict[str, Any]]:
+    """Preserve an existing MANUAL_REVIEW_REJECTED verdict across a backfill rebuild.
+
+    Found live 2026-09-06 (wave3 3d/typescript/ro): ``backfill_site`` rebuilds every row
+    from scratch using only receipt/git provenance (see module docstring) -- a row it
+    builds never carries ``claude_review_result``, so ``WorkLedger.bulk_upsert`` (a full
+    INSERT OR REPLACE of every column) silently resets a human's REJECTED verdict back to
+    NOT_REQUIRED the moment a still-matching automated-gate receipt exists, even though
+    the rejected content was never committed. Call this on ``rows`` *before* upserting
+    them; ``eligibility.reclassify_ledger`` (already TC-APT-007's correct precedence)
+    still needs to run afterward to turn the carried-forward fields back into the
+    MANUAL_REVIEW_REJECTED eligibility_state.
+    """
+    from src.workers.work_ledger import work_id_for
+
+    out = []
+    for row in rows:
+        work_id = work_id_for(row["site_id"], row["source_path"], row["target_lang"])
+        existing = ledger.get(work_id)
+        if existing and existing.get("claude_review_result") == "REJECTED":
+            row = dict(row)
+            row["claude_review_result"] = "REJECTED"
+            row["claude_review_note"] = existing.get("claude_review_note")
+            row["claude_review_at"] = existing.get("claude_review_at")
+            row["defect_reference"] = existing.get("defect_reference")
+            row["provenance_source_sha256"] = existing.get("provenance_source_sha256")
+            row["provenance_profile_fp"] = existing.get("provenance_profile_fp")
+            row["provenance_protection_fp"] = existing.get("provenance_protection_fp")
+        out.append(row)
+    return out
+
+
 # --------------------------------------------------------------------------- verification
 def ledger_matches_tracker(
     ledger: WorkLedger, tracker: MetadataTracker, *, sample: int | None = None
@@ -347,6 +381,7 @@ def main(argv: list[str] | None = None) -> int:
                 git_provenance_enabled=not args.no_git_provenance,
                 include_excluded_locales=not args.no_excluded_locales,
             )
+            rows = carry_forward_manual_rejections(rows, ledger)
             written = ledger.bulk_upsert(rows, reason="TC-APT-003 provenance backfill")
             mismatches = ledger_matches_tracker(ledger, tracker, sample=200)
             facts["ledger_rows_written"] = written
@@ -357,6 +392,28 @@ def main(argv: list[str] | None = None) -> int:
                 f"{site_id}: rows={written} states={facts['states']} git_governed={facts['git_governed_commits']} receipt_backed={facts['receipt_backed']} {facts['seconds']}s",
                 flush=True,
             )
+        # TC-APT-003/007 pairing (found live 2026-09-06, wave3 3d/typescript/ro): this
+        # backfill only ever sets what receipt/git provenance alone can justify (see
+        # module docstring) -- it has no notion of a prior manual review verdict, so a
+        # cell a human REJECTED after the automated gate battery already accepted it
+        # (receipt exists, hashes match) gets silently reset to UP_TO_DATE/NOT_REQUIRED
+        # on every run. eligibility.classify() already has the correct precedence
+        # (MANUAL_REVIEW_REJECTED beats a stale receipt match); running it here, inside
+        # the same ledger transaction, means a rejection never has a window where a
+        # concurrent read sees the wrong verdict.
+        from src.utils.config_loader import get_global_config
+        from src.utils.model_licensing import nllb_production_approved
+        from src.workers.eligibility import reclassify_ledger
+
+        reclassify_ledger(
+            ledger,
+            content_repo=content_repo,
+            profiles=profiles,
+            translator_repo=translator_repo,
+            known_langs=frozenset(known),
+            nllb_approved=nllb_production_approved(get_global_config()),
+            site_ids=list(profiles),
+        )
         summary["totals"] = {
             "rows": ledger.total(),
             "duplicate_cells": ledger.duplicate_cells(),

@@ -196,6 +196,79 @@ def test_ledger_hashes_match_tracker_records_acceptance(content_repo, tmp_path):
     )
 
 
+def test_manual_review_rejection_survives_reclassify_after_backfill(content_repo, tmp_path):
+    """Found live 2026-09-06 (wave3 3d/typescript/ro): a cell a human REJECTED after the
+    automated gate battery already accepted it (receipt exists, hashes match) must not be
+    silently reset to UP_TO_DATE the next time backfill_provenance reconciles the ledger.
+    ``main()`` now pairs backfill with ``eligibility.reclassify_ledger`` inside the same
+    ledger transaction so a REJECTED verdict always wins over a stale receipt match.
+    """
+    from src.workers.eligibility import reclassify_ledger
+
+    translator = _translator(tmp_path)
+    profile = _profile(content_repo / "content/docs.test.org")
+    receipts = _receipts(tmp_path, content_repo)
+    rows, _, _ = bp.backfill_site(
+        content_repo=content_repo,
+        translator_repo=translator,
+        profile=profile,
+        known_codes=KNOWN,
+        metadata_dir=tmp_path / "meta",
+        receipts=receipts,
+        workers=2,
+    )
+    ledger_path = tmp_path / "ledger.sqlite3"
+    with WorkLedger(ledger_path) as ledger:
+        ledger.bulk_upsert(rows)
+        row = ledger.get_cell("docs.test.org", "content/docs.test.org/en/cells/net/a.md", "de")
+        assert row["eligibility_state"] == "UP_TO_DATE"  # automated gates accepted it
+
+        # A human reviewer rejects it (RB-004-style meaning-changing defect) -- the
+        # fingerprints a real review would carry forward from the row it saw.
+        ledger.set_state(
+            row["work_id"],
+            "MANUAL_REVIEW_REJECTED",
+            "claude_rejected_unchanged",
+            claude_review_result="REJECTED",
+            claude_review_note="regression test: simulated manual reject",
+            provenance_source_sha256=row["provenance_source_sha256"],
+            provenance_profile_fp=row["profile_fingerprint"],
+            provenance_protection_fp=row["protection_fingerprint"],
+        )
+
+        # Re-running backfill alone (e.g. a peer session's routine reconciliation)
+        # rebuilds the row from the still-matching receipt with no memory of the
+        # rejection -- without carry_forward_manual_rejections this reverts straight
+        # back to UP_TO_DATE/NOT_REQUIRED (the bug). main() now calls it first.
+        rows2, _, _ = bp.backfill_site(
+            content_repo=content_repo,
+            translator_repo=translator,
+            profile=profile,
+            known_codes=KNOWN,
+            metadata_dir=tmp_path / "meta",
+            receipts=receipts,
+            workers=2,
+        )
+        rows2 = bp.carry_forward_manual_rejections(rows2, ledger)
+        ledger.bulk_upsert(rows2)
+        carried = ledger.get_cell("docs.test.org", "content/docs.test.org/en/cells/net/a.md", "de")
+        assert carried["claude_review_result"] == "REJECTED"
+
+        # eligibility.reclassify_ledger (TC-APT-007's precedence) turns the carried
+        # review fields back into the correct eligibility_state.
+        reclassify_ledger(
+            ledger,
+            content_repo=content_repo,
+            profiles={"docs.test.org": profile},
+            translator_repo=translator,
+            known_langs=frozenset(KNOWN),
+            nllb_approved=False,
+        )
+        fixed = ledger.get_cell("docs.test.org", "content/docs.test.org/en/cells/net/a.md", "de")
+        assert fixed["eligibility_state"] == "MANUAL_REVIEW_REJECTED"
+        assert fixed["claude_review_result"] == "REJECTED"
+
+
 def test_receipt_index_ignores_content_bearing_and_failed_receipts(tmp_path):
     good = {
         "output_path": "x.md",
