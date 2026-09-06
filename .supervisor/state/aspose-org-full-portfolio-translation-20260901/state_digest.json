@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T03:10:33.153109+00:00",
+  "generated_at": "2026-09-06T03:11:01.277093+00:00",
   "stamps": {
     "loop_prompt_version": "10.6 (2026-09-06)",
     "plan_revision": 16
@@ -38,5 +38,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "TC-APT-091 landed (link-strip + calibrated alpha floor); 9/15 heal_queue tickets confirmed fixed, 6 sv-only cells-go tickets still OPEN pending retrigger"
+  "next_action": "TC-APT-091 landed (44f3174); next: resume Track-A support or pick next unclaimed Track-B card"
 }
