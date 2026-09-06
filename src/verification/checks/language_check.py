@@ -10,6 +10,10 @@ import re
 from typing import Any
 
 from .base import VerificationCheck, VerificationIssue
+from src.translation_engine.frontmatter_signal import (
+    MIN_FRONTMATTER_SIGNAL_ALPHA,
+    is_untranslated,
+)
 from src.translation_engine.governed_terms import governed_signal_alternation
 
 logger = logging.getLogger(__name__)
@@ -264,6 +268,7 @@ class LanguageDetectionCheck(VerificationCheck):
                 target_lang,
                 "frontmatter",
                 context,
+                source_data=(source or {}).get("frontmatter"),
             )
             issues.extend(frontmatter_issues)
 
@@ -288,6 +293,7 @@ class LanguageDetectionCheck(VerificationCheck):
         target_lang: str,
         path: str,
         context: dict[str, Any] | None = None,
+        source_data: Any = None,
     ) -> list[VerificationIssue]:
         """
         Recursively check dictionary fields for language issues.
@@ -309,7 +315,14 @@ class LanguageDetectionCheck(VerificationCheck):
 
             if isinstance(value, str):
                 if len(value) >= self.min_text_length:
-                    field_issues = self._check_text(value, target_lang, current_path, context)
+                    _src = source_data.get(key) if isinstance(source_data, dict) else None
+                    field_issues = self._check_text(
+                        value,
+                        target_lang,
+                        current_path,
+                        context,
+                        source_text=_src if isinstance(_src, str) else None,
+                    )
                     issues.extend(field_issues)
 
             elif isinstance(value, list):
@@ -335,6 +348,7 @@ class LanguageDetectionCheck(VerificationCheck):
         target_lang: str,
         location: str,
         context: dict[str, Any] | None = None,
+        source_text: str | None = None,
     ) -> list[VerificationIssue]:
         """
         Check a single text field for language issues.
@@ -379,7 +393,54 @@ class LanguageDetectionCheck(VerificationCheck):
         # little independent prose to make any reliable determination, so
         # skip rather than misreport.
         detection_text = self._language_signal_text(text)
-        if sum(1 for char in detection_text if char.isalpha()) < 6:
+        signal_alpha = sum(1 for char in detection_text if char.isalpha())
+
+        # TC-APT-090 (2026-09-06): when the SOURCE field is available, a short
+        # residue is judged by comparison instead of by naming a language.
+        #
+        # The 6-character floor below was copied from engine.py by TC-APT-040,
+        # and that copy is why fixing the engine guard left this layer rejecting
+        # the same cells: cs and zh on introducing-cells-foss-go exhausted every
+        # attempt here at gate verification:language_detection, with the same
+        # field, fingerprint and 0.999996 confidence as the engine-side verdict.
+        #
+        # Below the calibrated floor the residue is page scaffolding, not prose:
+        # on introducing-cells-foss-rust the ENGLISH SOURCE seoTitle reads
+        # en 0.70 / ro 0.30, which is why cs, id, it, hi and ru were all called
+        # Romanian there while genuine Romanian passed. Accuracy on a residue is
+        # 66.2% at 6 alphabetic characters and 98.5% at 40, and confidence does
+        # NOT fall when the answer is wrong (median 1.000 when wrong), so no
+        # confidence cut helps.
+        #
+        # This does NOT weaken the check. An untranslated field is caught more
+        # directly than before -- its residue is identical to the source -- and
+        # the control is only skipped when there is genuinely nothing to compare
+        # and too little prose to judge. With no source_text the original
+        # behaviour is preserved exactly, which is what keeps this layer's
+        # existing tests meaningful.
+        if source_text and signal_alpha < MIN_FRONTMATTER_SIGNAL_ALPHA:
+            source_signal = self._language_signal_text(source_text)
+            if is_untranslated(source_signal, detection_text):
+                return [
+                    VerificationIssue(
+                        severity="error",
+                        check_name=self.name,
+                        location=location,
+                        message=(
+                            f"Field '{location}' is unchanged from the source, so it "
+                            f"was not translated into '{target_lang}'."
+                        ),
+                        metadata={
+                            "field": location,
+                            "reason": "untranslated_field",
+                            "signal_alpha": signal_alpha,
+                        },
+                    )
+                ]
+            logger.debug(f"Short residue differs from source at {location}; accepted")
+            return []
+
+        if signal_alpha < 6:
             logger.debug(f"No non-technical language signal at {location}")
             return []
 

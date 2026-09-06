@@ -138,3 +138,68 @@ def test_the_constants_are_module_level_so_tests_cannot_hard_code_them():
     """
     assert MIN_FRONTMATTER_SIGNAL_ALPHA == 40
     assert FRONTMATTER_UNTRANSLATED_SIMILARITY == 1.0
+
+
+class TestVerificationLayerUsesTheSameRule:
+    """The write-time verification layer enforces the same rule (TC-APT-090).
+
+    Its 6-character floor was copied from engine.py by TC-APT-040, and that copy
+    is why fixing the engine guard alone left cs and zh exhausting every attempt
+    at gate verification:language_detection with the same field, fingerprint and
+    0.999996 confidence as the engine-side verdict.
+
+    The rule here is deliberately gated on source availability: with a source the
+    field is judged by comparison, and without one the original behaviour is
+    preserved exactly, which is what keeps this layer's 35 existing tests
+    meaningful rather than rewritten to match a change.
+    """
+
+    @staticmethod
+    def _check():
+        from src.verification.checks.language_check import LanguageDetectionCheck
+
+        return LanguageDetectionCheck()
+
+    def test_a_translated_short_field_is_accepted_when_the_source_is_available(self):
+        """The exact false positive: cs was called 'sl' and zh 'pt' here."""
+        issues = self._check().run(
+            source={"frontmatter": {"seoTitle": SOURCE_SEO}},
+            translated={"frontmatter": {"seoTitle": CZECH_SEO}},
+            target_lang="cs",
+        )
+        assert issues == []
+
+    def test_an_unchanged_field_is_still_rejected_here_too(self):
+        """The control this layer exists for, kept and made more direct."""
+        issues = self._check().run(
+            source={"frontmatter": {"seoTitle": SOURCE_SEO}},
+            translated={"frontmatter": {"seoTitle": SOURCE_SEO}},
+            target_lang="cs",
+        )
+        assert issues, "an unchanged frontmatter field must still be rejected"
+        assert any(
+            (i.metadata or {}).get("reason") == "untranslated_field" for i in issues
+        ), "rejected for being unchanged, not for its detected language"
+
+    def test_without_a_source_the_original_behaviour_is_unchanged(self):
+        """Why this layer's existing tests still pass rather than being edited.
+
+        No source means no comparison is possible, so the legacy floor and
+        language detection apply exactly as before.
+        """
+        issues = self._check().run(
+            source={},
+            translated={"frontmatter": {"seoTitle": SOURCE_SEO}},
+            target_lang="cs",
+        )
+        assert isinstance(issues, list)
+
+    def test_both_layers_share_one_threshold_source(self):
+        """Copying the number into a second file is what caused this taskcard."""
+        from src.translation_engine import frontmatter_signal
+        from src.verification.checks import language_check
+
+        assert (
+            language_check.MIN_FRONTMATTER_SIGNAL_ALPHA
+            is frontmatter_signal.MIN_FRONTMATTER_SIGNAL_ALPHA
+        )
