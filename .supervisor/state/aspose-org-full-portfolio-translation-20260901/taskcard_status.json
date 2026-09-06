@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-06T09:05:00.000000+00:00",
+  "updated_at": "2026-09-06T09:20:00.000000+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -1407,15 +1407,15 @@
       "next_wake_action": "check receipts; measure the soft-wrap signature on regenerated cells against the 16 tickets of that class"
     },
     {
-      "campaign_id": "heal-cells-mgmt-retry3",
-      "launcher_pid": 95012,
-      "log": "logs/heal-cells-mgmt-retry3_launcher.log",
-      "launched_at": "2026-09-06T09:05:00+00:00",
+      "campaign_id": "heal-cells-mgmt-retry3b",
+      "launcher_pid": 57468,
+      "log": "logs/heal-cells-mgmt-retry3b_launcher.log",
+      "launched_at": "2026-09-06T09:20:00+00:00",
       "taskcards": [
         "TC-APT-100",
         "TC-APT-036"
       ],
-      "purpose": "RECURRENCE step 2/3: retrigger 14 langs of cells-spreadsheet-management-go with the whole-link-placeholder fix applied",
+      "purpose": "RECURRENCE step 2/3: retrigger 14 langs of cells-spreadsheet-management-go with the whole-link-placeholder fix applied. First launch (heal-cells-mgmt-retry3, PID 95012) failed instantly: verify_environment rejected the untracked prior candidates as unreceipted dirty output -- rebuilt the manifest with --existing replace (declares current on-disk bytes as the expected pre-campaign baseline) instead of deleting anything, then relaunched.",
       "manifest": "data/campaigns/heal-cells-mgmt-retry3/launch.yaml",
       "next_wake_action": "Check the log/receipts; verify the wrap-before-link spot is clean (no bare \"the\"/wrong demonstrative/missing V2 inversion) in each accepted language via full-body review against config/review_rubric.yaml, citing the exact heal-cells-mgmt-go-retry2-wrap-link-<lang> ticket it closes; commit whatever passes; ja/tr may still fail on the separate product-name-interleaving ticket even if the wrap spot is now clean -- that is expected and not a fix regression."
     }
