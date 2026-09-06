@@ -1327,10 +1327,10 @@
         "TC-APT-094"
       ],
       "owner": "loop",
-      "blocking_reason": "Depends on 092, 096, 094. Probe FIRST and report the measured band to the operator immediately.",
-      "evidence_path": null,
-      "commit": null,
-      "last_updated": "2026-09-06T03:00:01.239991+00:00",
+      "blocking_reason": "wave1 (email/net, 1 page) and wave2 (email/cpp, email/python partial) landed; wave_scale stepped 1->2->4. wave3 (wave_scale=4): 3d/java, 3d/net, 3d/python, 3d/typescript -- 65/88 professionalize_llm cells committed (228f78eb18) + 11/12 m2m100 hu/ja/ro cells committed (a376df9d6b, isolated retry succeeded after fixing GPU/VRAM-contention, translator-repo-sha-drift and dirty-tree blockers -- see data/summaries/review-wave3-3d-20260906.json and fp-wave3-m2m-crash-20260906.json). 3d/typescript/ro REJECTED (m2m100 mistranslated the platform name 'TypeScript' as Romanian 'tipografe' -- RB-004) and heal-ticketed for cross-model retry. Per-page state (of 25 in-scope langs each): java 20/25 (missing child3's el/he/ko/ru/uk), net 19/25 (missing child3's cs/fa/id/pl/th/zh), python 19/25 (missing child3's el/he/ko/ru/uk + tr gate36-failed), typescript 18/25 (missing child3's cs/fa/id/pl/th/zh + ro rejected). None page-complete yet -- child3's 22-cell LLM retry launching next now that m2m100 has fully exited (sequential, per the isolation rule).",
+      "evidence_path": "data/summaries/review-wave3-3d-20260906.json",
+      "commit": "228f78eb18",
+      "last_updated": "2026-09-06T13:20:00.000000+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.10/SS0.11 revisions 17-18"
     },
