@@ -1384,12 +1384,12 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907",
-      "pid": 51156,
+      "run_id": "heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907b",
+      "pid": 75004,
       "launched_at": "2026-09-07T00:00:00+00:00",
-      "manifest": "data/campaigns/manifests/heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907.yaml",
-      "log": "logs/heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907_launcher.log",
-      "note": "REJECT_ISOLATED retry on the OTHER model (m2m100_418m; pl primary was professionalize_llm) after a subagent review found a duplicated-word defect (obiektu Document object) confirmed isolated to pl (es/th same batch, same sentence, both correct). TM purged (133 entries) before this retry. es+th already committed (bef901d471). On next check: read log/candidate, full-body review, commit or heal-ticket if still failing (both models tried at that point)."
+      "manifest": "data/campaigns/manifests/heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907b.yaml",
+      "log": "logs/heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907b_launcher.log",
+      "note": "Take 2: take 1 (pid 51156) failed on TM fingerprint drift because the manifest was built BEFORE the TM purge landed -- rebuilt manifest after the purge (current HEAD 176e071, clean tree, fresh tm_fingerprint), relaunched. Recurring lesson (2nd time this taskcard): always build the retrigger manifest as the LAST step immediately before launch, after every purge/commit that touches repo or TM state."
     }
   ],
   "wave_scale": {
