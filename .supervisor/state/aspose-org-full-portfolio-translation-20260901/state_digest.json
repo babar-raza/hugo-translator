@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T19:19:41.756763+00:00",
+  "generated_at": "2026-09-06T22:34:08.051272+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "pdf-graphics-in-cpp is page-complete (25/25, first full-article page this session, 90.9% first-pass acceptance across all attempts). pages_newly_live_total=16. Validates scaling to pdf/cpp's remaining 3 pages (pdf-annotations-in-cpp, pdf-document-management-in-cpp, pdf-pdf-cpp) as a full wave next, OR continue exploring new families (html/python, barcode/python, words/net word-*-in-net, cells/cpp). Full-article pages need per-language subagent review (3 parallel reviewers worked well), not grep spot-checks. 4 cells remain MANUAL_REVIEW_REJECTED for 4 distinct already-ticketed reasons, none blocking. wave_scale=4 still applies to the title-only cohort; full-article cohort now has 1 successful full page as a track record -- reasonable to try a full 4-page wave next if continuing this family."
+  "next_action": "wave8 closed: pdf-annotations-in-cpp 16/25, pdf-document-management-in-cpp 15/25 (70.5% acceptance, lower than pilot -- several new cross-locale-recurring producer bugs found and heal-ticketed, none fixed yet). pdf-pdf-cpp pulled out entirely (fails both models, needs live instrumentation, see fp-pdf-pdf-cpp-dual-model-failure-20260907.json). Fixed a real _RetryFeedbackModel crash bug (8286ff2). CRITICAL: skill_run_manager order is create->commit(while pending)->finalize, NOT create->finalize->commit -- a peer session tightened the commit-msg hook mid-mission and finalize-before-commit now fails with 'no skill run record found'. pages_newly_live_total=16 (unchanged this wave). Next: either invest in the 4 confirmed-recurring bug classes (best candidate: Quick-Start punctuation corruption, 3 locales x 2 sentences = 6 confirmed occurrences, most reproducible), finish the 2 partial pages' hu/ja/ro + rejected-locale retries, or continue exploring new families (html/python, barcode/python, words/net). Full-article review requires parallel subagent full-reads, budget ~15-20 min per page for translation + ~5-10 min per page for review."
 }
