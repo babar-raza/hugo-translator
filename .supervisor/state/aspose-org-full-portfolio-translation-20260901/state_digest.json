@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T22:34:08.051272+00:00",
+  "generated_at": "2026-09-06T23:09:02.227311+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -16,7 +16,8 @@
     "TC-APT-078",
     "TC-APT-080",
     "TC-APT-090",
-    "TC-APT-098"
+    "TC-APT-098",
+    "TC-APT-101"
   ],
   "active_clauses": {
     "capacity_clause": {
@@ -36,5 +37,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "wave8 closed: pdf-annotations-in-cpp 16/25, pdf-document-management-in-cpp 15/25 (70.5% acceptance, lower than pilot -- several new cross-locale-recurring producer bugs found and heal-ticketed, none fixed yet). pdf-pdf-cpp pulled out entirely (fails both models, needs live instrumentation, see fp-pdf-pdf-cpp-dual-model-failure-20260907.json). Fixed a real _RetryFeedbackModel crash bug (8286ff2). CRITICAL: skill_run_manager order is create->commit(while pending)->finalize, NOT create->finalize->commit -- a peer session tightened the commit-msg hook mid-mission and finalize-before-commit now fails with 'no skill run record found'. pages_newly_live_total=16 (unchanged this wave). Next: either invest in the 4 confirmed-recurring bug classes (best candidate: Quick-Start punctuation corruption, 3 locales x 2 sentences = 6 confirmed occurrences, most reproducible), finish the 2 partial pages' hu/ja/ro + rejected-locale retries, or continue exploring new families (html/python, barcode/python, words/net). Full-article review requires parallel subagent full-reads, budget ~15-20 min per page for translation + ~5-10 min per page for review."
+  "next_action": "TC-APT-101 landed+committed (d773422): FIX-C no longer doubles a substituted terminal punctuation mark. Detached retrigger heal-recur-punct-fix-pdfdocmgmt-cpp-20260907 (pid 88592) running against pdf-document-management-in-cpp es/pl/th. Next wake: check logs/heal-recur-punct-fix-pdfdocmgmt-cpp-20260907_launcher.log + candidate files, review, commit or re-ticket. ro/fa word-gluing tickets in the same class label are a DIFFERENT mechanism (placeholder-start spacing, not punctuation doubling) -- still open, needs live instrumentation, not yet attempted. No new Track-A page until this class's open tickets are resolved (RECURRENCE ESCALATION)."
 }

@@ -1382,7 +1382,16 @@
   "last_wake_summary": "Wave 2 (wave_scale=2) completed: email/cpp 25/25 clean (title-only, page-complete, pages_newly_live_total 1->2), email/python 21/24 (zh gate-failed x3 no cross-model escalation; hi/hu/ja rejected for text adjacent to the FOSS-edition mask / unrelated fluency issues -- 4 heal tickets, 30 TM entries purged). Committed 4e93753027 (71 files) -- this ALSO recovered email/net (25 langs) after discovering its original commit fc101aa230 had been orphaned from HEAD ancestry during a concurrent multi-session window (reflog still had it; git log did not -- likely a peer git-reset in this shared single-checkout repo). Content was intact in the working tree/index (soft-reset shape), re-committed after confirming session_ledger candidates matched staged files exactly. Also hit the known transient stale-file-regression race twice more, both resolved by retry. cells_committed_total 96 -> 167. Flagged to the operator: multi-session single-checkout git setup can silently orphan commits -- worth per-session worktrees or a reflog integrity check.",
   "cells_committed_total": 167,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "run_id": "heal-recur-punct-fix-pdfdocmgmt-cpp-20260907",
+      "pid": 88592,
+      "launched_at": "2026-09-07T00:00:00+00:00",
+      "manifest": "data/campaigns/manifests/heal-recur-punct-fix-pdfdocmgmt-cpp-20260907.yaml",
+      "log": "logs/heal-recur-punct-fix-pdfdocmgmt-cpp-20260907_launcher.log",
+      "note": "TC-APT-101 RECURRENCE step 3: retriggering pdf-document-management-in-cpp es/pl/th after the FIX-C substituted-terminal fix (d773422). --existing replace (stale rejected candidates already on disk from wave8). --max-workers 1, single page x 3 langs. On next check: read the log tail + look for new candidate files (index.es.md/index.pl.md/index.th.md), review for the exact-.: -defect being gone, then either commit (content repo) or heal-ticket + TM purge on any fresh reject."
+    }
+  ],
   "wave_scale": {
     "value": 4,
     "previous": 2,
