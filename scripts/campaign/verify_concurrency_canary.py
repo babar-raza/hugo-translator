@@ -11,6 +11,18 @@ race: every receipted ``output_sha256`` must still match the bytes on disk. A mi
 means something overwrote an accepted output after its receipt was written — exactly the
 failure mode concurrency would introduce, and one no per-file gate can catch.
 
+CAVEAT (found while closing TC-APT-047, 2026-09-06): this fourth check has no sense of
+time. If a page is legitimately retriggered by a LATER, SEPARATE campaign (a RECURRENCE
+step-3 heal retrigger, for example) after this canary's receipts were written, every one
+of that page's cells will show a "receipt_integrity" mismatch forever after — the current
+disk bytes reflect the later campaign, not this one, and that is correct, not a race. This
+is indistinguishable from a real cross-job race using this check alone. Run this
+immediately after the canary campaign finishes, before anything else touches the same
+page, for it to mean what it says; a mismatch found long after the fact must first be
+traced (which campaign's acceptance receipt DOES match current disk / a chain of
+``superseded_sha256`` fields across later campaigns) before it is treated as a concurrency
+defect.
+
 Usage:
     python scripts/campaign/verify_concurrency_canary.py \
         --manifest data/campaigns/<id>/manifest.yaml [--json-out report.json]
