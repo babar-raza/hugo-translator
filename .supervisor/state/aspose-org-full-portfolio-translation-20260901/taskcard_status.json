@@ -1,10 +1,10 @@
 {
   "mission_id": "aspose-org-full-portfolio-translation-20260901",
   "plan_path": "C:\\Users\\prora\\.claude\\plans\\hugo-translator-aspose-org-partitioned-kahn.md",
-  "plan_revision": 16,
+  "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-06T00:28:14+00:00",
+  "updated_at": "2026-09-06T07:30:00.000000+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 3,
+  "wake_count": 4,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -861,15 +861,15 @@
       "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
     },
     "TC-APT-064": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "gate": null,
       "title": "Sustained-load calibration, THEN the schema-ceiling raise -- burst calibration is not evidence of a sustained ceiling. Owns the real throughput ceiling; the measured 1.94x page-vs-page / 3.52x aggregate sharding numbers are directional only.",
       "depends_on": [],
       "owner": "session-10942b65",
-      "blocking_reason": "Real sustained probe launched 2026-09-06 as a detached OS process: PID 52040, cmd \"llm_preflight_calibration --sustained --skip-calibration\", log logs/tc064_sustained_probe_20260906.log, output data/benchmark_corpus/results/professionalize_llm_calibration_tc064_sustained_20260906.json. Expected duration ~30-35 min (preflight + 4 levels x 450s). Check the log/output file on next wake before launching a second one -- do not relaunch while PID 52040 is still alive.",
-      "evidence_path": "scripts/campaign/llm_preflight_calibration.py (sustained_ramp method + --sustained CLI flags); tests/unit/workers/test_llm_preflight_calibration.py (TestSustainedRamp, 4 new tests) -- full suite 12 passed.",
+      "blocking_reason": "Real sustained probe (PID 52040) completed 2026-09-06 06:35-07:14 UTC, output data/benchmark_corpus/results/professionalize_llm_calibration_tc064_sustained_20260906.json. Held 16/32/48/64 concurrent for 450s each (3611 calls total): 0 errors, 0 rate-limited at every level. sustained_safe_ceiling=64, sustained_stop_reason=null (ceiling not found within tested range -- this is a floor, not a measured max). p95 latency 26.2-28.7s across levels 16-48, 28.7s at 64. Reported to operator via wake summary per BLITZ CONTRACT item 1. Unblocks TC-APT-099 (critical path 092->096->094->064 complete).",
+      "evidence_path": "data/benchmark_corpus/results/professionalize_llm_calibration_tc064_sustained_20260906.json",
       "commit": "bcb0558",
-      "last_updated": "2026-09-06T06:35:00.000000+00:00",
+      "last_updated": "2026-09-06T07:30:00.000000+00:00",
       "blocker_type": null,
       "provenance": "title derived from project/loop-prompt.md v10.4; row created by the loop because the runbook allocated the ID but the status file had no row"
     },
@@ -1351,9 +1351,9 @@
       ]
     }
   },
-  "last_wake_summary": "data/summaries/aspose-org-wake-001-20260902.json",
-  "cells_committed_total": 48,
-  "loop_prompt_version_seen": "10.6 (2026-09-06)",
+  "last_wake_summary": "TC-APT-064 sustained probe read DONE (ceiling>=64, 0 errors/3611 calls) -- reported to operator. Found+finished an interrupted commit: 8 already-reviewed, already-adopted pdf/cpp introducing-pdf-foss-cpp languages (el/hi/it/ja/ko/nl/pt/zh) staged since 2026-09-05T14:07Z, never committed by the session that adopted them. Verified candidates==staged==8, path_guard pass, spot-read clean; committed 04548cceb1 in D:/onedrive/Documents/GitHub/aspose.org. Also finalized an orphaned skill-run record (20260905-201508-sht02) against its already-landed commit 7e486c46eb. gate5-words-doc-r3/r4 remain unresolved (see field note) -- not touched this wake beyond diagnosis.",
+  "cells_committed_total": 56,
+  "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
       "campaign_id": "gate5-words-doc-r3",
@@ -1409,5 +1409,5 @@
     "released_at": "2026-09-05T23:16:13+00:00",
     "release_reason": "Stale-state fix, found while orienting for TC-APT-077: logs/watchdog_state.json reads kpi_cells_24h=90 (floor 25), kpi_breach_open=false. The clauses own AND condition (TC-APT-043..047 unlanded AND KPI below floor) requires BOTH; KPI has not been below floor for a while (the peer already acted on this correctly for wave-cells-rust-w1, citing 'capacity clause released, KPI 43' -- this field just never caught up to that decision). TC-APT-046/047 remain unlanded, so a future KPI dip re-engages it automatically once checked against watchdog_state.json again."
   },
-  "loop_prompt_version": "10.5 (2026-09-06)"
+  "loop_prompt_version": "10.7 (2026-09-06)"
 }

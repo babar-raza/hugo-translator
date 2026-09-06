@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-06T05:41:56.648168+00:00",
+  "generated_at": "2026-09-06T07:29:39.541770+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
-    "plan_revision": 16
+    "plan_revision": 18
   },
   "open_obligations": [
     "TC-APT-004b",
@@ -12,11 +12,11 @@
     "TC-APT-039",
     "TC-APT-042",
     "TC-APT-046",
-    "TC-APT-047",
     "TC-APT-069",
     "TC-APT-078",
     "TC-APT-080",
-    "TC-APT-090"
+    "TC-APT-090",
+    "TC-APT-098"
   ],
   "active_clauses": {
     "capacity_clause": {
@@ -38,5 +38,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "TC-APT-094 landed (71ea7d6); BLITZ critical path 092->096->094 complete. Next: TC-APT-099 (blitz waves) or the hour-0 sustained-load probe if not yet run."
+  "next_action": "TC-APT-099 (blitz waves) is now fully unblocked (092/096/094/064 all DONE); the hour-0 sustained probe measured sustained_safe_ceiling=64 with 0 errors, so report the 24h/48h band and begin wave planning. gate5-words-doc-r3/r4 (blog.aspose.org/words/net/words-document-net) have an orphaned RECURRENCE thread: r4's fr shard produced an untracked candidate file never reviewed (not in this session's ledger -- needs a fresh claim+review, do not commit without re-review), r3/r4's ar/tr/ro/fa/hi/el/he shards errored out (write-blocked or same-as-source) and were never ticketed."
 }
