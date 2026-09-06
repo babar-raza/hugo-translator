@@ -1279,15 +1279,14 @@
       "plan_ref": "SS0.10/SS0.11 revisions 17-18"
     },
     "TC-APT-096": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 5,
       "title": "LMDB hardening before fan-out: nested-write-txn self-deadlock fix in l2_persistent.py store/batch_store, mapsize policy, cross-process MDB_MAP_RESIZED verification -- test-first",
       "depends_on": [],
-      "owner": "loop",
-      "blocking_reason": "BLITZ CRITICAL PATH 2 of 3. Plan SS0.10.",
-      "evidence_path": null,
+      "owner": "session-10942b65",
+      "blocking_reason": "Direct reproduction on the PRE-FIX code confirmed the plan's self-deadlock diagnosis: store()/batch_store() caught lmdb.MapFullError INSIDE the still-open outer write transaction and opened a second write transaction there; on this platform/lmdb build that raised InvalidParameterError from set_mapsize() itself (LMDB forbids resizing while any transaction in this process is open), then BadTxnError unwinding the outer transaction -- a hard crash, not the graceful resize-and-retry the removed code's comments claimed. Fix: new _run_txn_with_map_recovery(txn_fn, max_attempts=3) wraps every call site whose transaction does not outlive the call (exact_lookup, store, batch_store, delete, delete_namespace, count, clear, export_all, count_by_config_fingerprint, lineage_index_stats) -- on MapFullError it grows the map (bounded by new named constant _MAX_MAP_SIZE_MB=8192, replacing the two inline `8192` literals) and retries the ENTIRE txn_fn fresh only after the failing transaction has fully exited its `with` block; LMDB transactions have no partial commit, so full-function retry is the only safe retry unit -- confirmed no double-write/double-count risk in delete_namespace (delete of an already-deleted key is a no-op) or batch_store (redo-whole-batch). Also fixed a previously-uncaught class: zero call sites anywhere handled lmdb.MapResizedError (MDB_MAP_RESIZED), so a sibling K-lane process resizing the shared LMDB file first would crash every OTHER lane's very next TM read or write; now recovered via env.set_mapsize(0) (adopt the sibling's new on-disk size) and retry. Known, documented gap (not silently dropped): iter_by_config_fingerprint and export_all_iter are generators that hold their read transaction open across the caller's iteration, so they are NOT wrapped -- retrying would mean re-entering a generator mid-yield, which cannot safely resume the caller's consumption loop; both docstrings flag this and note it is the lower-frequency backfill/reporting path, not the blitz's hot store/lookup path.", "evidence_path": "src/tm/l2_persistent.py; tests/unit/tm/test_l2_persistent_map_resize.py (8 new tests: MapFullError store/batch_store recovery with a REAL saturated 1MB map, map-size-actually-grew assertion, give-up-at-ceiling regression guard, MapResizedError recovery via a proxy simulating MDB_MAP_RESIZED for store()/exact_lookup(), a never-retry-forever regression guard, and a REAL two-independent-Environment-handle-on-one-path test exercising genuine cross-process resize adoption, not just mocks). Full tests/unit/tm/ suite (163 tests) passes, zero regressions.",
       "commit": null,
-      "last_updated": "2026-09-06T03:00:01.239991+00:00",
+      "last_updated": "2026-09-06T04:25:00.000000+00:00",
       "blocker_type": null,
       "plan_ref": "SS0.10/SS0.11 revisions 17-18"
     },
@@ -1353,7 +1352,7 @@
   },
   "last_wake_summary": "data/summaries/aspose-org-wake-001-20260902.json",
   "cells_committed_total": 48,
-  "loop_prompt_version_seen": "10.5 (2026-09-06)",
+  "loop_prompt_version_seen": "10.6 (2026-09-06)",
   "active_detached_runs": [
     {
       "campaign_id": "gate5-words-doc-r3",
