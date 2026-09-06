@@ -1327,7 +1327,7 @@
         "TC-APT-094"
       ],
       "owner": "loop",
-      "blocking_reason": "wave1 (email/net, 1 page) and wave2 (email/cpp, email/python partial) landed; wave_scale stepped 1->2->4. wave3 (wave_scale=4): 3d/java, 3d/net, 3d/python, 3d/typescript -- 65/88 professionalize_llm cells committed (228f78eb18) + 11/12 m2m100 hu/ja/ro cells committed (a376df9d6b, isolated retry succeeded after fixing GPU/VRAM-contention, translator-repo-sha-drift and dirty-tree blockers -- see data/summaries/review-wave3-3d-20260906.json and fp-wave3-m2m-crash-20260906.json). 3d/typescript/ro REJECTED (m2m100 mistranslated the platform name 'TypeScript' as Romanian 'tipografe' -- RB-004) and heal-ticketed for cross-model retry. Per-page state (of 25 in-scope langs each): java 20/25 (missing child3's el/he/ko/ru/uk), net 19/25 (missing child3's cs/fa/id/pl/th/zh), python 19/25 (missing child3's el/he/ko/ru/uk + tr gate36-failed), typescript 18/25 (missing child3's cs/fa/id/pl/th/zh + ro rejected). None page-complete yet -- child3's 22-cell LLM retry launching next now that m2m100 has fully exited (sequential, per the isolation rule).",
+      "blocking_reason": "wave1 (email/net) + wave2 (email/cpp, email/python) + wave3 (3d/java, 3d/net, 3d/python page-complete; 3d/typescript 24/25) landed; wave_scale 1->2->4. wave3 commits: 228f78eb18 (65 LLM cells), a376df9d6b (11 m2m100 hu/ja/ro), 1cd9feaad1 (22 LLM child3 retry -- java/net page-complete), c569b3d1e0 (python/tr cross-model m2m100 retry -- python page-complete). pages_newly_live_total 2->5. Only 3d/typescript/ro remains open: BOTH models now rejected it (m2m100 mistranslated 'TypeScript' as Romanian 'tipografe', RB-004; professionalize_llm cross-model retry then hit a short-field language-detection false-negative and was quarantined, matching TC-APT-040's tracked auto:verification:language_detection class) -- heal-ticketed, needs live instrumentation before a third attempt, not done this wake. Also found and fixed a real governance bug while heal-ticketing this: backfill_provenance.py silently reverted a manual REJECTED verdict back to UP_TO_DATE on every reconciliation run (receipt-only precedence, never consulted claude_review_result) -- fixed in b407d6a (carry_forward_manual_rejections + chained eligibility.reclassify_ledger), verified live against the real ledger and covered by a new regression test.",
       "evidence_path": "data/summaries/review-wave3-3d-20260906.json",
       "commit": "228f78eb18",
       "last_updated": "2026-09-06T13:20:00.000000+00:00",
@@ -1370,16 +1370,7 @@
   "last_wake_summary": "Wave 2 (wave_scale=2) completed: email/cpp 25/25 clean (title-only, page-complete, pages_newly_live_total 1->2), email/python 21/24 (zh gate-failed x3 no cross-model escalation; hi/hu/ja rejected for text adjacent to the FOSS-edition mask / unrelated fluency issues -- 4 heal tickets, 30 TM entries purged). Committed 4e93753027 (71 files) -- this ALSO recovered email/net (25 langs) after discovering its original commit fc101aa230 had been orphaned from HEAD ancestry during a concurrent multi-session window (reflog still had it; git log did not -- likely a peer git-reset in this shared single-checkout repo). Content was intact in the working tree/index (soft-reset shape), re-committed after confirming session_ledger candidates matched staged files exactly. Also hit the known transient stale-file-regression race twice more, both resolved by retry. cells_committed_total 96 -> 167. Flagged to the operator: multi-session single-checkout git setup can silently orphan commits -- worth per-session worktrees or a reflog integrity check.",
   "cells_committed_total": 167,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "run_id": "wave3-llm-retry2",
-      "pid": 58207,
-      "launched_at": "2026-09-06T13:29:57+00:00",
-      "manifest": "data/campaigns/wave3-llm/launch.yaml",
-      "log": "logs/wave3-llm-retry2_launcher.log",
-      "note": "Retries child3's 22 crashed cells (java/net/python/typescript x el,he,ko,ru,uk or cs,fa,id,pl,th,zh) plus python/tr's GATE36 failure, resume-based via acceptance_receipts.jsonl (65 already-accepted shards auto-skipped). Launched only after wave3-m2m fully exited (SHARD_SET_COMPLETE) -- do not launch any m2m100/GPU-bound campaign concurrently with this PID (see fp-wave3-m2m-crash-20260906.json). max-workers=4. Do not re-launch while this PID is alive."
-    }
-  ],
+  "active_detached_runs": [],
   "wave_scale": {
     "value": 4,
     "previous": 2,
@@ -1397,5 +1388,5 @@
     "release_reason": "Stale-state fix, found while orienting for TC-APT-077: logs/watchdog_state.json reads kpi_cells_24h=90 (floor 25), kpi_breach_open=false. The clauses own AND condition (TC-APT-043..047 unlanded AND KPI below floor) requires BOTH; KPI has not been below floor for a while (the peer already acted on this correctly for wave-cells-rust-w1, citing 'capacity clause released, KPI 43' -- this field just never caught up to that decision). TC-APT-046/047 remain unlanded, so a future KPI dip re-engages it automatically once checked against watchdog_state.json again."
   },
   "loop_prompt_version": "10.7 (2026-09-06)",
-  "pages_newly_live_total": 2
+  "pages_newly_live_total": 5
 }
