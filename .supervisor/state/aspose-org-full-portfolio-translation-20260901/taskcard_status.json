@@ -1372,12 +1372,12 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "wave4-llm-retry4",
-      "pid": 63718,
-      "launched_at": "2026-09-06T14:58:56+00:00",
-      "manifest": "data/campaigns/wave4-llm/launch.yaml",
-      "log": "logs/wave4-llm-retry4_launcher.log",
-      "note": "TC-APT-099 wave4 (wave_scale=4): cells/java, cells/net, cells/python, cells/typescript, professionalize_llm primary, 22 langs x 4 pages = 88 cells, max-workers=2 (reduced from 4 after attempt 1's MemoryError inside campaign_manifest.fingerprint_files() hashing the 4GiB data/tm/l2.lmdb/data.mdb concurrently across 4 children -- not fully root-caused, mitigated by concurrency reduction, not yet confirmed durable). Attempts 2/3 both failed on translator-repo-SHA-drift self-inflicted by a bookkeeping commit landing during the child startup window -- lesson: never commit to hugo-translator between launch and confirmed real per-cell progress (a receipt on disk), not just 'no error in the first few seconds'. This attempt (retry4) confirmed 2 real receipts written before this bookkeeping commit landed. Pages claimed in claims.jsonl. After this exits, launch wave4-m2m (hu/ja/ro) in isolation -- never concurrently with this PID (fp-wave3-m2m-crash-20260906.json). Do not re-launch while this PID is alive."
+      "run_id": "wave4-m2m",
+      "pid": 20580,
+      "launched_at": "2026-09-06T15:17:01+00:00",
+      "manifest": "data/campaigns/wave4-m2m/launch.yaml",
+      "log": "logs/wave4-m2m_launcher.log",
+      "note": "TC-APT-099 wave4: wave4-llm landed clean, 88/88 cells (2d19d2aa89), committed with max-workers=2 after mitigating a MemoryError from concurrent fingerprint_files() hashing of the 4GiB data/tm/l2.lmdb/data.mdb (not fully root-caused; watch for recurrence). This run: m2m100_418m for hu/ja/ro (12 cells), launched in isolation only after wave4-llm's process fully exited. Do not launch any concurrent GPU-bound/LLM campaign while this PID is alive (fp-wave3-m2m-crash-20260906.json)."
     }
   ],
   "wave_scale": {
