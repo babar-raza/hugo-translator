@@ -1401,7 +1401,24 @@
   "last_wake_summary": "wave12 (introducing-html-foss-python, blog.aspose.org/html/python) CLOSED CLEAN: both campaigns finished with ZERO failures -- LLM PID 50556: 22/22 accepted, m2m GPU PID 46940: 3/3 accepted (hu/ja/ro all escalated to professionalize_llm after their m2m100 primary attempt rejected, per normal dual-model policy). All 25 languages, 44/44 zero-defect gates each. Spot-checked ar/ru/zh frontmatter plus zh's full body (code blocks untouched, identifiers preserved, fluent natural prose) -- clean. Committed as one page-complete batch: content repo 95f0cc1a23 (25 files, no index.md touched). This is a genuine pages_newly_live event (0/25 -> 25/25 in one wave): pages_newly_live_total 16->17, cells_committed_total 175->200. Confirms the blog-post-shape hypothesis from wave11's close-out: avoiding reference.aspose.org's API-table pages (the malformed-table defect class) let a same-day Tier-1a page ship perfectly on the first attempt. Released the page claim. wave_scale sits at 4 (pages-per-wave) but this and recent iterations have only run 1 page per wave-cycle at a time (manual selection against work_ledger.sqlite3, no K-launcher multi-page orchestration wired up for this) -- NOT actually operating at the recorded wave_scale; flagging rather than claiming false compliance. Did not attempt to force 4 concurrent full-page campaigns this iteration given the real GPU/API/LMDB contention risk plan SS6.1 warns about for anything beyond the sanctioned LLM+m2m-GPU-shard split -- a proper multi-page wave launcher is a Track-B item, not a one-off risk to take here.",
   "cells_committed_total": 200,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "run_id": "wave13-html-dom-python-llm-20260907",
+      "pid": 40316,
+      "launched_at": "2026-09-07T10:56:00+00:00",
+      "manifest": "data/campaigns/manifests/wave13-html-dom-python-llm-20260907.yaml",
+      "log": "logs/wave13-html-dom-python-llm-20260907_launcher.log",
+      "note": "Tier-1a page content/blog.aspose.org/html/python/html-dom-python/index.md (0/25) -- 22 LLM-primary languages. Same family as the just-shipped introducing-html-foss-python (wave12, 25/25 clean), so a blog-post shape is expected here too. Claimed page:content/blog.aspose.org/html/python/html-dom-python/index.md. Passed verify_environment cleanly on HEAD 64dfdcf5. max_parallel_jobs=1, sequential -- check next wake."
+    },
+    {
+      "run_id": "wave13-html-dom-python-m2m-gpu-20260907",
+      "pid": 18316,
+      "launched_at": "2026-09-07T10:56:00+00:00",
+      "manifest": "data/campaigns/manifests/wave13-html-dom-python-m2m-gpu-20260907.yaml",
+      "log": "logs/wave13-html-dom-python-m2m-gpu-20260907_launcher.log",
+      "note": "Same page's hu/ja/ro cells (m2m100_418m primary, dedicated GPU shard), running concurrently with the LLM campaign above."
+    }
+  ],
   "wave_scale": {
     "value": 4,
     "previous": 2,
