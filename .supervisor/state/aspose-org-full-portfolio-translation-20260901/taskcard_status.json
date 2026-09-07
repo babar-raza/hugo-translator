@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 21,
+  "wake_count": 23,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,10 +1398,19 @@
       ]
     }
   },
-  "last_wake_summary": "wave15 (introducing-cells-foss-cpp) CLOSED at 0/25, same as wave14 -- TWO CONSECUTIVE Tier-1a pages now with 0 combined accepted cells (50 attempted). Confirmed via failure_metadata.jsonl: every one of 22 LLM locales + hu/ja/ro (m2m) hit the IDENTICAL deterministic mismatch -- StructureValidator code-span count source=73/translation=72 and LinkValidator link count source=7/translation=8, in every single language, both models. Source fences were pre-verified clean (unlike wave14), so this is a DIFFERENT mechanism: structure_validator.py:187 (_check_code_blocks) has ZERO tolerance for any fenced+inline code-span count mismatch (unlike _check_formatting a few lines below it, which explicitly allows a deviation of 2) -- this source page has 65 inline code spans, leaving zero margin for even one incidentally-merged/dropped span during translation. Full record: data/summaries/fp-wave15-introducing-cells-cpp-20260907.json (includes an unresolved gap: the live debug-harness diff to see the EXACT dropped span was attempted but did not finish within the iteration and was stopped rather than risk it spanning a wake boundary -- the absolute-path fix for debug_translate_one.py --source-path is now known for next time). TWO-STRIKES RULE (loop-prompt.md Sec6) now applies: per-iteration committed-cell floor missed twice in a row with a common structural cause -- Track-B priority for the next work is the code-span-count tolerance fix, NOT a third new Track-A page. Both claims (page:introducing-cells-foss-cpp) released.",
+  "last_wake_summary": "CONFIRMED: the structure_validator.py code-span-count fix (0c99e429) is necessary but not sufficient for wave15/introducing-cells-foss-cpp. Live debug_translate_one.py run (professionalize_llm, de) with the fix in place: the StructureValidator code-count ERROR (73 vs 72) is GONE from the issues list -- fix confirmed working as designed. But overall result is still success=False, \"Translation to de rejected after 4 attempts\", because LinkValidator AND StructureValidator BOTH still report a WARNING-severity Link/image count mismatch (source=7, translation=8), and that warning alone blocks under this manifest's zero-defect policy. Root mechanism of the extra link is still not directly observed (no candidate text is ever persisted, per the hard never-store-translated-text rule) -- a second debug run with extra error/retry_history printing added to the harness (uncommitted local edit) is running now as a detached process (PID 46684, ~9-10min expected) to try to surface the retry-feedback text describing the extra link without persisting full candidate text anywhere. A prior attempt at this same live-diagnosis got torn down mid-run when a Bash run_in_background task did not survive a turn boundary -- relaunched as a real detached Start-Process instead, which does survive. Next wake: read logs/debug-cells-cpp-de-20260907.log; if it shows the retry_history feedback text, use it to decide whether the link check needs a similar small-tolerance fix (if mechanical/harmless) or is a genuine hallucinated-link defect (if not) -- do NOT blindly copy the code-block tolerance pattern to links without understanding which case this is, since a translation should never introduce a link not derived from the source. If the log is inconclusive, decide whether to invest further or hand this off as an open question in the fp-record.",
   "cells_committed_total": 225,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "run_id": "debug-cells-cpp-de-20260907",
+      "pid": 46684,
+      "launched_at": "2026-09-07T14:20:00+00:00",
+      "manifest": null,
+      "log": "logs/debug-cells-cpp-de-20260907.log",
+      "note": "One-off debug_translate_one.py call (not a campaign), verifying the structure_validator.py code-count fix (0c99e429) against the real wave15 failing cell (introducing-cells-foss-cpp -> de, professionalize_llm). A FIRST run (foreground, completed cleanly before this entry) already confirmed the code-count ERROR is gone but the page still fails: only LinkValidator/StructureValidator link-count WARNING remains (source=7, translation=8), and that WARNING alone still blocks under zero-defect. This SECOND run adds result.error/retry_history printing (harness enhanced in-session, not yet committed) to try to see the retry-feedback text describing the extra link, without ever persisting candidate text to a tracked file. Launched as a real OS-detached Start-Process (not a Bash run_in_background task) after the first attempt at this got torn down mid-run when the session/turn boundary closed -- lesson: for a debug-harness call this slow (~9-10 min), use the same detached-subprocess pattern as campaigns, not an in-turn background Bash task, if there is any chance the turn ends before it finishes."
+    }
+  ],
   "wave_scale": {
     "value": 4,
     "previous": 2,
