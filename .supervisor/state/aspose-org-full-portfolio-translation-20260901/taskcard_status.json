@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 17,
+  "wake_count": 18,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,19 +1398,10 @@
       ]
     }
   },
-  "last_wake_summary": "Continuation: the LLM retry (professionalize_llm recovered, all 25 locales) hit de/cs/ar/el retrying through their full 3-phase escalation (primary_attempts=3, llm_escalation_attempts=2) -- each phase takes minutes under real latency, so 3 phases can run 10-15min per hard cell. I misread the repeating \"attempt 1/N\" log pattern as an infinite-retry bug and killed the whole process tree (PID 47276) partway through -- confirmed via campaign_runner.py that this was WRONG: the phases list is bounded and _run_campaign_job returns after exhausting it, at which point the outer as_completed loop moves to the next locale. Documented the correction in loop-prompt.md (archived a stale entry first to stay under the 40KB cap). Relaunched immediately with --resume (PID 52316) -- this time letting it run undisturbed. No content committed this iteration. Next wake: check summary.json (accepted/failed counts against all 25) and failure_metadata.jsonl rather than killing anything on log-pattern alone; if a cell has been in the SAME phase for >10-15min with zero log movement, that is the actual stuck signal, not a repeating bounded-phase log line. Review+commit whatever gate-passes as one page-complete batch once the run finishes or has enough completed locales to review.",
+  "last_wake_summary": "ROOT CAUSE FOUND, not a model/translation defect: introducing-pdf-foss-python (wave14) fails identically for EVERY locale under BOTH professionalize_llm and m2m100 because the ENGLISH SOURCE FILE has malformed fenced code blocks -- 15 (odd) triple-backtick lines; the first block closes prematurely after 1 line (line 140), leaving real code (141-148) and a prose sentence (150) unfenced, then a stray closing fence (151) shifts every subsequent open/close pairing by one. Verified by running StructureValidator's own fence regex directly against the live source file: it extracts 7 \"blocks\", but blocks 2-7 are markdown headings + prose (### Adding Text and Images / Annotations / Form Fields / Encryption / Text Extraction / Quick Start), whose lengths (451/429/305/62 chars) exactly match the recurring StructureValidator warning fingerprints every failed attempt showed. Under this manifest's zero-defect policy those warnings block acceptance. 11/11 attempted locales failed identically across two model configurations (m2m-forced during the outage, professionalize_llm after recovery) plus hu/ja/ro (m2m-primary, unrelated to the outage) -- ruling out model quality entirely. Full record: data/summaries/fp-wave14-introducing-pdf-python-20260907.json. Killed the (correctly, this time) futile campaign (PID 52316) rather than let it exhaust all 25 locales against a source defect no retry can fix. Recommended a 3-line fence fix to the operator (move the closing fence from after the import line to after the full code example, remove the now-stray fence after the following prose sentence) but did NOT apply it myself -- editing the English source page is outside campaign_runner.py's write scope (content/<site>/<lang>/ only) and outside what I judged this mission authorized without confirmation. This page's cells stay quarantined (root_cause_class effectively source:malformed_code_fences, layered over the auto:StructureValidator/LinkValidator/LanguageConsistencyValidator tickets already in heal_queue.jsonl from both wave14 attempts) until the source is fixed and the regression control in the fp-record passes. Next wake: pick a DIFFERENT Tier-1a page for Track-A (strict tier order) -- do not re-attempt this page until the fp-record's regression control (re-run the fence regex, expect 7 clean python blocks) passes.",
   "cells_committed_total": 225,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "run_id": "wave14-introducing-pdf-python-llm-retry-20260907",
-      "pid": 52316,
-      "launched_at": "2026-09-07T12:44:00+00:00",
-      "manifest": "data/campaigns/manifests/wave14-introducing-pdf-python-llm-retry-20260907.yaml",
-      "log": "logs/wave14-introducing-pdf-python-llm-retry-20260907e_launcher.log",
-      "note": "Relaunch with --resume after I wrongly killed the prior run (PID 47276) mid-phase, misreading its bounded 3-phase retry escalation (retry_policy: primary_attempts=3, llm_escalation_attempts=2 -- professionalize_llm x3 internal retries then 2 m2m100 escalation phases, each taking minutes) as an infinite loop. DO NOT kill this run again just because the same locale keeps showing repeated \"attempt 1/N\" / \"High retry overhead\" lines -- that is expected for a genuinely hard cell; only worry if a SINGLE phase itself exceeds several minutes with no log movement at all, or if the process dies. Full 25-locale run against professionalize_llm (recovered from the earlier circuit-breaker outage); some locales already known hard (de/cs/ar/el hit StructureValidator retries in the killed run) -- expect a slow wave, check back via summary.json/failure_metadata.jsonl rather than raw log tailing."
-    }
-  ],
+  "active_detached_runs": [],
   "wave_scale": {
     "value": 4,
     "previous": 2,

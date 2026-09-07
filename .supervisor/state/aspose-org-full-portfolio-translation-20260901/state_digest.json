@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T12:41:50.263430+00:00",
+  "generated_at": "2026-09-07T12:59:56.348721+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "Check wave14 LLM-retry (PID 52316, run_id wave14-introducing-pdf-python-llm-retry-20260907) summary.json/failure_metadata.jsonl; do NOT kill on repeating attempt-N/N log lines alone (bounded 3-phase retry_policy, minutes per phase is normal) -- only on a truly stuck process (no log movement 10-15min+) or a dead PID. Review+commit whatever gate-passes as one page-complete batch."
+  "next_action": "introducing-pdf-foss-python is BLOCKED on a source-content bug (malformed code fences, see data/summaries/fp-wave14-introducing-pdf-python-20260907.json) -- do not retry it. Pick a different Tier-1a page for Track-A in strict tier order; recommend the 3-line source fence fix to the operator for their decision."
 }
