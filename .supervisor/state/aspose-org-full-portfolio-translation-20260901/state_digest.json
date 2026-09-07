@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T07:53:51.324562+00:00",
+  "generated_at": "2026-09-07T09:17:26.507778+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": ""
+  "next_action": "Check wave10b (PID 45880) outcome: review/commit hu if it gate-passes; if ja repeats frontmatter_segment_not_applied, design a fix for _unapplied_frontmatter_keys's equality-to-snapshot gap (TC-APT-042 cross-field-repair interaction) rather than relaunching again."
 }
