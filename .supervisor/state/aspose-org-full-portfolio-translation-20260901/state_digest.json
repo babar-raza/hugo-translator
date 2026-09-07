@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T05:33:07.754113+00:00",
+  "generated_at": "2026-09-07T07:28:40.756039+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "pdf-annotations-in-cpp now 17/25 (it committed e1e06c4173). 5 of 6 wave8 leftover candidates REJECTED and heal-ticketed with TM purged (hi: governed-term inconsistency; nl: isolated garbled word, good retry candidate; fa: known cross-page description word-gluing, unfixed mechanism; ar: STALE pre-TC-APT-101 candidate, likely fixed by retranslating under current code; el: asymmetric frontmatter residual). Page claim released. Next: either retranslate this page's remaining 8 langs (hi/nl/fa/ar/el retry + hu/ja/ro never-attempted, needs GPU shard) in one combined manifest to reach 25/25, or select a fresh Tier-1a page -- both are valid Track-A choices, no recurrence-escalation blocker outstanding."
+  "next_action": ""
 }
