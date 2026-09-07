@@ -98,6 +98,9 @@ def main(argv: list[str] | None = None) -> int:
     print("validation_decision:", result.validation_decision)
     print("decision_reason:", result.decision_reason)
     print("retry_attempts:", result.retry_attempts)
+    print("error:", result.error)
+    for entry in result.retry_history:
+        print("retry_history entry:", entry)
     vr = result.validation_result
     if vr is not None:
         print("=== ValidationResult.issues ===")
