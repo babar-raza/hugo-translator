@@ -1394,7 +1394,16 @@
   "last_wake_summary": "Wave 2 (wave_scale=2) completed: email/cpp 25/25 clean (title-only, page-complete, pages_newly_live_total 1->2), email/python 21/24 (zh gate-failed x3 no cross-model escalation; hi/hu/ja rejected for text adjacent to the FOSS-edition mask / unrelated fluency issues -- 4 heal tickets, 30 TM entries purged). Committed 4e93753027 (71 files) -- this ALSO recovered email/net (25 langs) after discovering its original commit fc101aa230 had been orphaned from HEAD ancestry during a concurrent multi-session window (reflog still had it; git log did not -- likely a peer git-reset in this shared single-checkout repo). Content was intact in the working tree/index (soft-reset shape), re-committed after confirming session_ledger candidates matched staged files exactly. Also hit the known transient stale-file-regression race twice more, both resolved by retry. cells_committed_total 96 -> 167. Flagged to the operator: multi-session single-checkout git setup can silently orphan commits -- worth per-session worktrees or a reflog integrity check.",
   "cells_committed_total": 167,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "run_id": "wave9-annotations-cpp-llm-retry-20260907",
+      "pid": 46516,
+      "launched_at": "2026-09-07T00:00:00+00:00",
+      "manifest": "data/campaigns/manifests/wave9-annotations-cpp-llm-retry-20260907.yaml",
+      "log": "logs/wave9-annotations-cpp-llm-retry-20260907_launcher.log",
+      "note": "Retrying pdf-annotations-in-cpp hi/nl/fa/ar/el (professionalize_llm) after their wave8 candidates were rejected and TM-purged. hu/ja/ro (m2m100, GPU shard) deliberately NOT launched concurrently to avoid two processes contending for GPU/VRAM -- queued for a later wake once this one is confirmed done. On next check: read log/candidates, full-body review, commit or re-ticket."
+    }
+  ],
   "wave_scale": {
     "value": 4,
     "previous": 2,
