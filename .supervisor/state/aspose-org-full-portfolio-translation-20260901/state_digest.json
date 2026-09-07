@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T12:14:40.392243+00:00",
+  "generated_at": "2026-09-07T12:24:03.255090+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "Check wave14 retry (PID 58388, all 25 locales via professionalize_llm, run_id wave14-introducing-pdf-python-llm-retry-20260907) receipts/logs; review+commit page-complete if gates pass; if the same LinkValidator link-count-loss pattern recurs under LLM primary, open a Sec10.1 first-principles record before any new Track-A page."
+  "next_action": "Check wave14 LLM-retry (PID 47276, run_id wave14-introducing-pdf-python-llm-retry-20260907, all 25 locales via professionalize_llm) receipts/summary.json; review+commit page-complete if gates pass; if LinkValidator link-count-loss recurs under LLM primary too, open a Sec10.1 record before any new Track-A page."
 }
