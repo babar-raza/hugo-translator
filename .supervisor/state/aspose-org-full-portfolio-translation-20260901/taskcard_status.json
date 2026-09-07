@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-06T12:20:00.000000+00:00",
+  "updated_at": "2026-09-07T07:26:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 11,
+  "wake_count": 12,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,8 +1398,8 @@
       ]
     }
   },
-  "last_wake_summary": "Found TC-APT-103 fix (bare PascalCase compound identifier preserve_pattern) already written+tested but UNCOMMITTED by a prior session/turn, and confirmed it was silently blocking ALL campaign launches (verify_environment: translator repository is dirty) -- this is why the wave9 GPU shard (hu/ja/ro, PID 49284) died immediately after spawning. Registered TC-APT-103 DONE and committed (86c1e3fe). Read the actual wave9 LLM-retry candidates (hi/nl/fa/ar/el, generated pre-fix) and confirmed the defect is still present in hi (heading line 208: AnnotationCollection -> garbled transliteration) -- these stale candidates must NOT be reviewed/committed as-is. Rebuilt a fresh manifest (--existing replace, current stale candidates as baseline) and relaunched the LLM retry as a real OS-detached Windows process (PID 47684, Start-Process, not harness run_in_background) since launch_parallel_campaign_shards.py now refuses to run ungoverned without --wait. GPU shard (hu/ja/ro) deliberately deferred until this completes to avoid concurrent-engine lock contention.",
-  "cells_committed_total": 167,
+  "last_wake_summary": "wave9 llm-retry2 (TC-APT-103 fix verification): ar+el reviewed clean and committed (51fa066262); fa failed (auto:TC-SAS-01), heal-ticketed + TM purged; ar/el prior heal tickets closed FIXED_VERIFIED; hi/nl still running detached (PID 47684).",
+  "cells_committed_total": 169,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1408,7 +1408,7 @@
       "launched_at": "2026-09-07T00:00:00+00:00",
       "manifest": "data/campaigns/manifests/wave9-annotations-cpp-llm-retry2-tc103fix-20260907.yaml",
       "log": "logs/wave9-annotations-cpp-llm-retry2-tc103fix-20260907_launcher.log",
-      "note": "Re-running hi/nl/fa/ar/el LLM retry after committing TC-APT-103 (86c1e3fe) which fixes the bare-PascalCase-compound heading bug (AnnotationCollection etc). Prior wave9 llm-retry candidates on disk (5/5 gate-passed) predate the fix and still show the defect (verified: hi heading line 208 = garbled transliteration) -- do NOT review/commit those; this rerun declares them as replace_existing baseline. GPU shard for hu/ja/ro (previous PID 49284) died with verify_environment translator-repo-dirty error caused by this same uncommitted fix -- now unblocked but deliberately NOT launched concurrently with this LLM retry to avoid the documented shared _model_execution_lock/GPU contention hazard (plan SS0.3); launch it after this run completes."
+      "note": "ar+el accepted (44/44 gates + rubric review APPROVE), committed 51fa066262 (page now 19/25). fa failed again on attempt 3, different mechanism this time (auto:TC-SAS-01 same-as-source 18.2%, not the PascalCase bug) -- heal ticket heal-pdf-annotations-cpp-fa-tc-sas-01-20260907 opened, TM purged (21 entries). hi/nl still in flight in the same detached process (PID 47684, still alive at last check) -- review and commit on a later wake once their receipts land. GPU shard for hu/ja/ro still queued, not yet launched (avoiding concurrent GPU/model-lock contention with this still-running LLM retry per plan SS0.3)."
     }
   ],
   "wave_scale": {
