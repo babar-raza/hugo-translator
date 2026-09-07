@@ -1373,6 +1373,13 @@
       "commit": null,
       "last_updated": "2026-09-07T05:20:00.000000+00:00",
       "blocker_type": null
+    },
+    "TC-APT-103": {
+      "status": "DONE",
+      "gate": null,
+      "title": "producer_heading_compound_api_class_name_translated: bare (non-backtick) PascalCase compound identifiers (2+ camel-case humps, e.g. AnnotationCollection, TextAnnotation) had no preserve_pattern coverage outside code spans -- headings/prose transliterated them (hi: \"AnnotationCollection\" -> garbled phonetic mash; ar/it/nl: translated into generic nouns). Added global preserve_pattern (config/global.yaml body.preserve_patterns) matching bare 2+-hump PascalCase runs, single-hump words deliberately excluded (RB-006 carve-out). Regression: tests/regression/test_pascal_compound_identifier_protection.py (9 cases incl. 788-heading portfolio-sample false-positive check). Subsumes narrower TypeScript-only fix (eca736e). Fixes heal tickets heal-pdf-annotations-cpp-heading-class-name-untranslated, heal-pdf-annotations-cpp-hi-annotationcollection-glued, heal-pdf-annotations-cpp-hi-annotationcollection-summary -- reverification pending against a fresh regeneration (wave9 llm-retry candidates on disk predate this fix, config mtime is later than their generation).",
+      "depends_on": [],
+      "owner": "loop"
     }
   },
   "gate_closures": {

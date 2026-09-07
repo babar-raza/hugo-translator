@@ -293,6 +293,24 @@ body:
   # production audit data as the majority cause of false positives in the
   # equivalent detector logic (audit_all_content.py, write_gate.py Gate 22).
   - '`[^`\n]+`'
+  # TC-APT-103: protect bare (non-backtick) PascalCase COMPOUND identifiers --
+  # two or more capitalized word-parts run together with no space, e.g.
+  # "AnnotationCollection", "TextAnnotation", "PageLabelCollection" -- from
+  # MT/LLM translation. Reproduced directly on pdf-annotations-in-cpp: the
+  # heading "### Annotation and AnnotationCollection" has no backticks (a
+  # heading, not a code span), so the existing backtick-only protection above
+  # never reaches it; hi mistranslated it into a garbled phonetic mash
+  # "एनोटेशनकलेक्शन" TWICE across two independent retries (once via the
+  # frontmatter summary field, then again at this exact heading once the
+  # summary instance was fixed), and ar's first attempt separately translated
+  # both class names into generic Arabic nouns. A single capitalized word
+  # ("Annotation" alone) is excluded on purpose -- that's ordinary English
+  # text a language may legitimately translate (RB-006's own carve-out) --
+  # only a run of 2+ camel-case humps with no internal space is protected,
+  # which in practice is always an API/class/brand identifier, never natural
+  # prose (confirmed: also subsumes the narrower TypeScript-only fix from
+  # eca736e, since "TypeScript" is itself a 2-hump PascalCase compound).
+  - '\b[A-Z][a-z]+(?:[A-Z][a-z0-9]*)+\b'
 
 # Security settings
 security:
