@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 14,
+  "wake_count": 15,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,25 +1398,17 @@
       ]
     }
   },
-  "last_wake_summary": "wave13 (html-dom-python, blog.aspose.org/html/python) CLOSED: both campaigns finished with ZERO structural failures (LLM 22/22, m2m 3/3, all 44/44 gates), BUT manual rubric review of ja (which passed gates on m2m100 primary directly, not escalated) found real quality defects the gates missed: a garbled/nonsense word, a meaning-changing mistranslation of a heading, and the technical term tree (data-structure sense) rendered with the wrong kanji in two places -- REJECT under RB-004. Side-by-side spot-check of zh/ar/ru confirmed this was isolated to ja, not a producer bug. Shipped the other 24 languages immediately (716feb507f) rather than holding the page hostage to one bad cell. Retried ja: the debug harness's default force=False silently reused the stale on-disk m2m100 candidate unchanged (a real trap -- calling engine.translate_file(force=True, force_overwrite=True) directly, bypassing debug_translate_one.py's CLI, was required to actually retranslate). Forced professionalize_llm primary this way; all three defects gone, gate battery passed, committed 811fb6e4b3. html-dom-python is 25/25. pages_newly_live_total 17->18, cells_committed_total 200->225. Lesson for the runbook: 44/44 automated gates catch structural defects, not semantic/terminology quality -- rubric review of at least one non-Latin-script language per page (not just frontmatter, full body) remains necessary even on a clean gate run, and debug_translate_one.py needs force=True to actually retranslate an already-attempted cell.",
+  "last_wake_summary": "wave14 (introducing-pdf-foss-python) FIRST ATTEMPT closed 0/25 accepted: professionalize_llm circuit breaker tripped open 11:57:51Z (APIConnectionError, trips=4) mid-run, degrading all 22 LLM-primary locales to m2m100 fallback; hu/ja/ro (m2m-primary) independently hit the same LinkValidator/StructureValidator class (page resource-link list: source 6 links, translated as few as 2) -- a genuine m2m100 weakness on this page, not purely an outage artifact. All 25 cells auto-ticketed with classified root causes (heal_queue.jsonl), satisfying gate-close. mission_supervisor decide()=BLOCK on the open breaker; ran TC-APT-021 model-identity --check as the recovery probe (sanctioned periodic canary) at 12:10:17Z -- MATCH, breaker closed immediately after. Retried the whole page (all 25 locales) through professionalize_llm as the policy-prescribed other-model escalation before any quarantine (run_id wave14-introducing-pdf-python-llm-retry-20260907, PID 58388, real OS-detached Start-Process --wait, 4 gate5 child shards). No content committed this iteration pending retry results. Next wake: check retry receipts/logs, review and commit whatever gate-passes, and if the SAME link-count-loss defect recurs even under professionalize_llm primary, open a Sec10.1 first-principles record (root cause would then be upstream of model choice -- e.g. link extraction/placeholder handling for this specific resource-list markdown shape) before touching a new Track-A page.",
   "cells_committed_total": 225,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "wave14-introducing-pdf-python-llm-20260907",
-      "pid": 56664,
-      "launched_at": "2026-09-07T11:28:00+00:00",
-      "manifest": "data/campaigns/manifests/wave14-introducing-pdf-python-llm-20260907.yaml",
-      "log": "logs/wave14-introducing-pdf-python-llm-20260907_launcher.log",
-      "note": "Tier-1a page content/blog.aspose.org/pdf/python/introducing-pdf-foss-python/index.md (0/25) -- 22 LLM-primary languages. Blog-post shape like the two clean wins (wave12/wave13). Claimed page. Passed verify_environment cleanly on HEAD 43e53c86. Remember to full-body rubric-review at least one non-Latin-script language even if all 44 gates pass (wave13's ja RB-004 catch)."
-    },
-    {
-      "run_id": "wave14-introducing-pdf-python-m2m-gpu-20260907",
-      "pid": 54620,
-      "launched_at": "2026-09-07T11:28:00+00:00",
-      "manifest": "data/campaigns/manifests/wave14-introducing-pdf-python-m2m-gpu-20260907.yaml",
-      "log": "logs/wave14-introducing-pdf-python-m2m-gpu-20260907_launcher.log",
-      "note": "Same page's hu/ja/ro cells (m2m100_418m primary, dedicated GPU shard), running concurrently with the LLM campaign above."
+      "run_id": "wave14-introducing-pdf-python-llm-retry-20260907",
+      "pid": 58388,
+      "launched_at": "2026-09-07T12:13:31+00:00",
+      "manifest": "data/campaigns/manifests/wave14-introducing-pdf-python-llm-retry-20260907.yaml",
+      "log": "logs/wave14-introducing-pdf-python-llm-retry-20260907_launcher.log",
+      "note": "RETRY of wave14 (introducing-pdf-foss-python) for all 25 locales via professionalize_llm, launched immediately after the circuit breaker closed (probe succeeded 12:10:20Z). Original wave14 (LLM PID 56664 + m2m GPU PID 54620) went 0/25 accepted: professionalize_llm tripped open at 11:57:51Z (APIConnectionError, 4 trips total, 11:38-12:10Z outage window) forcing the 22 LLM-primary locales onto the m2m100 fallback; hu/ja/ro (m2m-primary, unaffected by the outage) failed independently on the SAME LinkValidator/StructureValidator pattern (source_count=6 links vs translation_count as low as 2) -- confirms this page has a genuine m2m100 link-preservation weakness on its resource-link list, not just an outage artifact. All 25 cells got auto heal tickets with classified root causes (auto:LinkValidator, auto:StructureValidator, auto:LanguageConsistencyValidator, pipeline) -- gate-close rule satisfied for the original attempt. This retry is the policy-prescribed \"other model\" escalation (plan Sec6.1) for all 25 cells before any quarantine. Single manifest, --primary-model professionalize_llm, 4 gate5 child shards, launched via Start-Process --wait (real OS-detached, survives wakes). Old wave14 entries (56664, 54620) removed here -- both exited, zero accepted, superseded by this retry."
     }
   ],
   "wave_scale": {

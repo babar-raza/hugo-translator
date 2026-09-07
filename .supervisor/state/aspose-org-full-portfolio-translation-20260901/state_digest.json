@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T11:38:09.683461+00:00",
+  "generated_at": "2026-09-07T12:14:40.392243+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "Check wave14 (LLM PID 56664, m2m GPU PID 54620) progress on introducing-pdf-foss-python; review+commit as one page-complete batch, including a full-body rubric spot-check of at least one non-Latin-script language even if all gates pass."
+  "next_action": "Check wave14 retry (PID 58388, all 25 locales via professionalize_llm, run_id wave14-introducing-pdf-python-llm-retry-20260907) receipts/logs; review+commit page-complete if gates pass; if the same LinkValidator link-count-loss pattern recurs under LLM primary, open a Sec10.1 first-principles record before any new Track-A page."
 }
