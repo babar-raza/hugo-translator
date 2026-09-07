@@ -1781,11 +1781,27 @@ class SegmentTranslator:
 
             force_protected_fields = compute_force_protected_fields(doc, site_profile)
 
+            # Merge the global preserve_patterns baseline the same way SegmentExtractor
+            # does (segment_extractor.py:125-127). Without this, a backtick-quoted
+            # identifier gets placeholder-protected when SegmentExtractor builds
+            # `segments` but stays raw here; the later reuse-match comparison at
+            # ~line 1846 then normalizes two genuinely different strings, "not_matched"
+            # sends the unit to an independent re-translation, and that translation
+            # disagrees with the one already stored in `translations[]` for the same
+            # source -- surfacing as a spurious `frontmatter_segment_not_applied` on
+            # any zero-defect m2m100-primary field containing an inline code span
+            # (found live 2026-09-07 on description/summary, 3/3 langs of one page).
+            from .extractor.segment_extractor import _get_global_body_preserve_patterns
+
+            _merged_preserve_patterns = _get_global_body_preserve_patterns() + (
+                site_profile.body.preserve_patterns or []
+            )
+
             extractor = TextUnitExtractor(
                 segmentation_strategy=site_profile.body.ast_segmentation_strategy,
                 terminology_file=terminology_file if terminology_file.exists() else None,
                 mt_model=mt_model,
-                preserve_patterns=site_profile.body.preserve_patterns,
+                preserve_patterns=_merged_preserve_patterns,
                 site_profile=site_profile,
                 batch_stats_tracker=engine.batch_stats_tracker,
                 fasttext_detector=engine.fasttext_detector,
