@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 25,
+  "wake_count": 26,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,10 +1398,27 @@
       ]
     }
   },
-  "last_wake_summary": "wave15 link-count mismatch fully diagnosed via live LinkValidator._extract_links instrumentation (ephemeral monkeypatch, printed to stdout only, script deleted immediately after use, never persisted candidate text to a tracked file): this IS a genuine duplication defect, not a false positive. The single link from the page's trailing \"Related Resources\" list section (Aspose.Cells Enterprise Blog) gets duplicated to ALSO appear before the separate, earlier \"Getting Started\" link list -- present from the very first translation attempt (not retry-feedback induced), same text/url both times (exact duplication, not a hallucination). CONCLUSION: unlike the code-span count (genuinely a false positive, fixed in 0c99e429), the LinkValidator warning must NOT get a tolerance -- it is correctly catching real content corruption. The exact producer-side mechanism (likely in list-block extraction/reconstruction ordering when a document has 2+ separate link-bearing sections) was not traced this iteration (a static grep for insert(0../prepend patterns found nothing obvious) -- flagged as a well-evidenced, well-scoped Track-B bug for a dedicated iteration, recorded in data/summaries/fp-wave15-introducing-cells-cpp-20260907.json. wave15 stays quarantined at 0/25 pending that fix. This iteration's concrete wins: (1) the code-span-count tolerance fix landed and unit-tested (0c99e429); (2) the link duplication bug is now precisely characterized instead of guessed at. Next action: since two-strikes Track-B time has now been spent productively (one real fix + one real bug fully diagnosed), resume Track-A with a NEW Tier-1a page, pre-screening candidates for BOTH clean code fences (wave14 lesson) AND a single link-bearing section rather than 2+ separate ones (wave15 lesson) to avoid a third consecutive near-total-failure wave.",
+  "last_wake_summary": "Resumed Track-A after productive Track-B work (structure_validator fix landed + link-duplication bug fully diagnosed, see prior wake_summary). Selected wave16: pdf-document-management-go, verified genuinely untranslated on the content-repo filesystem and fence-clean (5 genuine Go blocks). Revised the over-broad wave15 link-section heuristic after checking wave12's already-successful page shares the identical 2-section link-footer template -- that structural signal alone does not predict the duplication bug, so did not filter on it. Launched both campaigns (LLM PID 58472, m2m GPU PID 55168), both confirmed past verify_environment.",
   "cells_committed_total": 225,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "run_id": "wave16-pdf-doc-mgmt-go-llm-20260907",
+      "pid": 58472,
+      "launched_at": "2026-09-07T14:48:00+00:00",
+      "manifest": "data/campaigns/manifests/wave16-pdf-doc-mgmt-go-llm-20260907.yaml",
+      "log": "logs/wave16-pdf-doc-mgmt-go-llm-20260907_launcher.log",
+      "note": "Tier-1a page content/blog.aspose.org/pdf/go/pdf-document-management-go/index.md (0/25) -- 22 LLM-primary languages. Pre-screened: 5 fenced Go code blocks all genuine (no prose-as-code mismatch, wave14 lesson). NOTE: revised the wave15 lesson -- checked introducing-html-foss-python (wave12, 25/25 clean) and confirmed it shares the exact same 2-section link-footer template (Getting Started list + separate Related Resources list) that wave15 hit the duplication bug on, so \"avoid 2+ link sections\" is NOT a reliable predictor (too common a template, most pages using it succeed) -- did not screen for that; code-span-count tolerance fix (0c99e429) now also covers this page's moderate code density regardless. Claimed in claims.jsonl."
+    },
+    {
+      "run_id": "wave16-pdf-doc-mgmt-go-m2m-gpu-20260907",
+      "pid": 55168,
+      "launched_at": "2026-09-07T14:48:00+00:00",
+      "manifest": "data/campaigns/manifests/wave16-pdf-doc-mgmt-go-m2m-gpu-20260907.yaml",
+      "log": "logs/wave16-pdf-doc-mgmt-go-m2m-gpu-20260907_launcher.log",
+      "note": "Same page hu/ja/ro cells (m2m100_418m primary), running concurrently with the LLM campaign above."
+    }
+  ],
   "wave_scale": {
     "value": 4,
     "previous": 2,

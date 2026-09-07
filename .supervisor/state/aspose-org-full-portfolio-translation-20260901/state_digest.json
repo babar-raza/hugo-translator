@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T14:45:48.938514+00:00",
+  "generated_at": "2026-09-07T14:49:25.741116+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "Select a new Tier-1a page for Track-A, pre-screening for clean code fences (wave14 lesson) AND a single link-bearing section rather than 2+ separate ones (wave15 lesson: duplication bug confirmed, not a false positive, do not retry wave15 or loosen LinkValidator until the producer-side fix lands)."
+  "next_action": "Check wave16 (pdf-document-management-go, PID 58472 LLM + 55168 m2m) summary.json/failure_metadata.jsonl; review+commit page-complete if gates pass. wave14 still awaits operator decision on source-fence fix; wave15 stays quarantined pending the link-duplication producer-side fix (Track-B)."
 }
