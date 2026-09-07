@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T23:37:43.016034+00:00",
+  "generated_at": "2026-09-07T05:18:59.743093+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -16,8 +16,7 @@
     "TC-APT-078",
     "TC-APT-080",
     "TC-APT-090",
-    "TC-APT-098",
-    "TC-APT-101"
+    "TC-APT-098"
   ],
   "active_clauses": {
     "capacity_clause": {
@@ -37,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "TC-APT-101: es+th committed (bef901d471, content repo), reverification receipts recorded. pl REJECT_ISOLATED for a new, isolated (not recurring) duplicated-word defect near a Document placeholder restoration -- TM purged, retrying on m2m100_418m (pid 51156). Next wake: check pl retry log/candidate, review, commit or ticket (both models tried at that point -> plan SS10 full root-cause if still failing). No new Track-A page until this class fully resolves."
+  "next_action": "TC-APT-101 DONE: FIX-C punctuation-doubling fix shipped+verified (es+th committed bef901d471, pl's punctuation defect also confirmed fixed on both models but pl blocked by a SEPARATE new defect). RECURRENCE ESCALATION for reconstruction_punctuation_duplication satisfied for the manifestation I could reach; ro/fa word-gluing sub-issue and the new TC-APT-102 (Document-object duplication) remain as ordinary Track-B backlog, not blocking. Track A may resume: pick a new Tier-1a page or continue pdf/cpp family remnants (pdf-annotations-in-cpp partial, pdf-pdf-cpp pulled out, pdf-graphics-in-cpp). Next: orient via mission_supervisor, check claims.jsonl, resume normal wave cadence."
 }

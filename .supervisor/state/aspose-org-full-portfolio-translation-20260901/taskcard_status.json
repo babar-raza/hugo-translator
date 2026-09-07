@@ -1351,15 +1351,27 @@
       "plan_ref": "RECURRENCE ESCALATION step 1 (fix) for heal-cells-mgmt-go-retry2-wrap-link-* tickets"
     },
     "TC-APT-101": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "gate": 5,
       "title": "reconstruction_punctuation_duplication: FIX-C appends source trailing punctuation even when the model already ended the sentence with a DIFFERENT valid terminal mark (not a drop, a substitution) -- reproduced directly on pdf-document-management-in-cpp es/pl/th Quick Start sentences (model rendered a colon-before-code-block source as its own period; FIX-C then appended the source colon anyway, producing doubled \".:\"). RECURRENCE ESCALATION trigger: this root_cause_class had 4 open-ticket pages (pdf/typescript/_index.md ro, pdf-annotations-in-cpp fa, pdf-document-management-in-cpp fa+es/pl/th, scene-entities-in-net hi) though TC-APT-040/073 had already fixed two OTHER manifestations (native-terminal-equivalents, leading-side doubling) of the same class -- so no new Track-A page opens until this closed-loop sequence runs.",
       "depends_on": [],
       "owner": "loop",
-      "blocking_reason": "Step 1 (fix) DONE: ast_renderer.py _preserve_punctuation trailing branch now also skips the append when translated_text already ends with ANY terminal punctuation mark (own or native-equivalent set), not just the source-specific one -- an already-terminated sentence should never get a second terminal appended regardless of which mark the model chose. Step 2 (reverify against exact original file): confirmed directly by reading the actual rejected candidate files on disk (content repo, untracked from the wave8 run) -- es \"...aspose_pdf_foss`.:\" / \"...guarda el resultado.:\", pl and th identical shape -- and proving via a new regression test built from those EXACT strings that the fixed code no longer reproduces the double punctuation (also confirmed the OLD code DOES fail these same 3 tests via git-stash bisection). Step 3 (retrigger campaign) IN PROGRESS: manifest data/campaigns/manifests/heal-recur-punct-fix-pdfdocmgmt-cpp-20260907.yaml built (--existing replace, 1 source x es/pl/th), launched detached (see active_detached_runs). NOT yet done: the ro pentruTypeScript and fa description-field word-gluing tickets in this SAME class label look like a DIFFERENT mechanism (a missing space at a placeholder START boundary, not punctuation duplication) -- explicitly NOT touched this iteration; the mission has a standing precedent (placeholder_manager.py Finnish case-suffix comment) that blindly inserting spaces around placeholders is unsafe (agglutinative-language suffixes legitimately glue onto a placeholders END with no space), so this needs its own live-instrumentation investigation before any fix, not a blind extension of this one. Full regression+reconstructor suite (525 tests) passes with the fix, 0 regressions.",
+      "blocking_reason": "All 3 closed-loop steps complete. Step 1 (fix) landed d773422, unit-tested (3 new regression tests, bisection-confirmed). Step 2 (reverify against exact original files): confirmed on es, th, AND pl -- the doubled '.:' is gone in every one of the 3 originally-quarantined cells, pl confirmed on BOTH professionalize_llm and m2m100_418m independently. Step 3 (retrigger + commit): es+th committed to the content repo (bef901d471); pl could not be committed because a SEPARATE, newly-discovered defect (a duplicated 'object' near a `Document` placeholder, confirmed on both models) blocks it -- spun off as its own ticket (heal-pdf-docmgmt-cpp-pl-document-object-duplication) and taskcard TC-APT-102, not conflated with this taskcard's scope. reconstruction_punctuation_duplication's remaining open tickets (ro pentruTypeScript, fa description word-gluing) are a DIFFERENT mechanism (placeholder-start spacing, not punctuation doubling) explicitly left open per the Finnish-suffix precedent against blind space-insertion -- not this taskcard's scope either.",
       "evidence_path": "tests/regression/test_native_terminal_punctuation_not_doubled.py (TestSubstitutedTerminalsAreNotDoubled); data/campaigns/manifests/heal-recur-punct-fix-pdfdocmgmt-cpp-20260907.yaml",
+      "commit": "d773422",
+      "last_updated": "2026-09-07T05:20:00.000000+00:00",
+      "blocker_type": null
+    },
+    "TC-APT-102": {
+      "status": "TODO",
+      "gate": null,
+      "title": "model_quality_residual_phrase_defects: a generic classifier noun (e.g. 'object') gets translated once AND left as a second bare-English copy immediately after a backtick placeholder at a sentence's end -- confirmed reproducing identically on BOTH professionalize_llm and m2m100_418m for pdf-document-management-in-cpp/pl, line 170. es/th (same sentence) both correct, so not a universal producer bug; not model-specific either, since both engines converge on the same duplication. Needs live instrumentation across 2-3 more same-shape sentences before deciding fix-vs-MODEL_LIMITATION_DEFERRED.",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": "Not started. First-principles record written instead of a 3rd blind retry: data/summaries/fp-pdf-docmgmt-cpp-pl-object-duplication-20260907.json. Heal ticket: heal-pdf-docmgmt-cpp-pl-document-object-duplication.",
+      "evidence_path": "data/summaries/fp-pdf-docmgmt-cpp-pl-object-duplication-20260907.json",
       "commit": null,
-      "last_updated": "2026-09-07T00:00:00.000000+00:00",
+      "last_updated": "2026-09-07T05:20:00.000000+00:00",
       "blocker_type": null
     }
   },
@@ -1382,16 +1394,7 @@
   "last_wake_summary": "Wave 2 (wave_scale=2) completed: email/cpp 25/25 clean (title-only, page-complete, pages_newly_live_total 1->2), email/python 21/24 (zh gate-failed x3 no cross-model escalation; hi/hu/ja rejected for text adjacent to the FOSS-edition mask / unrelated fluency issues -- 4 heal tickets, 30 TM entries purged). Committed 4e93753027 (71 files) -- this ALSO recovered email/net (25 langs) after discovering its original commit fc101aa230 had been orphaned from HEAD ancestry during a concurrent multi-session window (reflog still had it; git log did not -- likely a peer git-reset in this shared single-checkout repo). Content was intact in the working tree/index (soft-reset shape), re-committed after confirming session_ledger candidates matched staged files exactly. Also hit the known transient stale-file-regression race twice more, both resolved by retry. cells_committed_total 96 -> 167. Flagged to the operator: multi-session single-checkout git setup can silently orphan commits -- worth per-session worktrees or a reflog integrity check.",
   "cells_committed_total": 167,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "run_id": "heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907d",
-      "pid": 26948,
-      "launched_at": "2026-09-07T00:00:00+00:00",
-      "manifest": "data/campaigns/manifests/heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907d.yaml",
-      "log": "logs/heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907d_launcher.log",
-      "note": "Take 4: take 3 (pid 74108) failed on translator-repo dirty(1 path) -- the dirty check gates on the WHOLE translator repo regardless of dirty_scope (that setting is for the CONTENT repo side only), and I had left an uncommitted bookkeeping edit in taskcard_status.json when I built/launched take 3. Root fix: rebuilt against a fully clean+committed tree, launched, waited ~35s past verify_environment with zero uncommitted changes the whole time, THEN wrote this bookkeeping update (safe now -- the environment check already passed for this run). Real lesson for future retriggers in this mission: the translator repo must be byte-for-byte clean (committed) at manifest-build time AND remain clean until the childs verify_environment call completes -- do not write ANY file in this repo, even .supervisor state, between build and launch-confirmed-past-check."
-    }
-  ],
+  "active_detached_runs": [],
   "wave_scale": {
     "value": 4,
     "previous": 2,
