@@ -1396,12 +1396,12 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "wave9-annotations-cpp-llm-retry-20260907",
-      "pid": 46516,
+      "run_id": "wave9-annotations-cpp-m2m-gpu-20260907b",
+      "pid": 49284,
       "launched_at": "2026-09-07T00:00:00+00:00",
-      "manifest": "data/campaigns/manifests/wave9-annotations-cpp-llm-retry-20260907.yaml",
-      "log": "logs/wave9-annotations-cpp-llm-retry-20260907_launcher.log",
-      "note": "Retrying pdf-annotations-in-cpp hi/nl/fa/ar/el (professionalize_llm) after their wave8 candidates were rejected and TM-purged. hu/ja/ro (m2m100, GPU shard) deliberately NOT launched concurrently to avoid two processes contending for GPU/VRAM -- queued for a later wake once this one is confirmed done. On next check: read log/candidates, full-body review, commit or re-ticket."
+      "manifest": "data/campaigns/manifests/wave9-annotations-cpp-m2m-gpu-20260907b.yaml",
+      "log": "logs/wave9-annotations-cpp-m2m-gpu-20260907b_launcher.log",
+      "note": "hu/ja/ro (m2m100, never attempted on this page) launched after wave9 LLM retry (pid 46516) exited cleanly, freeing the GPU. wave9 LLM retry results: 5/5 cells gate-passed; 5 parallel subagent reviews launched, results pending. On next check: review this GPU shards output, and check the wave9 LLM reviews."
     }
   ],
   "wave_scale": {
