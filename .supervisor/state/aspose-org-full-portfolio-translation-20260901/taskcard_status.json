@@ -1398,10 +1398,27 @@
       ]
     }
   },
-  "last_wake_summary": "wave10-annotations-cpp-fmfix-retry-20260907b (PID 45880) finished SHARD_SET_COMPLETE: hu AND ja both accepted, 44/44 gates each, via professionalize_llm escalation (m2m100 primary still failed for both -- hu on GATE36 fidelity 0.30, ja on the still-open cross-field-repair-vs-frontmatter-check gap -- but the campaign's existing dual-model retry organically routes around both once it escalates, since _retry_original_frontmatter_value() skips the whole frontmatter_segment_not_applied check for professionalize_llm). Manual rubric spot-check clean on both (identifiers preserved, no recurrence of the earlier garbled 'Annotage' in ja). Committed ca102740ec -- pdf-annotations-in-cpp is now 25/25, page complete. Closed both auto:StructureValidator heal tickets FIXED_VERIFIED. The preserve-pattern fix (de5189ca) is confirmed high-value: it directly unblocked hu's m2m100 attempt (no more spurious ValueError) even though final acceptance came via the LLM retry path. The ja cross-field-repair-vs-check gap (_unapplied_frontmatter_keys compares against a pre-repair snapshot) remains UNFIXED and unticketed as a standalone Track-B item -- it happens to not matter whenever the LLM escalation path is reached, so it's a latent bug, not a current blocker; worth a real taskcard if it ever surfaces on a page where LLM also fails.",
+  "last_wake_summary": "wave10-annotations-cpp-fmfix-retry-20260907b (PID 45880) finished SHARD_SET_COMPLETE: hu AND ja both accepted, 44/44 gates each, via professionalize_llm escalation (m2m100 primary still failed for both -- hu on GATE36 fidelity 0.30, ja on the still-open cross-field-repair-vs-frontmatter-check gap -- but the campaign's existing dual-model retry organically routes around both once it escalates, since _retry_original_frontmatter_value() skips the whole frontmatter_segment_not_applied check for professionalize_llm). Manual rubric spot-check clean on both (identifiers preserved, no recurrence of the earlier garbled 'Annotage' in ja). Committed ca102740ec -- pdf-annotations-in-cpp is now 25/25, page complete. Closed both auto:StructureValidator heal tickets FIXED_VERIFIED. The preserve-pattern fix (de5189ca) is confirmed high-value: it directly unblocked hu's m2m100 attempt (no more spurious ValueError) even though final acceptance came via the LLM retry path. The ja cross-field-repair-vs-check gap (_unapplied_frontmatter_keys compares against a pre-repair snapshot) remains UNFIXED and unticketed as a standalone Track-B item -- it happens to not matter whenever the LLM escalation path is reached, so it's a latent bug, not a current blocker; worth a real taskcard if it ever surfaces on a page where LLM also fails. Selected the next Tier-1a page per plan SS17.1.0 (decide() still SKIP, queue empty -- mission_supervisor does not auto-populate Track-A page candidates, selection is manual against work_ledger.sqlite3): content/reference.aspose.org/en/words/python/UnderlineBlock.md, 25/25 languages missing (queried page_language_work directly: source_path with SUM(target_exists)=0). Launched as two concurrent detached campaigns split by model policy (SS6.1) -- LLM-primary for the 22 non-hu/ja/ro languages, m2m100 GPU shard for hu/ja/ro -- both passed verify_environment on a clean tree pinned to a826fb70.",
   "cells_committed_total": 175,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "run_id": "wave11-underlineblock-llm-20260907",
+      "pid": 10428,
+      "launched_at": "2026-09-07T10:00:16+00:00",
+      "manifest": "data/campaigns/manifests/wave11-underlineblock-llm-20260907.yaml",
+      "log": "logs/wave11-underlineblock-llm-20260907_launcher.log",
+      "note": "Tier-1a page (zero existing translations), content/reference.aspose.org/en/words/python/UnderlineBlock.md -- 22 LLM-primary languages (all 25 minus hu/ja/ro). Claimed page:content/reference.aspose.org/en/words/python/UnderlineBlock.md. Passed verify_environment cleanly (built manifest twice to converge translator_repo_sha against the self-referential inventory file, per the lesson recorded on wave10b; reverted the second rebuild's inventory diff with git checkout -- instead of committing it again). max_parallel_jobs=1 so this runs sequentially, likely takes a while across several wakes -- check receipts/logs, do not relaunch while alive."
+    },
+    {
+      "run_id": "wave11-underlineblock-m2m-gpu-20260907",
+      "pid": 688,
+      "launched_at": "2026-09-07T10:00:16+00:00",
+      "manifest": "data/campaigns/manifests/wave11-underlineblock-m2m-gpu-20260907.yaml",
+      "log": "logs/wave11-underlineblock-m2m-gpu-20260907_launcher.log",
+      "note": "Same page's hu/ja/ro cells (m2m100_418m primary, dedicated GPU shard per plan SS0.8 TC-APT-065 pattern), running concurrently with the LLM campaign above -- different engines, no shared GPU/API contention. Expect the same producer bug class as pdf-annotations-in-cpp to be gone now (de5189ca fix); dual-model retry will still catch any residual per-cell issue."
+    }
+  ],
   "wave_scale": {
     "value": 4,
     "previous": 2,
