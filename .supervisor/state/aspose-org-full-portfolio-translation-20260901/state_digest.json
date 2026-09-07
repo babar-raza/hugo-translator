@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T10:01:19.884993+00:00",
+  "generated_at": "2026-09-07T10:28:28.330275+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "Check wave11 (LLM PID 10428, m2m GPU PID 688) progress on UnderlineBlock.md; review+commit whatever has completed, keep both running."
+  "next_action": "Check wave12 (LLM PID 50556, m2m GPU PID 46940) progress on introducing-html-foss-python; review+commit whatever has completed. If it also fails broadly, treat that as a second data point before assuming blog-post pages are safe from structural defects."
 }
