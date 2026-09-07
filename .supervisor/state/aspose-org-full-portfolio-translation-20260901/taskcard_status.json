@@ -19,8 +19,8 @@
     2,
     3
   ],
-  "wake_count": 19,
-  "wakes_without_state_change": 0,
+  "wake_count": 20,
+  "wakes_without_state_change": 1,
   "taskcards": {
     "TC-APT-001": {
       "status": "DONE",
@@ -1398,7 +1398,7 @@
       ]
     }
   },
-  "last_wake_summary": "wave14 stays closed on the source-content finding (see prior wake_summary and data/summaries/fp-wave14-introducing-pdf-python-20260907.json) -- did not retry it, did not edit the English source myself (flagged the 3-line fence fix to the operator, awaiting their call). Selected wave15: introducing-cells-foss-cpp, a genuinely untranslated (0/25, verified against the content-repo filesystem, NOT the work_ledger table which is stale -- html-dom-python/introducing-html-foss-python still showed as existing=0 there despite being committed 25/25 days ago) Tier-1a page in a different family/platform (cells/cpp) than wave14. Applied the new pre-launch sanity check (run the StructureValidator fence regex against the live source before committing compute to a wave) -- clean, 8 genuine code blocks, no prose-as-code risk. Claimed the page in claims.jsonl, built both manifests (LLM 22-locale + m2m GPU hu/ja/ro), launched both as real OS-detached processes (PID 55636, 54076), both passed verify_environment. No content committed this iteration. Next wake: check summary.json/failure_metadata.jsonl for both wave15 campaigns; remember retry_policy allows up to 3 phases per hard cell (minutes each) -- do not kill on a repeating attempt-log pattern alone.",
+  "last_wake_summary": "wave15 (introducing-cells-foss-cpp) still running, 0 accepted so far, 8/22 LLM locales + hu/ja (m2m) exhausted all phases and failed. UNLIKE wave14, this is NOT a deterministic source defect: fences were pre-verified clean. Root cause of THIS failure class identified instead: _check_code_blocks (structure_validator.py:187) counts fenced+inline code spans COMBINED and hard-ERRORs on ANY count mismatch (zero tolerance, unlike the formatting check's +/-2 allowance) -- this source page has 65 inline code spans (very API-reference-dense C++ content), so any translation that drops/merges even ONE backtick span anywhere in the document fails outright. This is a statistically-likely-but-not-guaranteed failure mode (unlike wave14's 100%-guaranteed one) -- letting the campaign continue rather than killing it; a lucky/careful pass on some locales is plausible, and escalation to the other model is the designed mitigation. If this wave ALSO closes at or near 0/25, that would be a second page in a row with an inline-code-preservation failure mode and would justify investigating whether structure_validator.py:187's zero-tolerance rule itself needs the same kind of small-deviation allowance the formatting check already has (Track-B candidate, not yet a taskcard). Both processes (PID 55636, 54076) confirmed alive and progressing, not stuck. No repo changes this iteration.",
   "cells_committed_total": 225,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
