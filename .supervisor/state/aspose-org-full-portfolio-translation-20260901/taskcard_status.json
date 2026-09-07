@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 16,
+  "wake_count": 17,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,17 +1398,17 @@
       ]
     }
   },
-  "last_wake_summary": "Continuation of the wave14 iteration: after the professionalize_llm circuit closed (see previous wake_summary) the LLM retry manifest hit a dirty-repo / SHA-drift double-bind on its first 3 launch attempts (build_campaign_manifest.py always dirties config/inventory/..., verify_environment demands HEAD == manifest translator_repo_sha AND zero dirty paths -- committing the inventory diff just moves HEAD and re-breaks the match). Fixed by M\tproject/loop-prompt.md-discarding the inventory diff immediately before launch instead of committing it -- documented in loop-prompt.md field notes. 4th launch (PID 47276, suffix d) passed verify_environment cleanly (4 shard locks acquired, real translation work started under professionalize_llm). No content committed yet pending results. Next wake: check receipts/summary.json + child logs (may still show 0 bytes due to Start-Process stdout buffering -- check the receipts dir and shard locks, not just log file size), review and commit whatever gate-passes as one page-complete batch, full-body rubric-spot-check at least one non-Latin-script language. If the SAME LinkValidator link-count-loss pattern recurs even under LLM primary, that moves the root cause upstream of model choice (link extraction/placeholder handling for this page resource-list shape) and needs a Sec10.1 record before any new Track-A page.",
+  "last_wake_summary": "Continuation: the LLM retry (professionalize_llm recovered, all 25 locales) hit de/cs/ar/el retrying through their full 3-phase escalation (primary_attempts=3, llm_escalation_attempts=2) -- each phase takes minutes under real latency, so 3 phases can run 10-15min per hard cell. I misread the repeating \"attempt 1/N\" log pattern as an infinite-retry bug and killed the whole process tree (PID 47276) partway through -- confirmed via campaign_runner.py that this was WRONG: the phases list is bounded and _run_campaign_job returns after exhausting it, at which point the outer as_completed loop moves to the next locale. Documented the correction in loop-prompt.md (archived a stale entry first to stay under the 40KB cap). Relaunched immediately with --resume (PID 52316) -- this time letting it run undisturbed. No content committed this iteration. Next wake: check summary.json (accepted/failed counts against all 25) and failure_metadata.jsonl rather than killing anything on log-pattern alone; if a cell has been in the SAME phase for >10-15min with zero log movement, that is the actual stuck signal, not a repeating bounded-phase log line. Review+commit whatever gate-passes as one page-complete batch once the run finishes or has enough completed locales to review.",
   "cells_committed_total": 225,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
       "run_id": "wave14-introducing-pdf-python-llm-retry-20260907",
-      "pid": 47276,
-      "launched_at": "2026-09-07T12:21:00+00:00",
+      "pid": 52316,
+      "launched_at": "2026-09-07T12:44:00+00:00",
       "manifest": "data/campaigns/manifests/wave14-introducing-pdf-python-llm-retry-20260907.yaml",
-      "log": "logs/wave14-introducing-pdf-python-llm-retry-20260907d_launcher.log",
-      "note": "Successful relaunch (4th attempt this iteration, suffix d) of the LLM retry for all 25 locales of introducing-pdf-foss-python via professionalize_llm (see loop-prompt.md field note 2026-09-07 for the dirty/SHA-drift double-bind that broke the first 3 attempts: build_campaign_manifest.py always rewrites config/inventory/..., and verify_environment needs HEAD to exactly equal the manifest baked-in translator_repo_sha AND zero dirty paths -- fix is M\tproject/loop-prompt.md the inventory diff right before launch, never commit it). Confirmed past verify_environment: 4 shard lock files present in the receipts dir, stdout/stderr buffered (0 bytes) because Start-Process redirection is fully buffered until flush/exit -- absence of log output here does NOT mean it is stuck; check receipts dir / shard locks instead."
+      "log": "logs/wave14-introducing-pdf-python-llm-retry-20260907e_launcher.log",
+      "note": "Relaunch with --resume after I wrongly killed the prior run (PID 47276) mid-phase, misreading its bounded 3-phase retry escalation (retry_policy: primary_attempts=3, llm_escalation_attempts=2 -- professionalize_llm x3 internal retries then 2 m2m100 escalation phases, each taking minutes) as an infinite loop. DO NOT kill this run again just because the same locale keeps showing repeated \"attempt 1/N\" / \"High retry overhead\" lines -- that is expected for a genuinely hard cell; only worry if a SINGLE phase itself exceeds several minutes with no log movement at all, or if the process dies. Full 25-locale run against professionalize_llm (recovered from the earlier circuit-breaker outage); some locales already known hard (de/cs/ar/el hit StructureValidator retries in the killed run) -- expect a slow wave, check back via summary.json/failure_metadata.jsonl rather than raw log tailing."
     }
   ],
   "wave_scale": {
