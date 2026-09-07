@@ -19,8 +19,8 @@
     2,
     3
   ],
-  "wake_count": 20,
-  "wakes_without_state_change": 1,
+  "wake_count": 21,
+  "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
       "status": "DONE",
@@ -1398,27 +1398,10 @@
       ]
     }
   },
-  "last_wake_summary": "wave15 (introducing-cells-foss-cpp) still running, 0 accepted so far, 8/22 LLM locales + hu/ja (m2m) exhausted all phases and failed. UNLIKE wave14, this is NOT a deterministic source defect: fences were pre-verified clean. Root cause of THIS failure class identified instead: _check_code_blocks (structure_validator.py:187) counts fenced+inline code spans COMBINED and hard-ERRORs on ANY count mismatch (zero tolerance, unlike the formatting check's +/-2 allowance) -- this source page has 65 inline code spans (very API-reference-dense C++ content), so any translation that drops/merges even ONE backtick span anywhere in the document fails outright. This is a statistically-likely-but-not-guaranteed failure mode (unlike wave14's 100%-guaranteed one) -- letting the campaign continue rather than killing it; a lucky/careful pass on some locales is plausible, and escalation to the other model is the designed mitigation. If this wave ALSO closes at or near 0/25, that would be a second page in a row with an inline-code-preservation failure mode and would justify investigating whether structure_validator.py:187's zero-tolerance rule itself needs the same kind of small-deviation allowance the formatting check already has (Track-B candidate, not yet a taskcard). Both processes (PID 55636, 54076) confirmed alive and progressing, not stuck. No repo changes this iteration.",
+  "last_wake_summary": "wave15 (introducing-cells-foss-cpp) CLOSED at 0/25, same as wave14 -- TWO CONSECUTIVE Tier-1a pages now with 0 combined accepted cells (50 attempted). Confirmed via failure_metadata.jsonl: every one of 22 LLM locales + hu/ja/ro (m2m) hit the IDENTICAL deterministic mismatch -- StructureValidator code-span count source=73/translation=72 and LinkValidator link count source=7/translation=8, in every single language, both models. Source fences were pre-verified clean (unlike wave14), so this is a DIFFERENT mechanism: structure_validator.py:187 (_check_code_blocks) has ZERO tolerance for any fenced+inline code-span count mismatch (unlike _check_formatting a few lines below it, which explicitly allows a deviation of 2) -- this source page has 65 inline code spans, leaving zero margin for even one incidentally-merged/dropped span during translation. Full record: data/summaries/fp-wave15-introducing-cells-cpp-20260907.json (includes an unresolved gap: the live debug-harness diff to see the EXACT dropped span was attempted but did not finish within the iteration and was stopped rather than risk it spanning a wake boundary -- the absolute-path fix for debug_translate_one.py --source-path is now known for next time). TWO-STRIKES RULE (loop-prompt.md Sec6) now applies: per-iteration committed-cell floor missed twice in a row with a common structural cause -- Track-B priority for the next work is the code-span-count tolerance fix, NOT a third new Track-A page. Both claims (page:introducing-cells-foss-cpp) released.",
   "cells_committed_total": 225,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "run_id": "wave15-introducing-cells-cpp-llm-20260907",
-      "pid": 55636,
-      "launched_at": "2026-09-07T13:08:00+00:00",
-      "manifest": "data/campaigns/manifests/wave15-introducing-cells-cpp-llm-20260907.yaml",
-      "log": "logs/wave15-introducing-cells-cpp-llm-20260907_launcher.log",
-      "note": "Tier-1a page content/blog.aspose.org/cells/cpp/introducing-cells-foss-cpp/index.md (0/25) -- 22 LLM-primary languages. Sanity-checked BEFORE launch (lesson from wave14): ran the StructureValidator fence regex against the live source, all 8 fenced blocks are genuine C++/bash/cmake code, no prose-as-code mismatch. Claimed in claims.jsonl. Passed verify_environment cleanly on HEAD 779d06c0."
-    },
-    {
-      "run_id": "wave15-introducing-cells-cpp-m2m-gpu-20260907",
-      "pid": 54076,
-      "launched_at": "2026-09-07T13:08:00+00:00",
-      "manifest": "data/campaigns/manifests/wave15-introducing-cells-cpp-m2m-gpu-20260907.yaml",
-      "log": "logs/wave15-introducing-cells-cpp-m2m-gpu-20260907_launcher.log",
-      "note": "Same page hu/ja/ro cells (m2m100_418m primary), running concurrently with the LLM campaign above."
-    }
-  ],
+  "active_detached_runs": [],
   "wave_scale": {
     "value": 4,
     "previous": 2,

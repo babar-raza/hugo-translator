@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T13:31:00.888172+00:00",
+  "generated_at": "2026-09-07T13:53:03.127798+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "Check wave15 (PID 55636 LLM, 54076 m2m) summary.json; this page has 65 inline code spans and structure_validator.py's zero-tolerance count check makes some failures statistically likely (not guaranteed like wave14) -- let it run to completion before judging. Review+commit whatever gate-passes."
+  "next_action": "TWO-STRIKES: wave14+wave15 both closed 0/25 with a common structural cause (zero-tolerance StructureValidator counts on code/link-dense pages). Track-B priority: add a small tolerance to structure_validator.py's _check_code_blocks (matching _check_formatting's existing +/-2 pattern), regression-tested, before opening any new Track-A page. wave14 also separately awaits the operator's call on its source-fence fix."
 }
