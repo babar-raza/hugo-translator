@@ -1403,19 +1403,19 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "wave13-html-dom-python-llm-20260907",
-      "pid": 40316,
-      "launched_at": "2026-09-07T10:56:00+00:00",
-      "manifest": "data/campaigns/manifests/wave13-html-dom-python-llm-20260907.yaml",
-      "log": "logs/wave13-html-dom-python-llm-20260907_launcher.log",
-      "note": "Tier-1a page content/blog.aspose.org/html/python/html-dom-python/index.md (0/25) -- 22 LLM-primary languages. Same family as the just-shipped introducing-html-foss-python (wave12, 25/25 clean), so a blog-post shape is expected here too. Claimed page:content/blog.aspose.org/html/python/html-dom-python/index.md. Passed verify_environment cleanly on HEAD 64dfdcf5. max_parallel_jobs=1, sequential -- check next wake."
+      "run_id": "wave14-introducing-pdf-python-llm-20260907",
+      "pid": 56664,
+      "launched_at": "2026-09-07T11:28:00+00:00",
+      "manifest": "data/campaigns/manifests/wave14-introducing-pdf-python-llm-20260907.yaml",
+      "log": "logs/wave14-introducing-pdf-python-llm-20260907_launcher.log",
+      "note": "Tier-1a page content/blog.aspose.org/pdf/python/introducing-pdf-foss-python/index.md (0/25) -- 22 LLM-primary languages. Blog-post shape like the two clean wins (wave12/wave13). Claimed page. Passed verify_environment cleanly on HEAD 43e53c86. Remember to full-body rubric-review at least one non-Latin-script language even if all 44 gates pass (wave13's ja RB-004 catch)."
     },
     {
-      "run_id": "wave13-html-dom-python-m2m-gpu-20260907",
-      "pid": 18316,
-      "launched_at": "2026-09-07T10:56:00+00:00",
-      "manifest": "data/campaigns/manifests/wave13-html-dom-python-m2m-gpu-20260907.yaml",
-      "log": "logs/wave13-html-dom-python-m2m-gpu-20260907_launcher.log",
+      "run_id": "wave14-introducing-pdf-python-m2m-gpu-20260907",
+      "pid": 54620,
+      "launched_at": "2026-09-07T11:28:00+00:00",
+      "manifest": "data/campaigns/manifests/wave14-introducing-pdf-python-m2m-gpu-20260907.yaml",
+      "log": "logs/wave14-introducing-pdf-python-m2m-gpu-20260907_launcher.log",
       "note": "Same page's hu/ja/ro cells (m2m100_418m primary, dedicated GPU shard), running concurrently with the LLM campaign above."
     }
   ],
