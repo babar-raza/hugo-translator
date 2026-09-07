@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T12:59:56.348721+00:00",
+  "generated_at": "2026-09-07T13:15:55.007959+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "introducing-pdf-foss-python is BLOCKED on a source-content bug (malformed code fences, see data/summaries/fp-wave14-introducing-pdf-python-20260907.json) -- do not retry it. Pick a different Tier-1a page for Track-A in strict tier order; recommend the 3-line source fence fix to the operator for their decision."
+  "next_action": "Check wave15 (introducing-cells-foss-cpp, PID 55636 LLM + 54076 m2m) summary.json/failure_metadata.jsonl; review+commit page-complete if gates pass. wave14 (introducing-pdf-foss-python) stays blocked on a source-content bug pending operator decision on the fence fix -- do not retry."
 }

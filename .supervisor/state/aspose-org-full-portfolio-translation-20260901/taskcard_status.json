@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 18,
+  "wake_count": 19,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,10 +1398,27 @@
       ]
     }
   },
-  "last_wake_summary": "ROOT CAUSE FOUND, not a model/translation defect: introducing-pdf-foss-python (wave14) fails identically for EVERY locale under BOTH professionalize_llm and m2m100 because the ENGLISH SOURCE FILE has malformed fenced code blocks -- 15 (odd) triple-backtick lines; the first block closes prematurely after 1 line (line 140), leaving real code (141-148) and a prose sentence (150) unfenced, then a stray closing fence (151) shifts every subsequent open/close pairing by one. Verified by running StructureValidator's own fence regex directly against the live source file: it extracts 7 \"blocks\", but blocks 2-7 are markdown headings + prose (### Adding Text and Images / Annotations / Form Fields / Encryption / Text Extraction / Quick Start), whose lengths (451/429/305/62 chars) exactly match the recurring StructureValidator warning fingerprints every failed attempt showed. Under this manifest's zero-defect policy those warnings block acceptance. 11/11 attempted locales failed identically across two model configurations (m2m-forced during the outage, professionalize_llm after recovery) plus hu/ja/ro (m2m-primary, unrelated to the outage) -- ruling out model quality entirely. Full record: data/summaries/fp-wave14-introducing-pdf-python-20260907.json. Killed the (correctly, this time) futile campaign (PID 52316) rather than let it exhaust all 25 locales against a source defect no retry can fix. Recommended a 3-line fence fix to the operator (move the closing fence from after the import line to after the full code example, remove the now-stray fence after the following prose sentence) but did NOT apply it myself -- editing the English source page is outside campaign_runner.py's write scope (content/<site>/<lang>/ only) and outside what I judged this mission authorized without confirmation. This page's cells stay quarantined (root_cause_class effectively source:malformed_code_fences, layered over the auto:StructureValidator/LinkValidator/LanguageConsistencyValidator tickets already in heal_queue.jsonl from both wave14 attempts) until the source is fixed and the regression control in the fp-record passes. Next wake: pick a DIFFERENT Tier-1a page for Track-A (strict tier order) -- do not re-attempt this page until the fp-record's regression control (re-run the fence regex, expect 7 clean python blocks) passes.",
+  "last_wake_summary": "wave14 stays closed on the source-content finding (see prior wake_summary and data/summaries/fp-wave14-introducing-pdf-python-20260907.json) -- did not retry it, did not edit the English source myself (flagged the 3-line fence fix to the operator, awaiting their call). Selected wave15: introducing-cells-foss-cpp, a genuinely untranslated (0/25, verified against the content-repo filesystem, NOT the work_ledger table which is stale -- html-dom-python/introducing-html-foss-python still showed as existing=0 there despite being committed 25/25 days ago) Tier-1a page in a different family/platform (cells/cpp) than wave14. Applied the new pre-launch sanity check (run the StructureValidator fence regex against the live source before committing compute to a wave) -- clean, 8 genuine code blocks, no prose-as-code risk. Claimed the page in claims.jsonl, built both manifests (LLM 22-locale + m2m GPU hu/ja/ro), launched both as real OS-detached processes (PID 55636, 54076), both passed verify_environment. No content committed this iteration. Next wake: check summary.json/failure_metadata.jsonl for both wave15 campaigns; remember retry_policy allows up to 3 phases per hard cell (minutes each) -- do not kill on a repeating attempt-log pattern alone.",
   "cells_committed_total": 225,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "run_id": "wave15-introducing-cells-cpp-llm-20260907",
+      "pid": 55636,
+      "launched_at": "2026-09-07T13:08:00+00:00",
+      "manifest": "data/campaigns/manifests/wave15-introducing-cells-cpp-llm-20260907.yaml",
+      "log": "logs/wave15-introducing-cells-cpp-llm-20260907_launcher.log",
+      "note": "Tier-1a page content/blog.aspose.org/cells/cpp/introducing-cells-foss-cpp/index.md (0/25) -- 22 LLM-primary languages. Sanity-checked BEFORE launch (lesson from wave14): ran the StructureValidator fence regex against the live source, all 8 fenced blocks are genuine C++/bash/cmake code, no prose-as-code mismatch. Claimed in claims.jsonl. Passed verify_environment cleanly on HEAD 779d06c0."
+    },
+    {
+      "run_id": "wave15-introducing-cells-cpp-m2m-gpu-20260907",
+      "pid": 54076,
+      "launched_at": "2026-09-07T13:08:00+00:00",
+      "manifest": "data/campaigns/manifests/wave15-introducing-cells-cpp-m2m-gpu-20260907.yaml",
+      "log": "logs/wave15-introducing-cells-cpp-m2m-gpu-20260907_launcher.log",
+      "note": "Same page hu/ja/ro cells (m2m100_418m primary), running concurrently with the LLM campaign above."
+    }
+  ],
   "wave_scale": {
     "value": 4,
     "previous": 2,
