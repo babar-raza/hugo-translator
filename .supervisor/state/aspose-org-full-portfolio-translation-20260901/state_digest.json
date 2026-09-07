@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T14:19:46.370187+00:00",
+  "generated_at": "2026-09-07T14:45:48.938514+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "Read logs/debug-cells-cpp-de-20260907.log (detached debug harness, PID 46684) once finished; decide on the LinkValidator 7-vs-8 mismatch (mechanical vs hallucinated-link) before any further wave15 relaunch or new Track-A page."
+  "next_action": "Select a new Tier-1a page for Track-A, pre-screening for clean code fences (wave14 lesson) AND a single link-bearing section rather than 2+ separate ones (wave15 lesson: duplication bug confirmed, not a false positive, do not retry wave15 or loosen LinkValidator until the producer-side fix lands)."
 }
