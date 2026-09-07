@@ -1384,12 +1384,12 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907b",
-      "pid": 75004,
+      "run_id": "heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907d",
+      "pid": 26948,
       "launched_at": "2026-09-07T00:00:00+00:00",
-      "manifest": "data/campaigns/manifests/heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907b.yaml",
-      "log": "logs/heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907b_launcher.log",
-      "note": "Take 2: take 1 (pid 51156) failed on TM fingerprint drift because the manifest was built BEFORE the TM purge landed -- rebuilt manifest after the purge (current HEAD 176e071, clean tree, fresh tm_fingerprint), relaunched. Recurring lesson (2nd time this taskcard): always build the retrigger manifest as the LAST step immediately before launch, after every purge/commit that touches repo or TM state."
+      "manifest": "data/campaigns/manifests/heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907d.yaml",
+      "log": "logs/heal-recur-punct-fix-pdfdocmgmt-cpp-pl-retry-20260907d_launcher.log",
+      "note": "Take 4: take 3 (pid 74108) failed on translator-repo dirty(1 path) -- the dirty check gates on the WHOLE translator repo regardless of dirty_scope (that setting is for the CONTENT repo side only), and I had left an uncommitted bookkeeping edit in taskcard_status.json when I built/launched take 3. Root fix: rebuilt against a fully clean+committed tree, launched, waited ~35s past verify_environment with zero uncommitted changes the whole time, THEN wrote this bookkeeping update (safe now -- the environment check already passed for this run). Real lesson for future retriggers in this mission: the translator repo must be byte-for-byte clean (committed) at manifest-build time AND remain clean until the childs verify_environment call completes -- do not write ANY file in this repo, even .supervisor state, between build and launch-confirmed-past-check."
     }
   ],
   "wave_scale": {
