@@ -2,20 +2,13 @@
   "phase": "idle",
   "run_id": null,
   "started_at": null,
-  "updated_at": "2026-09-07T12:09:13.579921+00:00",
+  "updated_at": "2026-09-07T13:09:07.175030+00:00",
   "completed_at": null,
   "current_site": null,
   "current_langs": [],
   "runs_history": [],
   "pending_work": [],
-  "blockers": [
-    {
-      "blocker_id": "circuit_breaker:professionalize_llm",
-      "type": "circuit_breaker_open",
-      "description": "professionalize_llm circuit breaker state=open (data/runtime/circuit_breaker/professionalize_llm.json); run this wake on the automatic m2m100_418m fallback",
-      "added_at": "2026-09-07T12:09:13.579921+00:00"
-    }
-  ],
+  "blockers": [],
   "next_action": null,
   "stats": {
     "total_runs": 0,
