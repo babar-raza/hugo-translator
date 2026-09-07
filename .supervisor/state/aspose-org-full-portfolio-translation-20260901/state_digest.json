@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T11:20:28.988883+00:00",
+  "generated_at": "2026-09-07T11:38:09.683461+00:00",
   "stamps": {
     "loop_prompt_version": "10.7 (2026-09-06)",
     "plan_revision": 18
@@ -36,5 +36,5 @@
       "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
     }
   },
-  "next_action": "Queue is empty (decide()=SKIP); select the next Tier-1a page from work_ledger.sqlite3 (stick to blog.aspose.org leaf pages, avoid reference.aspose.org API-table pages per the wave11 malformed-table finding) and launch the LLM+m2m-GPU-shard split. Always do a full-body rubric spot-check of at least one non-Latin-script language even on a 44/44-clean run -- automated gates do not catch semantic/terminology defects (wave13's ja RB-004 catch)."
+  "next_action": "Check wave14 (LLM PID 56664, m2m GPU PID 54620) progress on introducing-pdf-foss-python; review+commit as one page-complete batch, including a full-body rubric spot-check of at least one non-Latin-script language even if all gates pass."
 }
