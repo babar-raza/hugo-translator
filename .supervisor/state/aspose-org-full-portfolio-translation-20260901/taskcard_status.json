@@ -1398,17 +1398,17 @@
       ]
     }
   },
-  "last_wake_summary": "Wave 2 (wave_scale=2) completed: email/cpp 25/25 clean (title-only, page-complete, pages_newly_live_total 1->2), email/python 21/24 (zh gate-failed x3 no cross-model escalation; hi/hu/ja rejected for text adjacent to the FOSS-edition mask / unrelated fluency issues -- 4 heal tickets, 30 TM entries purged). Committed 4e93753027 (71 files) -- this ALSO recovered email/net (25 langs) after discovering its original commit fc101aa230 had been orphaned from HEAD ancestry during a concurrent multi-session window (reflog still had it; git log did not -- likely a peer git-reset in this shared single-checkout repo). Content was intact in the working tree/index (soft-reset shape), re-committed after confirming session_ledger candidates matched staged files exactly. Also hit the known transient stale-file-regression race twice more, both resolved by retry. cells_committed_total 96 -> 167. Flagged to the operator: multi-session single-checkout git setup can silently orphan commits -- worth per-session worktrees or a reflog integrity check.",
+  "last_wake_summary": "Found TC-APT-103 fix (bare PascalCase compound identifier preserve_pattern) already written+tested but UNCOMMITTED by a prior session/turn, and confirmed it was silently blocking ALL campaign launches (verify_environment: translator repository is dirty) -- this is why the wave9 GPU shard (hu/ja/ro, PID 49284) died immediately after spawning. Registered TC-APT-103 DONE and committed (86c1e3fe). Read the actual wave9 LLM-retry candidates (hi/nl/fa/ar/el, generated pre-fix) and confirmed the defect is still present in hi (heading line 208: AnnotationCollection -> garbled transliteration) -- these stale candidates must NOT be reviewed/committed as-is. Rebuilt a fresh manifest (--existing replace, current stale candidates as baseline) and relaunched the LLM retry as a real OS-detached Windows process (PID 47684, Start-Process, not harness run_in_background) since launch_parallel_campaign_shards.py now refuses to run ungoverned without --wait. GPU shard (hu/ja/ro) deliberately deferred until this completes to avoid concurrent-engine lock contention.",
   "cells_committed_total": 167,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "wave9-annotations-cpp-m2m-gpu-20260907b",
-      "pid": 49284,
+      "run_id": "wave9-annotations-cpp-llm-retry2-tc103fix-20260907",
+      "pid": 47684,
       "launched_at": "2026-09-07T00:00:00+00:00",
-      "manifest": "data/campaigns/manifests/wave9-annotations-cpp-m2m-gpu-20260907b.yaml",
-      "log": "logs/wave9-annotations-cpp-m2m-gpu-20260907b_launcher.log",
-      "note": "hu/ja/ro (m2m100, never attempted on this page) launched after wave9 LLM retry (pid 46516) exited cleanly, freeing the GPU. wave9 LLM retry results: 5/5 cells gate-passed; 5 parallel subagent reviews launched, results pending. On next check: review this GPU shards output, and check the wave9 LLM reviews."
+      "manifest": "data/campaigns/manifests/wave9-annotations-cpp-llm-retry2-tc103fix-20260907.yaml",
+      "log": "logs/wave9-annotations-cpp-llm-retry2-tc103fix-20260907_launcher.log",
+      "note": "Re-running hi/nl/fa/ar/el LLM retry after committing TC-APT-103 (86c1e3fe) which fixes the bare-PascalCase-compound heading bug (AnnotationCollection etc). Prior wave9 llm-retry candidates on disk (5/5 gate-passed) predate the fix and still show the defect (verified: hi heading line 208 = garbled transliteration) -- do NOT review/commit those; this rerun declares them as replace_existing baseline. GPU shard for hu/ja/ro (previous PID 49284) died with verify_environment translator-repo-dirty error caused by this same uncommitted fix -- now unblocked but deliberately NOT launched concurrently with this LLM retry to avoid the documented shared _model_execution_lock/GPU contention hazard (plan SS0.3); launch it after this run completes."
     }
   ],
   "wave_scale": {
