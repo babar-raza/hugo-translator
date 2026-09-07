@@ -1398,27 +1398,10 @@
       ]
     }
   },
-  "last_wake_summary": "wave11 (UnderlineBlock.md, reference.aspose.org/words/python) CLOSED, 0/25 accepted -- both campaigns finished (LLM PID 10428: 22/22 failed; m2m GPU PID 688: 3/3 failed) with the IDENTICAL StructureValidator signature (source_count=39, translation_count=28, error_sha256=278673ab...) on every single language/model combination. Root-caused directly (read the source file, extracted AST units): the Methods table's last row (get_parent()) has a malformed multi-line Description cell -- a Python docstring with a blank line and RST-style double-backtick syntax dropped into a one-line-per-row Markdown table by the upstream 'skill-generated' API-doc generator -- which the table parser cannot round-trip consistently between extraction and reconstruction. Deterministic and language/model-independent, so NOT the same bug as pdf-annotations-in-cpp's frontmatter fix (verified separately: description/summary protection matches byte-for-byte here). Grepped the family: 30+ other words/python pages share the same RST double-backtick artifact, so this is a recurring content-shape, not a one-off. Wrote data/summaries/fp-underlineblock-malformed-table-20260907.json; chose NOT to rush a parser fix to shared table-parsing code this iteration (that's a real Track-B candidate needing its own regression fixture) -- quarantined the page instead and released its claim. 25 heal tickets auto-opened by the campaign runner (per-cell) plus the fp record carry the evidence; do not re-attempt this page until either the parser handles malformed multi-line table cells or the source markdown is normalized content-repo-side. Picked a fresh Tier-1a page from a different site/family to sidestep the same content-shape: content/blog.aspose.org/html/python/introducing-html-foss-python/index.md (0/25), launched the same way (LLM-primary 22 langs + m2m100 GPU shard hu/ja/ro), both passed verify_environment cleanly on HEAD 3b573d51.",
-  "cells_committed_total": 175,
+  "last_wake_summary": "wave12 (introducing-html-foss-python, blog.aspose.org/html/python) CLOSED CLEAN: both campaigns finished with ZERO failures -- LLM PID 50556: 22/22 accepted, m2m GPU PID 46940: 3/3 accepted (hu/ja/ro all escalated to professionalize_llm after their m2m100 primary attempt rejected, per normal dual-model policy). All 25 languages, 44/44 zero-defect gates each. Spot-checked ar/ru/zh frontmatter plus zh's full body (code blocks untouched, identifiers preserved, fluent natural prose) -- clean. Committed as one page-complete batch: content repo 95f0cc1a23 (25 files, no index.md touched). This is a genuine pages_newly_live event (0/25 -> 25/25 in one wave): pages_newly_live_total 16->17, cells_committed_total 175->200. Confirms the blog-post-shape hypothesis from wave11's close-out: avoiding reference.aspose.org's API-table pages (the malformed-table defect class) let a same-day Tier-1a page ship perfectly on the first attempt. Released the page claim. wave_scale sits at 4 (pages-per-wave) but this and recent iterations have only run 1 page per wave-cycle at a time (manual selection against work_ledger.sqlite3, no K-launcher multi-page orchestration wired up for this) -- NOT actually operating at the recorded wave_scale; flagging rather than claiming false compliance. Did not attempt to force 4 concurrent full-page campaigns this iteration given the real GPU/API/LMDB contention risk plan SS6.1 warns about for anything beyond the sanctioned LLM+m2m-GPU-shard split -- a proper multi-page wave launcher is a Track-B item, not a one-off risk to take here.",
+  "cells_committed_total": 200,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "run_id": "wave12-html-python-llm-20260907",
-      "pid": 50556,
-      "launched_at": "2026-09-07T10:25:46+00:00",
-      "manifest": "data/campaigns/manifests/wave12-html-python-llm-20260907.yaml",
-      "log": "logs/wave12-html-python-llm-20260907_launcher.log",
-      "note": "Tier-1a page content/blog.aspose.org/html/python/introducing-html-foss-python/index.md -- 22 LLM-primary languages. Claimed page:content/blog.aspose.org/html/python/introducing-html-foss-python/index.md. Blog-post shape (like the already-successful pdf-annotations-in-cpp), not an API-reference table page, so the wave11 malformed-table defect class should not apply here. max_parallel_jobs=1, sequential -- check receipts/logs next wake, do not relaunch while alive."
-    },
-    {
-      "run_id": "wave12-html-python-m2m-gpu-20260907",
-      "pid": 46940,
-      "launched_at": "2026-09-07T10:25:46+00:00",
-      "manifest": "data/campaigns/manifests/wave12-html-python-m2m-gpu-20260907.yaml",
-      "log": "logs/wave12-html-python-m2m-gpu-20260907_launcher.log",
-      "note": "Same page's hu/ja/ro cells (m2m100_418m primary, dedicated GPU shard), running concurrently with the LLM campaign above."
-    }
-  ],
+  "active_detached_runs": [],
   "wave_scale": {
     "value": 4,
     "previous": 2,
@@ -1436,5 +1419,5 @@
     "release_reason": "Stale-state fix, found while orienting for TC-APT-077: logs/watchdog_state.json reads kpi_cells_24h=90 (floor 25), kpi_breach_open=false. The clauses own AND condition (TC-APT-043..047 unlanded AND KPI below floor) requires BOTH; KPI has not been below floor for a while (the peer already acted on this correctly for wave-cells-rust-w1, citing 'capacity clause released, KPI 43' -- this field just never caught up to that decision). TC-APT-046/047 remain unlanded, so a future KPI dip re-engages it automatically once checked against watchdog_state.json again."
   },
   "loop_prompt_version": "10.7 (2026-09-06)",
-  "pages_newly_live_total": 16
+  "pages_newly_live_total": 17
 }
