@@ -1398,19 +1398,10 @@
       ]
     }
   },
-  "last_wake_summary": "GPU shard for pdf-annotations-in-cpp hu/ja/ro launched successfully on 3rd attempt (PID 54280, campaign ...20260907d) after 2 verify_environment failures caused by launch/commit ordering -- lesson: never launch a detached campaign while the translator repo has uncommitted changes or a manifest built against a since-superseded HEAD.",
+  "last_wake_summary": "wave9-annotations-cpp-m2m-gpu-20260907d finished (PID 54280 exited): ro accepted (44/44 gates), hu+ja failed with ValueError frontmatter_segment_not_applied on description/summary after exhausting both models -- root-caused live (debug_translate_one.py + a monkeypatched _unapplied_frontmatter_keys probe): _translate_body_ast's TextUnitExtractor used only site_profile.body.preserve_patterns while SegmentExtractor merges in the config/global.yaml baseline, so a bare PascalCase identifier (AnnotationCollection, the exact TC-APT-103 example) was placeholder-protected in the legacy segments list but raw in the AST units -- reuse-match saw two different normalized strings, called the unit unmatched, independently re-translated it, and that disagreed with translations[] for the same field. Fixed segment_translator.py (merge global+site patterns the same way SegmentExtractor does), added a regression test, committed de5189ca. Verified against the exact failing file: hu now clears frontmatter reconstruction and reaches GATE36 (separate, legitimate fidelity gate) instead of raising. ja still raises the same ValueError for a SECOND, distinct reason: TC-APT-042's cross-field residual repair legitimately rewrites a unit's translated_text (proved via instrumentation -- the AST-applied ja text was better quality, not garbled, just different from the pre-repair translations[] snapshot the check compares against) -- this is a real gap in _unapplied_frontmatter_keys's invariant (equality-to-snapshot instead of applied-and-non-source), left for dedicated follow-up rather than a rushed second fix in the same iteration. Retriggered hu+ja via launch_parallel_campaign_shards.py against the post-fix HEAD (wave10-annotations-cpp-fmfix-retry-20260907, PID 58092) to get a real committable candidate; ro's already-accepted candidate is reviewed and committed this iteration (content repo commit 2a5a66bd87). wave10 (PID 58092) then died at verify_environment (\"translator repository is dirty (1 paths)\") because this same taskcard_status.json edit landed AFTER the launch instead of before -- the exact self-inflicted ordering bug already on record above for wave9's attempt 1; committing this edit now, rebuilding the manifest fresh against the new HEAD, and relaunching without further hugo-translator edits in between.",
   "cells_committed_total": 172,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "run_id": "wave9-annotations-cpp-m2m-gpu-20260907d",
-      "pid": 54280,
-      "launched_at": "2026-09-07T07:56:00+00:00",
-      "manifest": "data/campaigns/manifests/wave9-annotations-cpp-m2m-gpu-20260907d.yaml",
-      "log": "logs/wave9-annotations-cpp-m2m-gpu-20260907d_launcher.log",
-      "note": "GPU-dedicated shard for pdf-annotations-in-cpp hu/ja/ro (m2m100_418m primary), 3rd attempt. Attempts 1 (PID 40824, campaign ...20260907c) and 2 (PID 53396, same campaign relaunched) both died at verify_environment: attempt 1 hit \"translator repository is dirty\" because I launched it before committing the taskcard_status.json/state_digest.json edits from the SAME iteration -- self-inflicted ordering bug (launch AFTER committing hugo-translator state, never before); attempt 2 (same stale manifest, translator_repo_sha pinned to pre-ed70db72 HEAD) then hit \"translator repository SHA drift\" once I did commit. Fixed by rebuilding the manifest fresh (campaign wave9-annotations-cpp-m2m-gpu-20260907d) against the now-stable HEAD (ed70db72) with a clean tree, then launching without any further hugo-translator commits in between -- passed verify_environment, model loading in progress at last check."
-    }
-  ],
+  "active_detached_runs": [],
   "wave_scale": {
     "value": 4,
     "previous": 2,
