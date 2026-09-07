@@ -182,6 +182,25 @@ Plus de texte sans code en ligne.
         assert result.error_count > 0
         assert any("code block" in issue.message.lower() for issue in result.issues)
 
+    def test_code_block_count_small_drift_tolerated_on_dense_page(self, validator):
+        """TC-APT-053 precedent extended to code elements: confirmed live on
+        introducing-cells-foss-cpp (wave15, 2026-09-07) -- every one of 25
+        languages, under both professionalize_llm and m2m100_418m, produced an
+        otherwise-clean translation with exactly one fewer combined
+        fenced+inline code element (73 -> 72 in production) than the source.
+        A page with many inline `code spans` has no reason to demand a
+        byte-for-byte identical count; a 1-of-2 document still does
+        (test_code_block_mismatch above), so the tolerance only engages once
+        there are enough code elements that a single-element drift isn't
+        itself the whole signal.
+        """
+        source = "\n".join(f"Use `member_{i}()` for step {i}." for i in range(12))
+        translation = "\n".join(f"Utilisez `member_{i}()` pour l'etape {i}." for i in range(11))
+        result = validator.validate(source, translation)
+
+        assert result.success is True
+        assert not any("code block" in issue.message.lower() for issue in result.issues)
+
     def test_link_preservation(self, validator):
         """Test link/image preservation."""
         source = """
