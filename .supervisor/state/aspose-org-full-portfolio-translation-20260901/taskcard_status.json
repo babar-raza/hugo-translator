@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-07T07:47:00+00:00",
+  "updated_at": "2026-09-07T07:58:00+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 13,
+  "wake_count": 14,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,17 +1398,17 @@
       ]
     }
   },
-  "last_wake_summary": "wave9 llm-retry2 finished: hi/nl/fa reviewed clean and committed (2fa8dee5fc), page now 22/25. 3 stale heal tickets closed FIXED_VERIFIED (fa/hi/nl attempt-3 rejections all succeeded on retry within the same run). Launched fresh GPU shard (wave9-annotations-cpp-m2m-gpu-20260907c, PID 40824) for the final hu/ja/ro cells.",
+  "last_wake_summary": "GPU shard for pdf-annotations-in-cpp hu/ja/ro launched successfully on 3rd attempt (PID 54280, campaign ...20260907d) after 2 verify_environment failures caused by launch/commit ordering -- lesson: never launch a detached campaign while the translator repo has uncommitted changes or a manifest built against a since-superseded HEAD.",
   "cells_committed_total": 172,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "run_id": "wave9-annotations-cpp-m2m-gpu-20260907c",
-      "pid": 40824,
-      "launched_at": "2026-09-07T07:44:00+00:00",
-      "manifest": "data/campaigns/manifests/wave9-annotations-cpp-m2m-gpu-20260907c.yaml",
-      "log": "logs/wave9-annotations-cpp-m2m-gpu-20260907c_launcher.log",
-      "note": "GPU-dedicated shard (TC-APT-065 mechanism, --gpu-locales hu ja ro, --gpu-shard-memory-percent 80) for pdf-annotations-in-cpp hu/ja/ro (m2m100_418m primary per plan SS6.1 language-cost policy) -- the last 3 languages for this page. Fresh manifest built against current HEAD (content 2fa8dee5fc, translator 0c690937) after the prior attempt (PID 49284, wave9-annotations-cpp-m2m-gpu-20260907b) died on a stale-sha verify_environment error; launched only after the wave9 llm-retry2 run fully finished to avoid GPU/model-lock contention (plan SS0.3). Launched via PowerShell Start-Process (OS-detached, --wait so the detached process itself supervises its child shard) -- not harness run_in_background."
+      "run_id": "wave9-annotations-cpp-m2m-gpu-20260907d",
+      "pid": 54280,
+      "launched_at": "2026-09-07T07:56:00+00:00",
+      "manifest": "data/campaigns/manifests/wave9-annotations-cpp-m2m-gpu-20260907d.yaml",
+      "log": "logs/wave9-annotations-cpp-m2m-gpu-20260907d_launcher.log",
+      "note": "GPU-dedicated shard for pdf-annotations-in-cpp hu/ja/ro (m2m100_418m primary), 3rd attempt. Attempts 1 (PID 40824, campaign ...20260907c) and 2 (PID 53396, same campaign relaunched) both died at verify_environment: attempt 1 hit \"translator repository is dirty\" because I launched it before committing the taskcard_status.json/state_digest.json edits from the SAME iteration -- self-inflicted ordering bug (launch AFTER committing hugo-translator state, never before); attempt 2 (same stale manifest, translator_repo_sha pinned to pre-ed70db72 HEAD) then hit \"translator repository SHA drift\" once I did commit. Fixed by rebuilding the manifest fresh (campaign wave9-annotations-cpp-m2m-gpu-20260907d) against the now-stable HEAD (ed70db72) with a clean tree, then launching without any further hugo-translator commits in between -- passed verify_environment, model loading in progress at last check."
     }
   ],
   "wave_scale": {
