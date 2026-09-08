@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 28,
+  "wake_count": 29,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,8 +1398,8 @@
       ]
     }
   },
-  "last_wake_summary": "wave16 retrigger: 6/10 frontmatter-short-phrase-gap cells confirmed clean and committed (a8c0c3b059) -- fr/id/it/nl/hi/pt. pdf-document-management-go now 18/25. fa/sv hit a narrower residual of the same class (repair-retry fires but does not always succeed on the literal 'HTML Export' bigram); zh/ja frontmatter clean but hit a separate, now-confirmed-recurring heading-translation-collision bug. TM purged (120 entries) for the 4 still-rejected. cells_committed_total now 243.",
-  "cells_committed_total": 243,
+  "last_wake_summary": "Continued: wave17 pdf-document-management-python shipped 0->10/25 (21c7ffd21d); found + fixed RECURRENCE-mandatory producer_heading_translation_collision (heading_uniqueness.py, 21226a98 then corrected 2842a8e1 after a str(TextUnitKind) bug caught by immediate reverification); retrigger+commit landed 5578855bb7, closing pdf-document-management-go to 20/25 and pdf-document-management-python to 11/25. Two NEW high-value defect classes ticketed for future work: producer_short_isolated_cell_hallucination (8 langs, one page -- Supported Formats table TIFF/Write cell), producer_frontmatter_reordered_phrase_residual_gap (6 langs -- needs a structural detector fix, not a threshold tweak). Backfilled 22 stale FIXED_VERIFIED heal tickets. cells_committed_total now 256.",
+  "cells_committed_total": 256,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [],
   "wave_scale": {
