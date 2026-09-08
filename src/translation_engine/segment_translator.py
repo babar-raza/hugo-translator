@@ -754,6 +754,98 @@ class SegmentTranslator:
             )
         return repaired
 
+    def _repair_duplicate_heading_translations(
+        self,
+        engine,
+        units: list,
+        primary_model,
+        source_lang: str,
+        target_lang: str,
+        stats: TranslationStats,
+    ) -> int:
+        """Two DIFFERENT English headings translated independently sometimes
+        converge on the identical rendering (confirmed recurring on 2 source
+        pages for ja/zh: "Introduction" and "Getting Started" both render to
+        the same phrase). Retry every losing heading in a collision with
+        feedback naming the sibling's already-used rendering, so it produces
+        a distinct-but-accurate translation instead.
+        """
+        from .heading_uniqueness import _normalize, find_duplicate_heading_translations
+
+        collisions = find_duplicate_heading_translations(units)
+        if not collisions:
+            return 0
+        backend = primary_model if hasattr(primary_model, "translate_with_context") else None
+        if backend is None:
+            try:
+                with engine._model_lock:
+                    backend = engine.model_loader.load_model("professionalize_llm")
+            except Exception as load_error:
+                logger.warning(
+                    "heading-uniqueness: %d collision(s) found but no context-capable "
+                    "backend is available (%s); leaving for gate review",
+                    len(collisions),
+                    type(load_error).__name__,
+                )
+                return 0
+            if not hasattr(backend, "translate_with_context"):
+                return 0
+        repaired = 0
+        retried = 0
+        for collision in collisions:
+            for loser in collision.losers:
+                if retried >= 4:
+                    break
+                retried += 1
+                feedback = (
+                    f"A sibling heading elsewhere in this same document (English: "
+                    f"'{collision.winner.source_text}') already uses the exact "
+                    f"translation '{collision.shared_translation}'. Translate this "
+                    f"DIFFERENT heading with a distinct, still accurate rendering — "
+                    f"do not reuse that exact same translated phrase."
+                )
+                try:
+                    result = backend.translate_with_context(
+                        [str(loser.source_text)],
+                        source_lang,
+                        target_lang,
+                        context_hint="heading_uniqueness",
+                        file_context=None,
+                        retry_feedback=feedback,
+                    )
+                except Exception as repair_error:
+                    logger.warning(
+                        "heading-uniqueness: repair call failed for heading '%s' (%s)",
+                        sanitize_for_log(loser.source_text, 80),
+                        type(repair_error).__name__,
+                    )
+                    continue
+                candidate = str(result[0]) if result and result[0] else ""
+                if (
+                    not candidate.strip()
+                    or candidate.strip() == str(loser.source_text).strip()
+                    or _normalize(candidate) == _normalize(collision.shared_translation)
+                ):
+                    logger.info(
+                        "heading-uniqueness: repair did not produce a distinct rendering "
+                        "for heading '%s'; keeping prior candidate for gate review",
+                        sanitize_for_log(loser.source_text, 80),
+                    )
+                    continue
+                loser.translated_text = candidate
+                if loser.metadata is None:
+                    loser.metadata = {}
+                loser.metadata["heading_uniqueness_repair_sibling"] = collision.winner.source_text
+                stats.llm_units_translated += 1
+                repaired += 1
+                logger.info(
+                    "heading-uniqueness: repaired duplicate heading translation for '%s' "
+                    "(was colliding with sibling '%s')",
+                    sanitize_for_log(loser.source_text, 80),
+                    sanitize_for_log(collision.winner.source_text, 80),
+                )
+        return repaired
+
     def _translate_fenced_code_prose_chunks(
         self,
         backend,
@@ -2107,6 +2199,25 @@ class SegmentTranslator:
                 logger.warning(
                     "TC-APT-042: cross-field frontmatter repair pass skipped (%s)",
                     type(_xf_error).__name__,
+                )
+
+            # Recurrence 2026-09-08: two different English headings sometimes
+            # translate to the identical rendering (confirmed ja/zh, 2 pages) --
+            # retry the losing heading(s) with the sibling's rendering as the
+            # thing to avoid, before validation/review sees the collision.
+            try:
+                self._repair_duplicate_heading_translations(
+                    engine,
+                    translated_units,
+                    mt_model,
+                    site_profile.default_source_lang,
+                    target_lang,
+                    stats,
+                )
+            except Exception as _hu_error:
+                logger.warning(
+                    "heading-uniqueness: repair pass skipped (%s)",
+                    type(_hu_error).__name__,
                 )
 
             # TC-SAS-01: Detect translatable units the model returned unchanged (source-lang leakage).
