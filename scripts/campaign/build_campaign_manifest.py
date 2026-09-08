@@ -419,6 +419,7 @@ def build_manifest(
     max_parallel_jobs: int = 1,
     dirty_scope: str = "campaign_paths",
     replace_existing: dict[str, dict[str, dict[str, str]]] | None = None,
+    missing_only: bool = False,
     primary_model: str = "m2m100_418m",
 ) -> dict[str, Any]:
     """Assemble a schema-1 zero-defect manifest (validated by ``CampaignManifest.load``).
@@ -429,6 +430,9 @@ def build_manifest(
 
     ``locales`` (optional) narrows every source's outputs to a subset of the portfolio set
     (e.g. a Gate-4 canary cell); the manifest's ``target_locales`` then equals that subset.
+
+    ``missing_only`` excludes targets that already exist on disk. Existing files
+    must instead be handled through an explicit ``replace_existing`` declaration.
 
     ``primary_model`` (TC-APT-039, plan revision 8 §6.1): the model tried first. Must be
     ``"m2m100_418m"`` (default; escalates to professionalize_llm) or ``"professionalize_llm"``
@@ -445,6 +449,14 @@ def build_manifest(
     scoped = []
     for item in sources:
         outputs = {lang: item["outputs"][lang] for lang in locales_final}
+        if missing_only:
+            outputs = {
+                lang: output_path
+                for lang, output_path in outputs.items()
+                if not (content_repo / output_path).is_file()
+            }
+        if not outputs:
+            continue
         entry = {**item, "outputs": outputs}
         declared = (replace_existing or {}).get(item["source_path"]) or {}
         entry["replace_existing"] = {
@@ -493,6 +505,7 @@ def build_manifest(
         "execution_policy": {
             "max_parallel_jobs": max_parallel_jobs,
             "model_sharing": "single_shared_instance",
+            "output_selection": "missing_only" if missing_only else "all",
             # TC-APT-032: only the campaign's own sources/outputs gate a run in a shared repo.
             "dirty_scope": dirty_scope,
         },
@@ -582,6 +595,11 @@ def main(argv: list[str] | None = None) -> int:
         default="refuse",
         help="refuse: existing targets are a hard stop (default); replace: declare governed replacement from the work ledger",
     )
+    parser.add_argument(
+        "--missing-only",
+        action="store_true",
+        help="include only target cells absent from the content checkout; cannot be combined with --existing replace",
+    )
     parser.add_argument("--ledger", type=Path, default=Path("data/campaigns/work_ledger.sqlite3"))
     parser.add_argument(
         "--primary-model",
@@ -623,6 +641,8 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--campaign-id is required with --manifest-output")
         if args.no_hash:
             parser.error("--no-hash cannot be combined with --manifest-output")
+        if args.missing_only and args.existing == "replace":
+            parser.error("--missing-only cannot be combined with --existing replace")
         if not inventory["locale_set_consistent_across_sites"]:
             raise DiscoveryError("sites disagree on target locales; refusing to build one manifest")
         listed = None
@@ -659,6 +679,7 @@ def main(argv: list[str] | None = None) -> int:
             max_parallel_jobs=args.max_parallel_jobs,
             dirty_scope=args.dirty_scope,
             replace_existing=declared,
+            missing_only=args.missing_only,
             primary_model=args.primary_model,
         )
         atomic_write(

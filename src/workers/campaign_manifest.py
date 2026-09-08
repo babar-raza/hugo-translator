@@ -343,7 +343,16 @@ class CampaignManifest:
             if source.source_path in source_paths:
                 errors.append(f"duplicate source path: {source.source_path}")
             source_paths.add(source.source_path)
-            if set(source.outputs) != set(self.target_locales):
+            source_locales = set(source.outputs)
+            campaign_locales = set(self.target_locales)
+            missing_only = self.execution_policy.get("output_selection") == "missing_only"
+            if not source_locales:
+                errors.append(f"{source.source_path}: source has no output locales")
+            elif missing_only and not source_locales.issubset(campaign_locales):
+                errors.append(
+                    f"{source.source_path}: output locales are outside campaign locales"
+                )
+            elif not missing_only and source_locales != campaign_locales:
                 errors.append(f"{source.source_path}: output locales do not match campaign locales")
             for output in source.outputs.values():
                 normalized = Path(output)
@@ -539,7 +548,9 @@ class CampaignManifest:
             ),
         ):
             for locale in self.target_locales:
-                output = source.outputs[locale]
+                output = source.outputs.get(locale)
+                if output is None:
+                    continue
                 if output not in completed:
                     yield source, locale, output
 
@@ -559,7 +570,9 @@ class CampaignManifest:
         ] = {}
         for source in self.sources:
             for locale in self.target_locales:
-                output = source.outputs[locale]
+                output = source.outputs.get(locale)
+                if output is None:
+                    continue
                 if output in completed:
                     continue
                 key = (

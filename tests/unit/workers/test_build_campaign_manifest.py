@@ -270,6 +270,45 @@ def test_manifest_loads_and_validates_as_zero_defect(content_repo, tmp_path, mon
         )
 
 
+def test_missing_only_manifest_excludes_existing_targets(content_repo, tmp_path, monkeypatch):
+    translator = tmp_path / "translator"
+    _write_config(translator, ["docs.test.org"])
+    _touch(translator / "config/model_registry.yaml", "models: {}\n")
+    monkeypatch.setattr(builder, "git_sha", lambda repo: "f" * 40)
+    monkeypatch.setattr(builder, "fingerprint_files", lambda *_a, **_k: "c" * 64)
+    monkeypatch.setattr(
+        builder, "tm_fingerprint_inputs", lambda _repo: ["data/tm/l2.lmdb/data.mdb"]
+    )
+    profile = _folder_profile(content_repo / "content/docs.test.org")
+    sources, _ = builder.discover_sources(content_repo, profile, KNOWN)
+    manifest = builder.build_manifest(
+        content_repo=content_repo,
+        translator_repo=translator,
+        campaign_id="missing-only",
+        sources=sources,
+        target_locales=["ar", "de", "fr"],
+        sites=["docs.test.org"],
+        missing_only=True,
+    )
+    assert manifest["expected_source_count"] == 5
+    assert manifest["expected_output_count"] == 14
+    getting_started = next(
+        item for item in manifest["sources"] if item["source_path"].endswith("getting-started.md")
+    )
+    assert getting_started["outputs"] == {
+        "ar": "content/docs.test.org/ar/cells/net/getting-started.md",
+        "fr": "content/docs.test.org/fr/cells/net/getting-started.md",
+    }
+    out = tmp_path / "missing-only.yaml"
+    out.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+    loaded = CampaignManifest.load(out)
+    assert loaded.expected_output_count == 14
+    assert sum(
+        len(shard["jobs"])
+        for shard in loaded.shards(resume_receipts=set(), max_outputs=250)
+    ) == 14
+
+
 def test_build_manifest_primary_model_swaps_escalation(content_repo, tmp_path, monkeypatch):
     """TC-APT-039: primary_model="professionalize_llm" flips the escalation target to
     m2m100_418m, and the resulting manifest still validates as zero-defect."""
