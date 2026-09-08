@@ -128,6 +128,27 @@ class TestFindCrossFieldResiduals:
         ]
         assert find_cross_field_residuals(units) == []
 
+    def test_short_two_token_technical_phrase_residual_is_flagged(self):
+        # Live case (wave16, pdf-document-management-go, fr/nl/sv/...): title
+        # leaves the whole "HTML Export, Layers, and Tagged PDF" tail in English
+        # while seoTitle translates the same phrase pair. Each qualifying run
+        # is only 2 tokens (e.g. "Tagged PDF" = 9 alpha chars), below the old
+        # 12-alpha 2-token floor -- both "HTML Export" and "Tagged PDF" fell
+        # through the gap between the 2-token and 3-token qualification bands.
+        title_src = "Document Management in Go: HTML Export, Layers, and Tagged PDF"
+        title_fr = "Gestion de documents en Go: HTML Export, Layers, and Tagged PDF"
+        seo_src = "Aspose.PDF FOSS for Go — HTML Export, Layers & Tagged PDF Guide"
+        seo_fr = "Aspose.PDF FOSS pour Go — Guide d'Export, Calques et PDF balisé"
+        units = [
+            _fm_unit("title", title_src, title_fr),
+            _fm_unit("seoTitle", seo_src, seo_fr),
+        ]
+        residuals = find_cross_field_residuals(units)
+        phrases = {r.phrase for r in residuals}
+        assert residuals, "expected at least one residual on the title field"
+        assert all(r.field_name == "title" for r in residuals)
+        assert any("Tagged PDF" in p or "HTML Export" in p for p in phrases)
+
     def test_non_frontmatter_and_dnt_units_are_ignored(self):
         body_unit = SimpleNamespace(
             node_addr="body.0",

@@ -26,12 +26,15 @@ __all__ = ["CrossFieldResidual", "find_cross_field_residuals"]
 
 # A shared token run qualifies as a "phrase" worth checking when it is long
 # enough that its verbatim survival cannot plausibly be a cognate or a brand
-# token: 3+ tokens with >=8 alphabetic chars, or 2 tokens with >=12 (catches
-# hyphenated compound pairs like "MIT-licensed, zero-dependency").
+# token: 3+ tokens with >=8 alphabetic chars, or 2 tokens with >=9 (catches
+# hyphenated compound pairs like "MIT-licensed, zero-dependency" as well as
+# short technical noun pairs like "HTML Export"/"Tagged PDF" -- live case
+# wave16 pdf-document-management-go: these fell through the gap between the
+# 2-token and 3-token bands at the old 12-alpha floor and were never repaired).
 _MIN_TOKENS_LOOSE = 3
 _MIN_ALPHA_LOOSE = 8
 _MIN_TOKENS_TIGHT = 2
-_MIN_ALPHA_TIGHT = 12
+_MIN_ALPHA_TIGHT = 9
 
 
 @dataclass
