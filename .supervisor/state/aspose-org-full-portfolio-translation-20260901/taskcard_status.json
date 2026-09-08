@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 30,
+  "wake_count": 31,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,8 +1398,8 @@
       ]
     }
   },
-  "last_wake_summary": "Continued: wave18 pdf-engine-in-python shipped 0->9/25 (8d7a018005); found the SECOND-page confirmation of producer_short_isolated_cell_hallucination (RECURRENCE ESCALATION, 17 total occurrences); fixed the packed-batch dedup mechanism (llm_backend.py, cccf42ae) with 4 new tests; retriggered all 17, table-cell defect confirmed fixed in 11/17, 8 committed clean (386e910638) -- pdf-document-management-python now 21/25, pdf-engine-in-python now 15/25. 6/17 still show the defect (likely a second, independent mechanism -- ja reproduces the exact same canned hallucination regardless of batching); 2 new isolated defects found during reverification (tr reduplicated-phrase corruption, nl untranslated heading). cells_committed_total now 273.",
-  "cells_committed_total": 273,
+  "last_wake_summary": "Continued: wave19 words-text-in-net shipped 0->1/25 (th only, 0ebb9fe88f) -- 24/25 hit a NEW, page-wide, well-root-caused defect (producer_leaf_split_bare_verb_imperative_ambiguity): a single italic marker forces a whole paragraph into leaf-level extraction, stranding a bare-form plural verb ('report') without its subject, which every language with an imperative/indicative mood distinction then mistranslates as a command. Thai (no mood distinction) is the only locale unaffected -- confirms the mechanism precisely. Same architectural class as the already-fixed TC-APT-013/036/076 code-span/link leaf-splitting bugs; the analogous emphasis-exclusion fix needs the same multi-page validation rigor those got, deferred to a dedicated follow-up rather than guessed at this iteration. 24 heal tickets filed, TM purged. cells_committed_total now 274.",
+  "cells_committed_total": 274,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [],
   "wave_scale": {
