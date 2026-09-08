@@ -19,8 +19,8 @@
     2,
     3
   ],
-  "wake_count": 31,
-  "wakes_without_state_change": 0,
+  "wake_count": 32,
+  "wakes_without_state_change": 1,
   "taskcards": {
     "TC-APT-001": {
       "status": "DONE",
@@ -1398,7 +1398,7 @@
       ]
     }
   },
-  "last_wake_summary": "Continued: wave19 words-text-in-net shipped 0->1/25 (th only, 0ebb9fe88f) -- 24/25 hit a NEW, page-wide, well-root-caused defect (producer_leaf_split_bare_verb_imperative_ambiguity): a single italic marker forces a whole paragraph into leaf-level extraction, stranding a bare-form plural verb ('report') without its subject, which every language with an imperative/indicative mood distinction then mistranslates as a command. Thai (no mood distinction) is the only locale unaffected -- confirms the mechanism precisely. Same architectural class as the already-fixed TC-APT-013/036/076 code-span/link leaf-splitting bugs; the analogous emphasis-exclusion fix needs the same multi-page validation rigor those got, deferred to a dedicated follow-up rather than guessed at this iteration. 24 heal tickets filed, TM purged. cells_committed_total now 274.",
+  "last_wake_summary": "Continued: two Track-B investigations this iteration, neither landed a fix. (1) Prototyped the emphasis-exclusion fix for the FrameFormat imperative-verb bug (wave19) via a throwaway monkeypatch + identity round-trip across 40 real pages -- confirmed the target paragraph round-trips perfectly, but found 2 genuine regressions in other pages (ASTRenderer does not restore a placeholder for a former bold/italic span; the bold pattern greedily swallows a link nested inside **bold**) -- correctly deferred, documented precisely for a 2-stage fix. (2) wave20 cells-spreadsheet-management-cpp: 0/25 languages shipped -- ALL 25 hard-failed with the identical StructureValidator/LinkValidator source_count=6/translation_count=7 fingerprint, both models. Reproduced outside campaign_runner via debug_translate_one.py; identity round-trip on extraction/reconstruction is clean, ruling out a base structural bug -- the extra link is translation-dependent, exact content not yet viewed (would need a throwaway script, not done this iteration). 25 heal tickets filed (auto:LinkValidator), TM purged (105 entries -- confirms TC-APT-035 TM-write-on-reject is still open). No new cells committed this iteration -- both are documented first-principles records, not silent quarantine. cells_committed_total unchanged at 274.",
   "cells_committed_total": 274,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [],
