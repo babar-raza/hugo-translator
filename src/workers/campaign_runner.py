@@ -2168,7 +2168,16 @@ class CampaignRunner:
             "opened_at": datetime.now(timezone.utc).isoformat(),
             "root_cause_class": f"auto:{gate}",
             "evidence_path": f"data/campaigns/{self.manifest.campaign_id}/failure_metadata.jsonl",
-            "status": "OPEN",
+            "status": (
+                "QUEUED"
+                if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+                else "OPEN"
+            ),
+            "processing_model": (
+                self.manifest.retry_policy.get("llm_model")
+                if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+                else None
+            ),
             "tier": "unclassified",
             "note": note,
         }

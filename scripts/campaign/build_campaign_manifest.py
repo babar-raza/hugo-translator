@@ -421,6 +421,7 @@ def build_manifest(
     replace_existing: dict[str, dict[str, dict[str, str]]] | None = None,
     missing_only: bool = False,
     primary_model: str = "m2m100_418m",
+    llm_escalation_mode: str = "immediate",
 ) -> dict[str, Any]:
     """Assemble a schema-1 zero-defect manifest (validated by ``CampaignManifest.load``).
 
@@ -440,6 +441,13 @@ def build_manifest(
     """
     if primary_model not in ("m2m100_418m", "professionalize_llm"):
         raise DiscoveryError(f"primary_model must be m2m100_418m or professionalize_llm, got {primary_model!r}")
+    if llm_escalation_mode not in ("immediate", "deferred"):
+        raise DiscoveryError(
+            "llm_escalation_mode must be immediate or deferred, "
+            f"got {llm_escalation_mode!r}"
+        )
+    if llm_escalation_mode == "deferred" and primary_model != "m2m100_418m":
+        raise DiscoveryError("deferred LLM escalation requires m2m100_418m as the primary model")
     escalation_model = "professionalize_llm" if primary_model == "m2m100_418m" else "m2m100_418m"
     locales_final = tuple(sorted(locales)) if locales else tuple(sorted(target_locales))
     portfolio = set(target_locales)
@@ -491,8 +499,9 @@ def build_manifest(
         "retry_policy": {
             "primary_model": primary_model,
             "primary_attempts": 3,
-            "llm_escalation_attempts": 2,
+            "llm_escalation_attempts": 2 if llm_escalation_mode == "immediate" else 0,
             "llm_model": escalation_model,
+            "llm_escalation_mode": llm_escalation_mode,
         },
         # hugo-translator never commits into the content repo; the loop does (plan 19.2).
         "commit_policy": {
@@ -607,6 +616,12 @@ def main(argv: list[str] | None = None) -> int:
         default="m2m100_418m",
         help="TC-APT-039: model tried first; the other becomes the escalation target",
     )
+    parser.add_argument(
+        "--llm-escalation-mode",
+        choices=("immediate", "deferred"),
+        default="immediate",
+        help="immediate: retry failed M2M cells through LLM; deferred: queue them for a later LLM pass",
+    )
     args = parser.parse_args(argv)
 
     sites = tuple(args.sites) if args.sites else IN_SCOPE_SITES
@@ -681,6 +696,7 @@ def main(argv: list[str] | None = None) -> int:
             replace_existing=declared,
             missing_only=args.missing_only,
             primary_model=args.primary_model,
+            llm_escalation_mode=args.llm_escalation_mode,
         )
         atomic_write(
             path=args.manifest_output,

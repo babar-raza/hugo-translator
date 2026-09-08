@@ -281,8 +281,17 @@ class CampaignManifest:
             )
         if self.retry_policy.get("primary_attempts") != 3:
             errors.append("zero-defect campaign requires exactly 3 primary attempts")
-        if self.retry_policy.get("llm_escalation_attempts") != 2:
-            errors.append("zero-defect campaign requires exactly 2 LLM attempts")
+        _escalation_mode = self.retry_policy.get("llm_escalation_mode", "immediate")
+        _llm_attempts = self.retry_policy.get("llm_escalation_attempts")
+        if _escalation_mode == "immediate" and _llm_attempts != 2:
+            errors.append("immediate LLM escalation requires exactly 2 LLM attempts")
+        elif _escalation_mode == "deferred":
+            if _llm_attempts != 0:
+                errors.append("deferred LLM escalation requires zero in-run LLM attempts")
+            if _primary != "m2m100_418m" or _escalation != "professionalize_llm":
+                errors.append("deferred LLM escalation requires M2M100 primary and Professionalize queue target")
+        elif _escalation_mode not in {"immediate", "deferred"}:
+            errors.append("llm_escalation_mode must be immediate or deferred")
         if self.commit_policy.get("push") is not False:
             errors.append("zero-defect campaign commit policy must prohibit push")
         if not isinstance(self.commit_policy.get("enabled", True), bool):
