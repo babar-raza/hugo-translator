@@ -751,26 +751,56 @@ class LLMModelBackend:
 
         Falls back to per-segment calls if output parsing fails.
         Returns (total_input_tokens, total_output_tokens).
-        """
-        system_prompt = self._apply_retry_feedback(
-            self._build_batch_system_prompt(src_lang, tgt_lang, len(indices))
-        )
 
-        # Protect terms and build packed input
+        Recurrence 2026-09-08: a byte-identical short segment (e.g. a table's
+        repeated "Yes" cell) appearing more than once in the SAME packed
+        prompt reliably corrupted every occurrence after the first --
+        confirmed on 17 cells across 2 pages, always the second-or-later
+        "Yes" in one prompt, always rendering as a politeness/question
+        phrase ("Could you", "Please provide...") instead of a translation.
+        Fix: dedupe identical source text to ONE line per packed prompt and
+        broadcast its single translation back to every index that shared it
+        -- the model is never shown the same short string twice in one call.
+        """
+        # Protect terms per index as before (pure function of the text, safe
+        # to compute independently for every index, duplicates included).
+        # But emit only ONE prompt line per unique source text (see the
+        # recurrence note above) -- seq_for_idx maps every index, including
+        # duplicates, to the seq number of its text's single prompt line.
         protected_map = {}  # idx -> ProtectedResult
         lines = []
-        for seq, idx in enumerate(indices, 1):
+        seq_for_idx: dict[int, int] = {}
+        seq_for_text: dict[str, int] = {}
+        for idx in indices:
+            text = texts[idx]
             if tm:
-                p = tm.protect(texts[idx])
+                p = tm.protect(text)
                 if p:
                     protected_map[idx] = p
-                    lines.append(f"<<<SEG_{seq}>>> {p.protected_text}")
+                    line_text = p.protected_text
                 else:
-                    lines.append(f"<<<SEG_{seq}>>> {texts[idx]}")
+                    line_text = text
             else:
-                lines.append(f"<<<SEG_{seq}>>> {texts[idx]}")
+                line_text = text
+
+            existing_seq = seq_for_text.get(text)
+            if existing_seq is not None:
+                seq_for_idx[idx] = existing_seq
+                continue
+            seq = len(seq_for_text) + 1
+            seq_for_text[text] = seq
+            seq_for_idx[idx] = seq
+            lines.append(f"<<<SEG_{seq}>>> {line_text}")
 
         packed_input = "\n".join(lines)
+
+        # The prompt's own stated segment count must match the number of
+        # lines actually sent (len(seq_for_text)), not len(indices) -- telling
+        # the model to expect N segments while sending fewer unique lines is
+        # exactly the kind of count mismatch this fix exists to avoid.
+        system_prompt = self._apply_retry_feedback(
+            self._build_batch_system_prompt(src_lang, tgt_lang, len(seq_for_text))
+        )
 
         try:
             with self._llm_slot():
@@ -779,13 +809,16 @@ class LLMModelBackend:
                     user_text=packed_input,
                 )
 
-            # Parse numbered outputs
-            parsed = self._parse_packed_output(result, len(indices))
+            # Parse numbered outputs -- expected count is the number of
+            # UNIQUE lines actually sent (len(seq_for_text)), not len(indices):
+            # duplicate-text indices share a line and never got their own SEG.
+            parsed = self._parse_packed_output(result, len(seq_for_text))
 
             if parsed is not None:
-                # Successfully parsed — assign translations
-                for seq, idx in enumerate(indices):
-                    trans = parsed[seq]
+                # Successfully parsed — assign translations (duplicates reuse
+                # their shared text's single parsed result via seq_for_idx).
+                for idx in indices:
+                    trans = parsed[seq_for_idx[idx] - 1]
 
                     # TC-HT-003: reject prompt-echo/refusal per-item before
                     # term restore, same guard as the single-segment path.
