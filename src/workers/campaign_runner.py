@@ -392,6 +392,12 @@ class CampaignRunner:
         # it can default to the safe value without costing throughput today.
         self._force_serialize_lock = threading.RLock()
         self._force_serialize = _force_serialize_all_backends()
+        # A deferred escalation campaign must never make an incidental in-run
+        # Professionalize request from lower-level repair helpers.  Those
+        # cells fail closed and become queue tickets for the dedicated retry
+        # consumer instead.
+        if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred":
+            self.engine.campaign_context["defer_llm_fallbacks"] = True
 
     @contextmanager
     def _rollback_serialization(self):

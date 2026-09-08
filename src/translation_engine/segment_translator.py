@@ -2515,6 +2515,12 @@ class SegmentTranslator:
         placeholders under nllb_200_1.3b: it restored all 12 correctly.
         """
         engine = self._engine
+        if (getattr(engine, "campaign_context", {}) or {}).get("defer_llm_fallbacks"):
+            logger.info(
+                "Dropped-placeholder fallback deferred to the campaign LLM queue for %s",
+                target_lang,
+            )
+            return translation
         try:
             fallback_backend = engine.model_loader.load_model("professionalize_llm")
         except Exception as e:

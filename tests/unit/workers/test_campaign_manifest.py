@@ -96,6 +96,16 @@ def test_manifest_accepts_deferred_professionalize_queue(tmp_path):
     assert manifest.retry_policy["llm_escalation_mode"] == "deferred"
 
 
+def test_manifest_accepts_1_2b_m2m_for_deferred_queue(tmp_path):
+    raw = _manifest(tmp_path)
+    raw["retry_policy"].update(
+        primary_model="m2m100_1.2b", llm_escalation_mode="deferred", llm_escalation_attempts=0
+    )
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    assert CampaignManifest.load(path).retry_policy["primary_model"] == "m2m100_1.2b"
+
+
 @pytest.mark.parametrize(
     "primary_model,llm_model",
     [

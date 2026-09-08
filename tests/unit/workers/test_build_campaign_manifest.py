@@ -374,6 +374,28 @@ def test_build_manifest_can_defer_llm_escalation(content_repo, tmp_path, monkeyp
     assert manifest["retry_policy"]["llm_escalation_mode"] == "deferred"
 
 
+def test_build_manifest_can_use_1_2b_m2m(content_repo, tmp_path, monkeypatch):
+    translator = tmp_path / "translator"
+    _write_config(translator, ["docs.test.org"])
+    _touch(translator / "config/model_registry.yaml", "models: {}\n")
+    monkeypatch.setattr(builder, "git_sha", lambda repo: "f" * 40)
+    monkeypatch.setattr(builder, "fingerprint_files", lambda *_a, **_k: "c" * 64)
+    monkeypatch.setattr(builder, "tm_fingerprint_inputs", lambda _repo: ["data/tm/l2.lmdb/data.mdb"])
+    profile = _folder_profile(content_repo / "content/docs.test.org")
+    sources, _ = builder.discover_sources(content_repo, profile, KNOWN)
+    manifest = builder.build_manifest(
+        content_repo=content_repo,
+        translator_repo=translator,
+        campaign_id="unit-1-2b",
+        sources=sources,
+        target_locales=["ar", "de", "fr"],
+        sites=["docs.test.org"],
+        primary_model="m2m100_1.2b",
+        llm_escalation_mode="deferred",
+    )
+    assert manifest["retry_policy"]["primary_model"] == "m2m100_1.2b"
+
+
 def test_tm_fingerprint_inputs_require_l2_and_include_present_l3(tmp_path):
     with pytest.raises(builder.DiscoveryError):
         builder.tm_fingerprint_inputs(tmp_path)

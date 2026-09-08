@@ -272,11 +272,15 @@ class CampaignManifest:
         # both, or a model outside this pair, is never valid.
         _primary = self.retry_policy.get("primary_model")
         _escalation = self.retry_policy.get("llm_model")
-        _valid_pairs = {("m2m100_418m", "professionalize_llm"), ("professionalize_llm", "m2m100_418m")}
+        _valid_pairs = {
+            ("m2m100_418m", "professionalize_llm"),
+            ("m2m100_1.2b", "professionalize_llm"),
+            ("professionalize_llm", "m2m100_418m"),
+        }
         if (_primary, _escalation) not in _valid_pairs:
             errors.append(
-                "zero-defect campaign primary/escalation models must be m2m100_418m and "
-                "professionalize_llm in either order (TC-APT-039), got "
+                "zero-defect campaign model pair must be M2M100 primary with "
+                "professionalize_llm escalation (or the approved inverse pair), got "
                 f"primary_model={_primary!r} llm_model={_escalation!r}"
             )
         if self.retry_policy.get("primary_attempts") != 3:
@@ -288,8 +292,8 @@ class CampaignManifest:
         elif _escalation_mode == "deferred":
             if _llm_attempts != 0:
                 errors.append("deferred LLM escalation requires zero in-run LLM attempts")
-            if _primary != "m2m100_418m" or _escalation != "professionalize_llm":
-                errors.append("deferred LLM escalation requires M2M100 primary and Professionalize queue target")
+            if _primary not in {"m2m100_418m", "m2m100_1.2b"} or _escalation != "professionalize_llm":
+                errors.append("deferred LLM escalation requires an M2M100 primary and Professionalize queue target")
         elif _escalation_mode not in {"immediate", "deferred"}:
             errors.append("llm_escalation_mode must be immediate or deferred")
         if self.commit_policy.get("push") is not False:

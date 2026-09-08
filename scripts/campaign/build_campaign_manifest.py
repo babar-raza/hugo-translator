@@ -439,16 +439,19 @@ def build_manifest(
     ``"m2m100_418m"`` (default; escalates to professionalize_llm) or ``"professionalize_llm"``
     (escalates to m2m100_418m) -- ``CampaignManifest.validate_schema`` enforces this pair.
     """
-    if primary_model not in ("m2m100_418m", "professionalize_llm"):
-        raise DiscoveryError(f"primary_model must be m2m100_418m or professionalize_llm, got {primary_model!r}")
+    if primary_model not in ("m2m100_418m", "m2m100_1.2b", "professionalize_llm"):
+        raise DiscoveryError(
+            "primary_model must be m2m100_418m, m2m100_1.2b, or professionalize_llm, "
+            f"got {primary_model!r}"
+        )
     if llm_escalation_mode not in ("immediate", "deferred"):
         raise DiscoveryError(
             "llm_escalation_mode must be immediate or deferred, "
             f"got {llm_escalation_mode!r}"
         )
-    if llm_escalation_mode == "deferred" and primary_model != "m2m100_418m":
-        raise DiscoveryError("deferred LLM escalation requires m2m100_418m as the primary model")
-    escalation_model = "professionalize_llm" if primary_model == "m2m100_418m" else "m2m100_418m"
+    if llm_escalation_mode == "deferred" and primary_model not in ("m2m100_418m", "m2m100_1.2b"):
+        raise DiscoveryError("deferred LLM escalation requires an M2M100 primary model")
+    escalation_model = "professionalize_llm" if primary_model != "professionalize_llm" else "m2m100_418m"
     locales_final = tuple(sorted(locales)) if locales else tuple(sorted(target_locales))
     portfolio = set(target_locales)
     unknown = set(locales_final) - portfolio
@@ -612,7 +615,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ledger", type=Path, default=Path("data/campaigns/work_ledger.sqlite3"))
     parser.add_argument(
         "--primary-model",
-        choices=("m2m100_418m", "professionalize_llm"),
+        choices=("m2m100_418m", "m2m100_1.2b", "professionalize_llm"),
         default="m2m100_418m",
         help="TC-APT-039: model tried first; the other becomes the escalation target",
     )
