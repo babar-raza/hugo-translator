@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 29,
+  "wake_count": 30,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,8 +1398,8 @@
       ]
     }
   },
-  "last_wake_summary": "Continued: wave17 pdf-document-management-python shipped 0->10/25 (21c7ffd21d); found + fixed RECURRENCE-mandatory producer_heading_translation_collision (heading_uniqueness.py, 21226a98 then corrected 2842a8e1 after a str(TextUnitKind) bug caught by immediate reverification); retrigger+commit landed 5578855bb7, closing pdf-document-management-go to 20/25 and pdf-document-management-python to 11/25. Two NEW high-value defect classes ticketed for future work: producer_short_isolated_cell_hallucination (8 langs, one page -- Supported Formats table TIFF/Write cell), producer_frontmatter_reordered_phrase_residual_gap (6 langs -- needs a structural detector fix, not a threshold tweak). Backfilled 22 stale FIXED_VERIFIED heal tickets. cells_committed_total now 256.",
-  "cells_committed_total": 256,
+  "last_wake_summary": "Continued: wave18 pdf-engine-in-python shipped 0->9/25 (8d7a018005); found the SECOND-page confirmation of producer_short_isolated_cell_hallucination (RECURRENCE ESCALATION, 17 total occurrences); fixed the packed-batch dedup mechanism (llm_backend.py, cccf42ae) with 4 new tests; retriggered all 17, table-cell defect confirmed fixed in 11/17, 8 committed clean (386e910638) -- pdf-document-management-python now 21/25, pdf-engine-in-python now 15/25. 6/17 still show the defect (likely a second, independent mechanism -- ja reproduces the exact same canned hallucination regardless of batching); 2 new isolated defects found during reverification (tr reduplicated-phrase corruption, nl untranslated heading). cells_committed_total now 273.",
+  "cells_committed_total": 273,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [],
   "wave_scale": {
