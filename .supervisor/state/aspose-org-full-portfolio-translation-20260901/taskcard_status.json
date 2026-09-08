@@ -19,8 +19,8 @@
     2,
     3
   ],
-  "wake_count": 32,
-  "wakes_without_state_change": 1,
+  "wake_count": 33,
+  "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
       "status": "DONE",
@@ -1398,8 +1398,8 @@
       ]
     }
   },
-  "last_wake_summary": "Continued: two Track-B investigations this iteration, neither landed a fix. (1) Prototyped the emphasis-exclusion fix for the FrameFormat imperative-verb bug (wave19) via a throwaway monkeypatch + identity round-trip across 40 real pages -- confirmed the target paragraph round-trips perfectly, but found 2 genuine regressions in other pages (ASTRenderer does not restore a placeholder for a former bold/italic span; the bold pattern greedily swallows a link nested inside **bold**) -- correctly deferred, documented precisely for a 2-stage fix. (2) wave20 cells-spreadsheet-management-cpp: 0/25 languages shipped -- ALL 25 hard-failed with the identical StructureValidator/LinkValidator source_count=6/translation_count=7 fingerprint, both models. Reproduced outside campaign_runner via debug_translate_one.py; identity round-trip on extraction/reconstruction is clean, ruling out a base structural bug -- the extra link is translation-dependent, exact content not yet viewed (would need a throwaway script, not done this iteration). 25 heal tickets filed (auto:LinkValidator), TM purged (105 entries -- confirms TC-APT-035 TM-write-on-reject is still open). No new cells committed this iteration -- both are documented first-principles records, not silent quarantine. cells_committed_total unchanged at 274.",
-  "cells_committed_total": 274,
+  "last_wake_summary": "Continued: dove deeper into the emphasis-exclusion investigation (found + fixed the nested-placeholder root cause via pattern ordering, validated clean across effectively all of blog.aspose.org + 3/5 other sites -- but found 2 MORE distinct block-structure failure modes, blockquote-multi-paragraph and table-row collapse -- correctly still deferred, documented precisely for a proper multi-stage landing). Then shipped barcode-rendering-svg-png-python 0->18/25 (f7a13b623c), the healthiest wave in several iterations -- 7 heal tickets filed (2 cross-locale zh/ja frontmatter residual, others isolated). TM purged. cells_committed_total now 292.",
+  "cells_committed_total": 292,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [],
   "wave_scale": {
