@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 27,
+  "wake_count": 28,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,8 +1398,8 @@
       ]
     }
   },
-  "last_wake_summary": "wave16 pdf-document-management-go: 12/25 committed (012ac3b8e1); 13 REJECT -- 10 share one root cause (frontmatter_consistency.py short-phrase gap), fixed+tested (e3fcd3ca), retrigger pending; el/hu/th isolated, open for other-model retry. TM purged 953 entries. cells_committed_total now 237.",
-  "cells_committed_total": 237,
+  "last_wake_summary": "wave16 retrigger: 6/10 frontmatter-short-phrase-gap cells confirmed clean and committed (a8c0c3b059) -- fr/id/it/nl/hi/pt. pdf-document-management-go now 18/25. fa/sv hit a narrower residual of the same class (repair-retry fires but does not always succeed on the literal 'HTML Export' bigram); zh/ja frontmatter clean but hit a separate, now-confirmed-recurring heading-translation-collision bug. TM purged (120 entries) for the 4 still-rejected. cells_committed_total now 243.",
+  "cells_committed_total": 243,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [],
   "wave_scale": {
