@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 26,
+  "wake_count": 27,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1398,27 +1398,10 @@
       ]
     }
   },
-  "last_wake_summary": "Resumed Track-A after productive Track-B work (structure_validator fix landed + link-duplication bug fully diagnosed, see prior wake_summary). Selected wave16: pdf-document-management-go, verified genuinely untranslated on the content-repo filesystem and fence-clean (5 genuine Go blocks). Revised the over-broad wave15 link-section heuristic after checking wave12's already-successful page shares the identical 2-section link-footer template -- that structural signal alone does not predict the duplication bug, so did not filter on it. Launched both campaigns (LLM PID 58472, m2m GPU PID 55168), both confirmed past verify_environment.",
-  "cells_committed_total": 225,
+  "last_wake_summary": "wave16 pdf-document-management-go: 12/25 committed (012ac3b8e1); 13 REJECT -- 10 share one root cause (frontmatter_consistency.py short-phrase gap), fixed+tested (e3fcd3ca), retrigger pending; el/hu/th isolated, open for other-model retry. TM purged 953 entries. cells_committed_total now 237.",
+  "cells_committed_total": 237,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "run_id": "wave16-pdf-doc-mgmt-go-llm-20260907",
-      "pid": 58472,
-      "launched_at": "2026-09-07T14:48:00+00:00",
-      "manifest": "data/campaigns/manifests/wave16-pdf-doc-mgmt-go-llm-20260907.yaml",
-      "log": "logs/wave16-pdf-doc-mgmt-go-llm-20260907_launcher.log",
-      "note": "Tier-1a page content/blog.aspose.org/pdf/go/pdf-document-management-go/index.md (0/25) -- 22 LLM-primary languages. Pre-screened: 5 fenced Go code blocks all genuine (no prose-as-code mismatch, wave14 lesson). NOTE: revised the wave15 lesson -- checked introducing-html-foss-python (wave12, 25/25 clean) and confirmed it shares the exact same 2-section link-footer template (Getting Started list + separate Related Resources list) that wave15 hit the duplication bug on, so \"avoid 2+ link sections\" is NOT a reliable predictor (too common a template, most pages using it succeed) -- did not screen for that; code-span-count tolerance fix (0c99e429) now also covers this page's moderate code density regardless. Claimed in claims.jsonl."
-    },
-    {
-      "run_id": "wave16-pdf-doc-mgmt-go-m2m-gpu-20260907",
-      "pid": 55168,
-      "launched_at": "2026-09-07T14:48:00+00:00",
-      "manifest": "data/campaigns/manifests/wave16-pdf-doc-mgmt-go-m2m-gpu-20260907.yaml",
-      "log": "logs/wave16-pdf-doc-mgmt-go-m2m-gpu-20260907_launcher.log",
-      "note": "Same page hu/ja/ro cells (m2m100_418m primary), running concurrently with the LLM campaign above."
-    }
-  ],
+  "active_detached_runs": [],
   "wave_scale": {
     "value": 4,
     "previous": 2,
