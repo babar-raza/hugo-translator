@@ -8,6 +8,7 @@ independent units and both converge on the identical rendering.
 
 from types import SimpleNamespace
 
+from src.translation_engine.extractor.text_unit import TextUnitKind
 from src.translation_engine.heading_uniqueness import (
     find_duplicate_heading_translations,
 )
@@ -16,9 +17,16 @@ from src.translation_engine.segment_translator import SegmentTranslator
 
 
 def _heading_unit(source, translated, node_addr="body.0"):
+    # Use the REAL TextUnitKind enum, not a plain string: str(TextUnitKind.
+    # HEADING_TEXT) == "TextUnitKind.HEADING_TEXT" (its repr-style name), not
+    # "heading_text" (its value) -- a plain-string mock here would silently
+    # pass even if the detector compared kind via str() instead of direct
+    # equality, exactly the bug this fixture caught live (2026-09-08: the
+    # first version of find_duplicate_heading_translations used str(kind)
+    # and matched zero real production units).
     return SimpleNamespace(
         node_addr=node_addr,
-        kind="heading_text",
+        kind=TextUnitKind.HEADING_TEXT,
         source_text=source,
         translated_text=translated,
         do_not_translate=False,
@@ -59,7 +67,7 @@ class TestFindDuplicateHeadingTranslations:
     def test_non_heading_and_dnt_units_are_ignored(self):
         body_text_unit = SimpleNamespace(
             node_addr="body.0",
-            kind="text",
+            kind=TextUnitKind.TEXT,
             source_text="Introduction",
             translated_text="はじめに",
             do_not_translate=False,

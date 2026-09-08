@@ -48,7 +48,12 @@ def find_duplicate_heading_translations(units: list[Any]) -> list[HeadingCollisi
     translated to the identical rendering within one document."""
     eligible = []
     for unit in units:
-        kind = str(getattr(unit, "kind", "") or "")
+        # TextUnitKind is a (str, Enum) hybrid: str(kind) yields the
+        # "TextUnitKind.HEADING_TEXT" repr-style name, NOT its value -- direct
+        # equality (kind == "heading_text") is what actually works, the same
+        # comparison style already used elsewhere in this codebase (e.g.
+        # segment_translator.py's `u.kind == "block_code"` checks).
+        kind = getattr(unit, "kind", None)
         if kind not in ("heading_text", "HEADING_TEXT"):
             continue
         if getattr(unit, "do_not_translate", False):
