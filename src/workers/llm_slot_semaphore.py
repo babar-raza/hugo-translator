@@ -13,12 +13,17 @@ probe has not yet cleared beyond a measured ceiling.
 This gives every `generate()` call a slot in a small shared JSON file
 (`data/campaigns/llm_slots.json`) under the same `FileLock` pattern already
 used by `work_claims.py` (TC-APT-056) and `CampaignLedger`: total live slots
-capped at `DEFAULT_CAPACITY` (8, per the plan, until TC-APT-064 proves a
-higher sustained ceiling), each carrying a TTL so a crashed holder cannot
-starve the semaphore forever. The true unit of concurrency is one in-flight
-API call, not one process or one launcher -- `LLMSlot` defaults to a fresh
-holder id per instance so N calls in the same process (once max_parallel_jobs
-rises above 1) are counted as N slots, not 1.
+capped at `DEFAULT_CAPACITY` (64, raised from the original 8 on TC-APT-064's
+sustained-load evidence -- 16/32/48/64 concurrent calls against
+`professionalize_llm` each held for 450s, 3611 calls total, 0 errors and 0
+rate-limited at every level; see
+`data/benchmark_corpus/results/professionalize_llm_calibration_tc064_sustained_20260906.json`.
+`sustained_safe_ceiling=64` is a floor, not a measured max -- the probe did
+not find a ceiling within the tested range), each carrying a TTL so a
+crashed holder cannot starve the semaphore forever. The true unit of
+concurrency is one in-flight API call, not one process or one launcher --
+`LLMSlot` defaults to a fresh holder id per instance so N calls in the same
+process (once max_parallel_jobs rises above 1) are counted as N slots, not 1.
 """
 
 from __future__ import annotations
@@ -33,7 +38,11 @@ from typing import Any
 from src.utils.file_lock import FileLock
 
 _SLOTS_FILE = Path("data/campaigns/llm_slots.json")
-DEFAULT_CAPACITY = 8
+# TC-APT-064 sustained-load calibration (2026-09-06) held 16/32/48/64 concurrent
+# professionalize_llm calls for 450s each (3611 calls total): 0 errors, 0
+# rate-limited at every level. sustained_safe_ceiling=64 is the evidenced floor
+# (see module docstring for the full citation).
+DEFAULT_CAPACITY = 64
 DEFAULT_TTL_SECONDS = 120.0
 
 

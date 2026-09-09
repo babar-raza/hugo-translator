@@ -303,9 +303,14 @@ class CampaignManifest:
         max_outputs = self.commit_policy.get("max_outputs_per_commit")
         if not isinstance(max_outputs, int) or not 1 <= max_outputs <= 250:
             errors.append("campaign commit partitions must contain 1..250 outputs")
+        # TC-APT-046/TC-APT-064: ceiling raised 4 -> 64 on TC-APT-064's sustained-load
+        # evidence (data/benchmark_corpus/results/professionalize_llm_calibration_tc064_
+        # sustained_20260906.json): 16/32/48/64 concurrent held 450s each, 3611 calls
+        # total, 0 errors, 0 rate-limited at every level (sustained_safe_ceiling=64 is a
+        # floor, not a measured max -- the probe did not find a ceiling within range).
         max_parallel_jobs = self.execution_policy.get("max_parallel_jobs", 1)
-        if not isinstance(max_parallel_jobs, int) or not 1 <= max_parallel_jobs <= 4:
-            errors.append("campaign execution max_parallel_jobs must be 1..4")
+        if not isinstance(max_parallel_jobs, int) or not 1 <= max_parallel_jobs <= 64:
+            errors.append("campaign execution max_parallel_jobs must be 1..64")
         if (
             max_parallel_jobs > 1
             and self.execution_policy.get("model_sharing") != "single_shared_instance"
