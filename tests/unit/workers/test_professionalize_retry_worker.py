@@ -291,7 +291,8 @@ def test_main_stats_never_constructs_provider_or_claims(tmp_path: Path, monkeypa
     )
 
     exit_code = retry_worker_module.main(
-        ["--repository-root", str(tmp_path), "--queue-path", str(tmp_path / "queue.sqlite"), "--action", "stats"]
+        ["--repository-root", str(tmp_path), "--queue-path", str(tmp_path / "queue.sqlite"),
+         "--heartbeat-path", str(tmp_path / "heartbeat.json"), "--action", "stats"]
     )
 
     assert exit_code == 0
@@ -300,6 +301,8 @@ def test_main_stats_never_constructs_provider_or_claims(tmp_path: Path, monkeypa
     assert result["oldest_active_age_seconds"] is None
     assert result["expired_claims"] == 0
     assert provider_calls == []
+    heartbeat = json.loads((tmp_path / "heartbeat.json").read_text(encoding="utf-8"))
+    assert heartbeat["status"] == "stats" and heartbeat["QUEUED"] == 0
 
 
 def test_main_enqueue_validates_canonical_task_and_is_idempotent(tmp_path: Path, capsys):

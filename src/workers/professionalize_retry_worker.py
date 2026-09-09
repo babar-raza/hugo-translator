@@ -9,9 +9,11 @@ appending a TM intent.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import tempfile
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
@@ -25,6 +27,19 @@ class DocumentProvider(Protocol):
 
 
 Validator = Callable[[str, str, RejectedTranslationTask], dict[str, Any] | None]
+
+
+def write_retry_heartbeat(path: Path, *, status: str, queue: RejectedTaskQueue) -> None:
+    """Write payload-free health state without loading a provider or model."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(
+            {"timestamp": datetime.now(timezone.utc).isoformat(), "status": status, **queue.health()},
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
 
 
 class ProfessionalizeRetryWorker:
@@ -255,6 +270,7 @@ def load_retry_worker_config(config_root: Path) -> dict[str, Any]:
         "concurrency": 1,
         "lease_seconds": 300.0,
         "limit": 1,
+        "heartbeat_path": "data/logs/professionalize_retry_worker.heartbeat",
     }
     path = Path(config_root) / "global.yaml"
     if not path.exists():
@@ -295,6 +311,7 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--lease-seconds", type=float, default=None)
     parser.add_argument("--owner", default=None)
+    parser.add_argument("--heartbeat-path", default=None)
     parser.add_argument(
         "--action",
         choices=("run", "stats", "enqueue", "dead-letter", "reconcile"),
@@ -325,7 +342,9 @@ def main(argv: list[str] | None = None) -> int:
     config = load_retry_worker_config(Path(args.config_root))
     live_mode = bool(args.live or config["live_mode"])
     queue = RejectedTaskQueue(Path(args.queue_path or config["queue_path"]))
+    heartbeat_path = Path(args.heartbeat_path or config["heartbeat_path"])
     if args.action == "stats":
+        write_retry_heartbeat(heartbeat_path, status="stats", queue=queue)
         print(json.dumps(queue.health(), sort_keys=True))
         return 0
     if args.action == "enqueue":
@@ -351,6 +370,7 @@ def main(argv: list[str] | None = None) -> int:
             "retry_claims_requeued": queue.requeue_expired_claims(),
             "tm_intent_claims_requeued": intent_spool.requeue_expired_claims(),
         }, sort_keys=True))
+        write_retry_heartbeat(heartbeat_path, status="reconciled", queue=queue)
         return 0
     intent_spool = TMIntentSpool(Path(args.intent_spool_path or config["intent_spool_path"]))
     if live_mode and not args.campaign_manifest:
@@ -378,6 +398,7 @@ def main(argv: list[str] | None = None) -> int:
         limit=args.limit or int(config["limit"]),
         lease_seconds=args.lease_seconds or float(config["lease_seconds"]),
     )
+    write_retry_heartbeat(heartbeat_path, status="completed", queue=queue)
     print(json.dumps(result, sort_keys=True))
     return 0
 

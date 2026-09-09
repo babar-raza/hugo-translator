@@ -36,6 +36,7 @@ from src.observability.worker_telemetry import (
 )
 from src.tm import TranslationMemory
 from src.tm.improvement_queue import ImprovementCandidate, ImprovementQueue
+from src.tm.intent_spool import TMIntentSpool
 from src.tm.l1_cache import L1Cache
 from src.tm.l2_persistent import L2PersistentTM
 from src.tm.normalization import hash_text
@@ -309,6 +310,14 @@ class TMImprovementWorker:
             from src.tm.l2_persistent import L2_DB_NAME
             _raw_cfg = self.config_service.get_config() if self.config_service else {}
             _l2_max_mb = _raw_cfg.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
+            _writer_cfg = _raw_cfg.get("tm_writer", {}) or {}
+            _intent_spool = (
+                TMIntentSpool(
+                    Path(_writer_cfg.get("intent_spool_path", self.config.tm_path / "intent_spool.sqlite3"))
+                )
+                if _writer_cfg.get("enabled", False)
+                else None
+            )
             l2_store = L2PersistentTM(db_path=self.config.tm_path / L2_DB_NAME, max_size_mb=_l2_max_mb)
 
             # Create L3 semantic store (optional)
@@ -327,6 +336,7 @@ class TMImprovementWorker:
                 l1_cache=l1_cache,
                 l2_persistent=l2_store,
                 l3_semantic=l3_store,
+                intent_spool=_intent_spool,
             )
 
             logger.info("Initialized TranslationMemory")

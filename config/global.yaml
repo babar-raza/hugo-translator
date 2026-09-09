@@ -658,6 +658,7 @@ professionalize_retry:
   concurrency: 1
   limit: 1
   lease_seconds: 300
+  heartbeat_path: "data/logs/professionalize_retry_worker.heartbeat"
 
 # Single-writer TM boundary.  Keep disabled until the writer process is
 # deployed; when enabled, reader workers enqueue validated intents and never
