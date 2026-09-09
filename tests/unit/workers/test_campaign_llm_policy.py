@@ -8,6 +8,20 @@ from src.model_runtime.campaign_llm_policy import (
     campaign_llm_scope,
     llm_category,
 )
+from src.model_runtime.llm_providers import BaseLLMProvider
+
+
+class _RecordingProvider(BaseLLMProvider):
+    def __init__(self):
+        super().__init__()
+        self.calls = 0
+
+    def initialize(self, config):
+        self._config = config
+
+    def _generate_impl(self, system_prompt, user_text):
+        self.calls += 1
+        return "candidate", 3, 2
 
 
 @pytest.mark.parametrize("mode", ["immediate", "deferred"])
@@ -62,3 +76,26 @@ def test_nested_validation_allowed_and_threads_are_isolated():
         results = list(pool.map(run, ["immediate", "deferred"]))
     assert [rows[0]["mode"] for rows in results] == ["immediate", "deferred"]
     assert all(row["category"] == "validation" for rows in results for row in rows)
+
+
+def test_deferred_scope_suppresses_real_provider_repair_but_allows_validation():
+    provider = _RecordingProvider()
+    repair_events, validation_events = [], []
+
+    @llm_category("repair")
+    def repair():
+        return provider.generate("system", "source")
+
+    @llm_category("validation")
+    def validate():
+        return provider.generate("system", "source")
+
+    with campaign_llm_scope("deferred", "retry", repair_events.append):
+        with pytest.raises(DeferredLLMCall):
+            repair()
+    with campaign_llm_scope("deferred", "retry", validation_events.append):
+        assert validate() == ("candidate", 3, 2)
+
+    assert provider.calls == 1
+    assert [event["outcome"] for event in repair_events] == ["deferred"]
+    assert [event["outcome"] for event in validation_events] == ["started", "completed"]

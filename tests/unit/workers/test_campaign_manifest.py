@@ -19,6 +19,7 @@ from src.workers.campaign_manifest import (
 )
 from src.workers.campaign_runner import CampaignLedger, CampaignRunner
 from src.translation_engine.models import AcceptedTranslation
+from src.model_runtime.llm_providers import BaseLLMProvider
 
 
 def _manifest(tmp_path: Path) -> dict:
@@ -94,6 +95,21 @@ def test_manifest_accepts_deferred_professionalize_queue(tmp_path):
     path.write_text(yaml.safe_dump(raw), encoding="utf-8")
     manifest = CampaignManifest.load(path)
     assert manifest.retry_policy["llm_escalation_mode"] == "deferred"
+
+
+def test_llm_call_outcomes_are_category_scoped_and_payload_free(tmp_path):
+    ledger = CampaignLedger(tmp_path / "ledger", "pilot")
+    for category, outcome in (("identity", "completed"), ("repair", "deferred"), ("retry", "failed")):
+        ledger._append(
+            ledger.root / "llm_calls.jsonl",
+            {"category": category, "outcome": outcome, "candidate": "must not be surfaced"},
+        )
+
+    assert ledger.llm_call_outcomes() == {
+        "identity": {"completed": 1},
+        "repair": {"deferred": 1},
+        "retry": {"failed": 1},
+    }
 
 
 def test_deferred_campaign_skips_identity_provider_call(tmp_path):
@@ -862,6 +878,14 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
         def __init__(self):
             self.campaign_context = {}
             self.calls = []
+            class Provider(BaseLLMProvider):
+                def initialize(self, config):
+                    self._config = config
+
+                def _generate_impl(self, system_prompt, user_text):
+                    return "fixture", 2, 1
+
+            self.provider = Provider()
             self.decision_engine = SimpleNamespace(max_retry_attempts=99)
             self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
 
@@ -890,6 +914,8 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
                     _kwargs.get("model_id"),
                 )
             )
+            if _kwargs.get("model_id") == "professionalize_llm":
+                self.provider.generate("system", "source")
             if len(self.calls) < 3:
                 return SimpleNamespace(
                     success=False,
@@ -936,6 +962,7 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     summary = runner.run()
 
     assert summary["status"] == "COMPLETE"
+    assert summary["llm_call_outcomes"] == {"retry": {"completed": 2, "started": 2}}
     assert engine.calls[0] == (False, 2, None, "m2m100_418m")
     assert engine.calls[1][0:2] == (True, 0)
     assert "Regenerate the complete translation" in engine.calls[1][2]

@@ -248,6 +248,20 @@ class CampaignLedger:
             bucket(str(ticket.get("processing_model") or "unknown"))["queued"] += 1
         return dict(sorted(outcomes.items()))
 
+    def llm_call_outcomes(self) -> dict[str, dict[str, int]]:
+        """Summarize policy-accounted LLM calls without candidate payloads."""
+        outcomes: dict[str, dict[str, int]] = {}
+        for event in self._read_jsonl(self.root / "llm_calls.jsonl"):
+            category = str(event.get("category") or "unknown")
+            outcome = str(event.get("outcome") or "unknown")
+            outcomes.setdefault(category, {})[outcome] = (
+                outcomes.setdefault(category, {}).get(outcome, 0) + 1
+            )
+        return {
+            category: dict(sorted(counts.items()))
+            for category, counts in sorted(outcomes.items())
+        }
+
 
 class CampaignRunner:
     """Execute only jobs enumerated by a pinned CampaignManifest."""
@@ -2198,6 +2212,7 @@ class CampaignRunner:
                     "accepted": accepted,
                     "failed": failed,
                     "model_outcomes": self.ledger.model_outcomes(),
+                    "llm_call_outcomes": self.ledger.llm_call_outcomes(),
                 }
             )
             if shard_failed:
@@ -2215,6 +2230,7 @@ class CampaignRunner:
                         "accepted": accepted,
                         "failed": failed,
                         "model_outcomes": self.ledger.model_outcomes(),
+                        "llm_call_outcomes": self.ledger.llm_call_outcomes(),
                     }
                 )
 
@@ -2226,6 +2242,7 @@ class CampaignRunner:
             "failed_shard_ids": failed_shard_ids,
             "remaining": self.manifest.expected_output_count - accepted,
             "model_outcomes": self.ledger.model_outcomes(),
+            "llm_call_outcomes": self.ledger.llm_call_outcomes(),
             "status": (
                 "SHARD_SET_COMPLETE"
                 if partial and failed == 0
