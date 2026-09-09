@@ -1267,3 +1267,39 @@ resource_governance:
   temperature_recover_celsius: 70    # restart killed process when cooled
   temperature_poll_interval_sec: 30  # nvidia-smi sampling interval
   temperature_auto_restart: true     # restart killed process when temp recovers
+
+# VR-01 (gap CO-04): GPUAdmissionController (src/hardware/gpu_admission.py) --
+# a SIBLING to resource_governance above, not a replacement. resource_governance
+# gates on hand-tuned static SM% weight estimates; this block gates on REAL
+# measured VRAM (nvidia-smi, per-process MiB reservation) + real GPU temperature.
+# See data/summaries/vr-01-concurrency-measurement-*.json for the raw measurement
+# evidence and docs/operations/vr-01-concurrency-measurement.md for the writeup.
+#
+# NOT WIRED into any production launcher yet -- `enabled` is advisory only
+# (make_admission_controller()/GPUAdmissionController do not check it; no
+# campaign worker currently calls this module). Wiring it into
+# scripts/campaign/launch_parallel_campaign_shards.py, and any change to
+# max_parallel_jobs or concurrency.force_serialize_all_backends, is an explicit
+# follow-up decision for the orchestrating session after reviewing the measured
+# evidence -- deliberately left undone by VR-01's own scope boundary.
+gpu_admission:
+  enabled: false
+  # 45% caps the reservation ledger at exactly 6 concurrent m2m100_418m
+  # admissions (6 x 1100 MiB = 6600 MiB <= 45% of 16376 MiB; the 7th would
+  # need 7700 MiB > that budget). N=6 is the highest concurrency VR-01 proved
+  # clean (1/2/3/4/6 all clean; 5 and 7 untested). The naive 80%-of-VRAM
+  # figure was NOT tightened to this before: VRAM alone would admit ~10
+  # processes, well past N=6 and into the zone of VR-01's one real failure
+  # at N=8 -- a Windows pagefile/system-RAM exhaustion during simultaneous
+  # cold-start model loads, NOT a VRAM or thermal event this controller
+  # measures. 45% is therefore a deliberate proxy cap at the tested-safe
+  # ceiling, not a true model of the pagefile constraint -- raising this
+  # again requires either re-testing N=5/7/8 in isolation (no concurrent
+  # peer-fleet load) or adding real system-RAM/pagefile telemetry.
+  vram_budget_percent: 45
+  thermal_ceiling_celsius: 80    # deny admission at/above this GPU temp (measured peak at 8 concurrent: 67C -- well under)
+  per_process_vram_mib:
+    m2m100_418m: 1100            # measured ~927-1273MiB/process across 1..8 concurrent; rounded up for headroom
+    default: 1500
+  wait_interval_sec: 60
+  max_wait_attempts: 10
