@@ -25,6 +25,20 @@ to whichever launcher does hold it, rather than blocking or running anyway.
 This also wires `work_claims.py` (TC-APT-056) for real: a launcher refuses to
 start without first holding the `family:<campaign_id>` claim, renewed every
 wave so a long `--drain` run does not let the 45-minute TTL lapse mid-campaign.
+
+This-task follow-up (2026-09-09, VR-01's explicit deferred integration):
+`try_acquire_gpu_lane`'s one-GPU-shard-fleet-wide-at-a-time mutex is far more
+conservative than the hardware needs -- VR-01 (`src/hardware/gpu_admission.py`)
+measured 6 concurrent `m2m100_418m` processes running cleanly on this
+machine's RTX 4090. `config/global.yaml`'s `gpu_admission.enabled` flag
+(default ``false``, unchanged by this work) now actually gates something:
+``False`` keeps this launcher on the exact `try_acquire_gpu_lane` path it has
+always used; ``True`` switches the same call site to
+`try_acquire_gpu_admission`, a drop-in that asks `GPUAdmissionController` for
+a real-telemetry (nvidia-smi VRAM + temperature) admission slot instead of
+the single mutex, so more than one GPU-bound shard can run fleet-wide at
+once when the measured evidence says there is room. Flipping the flag live
+is deliberately left to the orchestrating session.
 """
 
 from __future__ import annotations
@@ -37,6 +51,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from src.hardware.gpu_admission import GPUAdmissionController, make_admission_controller
 from src.utils.file_lock import FileLock, LockError
 from src.workers import work_claims
 from src.workers.campaign_manifest import CampaignManifest
@@ -91,6 +106,66 @@ def try_acquire_gpu_lane(ledger_root: Path) -> FileLock | None:
     """
     lock = FileLock(gpu_lane_lock_path(ledger_root), timeout=0)
     return lock if lock.acquire(blocking=False) else None
+
+
+def is_gpu_admission_enabled(translator_repo: Path) -> bool:
+    """Read `gpu_admission.enabled` from `config/global.yaml` (default False on any error).
+
+    This is the ONE switch between `try_acquire_gpu_lane`'s conservative
+    single-mutex behaviour (default, unchanged) and `try_acquire_gpu_admission`'s
+    real-telemetry admission path (VR-01). Any read/parse problem -- missing
+    file, malformed YAML, missing key -- resolves to False, matching this
+    launcher's existing fail-closed-to-today's-behaviour stance: a config
+    problem must never silently unlock a code path nobody asked for.
+
+    A module-level function (not inlined in `main()`) purely so tests can
+    monkeypatch it directly to exercise both branches without needing to
+    write to, or depend on the contents of, the real `config/global.yaml`.
+    """
+    cfg_path = translator_repo / "config" / "global.yaml"
+    try:
+        import yaml  # local import: mirrors make_admission_controller()'s own tolerance
+
+        raw = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+        gpu_cfg = raw.get("gpu_admission") or {}
+        return bool(gpu_cfg.get("enabled", False))
+    except Exception:
+        return False
+
+
+def try_acquire_gpu_admission(
+    ledger_root: Path,
+    shard_id: str,
+    model_id: str = "m2m100_418m",
+) -> GPUAdmissionController | None:
+    """Non-blocking real-telemetry admission attempt -- the `gpu_admission.enabled: true` path.
+
+    Drop-in alternative to `try_acquire_gpu_lane` for a launcher that has
+    opted into VR-01's `GPUAdmissionController` (measured on this machine's
+    RTX 4090 to run up to 6 concurrent `m2m100_418m` processes cleanly --
+    see `config/global.yaml`'s `gpu_admission` block) instead of the older
+    one-GPU-shard-fleet-wide-at-a-time `gpu_lane.lock` mutex.
+
+    Returns the controller itself, already holding a registered admission
+    slot, on success -- the caller's existing `is not None` check needs no
+    change, only its release call becomes `.release_admission()` instead of
+    `FileLock.release()`. Returns None on denial (VRAM, thermal, or lock
+    contention) so the caller defers this wave's GPU-bound shards exactly as
+    it does today when the old lane is held by another launcher.
+
+    `ledger_root` is accepted for call-site symmetry with
+    `try_acquire_gpu_lane(ledger_root)` but does not choose where the
+    admission registry lives: `GPUAdmissionController`'s registry is a fixed
+    repo-relative path (`.local/gpu_admission_registry.json`) by design (see
+    `make_admission_controller()`), so every launcher instance/campaign on
+    this machine shares one real-telemetry view regardless of which ledger
+    root or manifest it is running -- unlike the per-`ledger_root`
+    `gpu_lane.lock`, which does need the path to be shared explicitly.
+    """
+    del ledger_root  # kept for call-site symmetry only; see docstring above
+    controller = make_admission_controller()
+    granted, _reason, _telemetry = controller.request_admission(shard_id, model_id)
+    return controller if granted else None
 
 
 def partition_for_wave(
@@ -423,6 +498,11 @@ def main(argv: list[str] | None = None) -> int:
     manifest = CampaignManifest.load(args.campaign_manifest)
     translator_repo = Path(__file__).resolve().parents[2]
     config_root = translator_repo / "config"
+    # TC-APT-047/094 follow-up: read once, not per-wave -- config/global.yaml's
+    # gpu_admission.enabled (default False, unchanged by this task) is the one
+    # switch between try_acquire_gpu_lane (today's behaviour) and
+    # try_acquire_gpu_admission (VR-01's real-telemetry admission controller).
+    gpu_admission_on = is_gpu_admission_enabled(translator_repo)
 
     # TC-APT-094: refuse to start without holding this family's fleet-visible
     # claim -- unlike the per-campaign parallel-launcher.lock below (a bare OS
@@ -462,7 +542,16 @@ def main(argv: list[str] | None = None) -> int:
 
             pending_all = pending_shards(manifest, args.ledger_root)
             gpu_bound, _api_bound = partition_by_device(pending_all, gpu_locales)
-            gpu_lane_lock = try_acquire_gpu_lane(args.ledger_root) if gpu_bound else None
+            if gpu_admission_on and gpu_bound:
+                # VR-01 path: real-telemetry admission instead of the single
+                # fleet-wide mutex. shard_id is this launcher's own manifest
+                # plus the lead GPU-bound shard, so a denial/registry dump is
+                # attributable to a specific campaign+shard for debugging.
+                admission_shard_id = f"{manifest.campaign_id}:{gpu_bound[0]['shard_id']}"
+                gpu_lane_lock = try_acquire_gpu_admission(args.ledger_root, admission_shard_id)
+            else:
+                # Unchanged: today's exact single-mutex behaviour.
+                gpu_lane_lock = try_acquire_gpu_lane(args.ledger_root) if gpu_bound else None
             try:
                 pending = partition_for_wave(
                     pending_all, gpu_locales, gpu_lane_available=gpu_lane_lock is not None
@@ -492,7 +581,10 @@ def main(argv: list[str] | None = None) -> int:
                 )
             finally:
                 if gpu_lane_lock is not None:
-                    gpu_lane_lock.release()
+                    if isinstance(gpu_lane_lock, GPUAdmissionController):
+                        gpu_lane_lock.release_admission()
+                    else:
+                        gpu_lane_lock.release()
             if wave_status != 0:
                 return wave_status
             if not args.drain:

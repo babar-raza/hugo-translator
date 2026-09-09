@@ -1285,8 +1285,19 @@ resource_governance:
 # max_parallel_jobs or concurrency.force_serialize_all_backends, is an explicit
 # follow-up decision for the orchestrating session after reviewing the measured
 # evidence -- deliberately left undone by VR-01's own scope boundary.
+#
+# ENABLED 2026-09-09 (orchestrating session, TC-APT-047/094 wiring landed in
+# scripts/campaign/launch_parallel_campaign_shards.py): the launcher's
+# try_acquire_gpu_admission() path now reads this flag and, when true,
+# replaces the old one-GPU-shard-fleet-wide-at-a-time gpu_lane.lock mutex
+# with this real-telemetry admission controller -- up to 6 concurrent
+# m2m100_418m processes (hu/ja/ro locales only) instead of exactly 1,
+# fail-closed to deny on any VRAM/thermal/telemetry error. Safe to flip live:
+# GPU was idle (0%, 0 MiB) at the moment of this change, and the disabled
+# path is unit-tested as byte-identical to today's behavior, so this is a
+# pure widening, never a narrowing, of what the launcher already does.
 gpu_admission:
-  enabled: false
+  enabled: true
   # 45% caps the reservation ledger at exactly 6 concurrent m2m100_418m
   # admissions (6 x 1100 MiB = 6600 MiB <= 45% of 16376 MiB; the 7th would
   # need 7700 MiB > that budget). N=6 is the highest concurrency VR-01 proved

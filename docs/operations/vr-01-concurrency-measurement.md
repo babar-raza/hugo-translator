@@ -222,3 +222,40 @@ and a process listing showed no `hugo-translator` Python process remaining
 -- the only Python processes present were unrelated peer-fleet /
 other-repository processes already running before this benchmark started.
 No orphaned GPU-holding process was left behind at any point.
+
+## 8. Follow-up: launcher wiring (2026-09-09, config-gated, off by default)
+
+Section 6's "none of this has been wired into
+`scripts/campaign/launch_parallel_campaign_shards.py`" is now superseded by
+this follow-up task: the wiring exists, but the launcher's live behaviour is
+**unchanged** until `config/global.yaml`'s `gpu_admission.enabled` is
+explicitly flipped to `true` -- it is still `false` today, and this task did
+not change that value.
+
+What changed: `launch_parallel_campaign_shards.py` gained two functions.
+`is_gpu_admission_enabled(translator_repo)` reads the `enabled` flag (default
+`False` on any read/parse error, matching the launcher's existing
+fail-closed-to-today's-behaviour stance). `try_acquire_gpu_admission(ledger_root,
+shard_id, model_id="m2m100_418m") -> GPUAdmissionController | None` is a
+drop-in for `try_acquire_gpu_lane` at the launcher's one call site: same
+`is not None` / release-in-`finally` shape, `.release_admission()` in place of
+`FileLock.release()`. The call site now branches on the flag; when `False` it
+is byte-identical to the pre-existing `try_acquire_gpu_lane(args.ledger_root)`
+line (proven by a monkeypatch-based regression test asserting
+`try_acquire_gpu_admission` is never even called, plus the full pre-existing
+launcher test suites passing unmodified). When `True`, the same call site asks
+`GPUAdmissionController` for a real-telemetry admission slot instead of the
+single fleet-wide mutex -- so, per this document's own N=6-clean measurement
+above, more than one GPU-bound shard can now run fleet-wide at once when the
+measured evidence says there is room, instead of always exactly one.
+
+Tested (mocked probes, isolated `tmp_path` registries -- never the real
+`.local/gpu_admission_registry.json`): grant/deny/release through a full dry
+wave; two independent `GPUAdmissionController`/`try_acquire_gpu_admission`
+callers sharing one registry both holding a slot at once, up to a configured
+cap, denied beyond it. Also one real (unmocked) nvidia-smi test confirming two
+concurrent admission requests both grant on this machine's actual idle GPU
+right now -- see `tests/unit/workers/test_launcher_gpu_admission_wiring.py`.
+
+Flipping `gpu_admission.enabled` live for the active fleet remains an explicit
+decision for the orchestrating session, same as VR-01 always intended.
