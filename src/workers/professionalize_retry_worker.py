@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import tempfile
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +23,8 @@ from src.tm.intent_spool import TMIntentSpool
 from src.tm.rejected_task_queue import RejectedTaskQueue
 from src.tm.retry_records import RejectedTranslationTask
 
+logger = logging.getLogger(__name__)
+
 
 class DocumentProvider(Protocol):
     def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]: ...
@@ -29,17 +33,28 @@ class DocumentProvider(Protocol):
 Validator = Callable[[str, str, RejectedTranslationTask], dict[str, Any] | None]
 
 
-def write_retry_heartbeat(path: Path, *, status: str, queue: RejectedTaskQueue) -> None:
-    """Write payload-free health state without loading a provider or model."""
+def write_retry_heartbeat(
+    path: Path, *, status: str, queue: RejectedTaskQueue, metrics: dict[str, int] | None = None
+) -> None:
+    """Write payload-free health state without loading a provider or model.
+
+    ``metrics`` is this worker *process's* own cumulative processed/accepted/
+    retried/dead_lettered counters (see ``ProfessionalizeRetryWorker.metrics``)
+    -- distinct from ``queue.health()``'s durable, queue-wide terminal-state
+    counts, which already span every consumer that has ever touched this
+    queue. Omitted (``None``) for actions that never claim/process work
+    (``stats``, ``reconcile``), preserving the original payload shape.
+    """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
-        json.dumps(
-            {"timestamp": datetime.now(timezone.utc).isoformat(), "status": status, **queue.health()},
-            sort_keys=True,
-        ),
-        encoding="utf-8",
-    )
+    payload: dict[str, Any] = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": status,
+        **queue.health(),
+    }
+    if metrics is not None:
+        payload["metrics"] = dict(metrics)
+    target.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
 
 
 class ProfessionalizeRetryWorker:
@@ -47,20 +62,83 @@ class ProfessionalizeRetryWorker:
 
     def __init__(self, *, queue: RejectedTaskQueue, intent_spool: TMIntentSpool,
                  provider: DocumentProvider, repository_root: Path,
-                 validate_document: Validator, live_mode: bool = False) -> None:
+                 validate_document: Validator, live_mode: bool = False,
+                 heartbeat_path: Path | None = None,
+                 heartbeat_interval_seconds: float = 30.0) -> None:
         self.queue = queue
         self.intent_spool = intent_spool
         self.provider = provider
         self.repository_root = Path(repository_root).resolve()
         self.validate_document = validate_document
         self.live_mode = live_mode
+        self.heartbeat_path = Path(heartbeat_path) if heartbeat_path is not None else None
+        self.heartbeat_interval_seconds = heartbeat_interval_seconds
+        # Cumulative for this worker *instance's* lifetime (it may live across
+        # several run_once() batches in a long-running process) -- distinct
+        # from queue.health(), whose ACCEPTED/DEAD_LETTER counts are durable
+        # and queue-wide across every consumer that has ever run.
+        self.metrics: dict[str, int] = {"processed": 0, "accepted": 0, "retried": 0, "dead_lettered": 0}
+        self._heartbeat_stop_event: threading.Event | None = None
+        self._heartbeat_thread: threading.Thread | None = None
+
+    def _write_heartbeat(self, status: str) -> None:
+        if self.heartbeat_path is not None:
+            write_retry_heartbeat(self.heartbeat_path, status=status, queue=self.queue, metrics=self.metrics)
+
+    def start_heartbeat_thread(self) -> None:
+        """Start a daemon thread that refreshes the heartbeat file on an interval.
+
+        Follows the start/stop daemon-thread convention used by
+        ``CampaignSupervisor``/``autonomous_content_translation_worker.py``/
+        ``tm_improvement_worker.py``. This is a backstop for a single slow
+        claimed task (e.g. a long LLM round-trip): ``run_once`` already writes
+        a fresh heartbeat immediately after every task's disposition, but a
+        monitor watching the heartbeat file's mtime would otherwise see no
+        movement for the full duration of whatever task is currently
+        in-flight. A no-op when no heartbeat_path is configured or the thread
+        is already running.
+        """
+        if self.heartbeat_path is None or self._heartbeat_thread is not None:
+            return
+        self._heartbeat_stop_event = threading.Event()
+        stop_event = self._heartbeat_stop_event
+
+        def _loop() -> None:
+            while not stop_event.is_set():
+                try:
+                    self._write_heartbeat("running")
+                except Exception as exc:  # pragma: no cover - defensive, matches worker convention
+                    logger.warning("professionalize retry worker heartbeat write failed: %s", exc)
+                stop_event.wait(timeout=self.heartbeat_interval_seconds)
+
+        self._heartbeat_thread = threading.Thread(
+            target=_loop, name="professionalize-retry-heartbeat", daemon=True
+        )
+        self._heartbeat_thread.start()
+
+    def stop_heartbeat_thread(self) -> None:
+        if self._heartbeat_stop_event is not None:
+            self._heartbeat_stop_event.set()
+        if self._heartbeat_thread is not None:
+            self._heartbeat_thread.join(timeout=5)
+        self._heartbeat_thread = None
+        self._heartbeat_stop_event = None
 
     def run_once(self, *, owner: str | None = None, limit: int = 1, lease_seconds: float = 300) -> dict[str, int]:
         owner = owner or f"professionalize-retry-{uuid.uuid4()}"
         counts = {"accepted": 0, "retried": 0, "dead_lettered": 0}
-        for task_id, task, attempt in self.queue.claim(owner, limit=limit, lease_seconds=lease_seconds):
-            disposition = self._process(task_id, task, attempt, owner)
-            counts[disposition] += 1
+        self.start_heartbeat_thread()
+        try:
+            for task_id, task, attempt in self.queue.claim(owner, limit=limit, lease_seconds=lease_seconds):
+                disposition = self._process(task_id, task, attempt, owner)
+                counts[disposition] += 1
+                self.metrics["processed"] += 1
+                self.metrics[disposition] += 1
+                # Milestone write: real progress the instant each task lands,
+                # independent of the background thread's interval.
+                self._write_heartbeat("running")
+        finally:
+            self.stop_heartbeat_thread()
         return {**counts, **self.queue.stats()}
 
     def _path(self, value: str) -> Path:
@@ -271,6 +349,7 @@ def load_retry_worker_config(config_root: Path) -> dict[str, Any]:
         "lease_seconds": 300.0,
         "limit": 1,
         "heartbeat_path": "data/logs/professionalize_retry_worker.heartbeat",
+        "heartbeat_interval_seconds": 30.0,
     }
     path = Path(config_root) / "global.yaml"
     if not path.exists():
@@ -286,6 +365,8 @@ def load_retry_worker_config(config_root: Path) -> dict[str, Any]:
         raise ValueError("professionalize_retry.concurrency must be 1; claims provide scale-out")
     if int(result["limit"]) < 1 or float(result["lease_seconds"]) <= 0:
         raise ValueError("professionalize_retry limit and lease_seconds must be positive")
+    if float(result["heartbeat_interval_seconds"]) <= 0:
+        raise ValueError("professionalize_retry.heartbeat_interval_seconds must be positive")
     return result
 
 
@@ -312,6 +393,7 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument("--lease-seconds", type=float, default=None)
     parser.add_argument("--owner", default=None)
     parser.add_argument("--heartbeat-path", default=None)
+    parser.add_argument("--heartbeat-interval-seconds", type=float, default=None)
     parser.add_argument(
         "--action",
         choices=("run", "stats", "enqueue", "dead-letter", "reconcile"),
@@ -392,13 +474,19 @@ def main(argv: list[str] | None = None) -> int:
         repository_root=Path(args.repository_root),
         validate_document=validator,
         live_mode=live_mode,
+        heartbeat_path=heartbeat_path,
+        heartbeat_interval_seconds=(
+            args.heartbeat_interval_seconds
+            if args.heartbeat_interval_seconds is not None
+            else float(config["heartbeat_interval_seconds"])
+        ),
     )
     result = worker.run_once(
         owner=args.owner,
         limit=args.limit or int(config["limit"]),
         lease_seconds=args.lease_seconds or float(config["lease_seconds"]),
     )
-    write_retry_heartbeat(heartbeat_path, status="completed", queue=queue)
+    write_retry_heartbeat(heartbeat_path, status="completed", queue=queue, metrics=worker.metrics)
     print(json.dumps(result, sort_keys=True))
     return 0
 

@@ -659,6 +659,7 @@ professionalize_retry:
   limit: 1
   lease_seconds: 300
   heartbeat_path: "data/logs/professionalize_retry_worker.heartbeat"
+  heartbeat_interval_seconds: 30
 
 # Single-writer TM boundary.  Keep disabled until the writer process is
 # deployed; when enabled, reader workers enqueue validated intents and never
@@ -676,6 +677,16 @@ tm_writer:
 campaign_quality:
   zero_acceptance_warning_after_attempts: 1
   zero_acceptance_stop_recommendation_after_attempts: 3
+
+# OP-01: durable CampaignSupervisor lifecycle (heartbeat + restart-safe
+# adoption/commit reconciliation) around one CampaignRunner. adoption_check_command
+# is left unset by default -- the content repo's session_ledger.py candidates check
+# is a manual runbook step this repository never shells out to on its own.
+campaign_supervisor:
+  heartbeat_path: "data/logs/campaign_supervisor.heartbeat"
+  state_path: "data/logs/campaign_supervisor.state.json"
+  heartbeat_interval_seconds: 30
+  adoption_check_command: null
 
 # Validation defaults
 validation_defaults:

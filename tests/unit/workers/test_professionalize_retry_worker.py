@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import time
 from hashlib import sha256
 from pathlib import Path
-from threading import Barrier, Thread
+from threading import Barrier, Event, Thread
 
 import pytest
 
@@ -16,6 +17,7 @@ from src.workers.professionalize_retry_worker import (
     build_campaign_zero_defect_validator,
     build_default_validator,
     load_retry_worker_config,
+    write_retry_heartbeat,
 )
 
 
@@ -46,9 +48,11 @@ def task(root: Path, source: str = "# source\n", budget: int = 2) -> RejectedTra
     })
 
 
-def worker(root: Path, queue: RejectedTaskQueue, spool: TMIntentSpool, provider: Provider, *, live=True, validator=None):
+def worker(root: Path, queue: RejectedTaskQueue, spool: TMIntentSpool, provider: Provider, *, live=True,
+           validator=None, heartbeat_path=None, heartbeat_interval_seconds=30.0):
     return ProfessionalizeRetryWorker(queue=queue, intent_spool=spool, provider=provider,
-        repository_root=root, live_mode=live, validate_document=validator or (lambda source, candidate, task: None))
+        repository_root=root, live_mode=live, validate_document=validator or (lambda source, candidate, task: None),
+        heartbeat_path=heartbeat_path, heartbeat_interval_seconds=heartbeat_interval_seconds)
 
 
 def test_accepted_retry_writes_full_document_receipt_then_tm_intent(tmp_path: Path):
@@ -140,6 +144,95 @@ def test_provider_timeout_retries_without_output_or_tm_intent(tmp_path: Path):
     assert spool.stats()["PENDING"] == 0
 
 
+def test_write_retry_heartbeat_includes_metrics_only_when_given(tmp_path: Path):
+    queue = RejectedTaskQueue(tmp_path / "queue.sqlite")
+    path = tmp_path / "heartbeat.json"
+    write_retry_heartbeat(path, status="idle", queue=queue)
+    assert "metrics" not in json.loads(path.read_text(encoding="utf-8"))
+    write_retry_heartbeat(path, status="running", queue=queue, metrics={"processed": 3})
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["metrics"] == {"processed": 3}
+
+
+def test_run_once_writes_heartbeat_with_cumulative_metrics_per_task(tmp_path: Path):
+    queue, spool = RejectedTaskQueue(tmp_path / "retry.sqlite"), TMIntentSpool(tmp_path / "tm.sqlite")
+    (tmp_path / "content/en/page2.md").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "content/en/page2.md").write_text("# source two\n", encoding="utf-8")
+    queue.enqueue(task(tmp_path))
+    queue.enqueue(RejectedTranslationTask.from_mapping({
+        "campaign_id": "campaign", "site_id": "docs.aspose.org",
+        "source_path": "content/en/page2.md", "output_path": "content/de/page2.md",
+        "source_sha256": "0" * 64,  # deliberately wrong -> SOURCE_DRIFT -> dead letter
+        "target_lang": "de", "failure_category": "validation", "failure_fingerprint": "f2",
+        "retry_budget": 2, "model_target": "professionalize_llm",
+    }))
+    heartbeat_path = tmp_path / "heartbeat.json"
+    result = worker(tmp_path, queue, spool, Provider(), heartbeat_path=heartbeat_path).run_once(
+        owner="one", limit=5
+    )
+    assert result["accepted"] == 1 and result["dead_lettered"] == 1
+    assert (tmp_path / "content/de/page.md").exists()
+    assert not (tmp_path / "content/de/page2.md").exists()
+    heartbeat = json.loads(heartbeat_path.read_text(encoding="utf-8"))
+    assert heartbeat["status"] == "running"
+    assert heartbeat["metrics"] == {"processed": 2, "accepted": 1, "retried": 0, "dead_lettered": 1}
+
+
+def test_heartbeat_thread_ticks_in_background_during_a_slow_task(tmp_path: Path):
+    """The per-task milestone write in run_once() only fires once _process()
+    returns, so a monitor would see no movement for the full duration of
+    whatever task is in-flight without the background interval thread. This
+    proves the thread writes a "running" heartbeat file WHILE a task is still
+    blocked inside provider.generate(), independent of that milestone write."""
+    queue, spool = RejectedTaskQueue(tmp_path / "retry.sqlite"), TMIntentSpool(tmp_path / "tm.sqlite")
+    queue.enqueue(task(tmp_path))
+    release = Event()
+
+    class SlowProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def generate(self, system_prompt, user_text):
+            self.calls += 1
+            release.wait(timeout=5)
+            return "# translated\n", 1, 1
+
+    heartbeat_path = tmp_path / "heartbeat.json"
+    built = worker(tmp_path, queue, spool, SlowProvider(), heartbeat_path=heartbeat_path,
+                    heartbeat_interval_seconds=0.02)
+    thread = Thread(target=built.run_once, kwargs={"owner": "one"})
+    thread.start()
+    try:
+        deadline = time.monotonic() + 5
+        seen_running = False
+        while time.monotonic() < deadline:
+            if heartbeat_path.is_file():
+                content = json.loads(heartbeat_path.read_text(encoding="utf-8"))
+                if content.get("status") == "running":
+                    seen_running = True
+                    break
+            time.sleep(0.005)
+        assert seen_running, "background heartbeat thread never wrote before the in-flight task finished"
+        assert content["metrics"]["processed"] == 0  # the in-flight task has not completed yet
+    finally:
+        release.set()
+        thread.join(timeout=5)
+    assert not thread.is_alive()
+    final = json.loads(heartbeat_path.read_text(encoding="utf-8"))
+    assert final["metrics"]["processed"] == 1
+
+
+def test_heartbeat_thread_start_stop_is_idempotent_and_noop_without_path(tmp_path: Path):
+    queue, spool = RejectedTaskQueue(tmp_path / "retry.sqlite"), TMIntentSpool(tmp_path / "tm.sqlite")
+    built = worker(tmp_path, queue, spool, Provider())
+    built.start_heartbeat_thread()
+    built.start_heartbeat_thread()
+    assert built._heartbeat_thread is None
+    built.stop_heartbeat_thread()
+    built.stop_heartbeat_thread()
+    assert built._heartbeat_thread is None
+
+
 def test_worker_config_rejects_parallel_consumer_or_bad_limits(tmp_path: Path):
     config = tmp_path / "config"
     config.mkdir()
@@ -159,6 +252,16 @@ def test_worker_config_uses_additive_defaults(tmp_path: Path):
     assert loaded["model_id"] == "test-model"
     assert loaded["live_mode"] is False
     assert loaded["concurrency"] == 1
+
+
+def test_worker_config_rejects_nonpositive_heartbeat_interval(tmp_path: Path):
+    config = tmp_path / "config"
+    config.mkdir()
+    (config / "global.yaml").write_text(
+        "professionalize_retry:\n  heartbeat_interval_seconds: 0\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="heartbeat_interval_seconds"):
+        load_retry_worker_config(config)
 
 
 def test_default_validator_accepts_a_clean_pair(tmp_path: Path):
@@ -279,6 +382,46 @@ def test_main_dry_run_never_calls_provider_and_retries(tmp_path: Path, capsys):
     result = json.loads(capsys.readouterr().out)
     assert result["retried"] == 1
     assert result["accepted"] == 0
+
+
+def test_main_run_writes_heartbeat_with_metrics_and_accepts_interval_flag(tmp_path: Path, capsys):
+    source = tmp_path / "content/en/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("# source\n", encoding="utf-8")
+    queue = RejectedTaskQueue(tmp_path / "queue.sqlite")
+    queue.enqueue(
+        RejectedTranslationTask.from_mapping(
+            {
+                "campaign_id": "c",
+                "site_id": "docs.aspose.org",
+                "source_path": "content/en/page.md",
+                "output_path": "content/de/page.md",
+                "source_sha256": sha256(source.read_bytes()).hexdigest(),
+                "target_lang": "de",
+                "failure_category": "x",
+                "failure_fingerprint": "x",
+                "retry_budget": 2,
+                "model_target": "professionalize_llm",
+            }
+        )
+    )
+    heartbeat_path = tmp_path / "heartbeat.json"
+
+    exit_code = retry_worker_module.main(
+        [
+            "--repository-root", str(tmp_path),
+            "--queue-path", str(tmp_path / "queue.sqlite"),
+            "--intent-spool-path", str(tmp_path / "intents.sqlite"),
+            "--heartbeat-path", str(heartbeat_path),
+            "--heartbeat-interval-seconds", "5",
+        ]
+    )
+
+    assert exit_code == 0
+    capsys.readouterr()
+    heartbeat = json.loads(heartbeat_path.read_text(encoding="utf-8"))
+    assert heartbeat["status"] == "completed"
+    assert heartbeat["metrics"] == {"processed": 1, "accepted": 0, "retried": 1, "dead_lettered": 0}
 
 
 def test_main_stats_never_constructs_provider_or_claims(tmp_path: Path, monkeypatch, capsys):
