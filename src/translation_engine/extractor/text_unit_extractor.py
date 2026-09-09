@@ -264,6 +264,11 @@ def analyze_segment_variance(segments: list[str]) -> dict[str, Any]:
 _ASPOSE_BRAND_PREFIX_RE = re.compile(r"^Aspose(?:\.[A-Za-z0-9]+)+")
 _TITLE_CASE_OR_CAPS_WORD_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$|^[A-Z]{2,}$")
 _LEADING_SEPARATOR_RE = re.compile(r"^[\s—–|:-]+")
+# Matches an optional "for <Platform>" clause immediately after the brand
+# token, before a separator+"Enterprise ..." tail -- see the carve-out in
+# _link_text_is_brand_navigation_label below. <Platform> covers the
+# portfolio's platform-name shapes (".NET", "C++", "Node.js", "Python", ...).
+_FOR_PLATFORM_RE = re.compile(r"^for\s+[A-Za-z0-9.][A-Za-z0-9.+#]*\s+")
 
 
 _WHOLE_LINK_RE = re.compile(r"^\[(?P<anchor>[^\]]+)\]\([^)]*\)$")
@@ -316,7 +321,32 @@ def _link_text_is_brand_navigation_label(text: str) -> bool:
     remainder = _LEADING_SEPARATOR_RE.sub("", text[match.end() :]).strip()
     if not remainder:
         return True
-    return all(_TITLE_CASE_OR_CAPS_WORD_RE.match(word) for word in remainder.split())
+    if all(_TITLE_CASE_OR_CAPS_WORD_RE.match(word) for word in remainder.split()):
+        return True
+    # 2026-09-10: "Aspose.X for <Platform> -- Enterprise <Suffix>" is ALSO a
+    # fixed nav-label/CTA shape (this exact link is the portfolio's "See
+    # Also"-footer / "Related Resources"-list CTA, appearing verbatim across
+    # many product/platform pages), not prose -- despite the lowercase "for"
+    # that the check above deliberately excludes for real sentences like
+    # "Aspose.3D FOSS for Java" (still correctly excluded here too: it has no
+    # "-- Enterprise" trigger, so it falls through to the final `return False`
+    # below exactly as before). Confirmed via two independent, portfolio-real
+    # failure modes, not guessed: wave24 (blog.aspose.org words/python)
+    # mistranslated the "Enterprise Product" tail into the target language
+    # (RB-006); wave25 (docs.aspose.org 3d/net/developer-guide, 4 pages) saw
+    # BOTH professionalize_llm and m2m100_418m repeatedly hallucinate/
+    # duplicate this exact "Aspose.3D for .NET -- Enterprise Documentation"
+    # link many times over in the same "## See Also" position (LinkValidator
+    # source_count=2 vs translation_count=13, identical failure across ar/cs/
+    # de and all 4 pages -- traced to this exact link via its n-gram hash,
+    # not assumed).
+    platform_match = _FOR_PLATFORM_RE.match(remainder)
+    if platform_match:
+        tail = _LEADING_SEPARATOR_RE.sub("", remainder[platform_match.end() :]).strip()
+        tail_words = tail.split()
+        if tail_words and tail_words[0] == "Enterprise":
+            return all(_TITLE_CASE_OR_CAPS_WORD_RE.match(word) for word in tail_words)
+    return False
 
 
 #: See the code comment at the call site in _is_non_translatable for the
