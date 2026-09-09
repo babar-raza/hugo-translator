@@ -20,6 +20,8 @@ from typing import Any
 import yaml
 
 from src.model_runtime.campaign_llm_policy import campaign_llm_scope
+from src.tm.rejected_task_queue import RejectedTaskQueue
+from src.tm.retry_records import RejectedTranslationTask
 from src.utils.atomic_write import atomic_write
 from src.utils.file_lock import FileLock
 from src.workers.content_commit_title import content_commit_title
@@ -266,6 +268,11 @@ class CampaignLedger:
 class CampaignRunner:
     """Execute only jobs enumerated by a pinned CampaignManifest."""
 
+    # TC-APT-046: retry budget handed to the dedicated, out-of-process
+    # Professionalize retry consumer for a deferred campaign's terminal
+    # heal ticket (src/workers/professionalize_retry_worker.py).
+    _DEFERRED_RETRY_BUDGET = 2
+
     _LOCALE_NAMES = {
         "ar": "Arabic",
         "cs": "Czech",
@@ -445,6 +452,43 @@ class CampaignRunner:
 
     def _llm_event(self, event):
         self.ledger._append(self.ledger.root / "llm_calls.jsonl", event)
+
+    # TC-APT-046: a deferred campaign's terminal heal ticket is also the
+    # dedicated retry consumer's only feed. Built lazily so campaigns that
+    # never open one (the immediate-mode majority) never create the file.
+    @property
+    def _rejected_task_queue(self) -> RejectedTaskQueue:
+        queue = getattr(self, "_rejected_task_queue_instance", None)
+        if queue is None:
+            queue = RejectedTaskQueue(self.ledger.root.parent / "rejected_tasks.sqlite3")
+            self._rejected_task_queue_instance = queue
+        return queue
+
+    def _enqueue_rejected_retry(
+        self,
+        *,
+        source: Any,
+        locale: str,
+        expected_output: str,
+        gate: str,
+        failure: dict[str, Any] | None,
+    ) -> None:
+        candidate_sha256 = str(failure.get("candidate_sha256") or "") if failure else ""
+        task = RejectedTranslationTask.from_mapping(
+            {
+                "campaign_id": self.manifest.campaign_id,
+                "site_id": getattr(source, "site_id", ""),
+                "source_path": source.source_path,
+                "output_path": expected_output,
+                "source_sha256": source.source_sha256,
+                "target_lang": locale,
+                "failure_category": f"auto:{gate}",
+                "failure_fingerprint": candidate_sha256 or f"auto:{gate}",
+                "retry_budget": self._DEFERRED_RETRY_BUDGET,
+                "model_target": str(self.manifest.retry_policy.get("llm_model") or "professionalize_llm"),
+            }
+        )
+        self._rejected_task_queue.enqueue(task)
 
     @contextmanager
     def _rollback_serialization(self):
@@ -2312,3 +2356,11 @@ class CampaignRunner:
         }
         heal_queue_path = self.ledger.root.parent / "heal_queue.jsonl"
         self.ledger._append(heal_queue_path, ticket)
+        if ticket["status"] == "QUEUED":
+            self._enqueue_rejected_retry(
+                source=source,
+                locale=locale,
+                expected_output=expected_output,
+                gate=gate,
+                failure=failure,
+            )

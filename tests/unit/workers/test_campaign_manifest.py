@@ -20,6 +20,7 @@ from src.workers.campaign_manifest import (
 from src.workers.campaign_runner import CampaignLedger, CampaignRunner
 from src.translation_engine.models import AcceptedTranslation
 from src.model_runtime.llm_providers import BaseLLMProvider
+from src.tm.rejected_task_queue import RejectedTaskQueue
 
 
 def _manifest(tmp_path: Path) -> dict:
@@ -1262,6 +1263,82 @@ def test_shard_failure_does_not_block_later_shard_commits(tmp_path, monkeypatch)
     ).stdout.splitlines()
     assert payload["sources"][0]["outputs"]["fr"] in changed
     assert payload["sources"][0]["outputs"]["es"] not in changed
+
+
+def test_deferred_terminal_heal_ticket_enqueues_rejected_retry_task(tmp_path):
+    """TC-APT-046: a deferred campaign's terminal heal ticket must also reach
+    the dedicated Professionalize retry consumer's queue -- otherwise the
+    consumer built in 64bb3bab has nothing feeding it in production."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "campaign@example.invalid"], cwd=repo, check=True
+    )
+    subprocess.run(["git", "config", "user.name", "Campaign Test"], cwd=repo, check=True)
+    source = repo / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    subprocess.run(["git", "add", str(source.relative_to(repo))], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=repo, check=True)
+
+    payload = _manifest(repo)
+    payload["target_locales"] = ["es"]
+    payload["expected_output_count"] = 1
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    payload["sources"][0]["outputs"] = {"es": "content/docs.aspose.org/es/words/net/page.md"}
+    payload["retry_policy"]["llm_escalation_mode"] = "deferred"
+    payload["retry_policy"]["llm_escalation_attempts"] = 0
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    output = repo / payload["sources"][0]["outputs"]["es"]
+
+    class Engine:
+        def __init__(self):
+            self.campaign_context = {}
+            self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
+            self.decision_engine = SimpleNamespace(max_retry_attempts=99)
+
+        def _get_output_path(self, _source, _locale, _profile):
+            return output
+
+        def translate_file(self, _site, _source, target_langs, **_kwargs):
+            return SimpleNamespace(
+                success=False,
+                acceptance_receipts={},
+                errors=["es rejected"],
+                retry_attempts=0,
+            )
+
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=Engine(),
+        translator_repo=repo,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch_verify = lambda **_kwargs: {**manifest.to_summary(), "accepted": 0, "remaining": 1}
+    runner.verify = monkeypatch_verify
+
+    summary = runner.run()
+
+    assert summary["status"] == "PARTIAL_WITH_TICKETS"
+    heal_queue_path = tmp_path / "ledger" / "heal_queue.jsonl"
+    tickets = [
+        json.loads(line) for line in heal_queue_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(tickets) == 1
+    assert tickets[0]["status"] == "QUEUED"
+
+    queue = RejectedTaskQueue(tmp_path / "ledger" / "rejected_tasks.sqlite3")
+    claimed = queue.claim("test-consumer")
+    assert len(claimed) == 1
+    _, task, _ = claimed[0]
+    assert task.campaign_id == "pilot"
+    assert task.source_path == payload["sources"][0]["source_path"]
+    assert task.target_lang == "es"
+    assert task.model_target == "professionalize_llm"
+    assert task.source_sha256 == sha256_file(source)
 
 
 def test_campaign_retry_feedback_accumulates_distinct_gate_instructions():
