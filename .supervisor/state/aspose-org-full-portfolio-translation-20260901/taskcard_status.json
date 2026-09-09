@@ -1430,26 +1430,15 @@
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [
   {
-   "run_id": "wave25-3d-net-devguide-llm-20260909",
-   "pid": 28160,
-   "manifest": "data/campaigns/manifests/wave25-3d-net-devguide-llm-20260909.yaml",
-   "purpose": "Normal strict-tier-order Tier-1a wave (breach resolved, back to baseline selection): 4 zero-translation docs.aspose.org 3d/net/developer-guide pages (deformers, gltf, profiles, render -- family template-siblings for TM leverage), 22 LLM-primary locales, wave_scale=4",
-   "log_stdout": "logs/wave25-3d-net-devguide-llm-20260909.out.log",
-   "log_stderr": "logs/wave25-3d-net-devguide-llm-20260909.err.log",
-   "launched_at": "2026-09-09T18:45:26+00:00",
+   "run_id": "wave25-3d-net-devguide-llm-20260909-r2",
+   "pid": 41888,
+   "manifest": "data/campaigns/manifests/wave25-3d-net-devguide-llm-20260909-r2.yaml",
+   "purpose": "Normal strict-tier-order Tier-1a wave (breach resolved, back to baseline selection): 4 zero-translation docs.aspose.org 3d/net/developer-guide pages (deformers, gltf, profiles, render -- family template-siblings for TM leverage), 22 LLM-primary locales, wave_scale=4. Retry of wave25-3d-net-devguide-llm-20260909 (PID 28160, dead) and wave25-3d-net-devguide-m2m-20260909 (PID 47600, dead) -- both crashed: launching LLM+m2m simultaneously raced for data/tm/.tm-leases/l2.lmdb/admission.lock (L2PersistentTM/EnvironmentLease is single-writer, matching max_parallel_jobs=1 -- LOST that race and hit EnvironmentBusy); the winner then hit 'translator repository SHA drift' because I committed active_detached_runs bookkeeping to hugo-translator immediately after Popen, moving HEAD before its own verify_environment call ran. LESSON: (1) never launch two campaign processes at once, even LLM+its own m2m companion -- the TM lease is exclusive, run them strictly sequentially; (2) never commit to the translator repo in the same breath as a Popen launch -- wait for confirmation the process is past verify_environment (e.g. no EnvironmentBusy/SHA-drift error within ~20s) before touching git.",
+   "log_stdout": "logs/wave25-3d-net-devguide-llm-20260909-r2.out.log",
+   "log_stderr": "logs/wave25-3d-net-devguide-llm-20260909-r2.err.log",
+   "launched_at": "2026-09-09T18:47:38+00:00",
    "status": "RUNNING",
-   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2"
-  },
-  {
-   "run_id": "wave25-3d-net-devguide-m2m-20260909",
-   "pid": 47600,
-   "manifest": "data/campaigns/manifests/wave25-3d-net-devguide-m2m-20260909.yaml",
-   "purpose": "wave25 companion: hu/ja/ro on m2m100_418m, same 4 pages",
-   "log_stdout": "logs/wave25-3d-net-devguide-m2m-20260909.out.log",
-   "log_stderr": "logs/wave25-3d-net-devguide-m2m-20260909.err.log",
-   "launched_at": "2026-09-09T18:45:26+00:00",
-   "status": "RUNNING",
-   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2"
+   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2; THEN (not concurrently) build+launch the m2m hu/ja/ro companion (data/campaigns/manifests/wave25-3d-net-devguide-m2m-20260909.yaml needs a fresh rebuild, sha/TM fingerprint will have drifted)"
   }
  ],
  "blocked_pending_clean_translator_repo": null,
