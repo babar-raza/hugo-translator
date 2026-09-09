@@ -1430,15 +1430,15 @@
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [
   {
-   "run_id": "wave26-barcode-llm-20260910-r2",
-   "pid": 42048,
-   "manifest": "data/campaigns/manifests/wave26-barcode-llm-20260910-r2.yaml",
-   "purpose": "wave26 (wave_scale=2, post-halving): blog.aspose.org/barcode/python/_index.md, 22 LLM-primary locales. Deliberately carries the just-fixed 'Aspose.BarCode -- Enterprise Blog' for-Platform-Enterprise-Suffix link as a bonus live check of commit 75bf700e on a fresh, uncomplicated page (no code blocks, unlike wave25; not the short words/python page that hit the language-purity issue).",
-   "log_stdout": "logs/wave26-barcode-llm-20260910-r2.out.log",
-   "log_stderr": "logs/wave26-barcode-llm-20260910-r2.err.log",
+   "run_id": "wave26-barcode-m2m-20260910",
+   "pid": 39000,
+   "manifest": "data/campaigns/manifests/wave26-barcode-m2m-20260910.yaml",
+   "purpose": "wave26 companion: barcode/python hu/ja/ro on m2m100_418m. LLM half (wave26-barcode-llm-20260910-r2) already COMPLETE: 22/22 accepted, 0 failed -- live-confirmed 'Aspose.BarCode -- Enterprise Blog' correctly preserved in English in the ar output. Review of the 22 LLM cells running in parallel (background subagent, not a translator-repo process, no lease conflict).",
+   "log_stdout": "logs/wave26-barcode-m2m-20260910.out.log",
+   "log_stderr": "logs/wave26-barcode-m2m-20260910.err.log",
    "launched_at": "2026-09-09T19:56:00+00:00",
    "status": "RUNNING",
-   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml (pay attention to whether the Enterprise Blog link is now correctly preserved in every locale); commit page-complete per plan section 19.2; THEN sequentially (never concurrently) build+launch: (1) the barcode/python m2m hu/ja/ro companion, (2) the docs.aspose.org/html/_index.md LLM wave (manifest not yet built), (3) its m2m companion"
+   "next_step_after_completion": "commit the 22 reviewed-approved LLM cells + the 3 m2m cells together (or separately if review finds any rejects) per plan section 19.2; THEN sequentially build+launch the docs.aspose.org/html/_index.md LLM wave (manifest already built: data/campaigns/manifests/wave26-html-llm-20260910.yaml) and its m2m companion"
   }
  ],
  "blocked_pending_clean_translator_repo": null,
