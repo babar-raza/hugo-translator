@@ -951,6 +951,21 @@ class L3SemanticTM:
             else:
                 self.metadata = []
 
+            # TM-02: rebuild entry_id -> position lookup from the loaded
+            # metadata. Without this, update_entry() can never find an entry
+            # that existed before this process started (it only sees
+            # positions recorded by add_entry() calls made in THIS session),
+            # so every reload silently disables in-place updates -- callers
+            # relying on "update if present, else add" (e.g. the TM
+            # improvement worker and TMIntentWriter.reconcile_l3()) would
+            # wrongly treat every on-disk entry as missing and append a
+            # duplicate vector for it via add_entry() instead of updating it.
+            self._entry_id_to_positions = {}
+            for position, entry in enumerate(self.metadata):
+                entry_id = entry.get("entry_id")
+                if entry_id is not None:
+                    self._entry_id_to_positions.setdefault(entry_id, []).append(position)
+
     def rebuild_index(self, entries: list[dict[str, Any]]) -> None:
         """
         Rebuild index from scratch with given entries.

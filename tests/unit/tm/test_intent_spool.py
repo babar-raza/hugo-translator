@@ -57,6 +57,59 @@ def test_reconcile_requeues_expired_claim_without_touching_applied_intent(tmp_pa
     assert second in [item["intent_id"] for item in spool.claim("recovery")]
 
 
+def test_reconcile_l3_repairs_applied_intent_missing_from_l3_without_duplicating_present_one(
+    tmp_path: Path,
+):
+    """A writer crash between spool.complete() and the batch's trailing
+    save_index() leaves the spool believing an L3 write landed when it never
+    reached disk. reconcile_l3() must restore exactly the missing entry and
+    leave an already-present one untouched (no duplicate vector)."""
+
+    class L2:
+        def store(self, **kwargs):
+            return True
+
+    class FakeL3:
+        def __init__(self, known):
+            self.known = set(known)
+            self.add_calls: list[str] = []
+            self.saved = False
+
+        def update_entry(self, entry_id, new_translation, new_metadata=None):
+            return entry_id in self.known
+
+        def add_entry(self, entry_id, **kwargs):
+            self.add_calls.append(entry_id)
+            self.known.add(entry_id)
+
+        def save_index(self):
+            self.saved = True
+
+    spool = TMIntentSpool(tmp_path / "intents.sqlite3")
+    missing_id = spool.enqueue(_payload("missing"))
+    present_id = spool.enqueue(_payload("present"))
+    for intent in spool.claim("crashed", limit=2):
+        spool.complete(intent["intent_id"], "crashed")
+    assert spool.stats() == {"PENDING": 0, "CLAIMED": 0, "APPLIED": 2}
+
+    present_entry_id = TMIntentWriter._l3_entry_id(_payload("present"))
+    missing_entry_id = TMIntentWriter._l3_entry_id(_payload("missing"))
+    l3 = FakeL3(known={present_entry_id})
+    writer = TMIntentWriter(spool, L2(), l3)
+
+    result = writer.reconcile_l3()
+    assert result == {"checked": 2, "repaired": 1}
+    assert l3.add_calls == [missing_entry_id]
+    assert l3.saved is True
+
+    # Re-running is a safe no-op: nothing left missing, nothing re-added.
+    l3.saved = False
+    assert writer.reconcile_l3() == {"checked": 2, "repaired": 0}
+    assert l3.add_calls == [missing_entry_id]
+    assert l3.saved is False
+    assert spool.stats() == {"PENDING": 0, "CLAIMED": 0, "APPLIED": 2}  # both remain APPLIED
+
+
 def test_batch_store_routes_to_spool_without_reader_side_l2_or_l3_mutation(tmp_path: Path):
     class L2:
         def batch_store(self, entries):

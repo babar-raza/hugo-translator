@@ -131,12 +131,36 @@ class TMIntentSpool:
         result.update({state: count for state, count in rows})
         return result
 
+    def applied_intents(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        """Return APPLIED intents (with their original payload) for reconciliation.
+
+        Unlike claim(), this is a read-only view that never changes state --
+        it exists so a reconciler can detect and repair an L3 update that a
+        writer crash left durably marked APPLIED in the spool but never
+        actually persisted to the L3 index (see TMIntentWriter.reconcile_l3).
+        """
+        query = "SELECT intent_id,payload FROM tm_intents WHERE state='APPLIED' ORDER BY created_at,intent_id"
+        params: tuple[Any, ...] = ()
+        if limit is not None:
+            query += " LIMIT ?"
+            params = (limit,)
+        with self._connect() as db:
+            rows = db.execute(query, params).fetchall()
+        return [{"intent_id": intent_id, **json.loads(payload)} for intent_id, payload in rows]
+
 
 class TMIntentWriter:
     """The only component permitted to mutate L2 and L3 from an intent spool."""
 
     def __init__(self, spool: TMIntentSpool, l2: Any, l3: Any | None = None) -> None:
         self.spool, self.l2, self.l3 = spool, l2, l3
+
+    @staticmethod
+    def _l3_entry_id(payload: dict[str, Any]) -> str:
+        return (
+            f"{payload['site_id']}:{payload['src_lang']}:{payload['tgt_lang']}:"
+            f"{hashlib.sha256(payload['text'].encode()).hexdigest()}"
+        )
 
     def run_once(
         self, *, limit: int = 50, owner: str | None = None, lease_seconds: float = 300
@@ -153,7 +177,7 @@ class TMIntentWriter:
                 stored = self.l2.store(**payload)
                 if stored and self.l3 is not None:
                     self.l3.add_entry(
-                        entry_id=f"{payload['site_id']}:{payload['src_lang']}:{payload['tgt_lang']}:{hashlib.sha256(payload['text'].encode()).hexdigest()}",
+                        entry_id=self._l3_entry_id(payload),
                         site_id=payload["site_id"],
                         src_lang=payload["src_lang"],
                         tgt_lang=payload["tgt_lang"],
@@ -170,3 +194,50 @@ class TMIntentWriter:
         if applied and self.l3 is not None and hasattr(self.l3, "save_index"):
             self.l3.save_index()
         return {"applied": applied, "failed": failed, **self.spool.stats()}
+
+    def reconcile_l3(self, *, limit: int | None = None) -> dict[str, int]:
+        """Repair L3 entries for intents the spool already marked APPLIED.
+
+        run_once() saves the L3 index once per batch, after its loop of
+        store()+add_entry()+complete() calls.  A writer crash after an
+        intent's spool.complete() but before that trailing save_index() call
+        leaves the spool durably believing an L3 update landed when the
+        crashed process's in-memory FAISS addition was actually lost --
+        never a duplicate (nothing else re-applies an APPLIED intent), but a
+        silent, permanent gap between L2/spool state and L3 with no
+        automatic repair. This scans already-APPLIED intents (their payload
+        survives completion) and, for each one, calls update_entry() first
+        so an entry that *was* durably saved is only refreshed -- never
+        given a second vector -- and falls back to add_entry() only for an
+        entry_id genuinely missing from L3. Safe to run at any time,
+        including when nothing is missing (a no-op pass).
+        """
+        if self.l3 is None:
+            return {"checked": 0, "repaired": 0}
+        checked = repaired = 0
+        for intent in self.spool.applied_intents(limit=limit):
+            checked += 1
+            payload = {
+                key: value
+                for key, value in intent.items()
+                if key not in {"intent_id", "schema_version"}
+            }
+            if not self.l3.update_entry(
+                entry_id=self._l3_entry_id(payload),
+                new_translation=payload["translation"],
+                new_metadata=payload.get("metadata"),
+            ):
+                self.l3.add_entry(
+                    entry_id=self._l3_entry_id(payload),
+                    site_id=payload["site_id"],
+                    src_lang=payload["src_lang"],
+                    tgt_lang=payload["tgt_lang"],
+                    source_text=payload["text"],
+                    translation=payload["translation"],
+                    context=payload.get("context"),
+                    metadata=payload.get("metadata"),
+                )
+                repaired += 1
+        if repaired and hasattr(self.l3, "save_index"):
+            self.l3.save_index()
+        return {"checked": checked, "repaired": repaired}

@@ -124,10 +124,24 @@ class TranslationWorker:
                 use_gpu=True  # TC-L3-002: GPU encode; CPU fallback built-in
             )
 
+            # TM-02: only enqueue validated write intents through the single
+            # canonical writer boundary when one is configured; otherwise
+            # retain legacy direct L2/L3 writes.
+            from src.tm.intent_spool import TMIntentSpool
+
+            _writer_cfg = _l2_cfg.get("tm_writer", {}) or {}
+            intent_spool = None
+            if _writer_cfg.get("enabled", False):
+                intent_spool = TMIntentSpool(
+                    Path(_writer_cfg.get("intent_spool_path", Path(self.tm_path) / "intent_spool.sqlite3"))
+                )
+                logger.info(f"TM writer boundary enabled: TMIntentSpool={intent_spool.path}")
+
             self.tm = TranslationMemory(
                 l1_cache=l1_cache,
                 l2_persistent=l2_persistent,
-                l3_semantic=l3_semantic
+                l3_semantic=l3_semantic,
+                intent_spool=intent_spool,
             )
             logger.info("Translation memory initialized")
 

@@ -26,6 +26,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--owner", default=None)
     parser.add_argument("--no-l3", action="store_true", help="Apply only L2; intended for recovery/testing.")
+    parser.add_argument(
+        "--reconcile",
+        action="store_true",
+        help=(
+            "Repair L3 entries for intents already marked APPLIED instead of "
+            "draining PENDING/expired-CLAIMED work. Recovers from a prior "
+            "writer crash between spool.complete() and the batch's trailing "
+            "save_index() call, without duplicating entries L3 already has."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -67,8 +77,11 @@ def main(argv: list[str] | None = None) -> int:
             from src.tm.l3_semantic import L3SemanticTM
 
             l3 = L3SemanticTM(index_path=root / "data" / "tm" / "l3_index", use_gpu=False)
-        result = TMIntentWriter(spool, l2, l3).run_once(
-            limit=limit, owner=args.owner, lease_seconds=float(config["lease_seconds"])
+        writer = TMIntentWriter(spool, l2, l3)
+        result = (
+            writer.reconcile_l3(limit=limit if args.limit is not None else None)
+            if args.reconcile
+            else writer.run_once(limit=limit, owner=args.owner, lease_seconds=float(config["lease_seconds"]))
         )
         print(json.dumps(result, sort_keys=True))
         return 0

@@ -2407,8 +2407,10 @@ def translate_site(args: argparse.Namespace) -> int:
         # Initialize TM layers (use reasonable defaults)
         l1_cache = L1Cache(max_size=10000)  # Default L1 cache size
 
-        from .tm.l2_persistent import L2_DB_NAME
         from src.tm import lmdb_registry as _lmdb_reg
+        from src.tm.intent_spool import TMIntentSpool
+
+        from .tm.l2_persistent import L2_DB_NAME
         _lmdb_reg.set_project_root(Path(__file__).parent.parent)
         _raw = config_service.get_config() if hasattr(config_service, "get_config") else {}
         _l2_max_mb = _raw.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
@@ -2426,10 +2428,22 @@ def translate_site(args: argparse.Namespace) -> int:
             except Exception as e:
                 logger.warning(f"L3 Semantic TM unavailable: {e}")
 
+        # TM-02: when a canonical single writer is configured, this CLI path
+        # (like the autonomous worker) must only enqueue validated write
+        # intents rather than mutate L2/L3 itself.
+        _writer_cfg = _raw.get("tm_writer", {}) or {}
+        intent_spool = None
+        if _writer_cfg.get("enabled", False):
+            intent_spool = TMIntentSpool(
+                Path(_writer_cfg.get("intent_spool_path", tm_data_dir / "intent_spool.sqlite3"))
+            )
+            logger.info(f"TM writer boundary enabled: TMIntentSpool={intent_spool.path}")
+
         tm = TranslationMemory(
             l1_cache=l1_cache,
             l2_persistent=l2_persistent,
             l3_semantic=l3_semantic,
+            intent_spool=intent_spool,
         )
 
         logger.info("Initializing Model Loader...")
