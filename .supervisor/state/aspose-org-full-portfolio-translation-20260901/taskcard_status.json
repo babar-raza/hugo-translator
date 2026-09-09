@@ -1425,23 +1425,17 @@
    ]
   }
  },
- "last_wake_summary": "Continued: both blockers cleared (peer's VR-01 GPU-admission commit 9466fdbf landed; the leftover taskcard note describing it was finalized verbatim in 73aacafd). ko/page retry (m2m100, wave24-heal-ko-page-retry-20260909-r3): rejected with an EMPTY diagnostic reason (all fields defaulted, same error_sha256 signature as the ar/words retry) -- both models now exhausted, heal-ticketed with a flagged Track-B observation (m2m100-path rejections may be losing verdict metadata the LLM-path GATE36 rejections carry). REVERIFIED the b801f275 RB-006 terminology fix against the exact originally-failing files (words/python x ar/hu/ja/ro) per plan SS10.1 step 2 -- and REVERTED it (fb91fbdc): all 4 cells hit write_gate.py 'Both existing (en) and new (en) are wrong language', a worse regression than the original defect. Root cause traced via a single-cell debug run with full stderr capture: governed_terms.py automatically feeds terminology.yaml's exact_matches into write_gate.py's language-detection signal-stripping, so the new terms were simultaneously never actually masked from the model (terminology.yaml alone is validation-only, per the file's own Document Object Model precedent -- needs a paired site-profile preserve_pattern) AND stripped from language-evidence text for these short, term-dominated units -- worst of both. Full diagnosis + next-step guidance recorded in heal_queue.jsonl (manual-wave24-blog-words-rb006-fix-attempt-reverted) so a future attempt implements both halves together and reverifies before trusting it. Lesson reinforced: the SS10.1 discipline of reverifying against the exact originally-failing files, not just a unit-level check, is why this got caught before it could regress already-correct content portfolio-wide on any future retrigger. cells_committed_total still 385 (no new commits this segment). Full detail: data/summaries/wave24-blog-lowdensity-llm-commit-20260909.json.",
+ "last_wake_summary": "Continued: launched wave25 (4 zero-translation docs.aspose.org 3d/net/developer-guide pages, back to normal strict-tier-order since the breach was resolved). It hit 0% acceptance across ar+cs fully quarantined (RepetitionDetectorValidator) before I stopped it (SIGTERM, freed the TM lease deliberately rather than burn through 19 more locales blindly). Root-caused via sha256 3-gram matching against the real source: all failures traced to ONE shared template link, 'Aspose.3D for .NET -- Enterprise Documentation' (## See Also footer, identical across all 4 pages), which both models hallucinate/duplicate ~13x. Fixed the real gap: this link shape ('Aspose.X for <Platform> -- Enterprise <Suffix>') was never recognized as a protected brand-nav-label (lowercase 'for' connector defeated the existing check) -- extended text_unit_extractor.py with a narrow carve-out (commit 75bf700e, 13 new regression tests, 739 total unit+regression tests pass). Live-reverified against BOTH originally-failing cell sets per plan SS10.1 step 2: fix is correct (do_not_translate=True now confirmed set) but does NOT fully unblock either -- wave25 still fails identically (model hallucinates NEW copies elsewhere regardless of the original's protection status -- a generation-time issue, not an extraction gap) and wave24 words/python now hits the SAME 'both wrong language: en' symptom the earlier reverted terminology.yaml fix also produced (likely the short Related-Resources section's aggregate language-purity ratio tipping once the link is fully protected, not yet confirmed with a live text read). Kept the fix (it's independently correct and tested); quarantined both wave families from further blind retry pending separate follow-up investigation (heal_queue.jsonl manual-brand-nav-fix-75bf700e-status-both-waves). Released the 4 wave25 page claims. cells_committed_total still 385 (no new commits this segment -- this iteration was entirely root-cause/fix/verify work). wave_scale halved 4->2 (wave25 acceptance 0% < 60%, plan SS0.9 STEP-UP/DOWN rule).",
  "cells_committed_total": 385,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [
-  {
-   "run_id": "wave25-3d-net-devguide-llm-20260909-r2",
-   "pid": 41888,
-   "status": "STOPPED (deliberately, SIGTERM) 2026-09-10T00:19Z -- 0/N accepted after ar (4/4 quarantined) + cs (4/4 quarantined) + de (starting the same pattern), all on RepetitionDetectorValidator. Killed to free the exclusive TM lease for live investigation rather than burn through 19 more locales blindly (plan section 10.1: stop after the pattern is clear, first-principles before attempt 3). CONFIRMED root cause (not the validator, see fix commit 75bf700e): the '## See Also' footer link 'Aspose.3D for .NET -- Enterprise Documentation' -- shared verbatim across all 4 pages -- was never protected as a nav-label (lowercase 'for' connector defeated the brand-navigation-label check), so both models hallucinated/duplicated it ~13x instead of copying it once. Fixed in text_unit_extractor.py; live reverification against these exact cells is the immediate next step."
-  }
- ],
+ "active_detached_runs": [],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
-  "value": 4,
-  "previous": 2,
-  "stepped_at": "2026-09-06T12:25:00+00:00",
-  "decision": "STEP UP 2 -> 4 per plan SS0.9/TC-APT-080",
-  "trigger": "wave2 closed at 71/74 attempted (95.9%, aggregating email/net recovery + email/cpp + email/python) >=80%; RECURRENCE gate clear; KPI 165 >= floor 25",
+  "value": 2,
+  "previous": 4,
+  "stepped_at": "2026-09-10T00:19:00+00:00",
+  "decision": "HALVE 4 -> 2 per plan SS0.9/TC-APT-080",
+  "trigger": "wave25 (3d/net/developer-guide, docs.aspose.org) closed at 0% acceptance (0/N across ar+cs fully quarantined before stopping the run) -- below the 60% floor",
   "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
  },
  "capacity_clause": {
