@@ -1401,7 +1401,32 @@
  "last_wake_summary": "Continued: dove deeper into the emphasis-exclusion investigation (found + fixed the nested-placeholder root cause via pattern ordering, validated clean across effectively all of blog.aspose.org + 3/5 other sites -- but found 2 MORE distinct block-structure failure modes, blockquote-multi-paragraph and table-row collapse -- correctly still deferred, documented precisely for a proper multi-stage landing). Then shipped barcode-rendering-svg-png-python 0->18/25 (f7a13b623c), the healthiest wave in several iterations -- 7 heal tickets filed (2 cross-locale zh/ja frontmatter residual, others isolated). TM purged. cells_committed_total now 292.",
  "cells_committed_total": 292,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "run_id": "wave23-cells-go-llm-20260909",
+   "pid": 44792,
+   "manifest": "data/campaigns/manifests/wave23-cells-go-llm-20260909.yaml",
+   "purpose": "TC-APT-046 step 2 canary: max_parallel_jobs=4, --no-force-serialize, 4-page docs.aspose.org/cells/go family batch, 22 LLM-primary locales",
+   "log_stdout": "logs/wave23-cells-go-llm-20260909.out.log",
+   "log_stderr": "logs/wave23-cells-go-llm-20260909.err.log",
+   "launched_at": "2026-09-09T13:53:30+00:00",
+   "status": "RUNNING",
+   "note": "two earlier launch attempts (PID 50464, 57588) failed instantly on translator-repo dirty-check races (own state-file edits mid-launch); fixed by never touching tracked files between Start-Process and confirmed progress in the log",
+   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2"
+  },
+  {
+   "run_id": "wave23-cells-go-m2m-20260909",
+   "pid": 54096,
+   "manifest": "data/campaigns/manifests/wave23-cells-go-m2m-20260909.yaml",
+   "purpose": "TC-APT-046 step 2 canary companion run: hu/ja/ro on m2m100_418m, same 4-page family, max_parallel_jobs=4",
+   "log_stdout": "logs/wave23-cells-go-m2m-20260909.out.log",
+   "log_stderr": "logs/wave23-cells-go-m2m-20260909.err.log",
+   "launched_at": "2026-09-09T13:53:59+00:00",
+   "status": "RUNNING",
+   "note": "hu already showing expected retry/quarantine behavior on _index.md (language_detection + GATE36 fidelity fail) -- normal healing path, not a crash",
+   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2"
+  }
+ ],
  "wave_scale": {
   "value": 4,
   "previous": 2,
