@@ -1428,7 +1428,30 @@
  "last_wake_summary": "Continued: both blockers cleared (peer's VR-01 GPU-admission commit 9466fdbf landed; the leftover taskcard note describing it was finalized verbatim in 73aacafd). ko/page retry (m2m100, wave24-heal-ko-page-retry-20260909-r3): rejected with an EMPTY diagnostic reason (all fields defaulted, same error_sha256 signature as the ar/words retry) -- both models now exhausted, heal-ticketed with a flagged Track-B observation (m2m100-path rejections may be losing verdict metadata the LLM-path GATE36 rejections carry). REVERIFIED the b801f275 RB-006 terminology fix against the exact originally-failing files (words/python x ar/hu/ja/ro) per plan SS10.1 step 2 -- and REVERTED it (fb91fbdc): all 4 cells hit write_gate.py 'Both existing (en) and new (en) are wrong language', a worse regression than the original defect. Root cause traced via a single-cell debug run with full stderr capture: governed_terms.py automatically feeds terminology.yaml's exact_matches into write_gate.py's language-detection signal-stripping, so the new terms were simultaneously never actually masked from the model (terminology.yaml alone is validation-only, per the file's own Document Object Model precedent -- needs a paired site-profile preserve_pattern) AND stripped from language-evidence text for these short, term-dominated units -- worst of both. Full diagnosis + next-step guidance recorded in heal_queue.jsonl (manual-wave24-blog-words-rb006-fix-attempt-reverted) so a future attempt implements both halves together and reverifies before trusting it. Lesson reinforced: the SS10.1 discipline of reverifying against the exact originally-failing files, not just a unit-level check, is why this got caught before it could regress already-correct content portfolio-wide on any future retrigger. cells_committed_total still 385 (no new commits this segment). Full detail: data/summaries/wave24-blog-lowdensity-llm-commit-20260909.json.",
  "cells_committed_total": 385,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "run_id": "wave25-3d-net-devguide-llm-20260909",
+   "pid": 28160,
+   "manifest": "data/campaigns/manifests/wave25-3d-net-devguide-llm-20260909.yaml",
+   "purpose": "Normal strict-tier-order Tier-1a wave (breach resolved, back to baseline selection): 4 zero-translation docs.aspose.org 3d/net/developer-guide pages (deformers, gltf, profiles, render -- family template-siblings for TM leverage), 22 LLM-primary locales, wave_scale=4",
+   "log_stdout": "logs/wave25-3d-net-devguide-llm-20260909.out.log",
+   "log_stderr": "logs/wave25-3d-net-devguide-llm-20260909.err.log",
+   "launched_at": "2026-09-09T18:45:26+00:00",
+   "status": "RUNNING",
+   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2"
+  },
+  {
+   "run_id": "wave25-3d-net-devguide-m2m-20260909",
+   "pid": 47600,
+   "manifest": "data/campaigns/manifests/wave25-3d-net-devguide-m2m-20260909.yaml",
+   "purpose": "wave25 companion: hu/ja/ro on m2m100_418m, same 4 pages",
+   "log_stdout": "logs/wave25-3d-net-devguide-m2m-20260909.out.log",
+   "log_stderr": "logs/wave25-3d-net-devguide-m2m-20260909.err.log",
+   "launched_at": "2026-09-09T18:45:26+00:00",
+   "status": "RUNNING",
+   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2"
+  }
+ ],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 4,
