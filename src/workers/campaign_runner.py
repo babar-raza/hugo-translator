@@ -244,11 +244,116 @@ class CampaignLedger:
                 model["provider_error"] += 1
             else:
                 model["rejected"] += 1
-        for ticket in self._read_jsonl(self.root.parent / "heal_queue.jsonl"):
-            if ticket.get("campaign_id") != self.root.name:
-                continue
-            bucket(str(ticket.get("processing_model") or "unknown"))["queued"] += 1
+        retry_outcomes = self.retry_queue_outcomes()
+        # A deferred campaign writes a human-facing heal ticket *and* its
+        # canonical SQLite retry task.  Once the latter exists it is the
+        # lifecycle authority; counting both would leave an ACCEPTED retry
+        # falsely reported as still queued.
+        if not retry_outcomes:
+            for ticket in self._read_jsonl(self.root.parent / "heal_queue.jsonl"):
+                if ticket.get("campaign_id") != self.root.name:
+                    continue
+                bucket(str(ticket.get("processing_model") or "unknown"))["queued"] += 1
+        for outcome in retry_outcomes:
+            counts = bucket(str(outcome["model_target"]))
+            if outcome["state"] == "ACCEPTED":
+                counts["accepted"] += 1
+            elif outcome["state"] in {"QUEUED", "CLAIMED"}:
+                counts["queued"] += 1
+            elif outcome["state"] == "DEAD_LETTER":
+                counts["rejected"] += 1
         return dict(sorted(outcomes.items()))
+
+    def retry_queue_outcomes(self) -> list[dict[str, Any]]:
+        """Read deferred retry dispositions for this campaign, if its queue exists."""
+        path = self.root.parent / "rejected_tasks.sqlite3"
+        if not path.is_file():
+            return []
+        return RejectedTaskQueue(path).campaign_outcomes(self.root.name)
+
+    def attempt_model_outcomes(self) -> dict[str, dict[str, dict[str, int]]]:
+        """Return active-campaign, candidate-free outcomes by model and attempt.
+
+        Failure metadata is append-only: a duplicate-retry suppression can add a
+        second row for the same invocation.  Count each ``job_id``/attempt/model
+        tuple once so summary counters describe provider/model attempts rather
+        than ledger writes.  Older receipts without the additive attempt fields
+        remain readable under ``unknown``.
+        """
+        outcomes: dict[str, dict[str, dict[str, int]]] = {}
+
+        def bucket(model_id: str, attempt: int | str) -> dict[str, int]:
+            return outcomes.setdefault(model_id or "unknown", {}).setdefault(
+                str(attempt),
+                {"attempted": 0, "accepted": 0, "rejected": 0, "provider_error": 0},
+            )
+
+        seen: set[tuple[str, str, str]] = set()
+        for failure in self._read_jsonl(self.failures_path):
+            model_id = str(failure.get("model_id") or "unknown")
+            attempt = str(failure.get("attempt") if failure.get("attempt") is not None else "unknown")
+            key = (str(failure.get("job_id") or failure.get("output_path") or "unknown"), attempt, model_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            counts = bucket(model_id, attempt)
+            counts["attempted"] += 1
+            if str(failure.get("gate")) == "campaign_job_exception":
+                counts["provider_error"] += 1
+            else:
+                counts["rejected"] += 1
+
+        for receipt in self.receipts().values():
+            model_id = str(
+                receipt.get("attempt_model_id") or receipt.get("model_fingerprint") or "unknown"
+            )
+            attempt = str(receipt.get("campaign_attempt") if receipt.get("campaign_attempt") is not None else "unknown")
+            key = (str(receipt.get("output_path") or "unknown"), attempt, model_id)
+            counts = bucket(model_id, attempt)
+            # A receipt may follow failure metadata for the same invocation
+            # only in malformed legacy artifacts.  Do not inflate attempts.
+            if key not in seen:
+                seen.add(key)
+                counts["attempted"] += 1
+            counts["accepted"] += 1
+
+        return {
+            model_id: {attempt: dict(counts) for attempt, counts in sorted(by_attempt.items())}
+            for model_id, by_attempt in sorted(outcomes.items())
+        }
+
+    def zero_acceptance_recommendations(
+        self,
+        *,
+        warning_after_attempts: int,
+        stop_recommendation_after_attempts: int,
+    ) -> dict[str, Any]:
+        """Return advisory systemic-failure recommendations; never stop a run."""
+        if warning_after_attempts < 1 or stop_recommendation_after_attempts < warning_after_attempts:
+            raise ValueError("zero-acceptance thresholds must be positive and ordered")
+        recommendations: list[dict[str, Any]] = []
+        for model_id, by_attempt in self.attempt_model_outcomes().items():
+            attempted = sum(counts["attempted"] for counts in by_attempt.values())
+            accepted = sum(counts["accepted"] for counts in by_attempt.values())
+            if attempted < warning_after_attempts or accepted:
+                continue
+            recommendations.append(
+                {
+                    "model_id": model_id,
+                    "attempted": attempted,
+                    "accepted": accepted,
+                    "recommendation": (
+                        "recommend_pause_and_investigate"
+                        if attempted >= stop_recommendation_after_attempts
+                        else "warn_and_continue"
+                    ),
+                }
+            )
+        return {
+            "warning_after_attempts": warning_after_attempts,
+            "stop_recommendation_after_attempts": stop_recommendation_after_attempts,
+            "recommendations": recommendations,
+        }
 
     def llm_call_outcomes(self) -> dict[str, dict[str, int]]:
         """Summarize policy-accounted LLM calls without candidate payloads."""
@@ -717,7 +822,50 @@ class CampaignRunner:
         superseded = replacing.get(normalized["output_path"])
         if superseded:
             normalized["superseded_sha256"] = superseded
+        # The engine owns receipt creation and deliberately has no campaign
+        # attempt arguments.  The runner keeps this output-addressed mapping
+        # under its state lock so concurrent jobs cannot attribute a receipt to
+        # another job.  The fields are additive and legacy receipt readers
+        # continue to work when they are absent.
+        metadata = (
+            getattr(self.engine, "campaign_context", {})
+            .get("attempt_metadata_by_output", {})
+            .get(str(Path(receipt["output_path"]).resolve()))
+        )
+        if metadata:
+            normalized.update(metadata)
         self.ledger.append_receipt(normalized)
+
+    def _quality_stop_recommendations(self) -> dict[str, Any]:
+        """Read fail-safe advisory thresholds once for campaign summary evidence."""
+        try:
+            from src.utils.config_loader import get_global_config
+
+            raw = get_global_config().get("campaign_quality", {}) or {}
+            warning_after = int(raw.get("zero_acceptance_warning_after_attempts", 1))
+            stop_after = int(raw.get("zero_acceptance_stop_recommendation_after_attempts", 3))
+            hardware = get_global_config().get("hardware", {}) or {}
+            vram_budget = hardware.get("max_gpu_memory_percent")
+            result = self.ledger.zero_acceptance_recommendations(
+                warning_after_attempts=warning_after,
+                stop_recommendation_after_attempts=stop_after,
+            )
+            result["vram_budget_percent"] = vram_budget
+            return result
+        except (TypeError, ValueError):
+            # A malformed operator threshold must not silently terminate a
+            # campaign. Surface it as evidence and continue its unrelated work.
+            return {"configuration_error": "invalid campaign_quality zero-acceptance thresholds"}
+
+    def _summary_evidence(self) -> dict[str, Any]:
+        """Shared, payload-free evidence for run and verify-only summaries."""
+        return {
+            "model_outcomes": self.ledger.model_outcomes(),
+            "retry_queue_outcomes": self.ledger.retry_queue_outcomes(),
+            "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
+            "quality_stop_recommendations": self._quality_stop_recommendations(),
+            "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+        }
 
     def _unreplaced_declaration(self, source: Any, locale: str, relative: str) -> bool:
         """TC-APT-031: True when ``relative`` is a declared replacement whose current bytes
@@ -1922,6 +2070,9 @@ class CampaignRunner:
             if feedback_by_output is None:
                 feedback_by_output = {}
                 self.engine._campaign_retry_feedback_by_output = feedback_by_output
+            attempt_metadata_by_output = self.engine.campaign_context.setdefault(
+                "attempt_metadata_by_output", {}
+            )
 
         # The primary invocation owns initial output plus its two guided
         # retries.  LLM escalation has exactly two one-attempt invocations.
@@ -1958,6 +2109,10 @@ class CampaignRunner:
                         llm_paths.add(resolved_output)
                     if next_feedback:
                         feedback_by_output[resolved_output] = next_feedback
+                    attempt_metadata_by_output[resolved_output] = {
+                        "campaign_attempt": attempt_number,
+                        "attempt_model_id": phase_model_id,
+                    }
                 translate_kwargs = {
                     "target_langs": [locale],
                     "validate": True,
@@ -2086,6 +2241,7 @@ class CampaignRunner:
             with self._engine_campaign_state_lock:
                 llm_paths.discard(resolved_output)
                 feedback_by_output.pop(resolved_output, None)
+                attempt_metadata_by_output.pop(resolved_output, None)
                 if declared:
                     (self.engine.campaign_context.get("replace_existing") or {}).pop(
                         expected_output, None
@@ -2170,7 +2326,7 @@ class CampaignRunner:
     ) -> dict[str, Any]:
         summary = self.verify(resume=resume)
         if verify_only:
-            self.ledger.write_summary({**summary, "status": "VERIFIED"})
+            self.ledger.write_summary({**summary, **self._summary_evidence(), "status": "VERIFIED"})
             return summary
 
         # TC-APT-021: model-identity canary before new LLM work (cadence-gated).
@@ -2256,6 +2412,8 @@ class CampaignRunner:
                     "accepted": accepted,
                     "failed": failed,
                     "model_outcomes": self.ledger.model_outcomes(),
+                    "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
+                    "quality_stop_recommendations": self._quality_stop_recommendations(),
                     "llm_call_outcomes": self.ledger.llm_call_outcomes(),
                 }
             )
@@ -2274,6 +2432,8 @@ class CampaignRunner:
                         "accepted": accepted,
                         "failed": failed,
                         "model_outcomes": self.ledger.model_outcomes(),
+                        "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
+                        "quality_stop_recommendations": self._quality_stop_recommendations(),
                         "llm_call_outcomes": self.ledger.llm_call_outcomes(),
                     }
                 )
@@ -2286,6 +2446,8 @@ class CampaignRunner:
             "failed_shard_ids": failed_shard_ids,
             "remaining": self.manifest.expected_output_count - accepted,
             "model_outcomes": self.ledger.model_outcomes(),
+            "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
+            "quality_stop_recommendations": self._quality_stop_recommendations(),
             "llm_call_outcomes": self.ledger.llm_call_outcomes(),
             "status": (
                 "SHARD_SET_COMPLETE"

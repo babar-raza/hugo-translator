@@ -646,6 +646,36 @@ tm_improvement:
     preflight_check: true  # Check GPU usage before starting run
     abort_on_high_usage: true  # Abort run if GPU already >=50% at start
 
+# Claim-safe Professionalize consumer for rejected M2M output.  It does not
+# load CUDA models, so configured live retries can overlap M2M translation.
+# Keep live_mode false until the worker is registered and monitored.
+professionalize_retry:
+  enabled: false
+  live_mode: false
+  queue_path: "data/campaigns/rejected_tasks.sqlite3"
+  intent_spool_path: "data/tm/intent_spool.sqlite3"
+  model_id: "professionalize_llm"
+  concurrency: 1
+  limit: 1
+  lease_seconds: 300
+
+# Single-writer TM boundary.  Keep disabled until the writer process is
+# deployed; when enabled, reader workers enqueue validated intents and never
+# mutate canonical L2/L3 directly.
+tm_writer:
+  enabled: false
+  intent_spool_path: "data/tm/intent_spool.sqlite3"
+  l3_enabled: true
+  batch_limit: 50
+  lease_seconds: 300
+
+# Campaign summaries remain advisory: systemic zero acceptance never stops
+# other shards.  These bounded thresholds only emit a machine-readable
+# recommendation for operators to investigate the affected model.
+campaign_quality:
+  zero_acceptance_warning_after_attempts: 1
+  zero_acceptance_stop_recommendation_after_attempts: 3
+
 # Validation defaults
 validation_defaults:
   mode: "normal"  # Validation mode: strict, normal, lenient

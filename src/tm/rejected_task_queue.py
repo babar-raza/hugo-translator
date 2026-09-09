@@ -110,6 +110,24 @@ class RejectedTaskQueue:
     def dead_letter(self, task_id: str, owner: str, code: str) -> None:
         self._terminal(task_id, owner, "DEAD_LETTER", error_code=code)
 
+    def operator_dead_letter(self, task_id: str, code: str) -> None:
+        """Safely terminate queued/claimed work during operator recovery.
+
+        This deliberately refuses accepted and already terminal work, preserving
+        its receipt as immutable evidence.  No task payload is returned.
+        """
+        code = str(code).strip()
+        if not code or len(code) > 120:
+            raise ValueError("dead-letter reason must be 1..120 characters")
+        with self._connect() as db:
+            changed = db.execute(
+                "UPDATE rejected_tasks SET state='DEAD_LETTER',claim_owner=NULL,claim_until=NULL,"
+                "error_code=?,updated_at=? WHERE task_id=? AND state IN ('QUEUED','CLAIMED')",
+                (code, time.time(), task_id),
+            ).rowcount
+        if changed != 1:
+            raise RuntimeError("task is absent or already terminal")
+
     def attach_intent(self, task_id: str, intent_id: str) -> None:
         """Attach the post-receipt TM intent correlation without candidate bytes."""
         with self._connect() as db:
@@ -136,6 +154,16 @@ class RejectedTaskQueue:
         if changed != 1:
             raise RuntimeError("retry task is not owned by this consumer")
 
+    def requeue_expired_claims(self, *, now: float | None = None) -> int:
+        """Return abandoned consumer claims to QUEUED without changing attempts."""
+        now = time.time() if now is None else now
+        with self._connect() as db:
+            return db.execute(
+                "UPDATE rejected_tasks SET state='QUEUED',claim_owner=NULL,claim_until=NULL,updated_at=? "
+                "WHERE state='CLAIMED' AND claim_until < ?",
+                (now, now),
+            ).rowcount
+
     def _terminal(self, task_id: str, owner: str, state: str, *, receipt: dict[str, Any] | None = None, error_code: str | None = None) -> None:
         now = time.time()
         with self._connect() as db:
@@ -154,9 +182,55 @@ class RejectedTaskQueue:
             return None
         return {"state": row[0], "attempts": row[1], "error_code": row[2], "receipt": json.loads(row[3]) if row[3] else None}
 
+    def campaign_outcomes(self, campaign_id: str) -> list[dict[str, Any]]:
+        """Return payload-free terminal/active outcome metadata for one campaign.
+
+        This is deliberately an aggregation boundary, not an inspection API:
+        source paths, failure detail, and accepted candidate bytes stay out of
+        campaign summaries.  It lets the originating campaign account for a
+        deferred Professionalize result from its durable terminal receipt.
+        """
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT task_id,payload,state,attempts,error_code,receipt FROM rejected_tasks"
+            ).fetchall()
+        outcomes: list[dict[str, Any]] = []
+        for task_id, payload_raw, state, attempts, error_code, receipt_raw in rows:
+            payload = json.loads(payload_raw)
+            if payload.get("campaign_id") != campaign_id:
+                continue
+            receipt = json.loads(receipt_raw) if receipt_raw else {}
+            outcomes.append(
+                {
+                    "task_id": task_id,
+                    "state": state,
+                    "attempts": attempts,
+                    "error_code": error_code,
+                    "model_target": str(payload.get("model_target") or "unknown"),
+                    "receipt_id": receipt.get("receipt_id"),
+                }
+            )
+        return sorted(outcomes, key=lambda row: str(row["task_id"]))
+
     def stats(self) -> dict[str, int]:
         with self._connect() as db:
             rows = db.execute("SELECT state,COUNT(*) FROM rejected_tasks GROUP BY state").fetchall()
         stats = {"QUEUED": 0, "CLAIMED": 0, "ACCEPTED": 0, "DEAD_LETTER": 0}
         stats.update(dict(rows))
         return stats
+
+    def health(self, *, now: float | None = None) -> dict[str, int | float | None]:
+        """Return payload-free operational state without scanning task content."""
+        now = time.time() if now is None else now
+        with self._connect() as db:
+            oldest = db.execute(
+                "SELECT MIN(created_at) FROM rejected_tasks WHERE state IN ('QUEUED','CLAIMED')"
+            ).fetchone()[0]
+            expired = db.execute(
+                "SELECT COUNT(*) FROM rejected_tasks WHERE state='CLAIMED' AND claim_until < ?", (now,)
+            ).fetchone()[0]
+        return {
+            **self.stats(),
+            "oldest_active_age_seconds": round(max(0.0, now - oldest), 3) if oldest else None,
+            "expired_claims": int(expired),
+        }

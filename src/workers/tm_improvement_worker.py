@@ -20,7 +20,7 @@ import signal
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -1177,7 +1177,7 @@ class TMImprovementWorker:
             # Store improved translation back to TM with force_update=True
             metadata = {
                 "improved_by": "tm_improvement_worker",
-                "improved_at": datetime.utcnow().isoformat(),
+                "improved_at": datetime.now(timezone.utc).isoformat(),
                 "previous_hash": previous_hash,
                 "previous_translation": candidate.translation,
                 "llm_provider": self.config.llm_provider,

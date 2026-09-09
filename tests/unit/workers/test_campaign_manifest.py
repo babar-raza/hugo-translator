@@ -21,6 +21,7 @@ from src.workers.campaign_runner import CampaignLedger, CampaignRunner
 from src.translation_engine.models import AcceptedTranslation
 from src.model_runtime.llm_providers import BaseLLMProvider
 from src.tm.rejected_task_queue import RejectedTaskQueue
+from src.tm.retry_records import RejectedTranslationTask
 
 
 def _manifest(tmp_path: Path) -> dict:
@@ -132,6 +133,31 @@ def test_deferred_campaign_skips_identity_provider_call(tmp_path):
         "reason": "llm_escalation_mode=deferred",
         "cadence": "deferred",
     }
+
+
+def test_verify_only_summary_has_outcomes_without_provider_or_translation(tmp_path, monkeypatch):
+    payload = _manifest(tmp_path)
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    engine = SimpleNamespace(campaign_context={})
+    runner = CampaignRunner(
+        manifest=CampaignManifest.load(manifest_path),
+        translation_engine=engine,
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(
+        runner, "verify", lambda **_kwargs: {"campaign_id": "pilot", "accepted": 0, "remaining": 2}
+    )
+
+    summary = runner.run(verify_only=True)
+
+    assert summary == {"campaign_id": "pilot", "accepted": 0, "remaining": 2}
+    artifact = json.loads(runner.ledger.summary_path.read_text(encoding="utf-8"))
+    assert artifact["status"] == "VERIFIED"
+    assert artifact["model_outcomes"] == {}
+    assert artifact["attempt_model_outcomes"] == {}
+    assert artifact["llm_call_outcomes"] == {}
 
 
 def test_manifest_accepts_1_2b_m2m_for_deferred_queue(tmp_path):
@@ -443,6 +469,22 @@ def test_model_outcomes_are_campaign_scoped_and_candidate_free(tmp_path):
         tmp_path / "heal_queue.jsonl",
         {"campaign_id": "old", "processing_model": "professionalize_llm", "status": "QUEUED"},
     )
+    CampaignLedger(tmp_path, "historical").append_receipt(
+        {"output_path": "fr/old-page.md", "model_fingerprint": "professionalize_llm"}
+    )
+    retry_queue = RejectedTaskQueue(tmp_path / "rejected_tasks.sqlite3")
+    deferred = RejectedTranslationTask.from_mapping(
+        {
+            "campaign_id": "active", "site_id": "docs.aspose.org",
+            "source_path": "content/en/page.md", "output_path": "content/de/page.md",
+            "source_sha256": "a" * 64, "target_lang": "de",
+            "failure_category": "structure", "failure_fingerprint": "fingerprint",
+            "retry_budget": 2, "model_target": "professionalize_llm",
+        }
+    )
+    task_id = retry_queue.enqueue(deferred)
+    retry_queue.claim("consumer")
+    retry_queue.accepted(task_id, "consumer", {"receipt_id": "retry-receipt"})
 
     outcomes = ledger.model_outcomes()
 
@@ -452,7 +494,97 @@ def test_model_outcomes_are_campaign_scoped_and_candidate_free(tmp_path):
         "provider_error": 0,
         "queued": 0,
     }
-    assert outcomes["professionalize_llm"]["queued"] == 1
+    # The canonical SQLite task supersedes the human-facing heal-ticket row;
+    # an accepted deferred retry must not remain falsely counted as queued.
+    assert outcomes["professionalize_llm"]["queued"] == 0
+    assert outcomes["professionalize_llm"]["accepted"] == 1
+    assert ledger.retry_queue_outcomes() == [
+        {
+            "task_id": task_id,
+            "state": "ACCEPTED",
+            "attempts": 1,
+            "error_code": None,
+            "model_target": "professionalize_llm",
+            "receipt_id": "retry-receipt",
+        }
+    ]
+
+
+def test_attempt_model_outcomes_deduplicate_terminal_failure_rows_and_warn(tmp_path):
+    ledger = CampaignLedger(tmp_path, "active")
+    ledger.append_failure(
+        source_path="source.md",
+        output_path="de/page.md",
+        target_lang="de",
+        error="gate failed",
+        attempt=1,
+        job_id="shard::source.md::de",
+        model_id="m2m100_418m",
+        gate="StructureValidator",
+    )
+    # Audit-only duplicate suppression must not count as a second paid/model attempt.
+    ledger.append_failure(
+        source_path="source.md",
+        output_path="de/page.md",
+        target_lang="de",
+        error="duplicate fingerprint",
+        attempt=1,
+        job_id="shard::source.md::de",
+        model_id="m2m100_418m",
+        gate="duplicate_retry_suppressed",
+    )
+    ledger.append_receipt(
+        {
+            "output_path": "fr/page.md",
+            "model_fingerprint": "professionalize_llm",
+            "attempt_model_id": "professionalize_llm",
+            "campaign_attempt": 4,
+        }
+    )
+
+    expected = {
+        "m2m100_418m": {
+            "1": {"attempted": 1, "accepted": 0, "rejected": 1, "provider_error": 0}
+        },
+        "professionalize_llm": {
+            "4": {"attempted": 1, "accepted": 1, "rejected": 0, "provider_error": 0}
+        },
+    }
+    assert ledger.attempt_model_outcomes() == expected
+    # Re-opening the durable ledger is the resumed-campaign aggregation path.
+    assert CampaignLedger(tmp_path, "active").attempt_model_outcomes() == expected
+    assert ledger.zero_acceptance_recommendations(
+        warning_after_attempts=1, stop_recommendation_after_attempts=2
+    )["recommendations"] == [
+        {
+            "model_id": "m2m100_418m",
+            "attempted": 1,
+            "accepted": 0,
+            "recommendation": "warn_and_continue",
+        }
+    ]
+
+
+def test_attempt_model_outcomes_recommends_investigation_without_stopping(tmp_path):
+    ledger = CampaignLedger(tmp_path, "active")
+    for attempt in (1, 2, 3):
+        ledger.append_failure(
+            source_path="source.md",
+            output_path=f"de/page-{attempt}.md",
+            target_lang="de",
+            error="provider error",
+            attempt=attempt,
+            job_id=f"shard::{attempt}",
+            model_id="m2m100_418m",
+            gate="campaign_job_exception",
+        )
+
+    report = ledger.zero_acceptance_recommendations(
+        warning_after_attempts=1, stop_recommendation_after_attempts=3
+    )
+
+    assert report["recommendations"][0]["recommendation"] == "recommend_pause_and_investigate"
+    assert report["recommendations"][0]["accepted"] == 0
 
 
 def test_campaign_failure_metadata_uses_validator_names_without_messages():
@@ -964,6 +1096,14 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
 
     assert summary["status"] == "COMPLETE"
     assert summary["llm_call_outcomes"] == {"retry": {"completed": 2, "started": 2}}
+    assert summary["attempt_model_outcomes"]["professionalize_llm"]["5"] == {
+        "attempted": 1,
+        "accepted": 1,
+        "rejected": 0,
+        "provider_error": 0,
+    }
+    assert runner.ledger.receipts()[output_relative]["campaign_attempt"] == 5
+    assert runner.ledger.receipts()[output_relative]["attempt_model_id"] == "professionalize_llm"
     assert engine.calls[0] == (False, 2, None, "m2m100_418m")
     assert engine.calls[1][0:2] == (True, 0)
     assert "Regenerate the complete translation" in engine.calls[1][2]
@@ -1317,7 +1457,9 @@ def test_deferred_terminal_heal_ticket_enqueues_rejected_retry_task(tmp_path):
         translator_repo=repo,
         ledger_root=tmp_path / "ledger",
     )
-    monkeypatch_verify = lambda **_kwargs: {**manifest.to_summary(), "accepted": 0, "remaining": 1}
+    def monkeypatch_verify(**_kwargs):
+        return {**manifest.to_summary(), "accepted": 0, "remaining": 1}
+
     runner.verify = monkeypatch_verify
 
     summary = runner.run()

@@ -47,6 +47,16 @@ def test_expired_claim_is_reclaimed_without_lost_intent(tmp_path: Path):
     assert [item["intent_id"] for item in second] == [item["intent_id"] for item in first]
 
 
+def test_reconcile_requeues_expired_claim_without_touching_applied_intent(tmp_path: Path):
+    spool = TMIntentSpool(tmp_path / "intents.sqlite3")
+    first, second = spool.enqueue(_payload("one")), spool.enqueue(_payload("two"))
+    claimed = spool.claim("crashed", limit=2, lease_seconds=1)
+    spool.complete(next(item["intent_id"] for item in claimed if item["intent_id"] == first), "crashed")
+    assert spool.requeue_expired_claims(now=10**11) == 1
+    assert spool.stats() == {"PENDING": 1, "CLAIMED": 0, "APPLIED": 1}
+    assert second in [item["intent_id"] for item in spool.claim("recovery")]
+
+
 def test_batch_store_routes_to_spool_without_reader_side_l2_or_l3_mutation(tmp_path: Path):
     class L2:
         def batch_store(self, entries):

@@ -114,6 +114,16 @@ class TMIntentSpool:
                 (type(error).__name__, intent_id, owner),
             )
 
+    def requeue_expired_claims(self, *, now: float | None = None) -> int:
+        """Return abandoned writer claims to PENDING without touching APPLIED work."""
+        now = time.time() if now is None else now
+        with self._connect() as db:
+            return db.execute(
+                "UPDATE tm_intents SET state='PENDING',claim_owner=NULL,claim_until=NULL "
+                "WHERE state='CLAIMED' AND claim_until < ?",
+                (now,),
+            ).rowcount
+
     def stats(self) -> dict[str, int]:
         with self._connect() as db:
             rows = db.execute("SELECT state,COUNT(*) FROM tm_intents GROUP BY state").fetchall()
@@ -128,10 +138,12 @@ class TMIntentWriter:
     def __init__(self, spool: TMIntentSpool, l2: Any, l3: Any | None = None) -> None:
         self.spool, self.l2, self.l3 = spool, l2, l3
 
-    def run_once(self, *, limit: int = 50, owner: str | None = None) -> dict[str, int]:
+    def run_once(
+        self, *, limit: int = 50, owner: str | None = None, lease_seconds: float = 300
+    ) -> dict[str, int]:
         owner = owner or f"tm-writer-{uuid.uuid4()}"
         applied = failed = 0
-        for intent in self.spool.claim(owner, limit=limit):
+        for intent in self.spool.claim(owner, limit=limit, lease_seconds=lease_seconds):
             try:
                 payload = {
                     key: value

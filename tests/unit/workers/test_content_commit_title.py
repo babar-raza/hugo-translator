@@ -1,6 +1,10 @@
+import subprocess
+
 import pytest
 
+from src.observability.git_commit import GitCommitConfig, GitCommitter
 from src.workers.content_commit_title import content_commit_title
+from src.workers.autonomous_content_translation_worker import AutonomousContentTranslationWorker
 from src.workers.git_provenance import governed_subject_pattern
 
 
@@ -38,3 +42,33 @@ def test_title_cannot_inject_message_trailers():
         content_commit_title(
             ["content/docs.aspose.org/de/3d/java/a.md"], "translate\n\nInjected: x"
         )
+
+
+def test_autonomous_worker_commit_title_refuses_mixed_scope():
+    first = type("File", (), {"outputs": {"de": "content/docs.aspose.org/de/3d/java/a.md"}})()
+    second = type("File", (), {"outputs": {"fr": "content/docs.aspose.org/fr/pdf/python/b.md"}})()
+    result = type("Result", (), {"file_results": [first, second]})()
+    with pytest.raises(ValueError, match="partition mixed"):
+        AutonomousContentTranslationWorker._content_commit_title(result)
+
+
+def test_generated_title_and_governed_trailer_commit_locally_without_push(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "test"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    path = repo / "content/docs.aspose.org/de/3d/java/page.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("translated", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    title = content_commit_title([path], "translate 1 validated page(s)")
+    config = GitCommitConfig(auto_push=False, co_author_name="Codex", co_author_email="codex@example.invalid")
+    committer = GitCommitter(config)
+    commit_hash = committer._create_commit(f"{title}\n\nCo-authored-by: Codex <codex@example.invalid>", repo)
+    assert commit_hash
+    message = subprocess.run(
+        ["git", "log", "-1", "--format=%B"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout
+    assert message.startswith("content(3d/java): translate 1 validated page(s)")
+    assert message.count("Co-authored-by:") == 1

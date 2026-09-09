@@ -34,6 +34,7 @@ from src.translation_engine.engine import TranslationEngine
 from src.utils.config_loader import ConfigService
 from src.utils.file_lock import LockError as _LockError
 from src.utils.timeout_guard import TimeoutError, timeout_guard
+from src.workers.content_commit_title import content_commit_title
 from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
 from src.workers.worker_state import record_worker_state
 
@@ -433,6 +434,7 @@ class AutonomousContentTranslationWorker:
         # Initialize TranslationMemory
         try:
             from src.tm import TranslationMemory
+            from src.tm.intent_spool import TMIntentSpool
             from src.tm.l1_cache import L1Cache
             from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
 
@@ -450,6 +452,13 @@ class AutonomousContentTranslationWorker:
             raw_config = self.config_service.get_config()
             paths_config = raw_config.get("paths", {})
             tm_data_dir = Path(paths_config.get("tm_data_dir", "data/tm"))
+            writer_config = raw_config.get("tm_writer", {}) or {}
+            intent_spool = None
+            if writer_config.get("enabled", False):
+                spool_path = Path(
+                    writer_config.get("intent_spool_path", tm_data_dir / "intent_spool.sqlite3")
+                )
+                intent_spool = TMIntentSpool(spool_path)
 
             # Create TM components
             l1_cache = L1Cache(max_size=10000)
@@ -497,8 +506,11 @@ class AutonomousContentTranslationWorker:
                 l2_persistent=l2_persistent,
                 l3_semantic=l3_semantic,
                 improvement_queue=improvement_queue,
+                intent_spool=intent_spool,
             )
             queue_status = "with ImprovementQueue" if improvement_queue else "no ImprovementQueue"
+            if intent_spool is not None:
+                queue_status += f", TMIntentSpool={intent_spool.path}"
             logger.info(f"Initialized TranslationMemory (L1+L2+L3, {queue_status})")
         except Exception as e:
             logger.error(f"Failed to initialize TranslationMemory: {e}")
@@ -1720,12 +1732,25 @@ class AutonomousContentTranslationWorker:
                     )
 
             if result.successful_files > 0 and _has_new_translations:
+                try:
+                    commit_title = self._content_commit_title(result)
+                except ValueError as exc:
+                    # A content tree that doesn't match the governed
+                    # content/<site>.aspose.org/<family>/<platform>/... shape
+                    # (or a genuinely mixed-scope batch) must still commit --
+                    # falling back to auto_commit_translations' own default
+                    # title, never dropping already-validated work on the floor.
+                    logger.warning(
+                        "Governed commit title unavailable, using default title: %s", exc
+                    )
+                    commit_title = None
                 success = auto_commit_translations(
                     result=result,
                     site_id=site_id,
                     target_langs=target_langs,
                     run_id=run_id,
                     config_service=self.config_service,
+                    commit_message_override=commit_title,
                 )
                 if success:
                     logger.info("Git commit successful")
@@ -2065,6 +2090,16 @@ class AutonomousContentTranslationWorker:
                 logger.debug("[VRAM] L3 encoder offloaded to CPU")
         except Exception as e:
             logger.debug("[VRAM] L3 offload skipped: %s", e)
+
+    @staticmethod
+    def _content_commit_title(result) -> str:
+        """Derive one governed title or refuse a mixed family/platform batch."""
+        paths = []
+        for file_result in getattr(result, "file_results", []) or []:
+            paths.extend(Path(path) for path in getattr(file_result, "outputs", {}).values())
+        if not paths:
+            raise ValueError("commit has no output paths from this run")
+        return content_commit_title(paths, f"translate {len(paths)} validated page(s)")
 
     @staticmethod
     def _build_orphan_commit_message(

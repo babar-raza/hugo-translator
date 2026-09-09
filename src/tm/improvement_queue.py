@@ -15,7 +15,7 @@ import os
 import tempfile
 import threading
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -52,7 +52,7 @@ class ImprovementCandidate:
     def __post_init__(self):
         """Generate hash and timestamp if not provided."""
         if self.added_at is None:
-            self.added_at = datetime.utcnow().isoformat()
+            self.added_at = datetime.now(timezone.utc).isoformat()
 
         if self.candidate_hash is None:
             self.candidate_hash = self._compute_hash()
