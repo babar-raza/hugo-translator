@@ -1428,7 +1428,19 @@
  "last_wake_summary": "Continued: wave26 (barcode/python, wave_scale=2) shipped clean. LLM half 22/22 accepted 0 failed; m2m half (hu/ja/ro) 3/3 accepted. Review: 21 APPROVE (19 LLM + hu/ro m2m), 4 REJECT (hi/ko/tr from subagent review + ja found on my own direct read) all sharing ONE recurring defect: the frontmatter title field inverts the 'for'-postposition attachment in every postpositional/particle language tried ('Aspose.BarCode <postposition> Python' instead of 'Python <postposition> Aspose.BarCode'), while each document's own body/description gets the identical relationship right -- ticketed as a likely title-path-specific producer gap (heal_queue.jsonl manual-wave26-barcode-title-postposition-inversion), TM purged, quarantined pending a second-page recurrence check. Committed 21 cells (0d98ffadd1) -- LIVE-CONFIRMS the brand-nav-link fix (75bf700e) works cleanly on an uncomplicated page: 'Aspose.BarCode -- Enterprise Blog' correctly preserved in English across all 21, zero RB-006 findings. cells_committed_total 385 -> 406. barcode/python now 21/25 (missing hi/ko/tr/ja, quarantined not blocked).",
  "cells_committed_total": 406,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "run_id": "wave26-html-llm-20260910-r2",
+   "pid": 47648,
+   "manifest": "data/campaigns/manifests/wave26-html-llm-20260910-r2.yaml",
+   "purpose": "wave26 second page (wave_scale=2): docs.aspose.org/en/html/_index.md, 22 LLM-primary locales. Also carries a for-Platform-Enterprise-Suffix link ('Aspose.HTML -- Enterprise Documentation') -- second independent live check of commit 75bf700e.",
+   "log_stdout": "logs/wave26-html-llm-20260910-r2.out.log",
+   "log_stderr": "logs/wave26-html-llm-20260910-r2.err.log",
+   "launched_at": "2026-09-09T20:36:00+00:00",
+   "status": "RUNNING",
+   "next_step_after_completion": "review accepted candidates; commit page-complete per plan section 19.2; THEN sequentially build+launch the m2m hu/ja/ro companion"
+  }
+ ],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 2,
