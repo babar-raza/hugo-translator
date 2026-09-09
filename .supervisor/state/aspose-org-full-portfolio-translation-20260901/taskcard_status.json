@@ -1424,33 +1424,18 @@
    ]
   }
  },
- "last_wake_summary": "Continued: dove deeper into the emphasis-exclusion investigation (found + fixed the nested-placeholder root cause via pattern ordering, validated clean across effectively all of blog.aspose.org + 3/5 other sites -- but found 2 MORE distinct block-structure failure modes, blockquote-multi-paragraph and table-row collapse -- correctly still deferred, documented precisely for a proper multi-stage landing). Then shipped barcode-rendering-svg-png-python 0->18/25 (f7a13b623c), the healthiest wave in several iterations -- 7 heal tickets filed (2 cross-locale zh/ja frontmatter residual, others isolated). TM purged. cells_committed_total now 292.",
- "cells_committed_total": 292,
+ "last_wake_summary": "Continued: active_detached_runs was stale for both wave24-blog-lowdensity processes (both PIDs already exited) -- reconstructed real outcomes from receipts/logs instead of trusting the bookkeeping. LLM wave (COMPLETE, 88/90 gate-accepted) reviewed by 5 parallel subagent reviewers against config/review_rubric.yaml: 86 APPROVE committed (f38869a3d3, blog.aspose.org font/page/tex/words python, 22 locales, 0/25->21-22/25 each); 2 isolated REJECTs (ar/words RB-006, ko/page RB-004), TM purged for both, cross-model retry pending. m2m companion (hu/ja/ro) had failed at verify_environment on a stale manifest diff + drifted SHA; root-caused and fixed (rebuilt manifest via build_campaign_manifest.py; discovered data/* is gitignored so a NEW manifest filename is invisible to the translator-repo dirty check, but the ALREADY-TRACKED wave24-blog-lowdensity-m2m-20260909.yaml is not -- must use a fresh filename on relaunch, never overwrite the tracked one). Relaunch + the 2 retries are now blocked: a live peer session has an uncommitted, in-progress edit to src/workers/campaign_manifest.py + llm_slot_semaphore.py (TC-APT-064 concurrency ceiling raise 4->64), and verify_environment requires the WHOLE translator repo clean with no carve-out (unlike the content repo's campaign_scoped exception) -- left the peer's files untouched, deferred relaunch to next wake. cells_committed_total now 378. Full detail: data/summaries/wave24-blog-lowdensity-llm-commit-20260909.json.",
+ "cells_committed_total": 378,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [
-  {
-   "run_id": "wave24-blog-lowdensity-llm-20260909",
-   "pid": 35024,
-   "manifest": "data/campaigns/manifests/wave24-blog-lowdensity-llm-20260909.yaml",
-   "purpose": "THROUGHPUT_BREACH corrective wave (fp-throughput-breach-strategy-20260909.json): 4 low-code-density blog.aspose.org category pages (tex/font/page/words python), 22 LLM-primary locales",
-   "log_stdout": "logs/wave24-blog-lowdensity-llm-20260909.out.log",
-   "log_stderr": "logs/wave24-blog-lowdensity-llm-20260909.err.log",
-   "launched_at": "2026-09-09T15:53:30+00:00",
-   "status": "RUNNING",
-   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2"
-  },
-  {
-   "run_id": "wave24-blog-lowdensity-m2m-20260909",
-   "pid": 48800,
-   "manifest": "data/campaigns/manifests/wave24-blog-lowdensity-m2m-20260909.yaml",
-   "purpose": "THROUGHPUT_BREACH corrective wave companion: hu/ja/ro on m2m100_418m, same 4 pages",
-   "log_stdout": "logs/wave24-blog-lowdensity-m2m-20260909.out.log",
-   "log_stderr": "logs/wave24-blog-lowdensity-m2m-20260909.err.log",
-   "launched_at": "2026-09-09T15:53:45+00:00",
-   "status": "RUNNING",
-   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2"
-  }
- ],
+ "active_detached_runs": [],
+ "blocked_pending_clean_translator_repo": {
+  "reason": "live peer session mid-edit on src/workers/campaign_manifest.py + src/workers/llm_slot_semaphore.py (TC-APT-064 concurrency ceiling 4->64); verify_environment requires the translator repo fully git-clean with no campaign_scoped carve-out (campaign_manifest.py L503-509) -- blocks ANY new launch, not just this mission's",
+  "queued_work": [
+   "hu/ja/ro m2m100_418m companion wave for wave24-blog-lowdensity (4 pages, same scope as the committed LLM wave) -- rebuild with build_campaign_manifest.py --site blog.aspose.org --source-list data/campaigns/manifests/wave24-blog-lowdensity-source-list.txt --locale hu --locale ja --locale ro --primary-model m2m100_418m --llm-escalation-mode immediate, output to a FRESH untracked filename (never wave24-blog-lowdensity-m2m-20260909.yaml -- that one is already tracked/committed at d181035a and any in-place edit shows as dirty; a new filename stays gitignored under data/* until deliberately force-added for record-keeping)",
+   "single-cell cross-model retry, content/blog.aspose.org/words/python/_index.ar.md, ar, m2m100_418m (TM already purged, 5 entries)",
+   "single-cell cross-model retry, content/blog.aspose.org/page/python/_index.ko.md, ko, m2m100_418m (TM already purged, 2 entries)"
+  ]
+ },
  "wave_scale": {
   "value": 4,
   "previous": 2,
