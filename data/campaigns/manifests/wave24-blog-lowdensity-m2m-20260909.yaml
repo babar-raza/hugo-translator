@@ -1,0 +1,83 @@
+schema_version: 1
+campaign_id: wave24-blog-lowdensity-m2m-20260909
+validation_policy: zero-defect
+content_repo: D:/onedrive/Documents/GitHub/aspose.org
+content_repo_sha: 500ed05cf7d29469830c5f77dd1a66829c0d80fc
+translator_repo_sha: e7df5028a26ecd38901daaffbf1508539c48b681
+config_fingerprint: 5fc2d2c2d26bfb1bc572f92c1a1a6955d0dbd11bd1471962e6dddfa33f832b9e
+model_fingerprints:
+  model_registry: 632c4a146e97600632a888331225fc419b61f921261627e7ff40bc93a3adc25b
+tm_fingerprint: ee6cab0a119be0c2f36e354320e1ffd9afed76c2f61cdcba4e4d699239e73286
+tm_fingerprint_inputs:
+- data/tm/l2.lmdb/data.mdb
+knowledge_fingerprints: {}
+sites:
+- blog.aspose.org
+target_locales:
+- hu
+- ja
+- ro
+expected_source_count: 4
+expected_output_count: 12
+retry_policy:
+  primary_model: m2m100_418m
+  primary_attempts: 3
+  llm_escalation_attempts: 2
+  llm_model: professionalize_llm
+  llm_escalation_mode: immediate
+commit_policy:
+  branch: main
+  max_outputs_per_commit: 250
+  push: false
+  enabled: false
+execution_policy:
+  max_parallel_jobs: 1
+  model_sharing: single_shared_instance
+  output_selection: all
+  dirty_scope: campaign_paths
+destination_baseline: {}
+sources:
+- site_id: blog.aspose.org
+  family: font
+  platform: python
+  source_path: content/blog.aspose.org/font/python/_index.md
+  source_sha256: 38b109e3fb82c3bda358ded1507456da238a9b15062a74926d55db31ddc2ebd7
+  outputs:
+    hu: content/blog.aspose.org/font/python/_index.hu.md
+    ja: content/blog.aspose.org/font/python/_index.ja.md
+    ro: content/blog.aspose.org/font/python/_index.ro.md
+  wave: 0
+  replace_existing: {}
+- site_id: blog.aspose.org
+  family: page
+  platform: python
+  source_path: content/blog.aspose.org/page/python/_index.md
+  source_sha256: 538ed7cd63374898a58cecbe5d2d39f6a13e23962e898db0001397cf0e67b801
+  outputs:
+    hu: content/blog.aspose.org/page/python/_index.hu.md
+    ja: content/blog.aspose.org/page/python/_index.ja.md
+    ro: content/blog.aspose.org/page/python/_index.ro.md
+  wave: 0
+  replace_existing: {}
+- site_id: blog.aspose.org
+  family: tex
+  platform: python
+  source_path: content/blog.aspose.org/tex/python/_index.md
+  source_sha256: 034ded58ca854bdb61155643693fa5d428459b32a98ab6d7478c80e3e5ca5c6f
+  outputs:
+    hu: content/blog.aspose.org/tex/python/_index.hu.md
+    ja: content/blog.aspose.org/tex/python/_index.ja.md
+    ro: content/blog.aspose.org/tex/python/_index.ro.md
+  wave: 0
+  replace_existing: {}
+- site_id: blog.aspose.org
+  family: words
+  platform: python
+  source_path: content/blog.aspose.org/words/python/_index.md
+  source_sha256: d12424f903f1b5852fc105a75f2e6010b984438d2cdcaf3222a7a2160095cfd0
+  outputs:
+    hu: content/blog.aspose.org/words/python/_index.hu.md
+    ja: content/blog.aspose.org/words/python/_index.ja.md
+    ro: content/blog.aspose.org/words/python/_index.ro.md
+  wave: 0
+  replace_existing: {}

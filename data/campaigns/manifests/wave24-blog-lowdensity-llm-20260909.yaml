@@ -1,0 +1,178 @@
+schema_version: 1
+campaign_id: wave24-blog-lowdensity-llm-20260909
+validation_policy: zero-defect
+content_repo: D:/onedrive/Documents/GitHub/aspose.org
+content_repo_sha: 500ed05cf7d29469830c5f77dd1a66829c0d80fc
+translator_repo_sha: e7df5028a26ecd38901daaffbf1508539c48b681
+config_fingerprint: 5fc2d2c2d26bfb1bc572f92c1a1a6955d0dbd11bd1471962e6dddfa33f832b9e
+model_fingerprints:
+  model_registry: 632c4a146e97600632a888331225fc419b61f921261627e7ff40bc93a3adc25b
+tm_fingerprint: ee6cab0a119be0c2f36e354320e1ffd9afed76c2f61cdcba4e4d699239e73286
+tm_fingerprint_inputs:
+- data/tm/l2.lmdb/data.mdb
+knowledge_fingerprints: {}
+sites:
+- blog.aspose.org
+target_locales:
+- ar
+- cs
+- de
+- el
+- es
+- fa
+- fr
+- he
+- hi
+- id
+- it
+- ko
+- nl
+- pl
+- pt
+- ru
+- sv
+- th
+- tr
+- uk
+- vi
+- zh
+expected_source_count: 4
+expected_output_count: 88
+retry_policy:
+  primary_model: professionalize_llm
+  primary_attempts: 3
+  llm_escalation_attempts: 2
+  llm_model: m2m100_418m
+  llm_escalation_mode: immediate
+commit_policy:
+  branch: main
+  max_outputs_per_commit: 250
+  push: false
+  enabled: false
+execution_policy:
+  max_parallel_jobs: 1
+  model_sharing: single_shared_instance
+  output_selection: all
+  dirty_scope: campaign_paths
+destination_baseline: {}
+sources:
+- site_id: blog.aspose.org
+  family: font
+  platform: python
+  source_path: content/blog.aspose.org/font/python/_index.md
+  source_sha256: 38b109e3fb82c3bda358ded1507456da238a9b15062a74926d55db31ddc2ebd7
+  outputs:
+    ar: content/blog.aspose.org/font/python/_index.ar.md
+    cs: content/blog.aspose.org/font/python/_index.cs.md
+    de: content/blog.aspose.org/font/python/_index.de.md
+    el: content/blog.aspose.org/font/python/_index.el.md
+    es: content/blog.aspose.org/font/python/_index.es.md
+    fa: content/blog.aspose.org/font/python/_index.fa.md
+    fr: content/blog.aspose.org/font/python/_index.fr.md
+    he: content/blog.aspose.org/font/python/_index.he.md
+    hi: content/blog.aspose.org/font/python/_index.hi.md
+    id: content/blog.aspose.org/font/python/_index.id.md
+    it: content/blog.aspose.org/font/python/_index.it.md
+    ko: content/blog.aspose.org/font/python/_index.ko.md
+    nl: content/blog.aspose.org/font/python/_index.nl.md
+    pl: content/blog.aspose.org/font/python/_index.pl.md
+    pt: content/blog.aspose.org/font/python/_index.pt.md
+    ru: content/blog.aspose.org/font/python/_index.ru.md
+    sv: content/blog.aspose.org/font/python/_index.sv.md
+    th: content/blog.aspose.org/font/python/_index.th.md
+    tr: content/blog.aspose.org/font/python/_index.tr.md
+    uk: content/blog.aspose.org/font/python/_index.uk.md
+    vi: content/blog.aspose.org/font/python/_index.vi.md
+    zh: content/blog.aspose.org/font/python/_index.zh.md
+  wave: 0
+  replace_existing: {}
+- site_id: blog.aspose.org
+  family: page
+  platform: python
+  source_path: content/blog.aspose.org/page/python/_index.md
+  source_sha256: 538ed7cd63374898a58cecbe5d2d39f6a13e23962e898db0001397cf0e67b801
+  outputs:
+    ar: content/blog.aspose.org/page/python/_index.ar.md
+    cs: content/blog.aspose.org/page/python/_index.cs.md
+    de: content/blog.aspose.org/page/python/_index.de.md
+    el: content/blog.aspose.org/page/python/_index.el.md
+    es: content/blog.aspose.org/page/python/_index.es.md
+    fa: content/blog.aspose.org/page/python/_index.fa.md
+    fr: content/blog.aspose.org/page/python/_index.fr.md
+    he: content/blog.aspose.org/page/python/_index.he.md
+    hi: content/blog.aspose.org/page/python/_index.hi.md
+    id: content/blog.aspose.org/page/python/_index.id.md
+    it: content/blog.aspose.org/page/python/_index.it.md
+    ko: content/blog.aspose.org/page/python/_index.ko.md
+    nl: content/blog.aspose.org/page/python/_index.nl.md
+    pl: content/blog.aspose.org/page/python/_index.pl.md
+    pt: content/blog.aspose.org/page/python/_index.pt.md
+    ru: content/blog.aspose.org/page/python/_index.ru.md
+    sv: content/blog.aspose.org/page/python/_index.sv.md
+    th: content/blog.aspose.org/page/python/_index.th.md
+    tr: content/blog.aspose.org/page/python/_index.tr.md
+    uk: content/blog.aspose.org/page/python/_index.uk.md
+    vi: content/blog.aspose.org/page/python/_index.vi.md
+    zh: content/blog.aspose.org/page/python/_index.zh.md
+  wave: 0
+  replace_existing: {}
+- site_id: blog.aspose.org
+  family: tex
+  platform: python
+  source_path: content/blog.aspose.org/tex/python/_index.md
+  source_sha256: 034ded58ca854bdb61155643693fa5d428459b32a98ab6d7478c80e3e5ca5c6f
+  outputs:
+    ar: content/blog.aspose.org/tex/python/_index.ar.md
+    cs: content/blog.aspose.org/tex/python/_index.cs.md
+    de: content/blog.aspose.org/tex/python/_index.de.md
+    el: content/blog.aspose.org/tex/python/_index.el.md
+    es: content/blog.aspose.org/tex/python/_index.es.md
+    fa: content/blog.aspose.org/tex/python/_index.fa.md
+    fr: content/blog.aspose.org/tex/python/_index.fr.md
+    he: content/blog.aspose.org/tex/python/_index.he.md
+    hi: content/blog.aspose.org/tex/python/_index.hi.md
+    id: content/blog.aspose.org/tex/python/_index.id.md
+    it: content/blog.aspose.org/tex/python/_index.it.md
+    ko: content/blog.aspose.org/tex/python/_index.ko.md
+    nl: content/blog.aspose.org/tex/python/_index.nl.md
+    pl: content/blog.aspose.org/tex/python/_index.pl.md
+    pt: content/blog.aspose.org/tex/python/_index.pt.md
+    ru: content/blog.aspose.org/tex/python/_index.ru.md
+    sv: content/blog.aspose.org/tex/python/_index.sv.md
+    th: content/blog.aspose.org/tex/python/_index.th.md
+    tr: content/blog.aspose.org/tex/python/_index.tr.md
+    uk: content/blog.aspose.org/tex/python/_index.uk.md
+    vi: content/blog.aspose.org/tex/python/_index.vi.md
+    zh: content/blog.aspose.org/tex/python/_index.zh.md
+  wave: 0
+  replace_existing: {}
+- site_id: blog.aspose.org
+  family: words
+  platform: python
+  source_path: content/blog.aspose.org/words/python/_index.md
+  source_sha256: d12424f903f1b5852fc105a75f2e6010b984438d2cdcaf3222a7a2160095cfd0
+  outputs:
+    ar: content/blog.aspose.org/words/python/_index.ar.md
+    cs: content/blog.aspose.org/words/python/_index.cs.md
+    de: content/blog.aspose.org/words/python/_index.de.md
+    el: content/blog.aspose.org/words/python/_index.el.md
+    es: content/blog.aspose.org/words/python/_index.es.md
+    fa: content/blog.aspose.org/words/python/_index.fa.md
+    fr: content/blog.aspose.org/words/python/_index.fr.md
+    he: content/blog.aspose.org/words/python/_index.he.md
+    hi: content/blog.aspose.org/words/python/_index.hi.md
+    id: content/blog.aspose.org/words/python/_index.id.md
+    it: content/blog.aspose.org/words/python/_index.it.md
+    ko: content/blog.aspose.org/words/python/_index.ko.md
+    nl: content/blog.aspose.org/words/python/_index.nl.md
+    pl: content/blog.aspose.org/words/python/_index.pl.md
+    pt: content/blog.aspose.org/words/python/_index.pt.md
+    ru: content/blog.aspose.org/words/python/_index.ru.md
+    sv: content/blog.aspose.org/words/python/_index.sv.md
+    th: content/blog.aspose.org/words/python/_index.th.md
+    tr: content/blog.aspose.org/words/python/_index.tr.md
+    uk: content/blog.aspose.org/words/python/_index.uk.md
+    vi: content/blog.aspose.org/words/python/_index.vi.md
+    zh: content/blog.aspose.org/words/python/_index.zh.md
+  wave: 0
+  replace_existing: {}

@@ -1427,7 +1427,30 @@
  "last_wake_summary": "Continued: dove deeper into the emphasis-exclusion investigation (found + fixed the nested-placeholder root cause via pattern ordering, validated clean across effectively all of blog.aspose.org + 3/5 other sites -- but found 2 MORE distinct block-structure failure modes, blockquote-multi-paragraph and table-row collapse -- correctly still deferred, documented precisely for a proper multi-stage landing). Then shipped barcode-rendering-svg-png-python 0->18/25 (f7a13b623c), the healthiest wave in several iterations -- 7 heal tickets filed (2 cross-locale zh/ja frontmatter residual, others isolated). TM purged. cells_committed_total now 292.",
  "cells_committed_total": 292,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "run_id": "wave24-blog-lowdensity-llm-20260909",
+   "pid": 35024,
+   "manifest": "data/campaigns/manifests/wave24-blog-lowdensity-llm-20260909.yaml",
+   "purpose": "THROUGHPUT_BREACH corrective wave (fp-throughput-breach-strategy-20260909.json): 4 low-code-density blog.aspose.org category pages (tex/font/page/words python), 22 LLM-primary locales",
+   "log_stdout": "logs/wave24-blog-lowdensity-llm-20260909.out.log",
+   "log_stderr": "logs/wave24-blog-lowdensity-llm-20260909.err.log",
+   "launched_at": "2026-09-09T15:53:30+00:00",
+   "status": "RUNNING",
+   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2"
+  },
+  {
+   "run_id": "wave24-blog-lowdensity-m2m-20260909",
+   "pid": 48800,
+   "manifest": "data/campaigns/manifests/wave24-blog-lowdensity-m2m-20260909.yaml",
+   "purpose": "THROUGHPUT_BREACH corrective wave companion: hu/ja/ro on m2m100_418m, same 4 pages",
+   "log_stdout": "logs/wave24-blog-lowdensity-m2m-20260909.out.log",
+   "log_stderr": "logs/wave24-blog-lowdensity-m2m-20260909.err.log",
+   "launched_at": "2026-09-09T15:53:45+00:00",
+   "status": "RUNNING",
+   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml; commit page-complete per plan section 19.2"
+  }
+ ],
  "wave_scale": {
   "value": 4,
   "previous": 2,
