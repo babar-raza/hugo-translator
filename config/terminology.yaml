@@ -327,6 +327,15 @@ global:
       preserve_mode: protect
       severity: warning
 
+    # glTF is a file-format identifier, not untranslated prose.  It occurs in
+    # docs.aspose.org format-support tables, including legacy malformed rows
+    # that the Markdown parser represents as text fragments.
+    - term: "glTF"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+
   # Pattern-based matches: Regular expressions for dynamic terminology
   patterns:
     # FOSS edition compound names must be protected as ONE span, and must be

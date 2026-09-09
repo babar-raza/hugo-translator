@@ -51,6 +51,14 @@ class BaseLLMProvider(ABC):
         )
 
     def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
+        from .campaign_llm_policy import accounted_generate
+
+        return accounted_generate(
+            self.breaker_key,
+            lambda: self._generate_governed(system_prompt, user_text),
+        )
+
+    def _generate_governed(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         """Hardened generate (TC-APT-004 / LLM-HARDEN-001).
 
         * refuses immediately with ``LLMCircuitOpenError`` while the model's breaker is open;

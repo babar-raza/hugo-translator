@@ -5,6 +5,8 @@ Verifies that parser fixes are actually used in translation pipeline.
 """
 
 from pathlib import Path
+from collections import Counter
+import re
 
 import pytest
 
@@ -13,6 +15,10 @@ from src.translation_engine.extractor.text_unit_extractor import TextUnitExtract
 from src.translation_engine.parser.ast_nodes import NodeType
 from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
+from src.translation_engine.validation import StructureValidator
+from src.translation_engine.validation.repetition_detector_validator import (
+    RepetitionDetectorValidator,
+)
 from src.utils.config_loader import ConfigService
 
 
@@ -156,3 +162,125 @@ This has **bold emphasis** in paragraph.
 
         # Verify extractor produced units from test content (pipeline is functional)
         assert len(plan.units) > 0, "TextUnitExtractor produced no units"
+
+
+class TestCampaignHealingFixtureTopology:
+    """Pin the real-shaped docs failures to immutable, offline fixtures."""
+
+    _TOPOLOGY_KINDS = frozenset(
+        {
+            NodeType.HEADING,
+            NodeType.LIST,
+            NodeType.LIST_ITEM,
+            NodeType.LINK,
+            NodeType.CODE_BLOCK,
+            NodeType.TABLE,
+            NodeType.TABLE_ROW,
+            NodeType.TABLE_CELL,
+        }
+    )
+
+    @staticmethod
+    def _topology(ast):
+        counts = Counter()
+
+        def walk(nodes):
+            for node in nodes:
+                if node.type in TestCampaignHealingFixtureTopology._TOPOLOGY_KINDS:
+                    counts[node.type.value] += 1
+                walk(getattr(node, "children", []) or [])
+
+        walk(ast)
+        return counts
+
+    @pytest.mark.parametrize(
+        "fixture_name",
+        [
+            "format-support.md",
+            "materials-shading.md",
+            "deformers.md",
+            "gltf.md",
+            "profiles.md",
+            "render.md",
+            "scene-management.md",
+        ],
+    )
+    def test_identity_ast_roundtrip_preserves_campaign_fixture_topology(self, fixture_name):
+        """Real parser/extractor/reconstructor keeps structural nodes intact.
+
+        This deliberately uses identity translations.  It proves the topology
+        boundary itself and leaves model-generated bad candidates to the
+        structural validators rather than weakening them.
+        """
+        repo = Path(__file__).resolve().parents[2]
+        parser = HugoParser()
+        profile = ConfigService(repo / "config").get_site_profile("docs.aspose.org")
+        source_path = repo / "tests" / "fixtures" / "campaign_healing" / fixture_name
+        source = parser.parse_file(source_path)
+        plan = TextUnitExtractor(
+            segmentation_strategy="sentence_only", site_profile=profile, target_lang="de"
+        ).extract_from_ast(source.ast, source.frontmatter)
+        translations = {
+            unit.node_addr: unit.source_text
+            for unit in plan.units
+            if unit.node_addr and unit.source_text
+        }
+
+        reconstructor = MarkdownReconstructor(profile)
+        source_body = reconstructor.reconstruct_body(source.ast, {}, "en")
+        rendered = reconstructor.reconstruct_body(source.ast, translations, "de")
+        target = parser.parse_string(rendered)
+
+        assert self._topology(target.ast) == self._topology(source.ast)
+        assert len(re.findall(r"\{\{[<%].*?[>%]\}\}", rendered)) == len(
+            re.findall(r"\{\{[<%].*?[>%]\}\}", source_path.read_text(encoding="utf-8"))
+        )
+
+        # The AST snapshot is the authoritative topology proof.  Keep the
+        # text-level structural validator in the same offline path as a
+        # second, independently implemented guard against renderer drift.
+        structure_result = StructureValidator().validate(
+            source_body, rendered
+        )
+        assert structure_result.success
+        assert structure_result.issues == []
+
+    def test_structural_and_repetition_regressions_remain_detectable(self):
+        """Broken candidates remain blocking inputs to a zero-defect run.
+
+        These are deliberately representative Markdown rather than a mock
+        parser result: a duplicate link, three dropped list nodes, a dropped
+        heading, and a removed code span all flow through the production
+        structure validator.  Repetition is tested separately because it is
+        an independent page-level gate that must not be hidden by topology
+        preservation.
+        """
+        source = """## Overview
+
+- First item
+- Second item
+- Third item
+- Fourth item
+
+See [the reference](https://example.invalid/reference) and use `method()`.
+"""
+        malformed = """See [the reference](https://example.invalid/reference)
+and [the reference](https://example.invalid/reference).
+"""
+
+        structure_result = StructureValidator().validate(source, malformed)
+        messages = "\n".join(issue.message for issue in structure_result.issues).lower()
+        assert not structure_result.success  # dropped inline code is an ERROR
+        assert "heading count mismatch" in messages
+        assert "list item count mismatch" in messages
+        assert "link/image count mismatch" in messages
+        assert "code block count mismatch" in messages
+
+        repetition_result = RepetitionDetectorValidator().validate(
+            source,
+            "boucle de traduction boucle de traduction boucle de traduction "
+            "boucle de traduction boucle de traduction boucle de traduction",
+            context={"target_lang": "fr"},
+        )
+        assert not repetition_result.success
+        assert any("gram" in issue.message for issue in repetition_result.issues)

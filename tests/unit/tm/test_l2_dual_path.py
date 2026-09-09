@@ -1,13 +1,17 @@
 """
-TC-TM-02: L2 LMDB dual-path detection and migration tests.
+TC-TM-02: L2 LMDB dual-path detection tests.
 
 Verifies:
 1. L2PersistentTM emits UserWarning when a sibling l2*.lmdb directory exists.
 2. No warning is emitted when only the canonical database is present.
-3. migrate_l2_lmdb.py --dry-run counts correctly without writing.
-4. migrate_l2_lmdb.py --apply merges missing keys idempotently.
 
 Gap: G-TM-02 — two live L2 LMDB directories (data/tm/l2.lmdb + data/tm/l2_lmdb).
+
+migrate_l2_lmdb.py's own merge/apply/idempotency/integrity behavior is covered
+by tests/unit/tm/test_migrate_l2_lmdb.py against the current TranslationEntry-
+JSON-payload contract (this file's former TestMigrationScript fixtures wrote
+raw arbitrary bytes as values, which predates entry validation and no longer
+reflects how the script is actually used).
 """
 
 from __future__ import annotations
@@ -42,18 +46,6 @@ def _make_lmdb(path: Path, entries: dict[bytes, bytes]) -> None:
         for key, value in entries.items():
             txn.put(key, value)
     env.close()
-
-
-def _read_lmdb(path: Path) -> dict[bytes, bytes]:
-    """Return all entries in the given LMDB database as a dict."""
-    env = lmdb.open(str(path), readonly=True, lock=False, max_dbs=1)
-    result = {}
-    with env.begin() as txn:
-        cursor = txn.cursor()
-        for key, value in cursor.iternext(keys=True, values=True):
-            result[key] = value
-    env.close()
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -157,67 +149,6 @@ class TestMigrationScript:
         expected = Path(migrate_l2_lmdb.__file__).resolve().parents[2]
         assert migrate_l2_lmdb.repository_root() == expected
         assert (expected / "scripts" / "tm" / "migrate_l2_lmdb.py").is_file()
-
-    def test_dry_run_does_not_write(self, tmp_path: Path, capsys):
-        """--dry-run must not copy any keys into the destination."""
-        src = tmp_path / "l2_lmdb"
-        dst = tmp_path / "l2.lmdb"
-        _make_lmdb(src, {b"k1": b"v1", b"k2": b"v2"})
-        _make_lmdb(dst, {})
-
-        from scripts.tm.migrate_l2_lmdb import migrate
-
-        migrate(src, dst, dry_run=True)
-
-        dst_entries = _read_lmdb(dst)
-        assert len(dst_entries) == 0, "dry-run must not write any keys"
-
-        out = capsys.readouterr().out
-        assert "Migrated" in out and "2" in out  # 2 would-be migrations
-
-    def test_apply_copies_missing_keys(self, tmp_path: Path):
-        """--apply must copy keys from source that are absent in destination."""
-        src = tmp_path / "l2_lmdb"
-        dst = tmp_path / "l2.lmdb"
-        _make_lmdb(src, {b"k1": b"v1", b"k2": b"v2"})
-        _make_lmdb(dst, {b"k1": b"already_there"})  # k1 already present
-
-        from scripts.tm.migrate_l2_lmdb import migrate
-
-        migrate(src, dst, dry_run=False)
-
-        dst_entries = _read_lmdb(dst)
-        assert dst_entries[b"k1"] == b"already_there", "Existing key must not be overwritten"
-        assert dst_entries[b"k2"] == b"v2", "Missing key must be copied"
-
-    def test_apply_is_idempotent(self, tmp_path: Path):
-        """Running --apply twice must produce the same result as running once."""
-        src = tmp_path / "l2_lmdb"
-        dst = tmp_path / "l2.lmdb"
-        _make_lmdb(src, {b"k1": b"v1"})
-        _make_lmdb(dst, {})
-
-        from scripts.tm.migrate_l2_lmdb import migrate
-
-        migrate(src, dst, dry_run=False)
-        after_first = _read_lmdb(dst)
-
-        migrate(src, dst, dry_run=False)
-        after_second = _read_lmdb(dst)
-
-        assert after_first == after_second, "Second run must not change the database"
-
-    def test_apply_no_source_is_noop(self, tmp_path: Path):
-        """If source does not exist, migrate() should exit gracefully."""
-        src = tmp_path / "l2_lmdb_nonexistent"
-        dst = tmp_path / "l2.lmdb"
-        _make_lmdb(dst, {b"k": b"v"})
-
-        from scripts.tm.migrate_l2_lmdb import migrate
-
-        # Should not raise — just report nothing to migrate
-        migrate(src, dst, dry_run=False)
-        assert _read_lmdb(dst) == {b"k": b"v"}, "Destination must be unchanged"
 
     def test_cli_requires_dry_run_or_apply(self, tmp_path: Path, monkeypatch):
         """Running without --dry-run or --apply must exit with an error."""

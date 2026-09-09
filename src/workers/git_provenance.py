@@ -45,7 +45,7 @@ def governed_subject_pattern(
 ) -> re.Pattern[str]:
     shard_prefix = f"w{wave}:{site_id}:{family}:{platform}:{locale}:"
     return re.compile(
-        rf"^content\(locale\): zero-defect shard {re.escape(shard_prefix)}[1-9][0-9]*$"
+        rf"^content\((?:locale|{re.escape(family)}/{re.escape(platform)})\): zero-defect shard {re.escape(shard_prefix)}[1-9][0-9]*$"
     )
 
 

@@ -176,7 +176,7 @@ class _StubBackend:
 
 class TestRepairCrossFieldResiduals:
     def _translator(self):
-        engine = SimpleNamespace(model_loader=None, _model_lock=None)
+        engine = SimpleNamespace(model_loader=None, _model_lock=None, campaign_context={})
         translator = SegmentTranslator.__new__(SegmentTranslator)
         translator._engine = engine
         return translator, engine
@@ -252,3 +252,20 @@ class TestRepairCrossFieldResiduals:
         )
         assert repaired == 0
         assert backend.calls == []
+
+    def test_deferred_campaign_does_not_call_llm_cross_field_repair(self):
+        translator, engine = self._translator()
+        engine.campaign_context["defer_llm_fallbacks"] = True
+        units = [
+            _fm_unit("description", SOURCE_DESC, GOOD_DESC),
+            _fm_unit("summary", SOURCE_SUMM, BAD_SUMM),
+        ]
+        backend = _StubBackend("unused")
+
+        repaired = translator._repair_cross_field_frontmatter_residuals(
+            engine, units, backend, "en", "cs", TranslationStats()
+        )
+
+        assert repaired == 0
+        assert backend.calls == []
+        assert units[1].translated_text == BAD_SUMM

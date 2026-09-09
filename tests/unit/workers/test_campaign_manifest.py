@@ -96,6 +96,27 @@ def test_manifest_accepts_deferred_professionalize_queue(tmp_path):
     assert manifest.retry_policy["llm_escalation_mode"] == "deferred"
 
 
+def test_deferred_campaign_skips_identity_provider_call(tmp_path):
+    payload = _manifest(tmp_path)
+    payload["retry_policy"]["llm_escalation_mode"] = "deferred"
+    payload["retry_policy"]["llm_escalation_attempts"] = 0
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=SimpleNamespace(campaign_context={}),
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+
+    assert runner._llm_identity_gate() == {
+        "status": "SKIPPED",
+        "reason": "llm_escalation_mode=deferred",
+        "cadence": "deferred",
+    }
+
+
 def test_manifest_accepts_1_2b_m2m_for_deferred_queue(tmp_path):
     raw = _manifest(tmp_path)
     raw["retry_policy"].update(
@@ -254,7 +275,9 @@ def _campaign_scoped_env(tmp_path: Path):
     for repo in (content_repo, translator_repo):
         repo.mkdir()
         subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True
+        )
         subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
 
     source = content_repo / "content/docs.aspose.org/en/words/net/page.md"
@@ -284,7 +307,11 @@ def _campaign_scoped_env(tmp_path: Path):
         ["git", "rev-parse", "HEAD"], cwd=content_repo, check=True, capture_output=True, text=True
     ).stdout.strip()
     payload["translator_repo_sha"] = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=translator_repo, check=True, capture_output=True, text=True
+        ["git", "rev-parse", "HEAD"],
+        cwd=translator_repo,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
     payload["model_fingerprints"] = {"model_registry": sha256_file(registry)}
     payload["sources"][0]["source_sha256"] = sha256_file(source)
@@ -378,6 +405,37 @@ def test_failure_ledger_contains_metadata_only(tmp_path):
     assert row["gate"] == "pipeline"
     assert row["job_id"]
     assert "content" not in row
+
+
+def test_model_outcomes_are_campaign_scoped_and_candidate_free(tmp_path):
+    ledger = CampaignLedger(tmp_path, "active")
+    ledger.append_receipt({"output_path": "de/page.md", "model_fingerprint": "m2m100_418m"})
+    ledger.append_failure(
+        source_path="source.md",
+        output_path="de/page.md",
+        target_lang="de",
+        error="gate failed",
+        gate="StructureValidator",
+        model_id="m2m100_418m",
+    )
+    ledger._append(
+        tmp_path / "heal_queue.jsonl",
+        {"campaign_id": "active", "processing_model": "professionalize_llm", "status": "QUEUED"},
+    )
+    ledger._append(
+        tmp_path / "heal_queue.jsonl",
+        {"campaign_id": "old", "processing_model": "professionalize_llm", "status": "QUEUED"},
+    )
+
+    outcomes = ledger.model_outcomes()
+
+    assert outcomes["m2m100_418m"] == {
+        "accepted": 1,
+        "rejected": 1,
+        "provider_error": 0,
+        "queued": 0,
+    }
+    assert outcomes["professionalize_llm"]["queued"] == 1
 
 
 def test_campaign_failure_metadata_uses_validator_names_without_messages():
@@ -894,6 +952,67 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     assert "translation_rejected" in failure_log
 
 
+def test_campaign_suppresses_second_paid_retry_for_duplicate_candidate(tmp_path):
+    """A source-based retry is audited once, then deduplicated by hash+gate."""
+    source = tmp_path / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    payload = _manifest(tmp_path)
+    payload["target_locales"] = ["es"]
+    payload["expected_output_count"] = 1
+    payload["sources"][0]["outputs"] = {"es": payload["sources"][0]["outputs"]["es"]}
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    output = tmp_path / payload["sources"][0]["outputs"]["es"]
+
+    class Engine:
+        def __init__(self):
+            self.campaign_context = {}
+            self.calls = []
+            self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
+
+        def _get_output_path(self, *_args):
+            return output
+
+        def translate_file(self, _site, _source, target_langs, **kwargs):
+            self.calls.append(kwargs["model_id"])
+            return SimpleNamespace(
+                success=False,
+                acceptance_receipts={},
+                errors=["rejected"],
+                retry_attempts=0,
+                candidate_sha256={target_langs[0]: "a" * 64},
+            )
+
+    engine = Engine()
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    shard = next(manifest.shards(resume_receipts=set(), max_outputs=1))
+    accepted, _output = runner._run_campaign_job(
+        shard=shard,
+        source=manifest.sources[0],
+        locale="es",
+        expected_output=payload["sources"][0]["outputs"]["es"],
+    )
+
+    assert not accepted
+    assert engine.calls == ["m2m100_418m", "professionalize_llm"]
+    rows = CampaignLedger(tmp_path / "ledger", "pilot")._read_jsonl(runner.ledger.failures_path)
+    assert [row["model_id"] for row in rows] == [
+        "m2m100_418m",
+        "professionalize_llm",
+        "professionalize_llm",
+    ]
+    assert rows[-1]["gate"] == "duplicate_retry_suppressed"
+    assert rows[-1]["candidate_sha256"] == "a" * 64
+
+
 def test_campaign_parallel_jobs_share_engine_without_cross_job_state(tmp_path, monkeypatch):
     """A bounded campaign shard overlaps jobs while receipts stay per-output."""
     source = tmp_path / "content/docs.aspose.org/en/words/net/page.md"
@@ -1016,7 +1135,9 @@ def test_shard_failure_does_not_block_later_shard_commits(tmp_path, monkeypatch)
     # own generated outputs show up as dirty later -- the source itself must
     # already be tracked, or _commit_verified_outputs's dirty-scope check
     # (rightly) refuses to commit anything at all.
-    subprocess.run(["git", "add", "baseline.txt", str(source.relative_to(repo))], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "add", "baseline.txt", str(source.relative_to(repo))], cwd=repo, check=True
+    )
     subprocess.run(["git", "commit", "-m", "baseline"], cwd=repo, check=True)
 
     payload = _manifest(repo)
@@ -1025,9 +1146,7 @@ def test_shard_failure_does_not_block_later_shard_commits(tmp_path, monkeypatch)
     manifest_path = tmp_path / "manifest.yaml"
     manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
     manifest = CampaignManifest.load(manifest_path)
-    outputs = {
-        locale: repo / payload["sources"][0]["outputs"][locale] for locale in ("es", "fr")
-    }
+    outputs = {locale: repo / payload["sources"][0]["outputs"][locale] for locale in ("es", "fr")}
 
     class Engine:
         def __init__(self):
@@ -1094,7 +1213,9 @@ def test_shard_failure_does_not_block_later_shard_commits(tmp_path, monkeypatch)
     assert "es" in summary["failed_shard_ids"][0]
 
     heal_queue_path = tmp_path / "ledger" / "heal_queue.jsonl"
-    tickets = [json.loads(line) for line in heal_queue_path.read_text(encoding="utf-8").splitlines()]
+    tickets = [
+        json.loads(line) for line in heal_queue_path.read_text(encoding="utf-8").splitlines()
+    ]
     assert len(tickets) == 1
     assert tickets[0]["target_lang"] == "es"
     assert tickets[0]["status"] == "OPEN"

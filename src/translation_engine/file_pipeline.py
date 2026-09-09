@@ -12,6 +12,7 @@ and mutates the TranslationResult directly.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from copy import deepcopy
@@ -188,6 +189,12 @@ class FileTranslationPipeline:
                     model_id_override=_llm_model_override or _model_id_pin,
                     tm_write_buffer=_tm_write_buffer,
                 )
+                # Persist only a digest in the in-memory result.  Campaign
+                # orchestration uses it to avoid repeatedly paying for an
+                # LLM candidate that has already failed the same gates.
+                result.candidate_sha256[target_lang] = hashlib.sha256(
+                    translated_content.encode("utf-8")
+                ).hexdigest()
 
                 # Pre-write validation (if enabled)
                 if should_validate and engine.validation_suite and engine.decision_engine:
@@ -378,7 +385,8 @@ class FileTranslationPipeline:
                                         result.validation_result = validation_result
                                         # TC-APT-090: see the note on the first call site.
                                         _fm_issues = engine._check_frontmatter_language(
-                                            translated_content, target_lang,
+                                            translated_content,
+                                            target_lang,
                                             source_content=content,
                                         )
                                         validation_result.issues.extend(_fm_issues)

@@ -114,7 +114,7 @@ def test_campaign_manifest_rejects_nllb_primary(tmp_path):
     }
     path = tmp_path / "m.yaml"
     path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
-    with pytest.raises(CampaignManifestError, match="m2m100_418m"):
+    with pytest.raises(CampaignManifestError, match="M2M100 primary"):
         CampaignManifest.load(path)
 
 

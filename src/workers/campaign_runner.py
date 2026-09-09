@@ -19,8 +19,10 @@ from typing import Any
 
 import yaml
 
+from src.model_runtime.campaign_llm_policy import campaign_llm_scope
 from src.utils.atomic_write import atomic_write
 from src.utils.file_lock import FileLock
+from src.workers.content_commit_title import content_commit_title
 from src.workers.git_provenance import (
     GovernedProvenanceError,
     governed_subject_pattern,
@@ -55,7 +57,7 @@ def _force_serialize_all_backends() -> bool:
         config = get_global_config() or {}
     except Exception:  # pragma: no cover - config load is exercised elsewhere
         return True
-    concurrency = ((config.get("translation_engine") or {}).get("concurrency") or {})
+    concurrency = (config.get("translation_engine") or {}).get("concurrency") or {}
     return bool(concurrency.get("force_serialize_all_backends", True))
 
 
@@ -130,6 +132,7 @@ class CampaignLedger:
         gate: str = "pipeline",
         source_sha256: str | None = None,
         candidate_sha256: str | None = None,
+        model_id: str | None = None,
     ) -> None:
         self._append(
             self.failures_path,
@@ -143,6 +146,7 @@ class CampaignLedger:
                 "attempt": attempt,
                 "source_sha256": source_sha256,
                 "candidate_sha256": candidate_sha256,
+                "model_id": model_id,
                 "failed_at": datetime.now(timezone.utc).isoformat(),
             },
         )
@@ -219,6 +223,30 @@ class CampaignLedger:
                 fsync=True,
                 create_parents=True,
             )
+
+    def model_outcomes(self) -> dict[str, dict[str, int]]:
+        """Return candidate-free, current-campaign model dispositions."""
+        outcomes: dict[str, dict[str, int]] = {}
+
+        def bucket(model_id: str) -> dict[str, int]:
+            return outcomes.setdefault(
+                model_id or "unknown",
+                {"accepted": 0, "rejected": 0, "provider_error": 0, "queued": 0},
+            )
+
+        for receipt in self.receipts().values():
+            bucket(str(receipt.get("model_fingerprint") or "unknown"))["accepted"] += 1
+        for failure in self._read_jsonl(self.failures_path):
+            model = bucket(str(failure.get("model_id") or "unknown"))
+            if str(failure.get("gate")) == "campaign_job_exception":
+                model["provider_error"] += 1
+            else:
+                model["rejected"] += 1
+        for ticket in self._read_jsonl(self.root.parent / "heal_queue.jsonl"):
+            if ticket.get("campaign_id") != self.root.name:
+                continue
+            bucket(str(ticket.get("processing_model") or "unknown"))["queued"] += 1
+        return dict(sorted(outcomes.items()))
 
 
 class CampaignRunner:
@@ -396,8 +424,13 @@ class CampaignRunner:
         # Professionalize request from lower-level repair helpers.  Those
         # cells fail closed and become queue tickets for the dedicated retry
         # consumer instead.
-        if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred":
-            self.engine.campaign_context["defer_llm_fallbacks"] = True
+        if hasattr(self.engine, "campaign_context"):
+            self.engine.campaign_context["defer_llm_fallbacks"] = (
+                self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+            )
+
+    def _llm_event(self, event):
+        self.ledger._append(self.ledger.root / "llm_calls.jsonl", event)
 
     @contextmanager
     def _rollback_serialization(self):
@@ -823,6 +856,10 @@ class CampaignRunner:
         commit_paths = sorted(dirty & allowed)
         if not commit_paths:
             return None
+        try:
+            title = content_commit_title(commit_paths, f"zero-defect shard {shard_id}")
+        except ValueError as exc:
+            raise CampaignManifestError(str(exc)) from exc
         for relative in commit_paths:
             receipt = receipts[relative]
             output = self.content_repo / relative
@@ -846,7 +883,7 @@ class CampaignRunner:
         if {Path(item).as_posix() for item in staged} != set(commit_paths):
             raise CampaignManifestError("staged diff differs from accepted output set")
         run_id = self._create_governed_skill_run(shard_id, len(commit_paths))
-        message = [f"content(locale): zero-defect shard {shard_id}"]
+        message = [title]
         if run_id:
             message.extend(
                 [
@@ -1842,6 +1879,14 @@ class CampaignRunner:
             locale,
             source_path=source_path,
         )
+        seen_failure_fingerprints = {
+            (str(row.get("candidate_sha256")), str(row.get("gate")))
+            for row in self.ledger.recent_failures(
+                output_path=expected_output,
+                target_lang=locale,
+            )
+            if row.get("candidate_sha256")
+        }
         try:
             for use_llm, retry_budget, attempt_number in phases:
                 # A manifest model pin takes precedence over the adaptive
@@ -1880,7 +1925,19 @@ class CampaignRunner:
                     "retry_budget_override": retry_budget,
                     "model_id": phase_model_id,
                 }
-                with self._rollback_serialization():
+                with (
+                    self._rollback_serialization(),
+                    campaign_llm_scope(
+                        self.manifest.retry_policy.get("llm_escalation_mode", "immediate"),
+                        "retry" if use_llm else "primary",
+                        self._llm_event,
+                        campaign_id=self.manifest.campaign_id,
+                        source_path=source.source_path,
+                        output_path=expected_output,
+                        target_lang=locale,
+                        attempt=attempt_number,
+                    ),
+                ):
                     result = self.engine.translate_file(
                         source.site_id, source_path, **translate_kwargs
                     )
@@ -1899,6 +1956,18 @@ class CampaignRunner:
                             f"rejected attempt produced an unreceipted output: {expected_output}"
                         )
                 failure_gate, failure_reason = self._failure_metadata(result)
+                candidate_sha256 = (getattr(result, "candidate_sha256", {}) or {}).get(locale)
+                failure_fingerprint = (str(candidate_sha256), failure_gate)
+                # A retry must be source-based and materially different when
+                # it is meant to repair a prior failure.  The first repeated
+                # paid candidate is recorded for audit, then further paid
+                # retries are suppressed; the normal terminal heal ticket
+                # path below retains the cell for a later consumer.
+                duplicate_paid_candidate = (
+                    use_llm
+                    and candidate_sha256
+                    and failure_fingerprint in seen_failure_fingerprints
+                )
                 next_feedback = self._retry_feedback(
                     result,
                     locale,
@@ -1913,8 +1982,25 @@ class CampaignRunner:
                     attempt=attempt_number,
                     job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
                     source_sha256=source.source_sha256,
+                    candidate_sha256=candidate_sha256,
+                    model_id=phase_model_id,
                     gate=failure_gate,
                 )
+                seen_failure_fingerprints.add(failure_fingerprint)
+                if duplicate_paid_candidate:
+                    self.ledger.append_failure(
+                        source_path=source.source_path,
+                        output_path=expected_output,
+                        target_lang=locale,
+                        error="duplicate_candidate_failure_fingerprint",
+                        attempt=attempt_number,
+                        job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
+                        source_sha256=source.source_sha256,
+                        candidate_sha256=candidate_sha256,
+                        model_id=phase_model_id,
+                        gate="duplicate_retry_suppressed",
+                    )
+                    break
         except Exception as exc:
             # An engine crash must not leave an unreceipted bytes-on-disk
             # candidate behind.  Expected output is manifest-scoped.
@@ -1934,6 +2020,7 @@ class CampaignRunner:
                 attempt=0,
                 job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
                 source_sha256=source.source_sha256,
+                model_id=(llm_model if "llm_model" in locals() else None),
                 gate="campaign_job_exception",
             )
             return False, expected_output
@@ -1961,6 +2048,16 @@ class CampaignRunner:
         section 21). UNAVAILABLE is recorded in the drift log, never treated as a pass.
         Returns the check as a dict for the run summary, or None when not applicable.
         """
+        if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred":
+            # The identity canary is itself a provider request.  A deferred
+            # campaign promises to enqueue Professionalize work rather than
+            # perform any in-run provider call, so record this explicitly
+            # instead of making an unaccounted exception to that policy.
+            return {
+                "status": "SKIPPED",
+                "reason": "llm_escalation_mode=deferred",
+                "cadence": "deferred",
+            }
         try:
             te_cfg = self.engine.config.get_config().get("translation_engine", {}) or {}
         except Exception:
@@ -2019,7 +2116,13 @@ class CampaignRunner:
             return summary
 
         # TC-APT-021: model-identity canary before new LLM work (cadence-gated).
-        self._llm_identity_check = self._llm_identity_gate()
+        with campaign_llm_scope(
+            self.manifest.retry_policy.get("llm_escalation_mode", "immediate"),
+            "identity",
+            self._llm_event,
+            campaign_id=self.manifest.campaign_id,
+        ):
+            self._llm_identity_check = self._llm_identity_gate()
 
         receipts = self._validated_resume_receipts() if resume else {}
         self.engine.campaign_context.update(
@@ -2094,6 +2197,7 @@ class CampaignRunner:
                     "shard_failed": shard_failed,
                     "accepted": accepted,
                     "failed": failed,
+                    "model_outcomes": self.ledger.model_outcomes(),
                 }
             )
             if shard_failed:
@@ -2110,6 +2214,7 @@ class CampaignRunner:
                         "commit_sha": commit_sha,
                         "accepted": accepted,
                         "failed": failed,
+                        "model_outcomes": self.ledger.model_outcomes(),
                     }
                 )
 
@@ -2120,6 +2225,7 @@ class CampaignRunner:
             "failed": failed,
             "failed_shard_ids": failed_shard_ids,
             "remaining": self.manifest.expected_output_count - accepted,
+            "model_outcomes": self.ledger.model_outcomes(),
             "status": (
                 "SHARD_SET_COMPLETE"
                 if partial and failed == 0

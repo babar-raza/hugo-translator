@@ -28,6 +28,8 @@ import logging
 import re
 from dataclasses import dataclass, field
 
+from src.model_runtime.campaign_llm_policy import llm_category
+
 logger = logging.getLogger(__name__)
 
 _JUDGE_SYSTEM_PROMPT = (
@@ -195,6 +197,7 @@ def _aligned_fidelity_chunks(
     return chunks or None
 
 
+@llm_category("validation")
 def judge_fidelity(
     source_text: str,
     translated_text: str,

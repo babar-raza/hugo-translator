@@ -3,11 +3,13 @@ Unified Translation Memory Interface.
 
 Coordinates L1 (cache), L2 (persistent), and L3 (semantic) layers.
 """
+
 from __future__ import annotations
 
 import logging
 from typing import Any
 
+from .intent_spool import TMIntentSpool
 from .l1_cache import L1Cache
 from .l2_persistent import L2PersistentTM, TranslationEntry
 from .normalization import hash_text
@@ -51,6 +53,7 @@ class TranslationMemory:
         improvement_queue: ImprovementQueue | None = None,
         language_detector: Any | None = None,
         similarity_tracker: Any | None = None,
+        intent_spool: TMIntentSpool | None = None,
     ):
         """
         Initialize unified TM.
@@ -75,6 +78,7 @@ class TranslationMemory:
         self.improvement_queue = improvement_queue
         self._language_detector = language_detector
         self._similarity_tracker = similarity_tracker
+        self.intent_spool = intent_spool
 
         # Share language detector with L2 to avoid duplicate model loads
         if language_detector is not None and hasattr(l2_persistent, "_lang_detector"):
@@ -114,7 +118,9 @@ class TranslationMemory:
             logger.warning(
                 "TM cache hit language mismatch: expected=%s got=%s (conf=%.2f) "
                 "— rejecting poisoned entry, forcing fresh translation",
-                tgt_lang, detected_lang, confidence,
+                tgt_lang,
+                detected_lang,
+                confidence,
             )
             self._poisoned_hits_rejected += 1
             return False
@@ -122,7 +128,8 @@ class TranslationMemory:
             logger.warning(
                 "TM language detector raised exception during hit validation "
                 "(tgt_lang=%s) — rejecting hit (fail-closed): %s",
-                tgt_lang, exc,
+                tgt_lang,
+                exc,
             )
             return False  # fail closed — detector errors reject the hit (TC-C3)
 
@@ -183,7 +190,9 @@ class TranslationMemory:
             )
 
         # Layer 2: Check persistent exact match
-        entry = self.l2.exact_lookup(site_id, src_lang, tgt_lang, text, context, field_name=field_name)
+        entry = self.l2.exact_lookup(
+            site_id, src_lang, tgt_lang, text, context, field_name=field_name
+        )
         if entry:
             # TC-12: Validate that the cached translation is actually in the target language.
             # Rejects poisoned L2 entries (e.g., Bulgarian stored under a Malay key).
@@ -287,7 +296,25 @@ class TranslationMemory:
         # Store in L1 cache (always update L1 - it's just a cache)
         self.l1.put(site_id, src_lang, tgt_lang, text, translation, field_name)
 
-        # Store in L2 persistent (respect overwrite setting)
+        # A configured spool is the single-writer boundary: workers retain a
+        # local L1 hint but never mutate L2/L3 themselves.
+        if self.intent_spool is not None:
+            self.intent_spool.enqueue(
+                {
+                    "site_id": site_id,
+                    "src_lang": src_lang,
+                    "tgt_lang": tgt_lang,
+                    "text": text,
+                    "translation": translation,
+                    "context": context,
+                    "metadata": metadata,
+                    "field_name": field_name,
+                    "overwrite": should_update,
+                }
+            )
+            return True
+
+        # Store in L2 persistent (legacy direct-write mode)
         stored = self.l2.store(
             site_id=site_id,
             src_lang=src_lang,
@@ -377,22 +404,37 @@ class TranslationMemory:
             cached = self.l1.get(req.site_id, req.src_lang, req.tgt_lang, req.text, req.field_name)
             if cached:
                 self._total_hits += 1
-                results[i] = LookupResult(hit=True, translation=cached, source="l1_cache", confidence=1.0)
+                results[i] = LookupResult(
+                    hit=True, translation=cached, source="l1_cache", confidence=1.0
+                )
                 continue
 
             # L2
             entry = self.l2.exact_lookup(
-                req.site_id, req.src_lang, req.tgt_lang, req.text, req.context, field_name=req.field_name
+                req.site_id,
+                req.src_lang,
+                req.tgt_lang,
+                req.text,
+                req.context,
+                field_name=req.field_name,
             )
             if entry:
                 if self._validate_hit_language(entry.translation, req.tgt_lang):
                     self.l1.put(
-                        req.site_id, req.src_lang, req.tgt_lang, req.text, entry.translation, req.field_name
+                        req.site_id,
+                        req.src_lang,
+                        req.tgt_lang,
+                        req.text,
+                        entry.translation,
+                        req.field_name,
                     )
                     self._total_hits += 1
                     results[i] = LookupResult(
-                        hit=True, translation=entry.translation,
-                        source="l2_exact", confidence=1.0, metadata=entry.metadata,
+                        hit=True,
+                        translation=entry.translation,
+                        source="l2_exact",
+                        confidence=1.0,
+                        metadata=entry.metadata,
                     )
                     continue
                 # Poisoned — fall through to L3
@@ -404,14 +446,16 @@ class TranslationMemory:
             batch_queries = []
             for i in l3_miss_indices:
                 req = requests[i]
-                batch_queries.append({
-                    "site_id": req.site_id,
-                    "src_lang": req.src_lang,
-                    "tgt_lang": req.tgt_lang,
-                    "query_text": req.text,
-                    "k": 5,
-                    "threshold": semantic_threshold,
-                })
+                batch_queries.append(
+                    {
+                        "site_id": req.site_id,
+                        "src_lang": req.src_lang,
+                        "tgt_lang": req.tgt_lang,
+                        "query_text": req.text,
+                        "k": 5,
+                        "threshold": semantic_threshold,
+                    }
+                )
 
             has_batch = hasattr(self.l3, "batch_semantic_search")
             if has_batch:
@@ -420,11 +464,16 @@ class TranslationMemory:
                 # Fallback: call semantic_search individually
                 batch_results = []
                 for bq in batch_queries:
-                    batch_results.append(self.l3.semantic_search(
-                        site_id=bq["site_id"], src_lang=bq["src_lang"],
-                        tgt_lang=bq["tgt_lang"], query_text=bq["query_text"],
-                        k=bq["k"], threshold=bq["threshold"],
-                    ))
+                    batch_results.append(
+                        self.l3.semantic_search(
+                            site_id=bq["site_id"],
+                            src_lang=bq["src_lang"],
+                            tgt_lang=bq["tgt_lang"],
+                            query_text=bq["query_text"],
+                            k=bq["k"],
+                            threshold=bq["threshold"],
+                        )
+                    )
 
             for j, i in enumerate(l3_miss_indices):
                 matches = batch_results[j]
@@ -432,13 +481,18 @@ class TranslationMemory:
                     best = matches[0]
                     req = requests[i]
                     if self._validate_hit_language(best.translation, req.tgt_lang):
-                        self.l1.put(req.site_id, req.src_lang, req.tgt_lang, req.text, best.translation)
+                        self.l1.put(
+                            req.site_id, req.src_lang, req.tgt_lang, req.text, best.translation
+                        )
                         self._total_hits += 1
                         self._l3_hits += 1
                         results[i] = LookupResult(
-                            hit=True, translation=best.translation,
-                            source="l3_semantic", confidence=best.similarity,
-                            candidates=matches, metadata=best.metadata,
+                            hit=True,
+                            translation=best.translation,
+                            source="l3_semantic",
+                            confidence=best.similarity,
+                            candidates=matches,
+                            metadata=best.metadata,
                         )
                         continue
                 # No L3 hit or poisoned

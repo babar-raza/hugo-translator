@@ -19,6 +19,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from src.model_runtime.campaign_llm_policy import llm_category
+
 from ..observability.progress import get_progress_tracker
 from ..utils.log_sanitizer import sanitize_for_log
 from .engine import estimate_token_count
@@ -26,6 +28,7 @@ from .exceptions import TranslationRetryableError
 from .extractor import SegmentExtractor, TextUnitKind
 from .models import TranslationStats, ValidationIssue, ValidationResult
 from .reconstructor import MarkdownReconstructor
+from .terminology.classification import get_default_protected_terms
 
 if TYPE_CHECKING:
     from .engine import TranslationEngine
@@ -169,7 +172,11 @@ def _restore_required_seo_separator(
         return translated_value
     separator = source_separator.group()
     rendered_separator = separator if separator == " - " else f" {separator} "
-    return translated_value[: product.start()].rstrip() + rendered_separator + translated_value[product.start() :]
+    return (
+        translated_value[: product.start()].rstrip()
+        + rendered_separator
+        + translated_value[product.start() :]
+    )
 
 
 _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
@@ -224,6 +231,16 @@ def _has_translatable_residue(
             residue = re.sub(pattern, " ", residue)
         except re.error:
             continue
+    # Preserve patterns are not the only governed source-language spans.  The
+    # terminology registry is also the canonical protection source for file
+    # formats, API identifiers, and product names.  A malformed Markdown row
+    # can be parsed as ordinary text (for example ``| — | | glTF |``); without
+    # masking the registered term, TC-SAS-01 mistakes that structural fragment
+    # for untranslated prose and retries it forever.  Exact terms are escaped
+    # deliberately: terminology is configuration, not executable regex.
+    for term in get_default_protected_terms().terms:
+        if term:
+            residue = re.sub(re.escape(term), " ", residue, flags=re.IGNORECASE)
     for token in re.findall(r"[^\W\d_]+", residue, flags=re.UNICODE):
         if len(token) >= min_word_len and not token.isupper():
             return True
@@ -657,6 +674,7 @@ class SegmentTranslator:
                 return chunk_candidate
         return translated_text
 
+    @llm_category("repair")
     def _repair_cross_field_frontmatter_residuals(
         self,
         engine,
@@ -678,6 +696,13 @@ class SegmentTranslator:
 
         residuals = find_cross_field_residuals(units)
         if not residuals:
+            return 0
+        if (getattr(engine, "campaign_context", {}) or {}).get("defer_llm_fallbacks"):
+            logger.info(
+                "TC-APT-042: deferred campaign leaves %d cross-field residual(s) "
+                "for page-level retry handling",
+                len(residuals),
+            )
             return 0
         backend = primary_model if hasattr(primary_model, "translate_with_context") else None
         if backend is None:
@@ -754,6 +779,7 @@ class SegmentTranslator:
             )
         return repaired
 
+    @llm_category("repair")
     def _repair_duplicate_heading_translations(
         self,
         engine,
@@ -774,6 +800,13 @@ class SegmentTranslator:
 
         collisions = find_duplicate_heading_translations(units)
         if not collisions:
+            return 0
+        if (getattr(engine, "campaign_context", {}) or {}).get("defer_llm_fallbacks"):
+            logger.info(
+                "heading-uniqueness: deferred campaign leaves %d collision(s) "
+                "for page-level retry handling",
+                len(collisions),
+            )
             return 0
         backend = primary_model if hasattr(primary_model, "translate_with_context") else None
         if backend is None:
@@ -1428,7 +1461,9 @@ class SegmentTranslator:
             with engine._model_lock:
                 backend = engine.model_loader.load_model(model_id)
             # TC-APT-004: record the model ACTUALLY used (load_model may have rerouted an open LLM)
-            stats.model_used = getattr(getattr(backend, "model_info", None), "model_id", None) or model_id
+            stats.model_used = (
+                getattr(getattr(backend, "model_info", None), "model_id", None) or model_id
+            )
 
             texts = [seg.source_text for seg in segments_to_translate]
 
@@ -1700,9 +1735,7 @@ class SegmentTranslator:
                     yaml_formatter,
                 )
                 if _fm_not_applied:
-                    _fm_error = (
-                        "frontmatter_segment_not_applied: " f"keys={sorted(_fm_not_applied)}"
-                    )
+                    _fm_error = f"frontmatter_segment_not_applied: keys={sorted(_fm_not_applied)}"
                     if getattr(engine, "validation_policy", "standard") == "zero-defect":
                         raise ValueError(_fm_error)
                     logger.warning(_fm_error)
@@ -2236,7 +2269,9 @@ class SegmentTranslator:
             _sas_min_len = int(_te_cfg_sas.get("same_as_source_min_length", 10))
             # The site profile owns the protected-span patterns, so the residue floor
             # sees exactly what the model saw after masking.
-            _sas_preserve_patterns = list(getattr(site_profile.body, "preserve_patterns", None) or [])
+            _sas_preserve_patterns = list(
+                getattr(site_profile.body, "preserve_patterns", None) or []
+            )
             _validation_policy_sas = getattr(engine, "validation_policy", "standard")
             _zero_defect_sas = _validation_policy_sas == "zero-defect"
             _sas_tolerance = _effective_same_as_source_tolerance(
@@ -2493,6 +2528,7 @@ class SegmentTranslator:
             logger.error(f"AST-based translation failed: {e}", exc_info=True)
             raise RuntimeError(f"AST-based translation failed: {e}")
 
+    @llm_category("repair")
     def _retry_dropped_placeholders_via_llm(
         self,
         segment,

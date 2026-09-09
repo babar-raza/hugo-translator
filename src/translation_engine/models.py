@@ -200,6 +200,10 @@ class TranslationResult:
     # Metadata-only gate outcomes for rejected candidates. Error strings are
     # intentionally excluded because they may contain candidate fragments.
     rejection_gate_results: dict[int, dict[str, Any]] = field(default_factory=dict)
+    # Candidate hashes are transient, metadata-only diagnostics for retry
+    # deduplication.  Candidate bytes never leave the file pipeline on a
+    # rejected run.
+    candidate_sha256: dict[str, str] = field(default_factory=dict)
 
     def __str__(self) -> str:
         """Human-readable summary."""

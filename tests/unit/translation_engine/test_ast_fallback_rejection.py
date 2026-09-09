@@ -65,7 +65,7 @@ def test_config_key_present():
     cfg_path = Path("config/global.yaml")
     if not cfg_path.exists():
         pytest.skip("config/global.yaml not present in working directory")
-    with open(cfg_path) as f:
+    with open(cfg_path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     te = cfg.get("translation_engine", {})
     assert "ast_fallback_node_tolerance" in te, (
@@ -318,7 +318,7 @@ def test_sas01_config_keys_present():
     cfg_path = Path("config/global.yaml")
     if not cfg_path.exists():
         pytest.skip("config/global.yaml not present in working directory")
-    with open(cfg_path) as f:
+    with open(cfg_path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     te = cfg.get("translation_engine", {})
     assert "same_as_source_tolerance" in te, (

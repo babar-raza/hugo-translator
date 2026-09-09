@@ -104,7 +104,7 @@ class _StubBackend:
 
 class TestRepairDuplicateHeadingTranslations:
     def _translator(self):
-        engine = SimpleNamespace(model_loader=None, _model_lock=None)
+        engine = SimpleNamespace(model_loader=None, _model_lock=None, campaign_context={})
         translator = SegmentTranslator.__new__(SegmentTranslator)
         translator._engine = engine
         return translator, engine
@@ -149,3 +149,20 @@ class TestRepairDuplicateHeadingTranslations:
         )
         assert repaired == 0
         assert backend.calls == []
+
+    def test_deferred_campaign_does_not_call_llm_heading_repair(self):
+        translator, engine = self._translator()
+        engine.campaign_context["defer_llm_fallbacks"] = True
+        units = [
+            _heading_unit("Introduction", "ã¯ã˜ã‚ã«", "body.0"),
+            _heading_unit("Getting Started", "ã¯ã˜ã‚ã«", "body.1"),
+        ]
+        backend = _StubBackend("ä½¿ã„æ–¹")
+
+        repaired = translator._repair_duplicate_heading_translations(
+            engine, units, backend, "en", "ja", TranslationStats()
+        )
+
+        assert repaired == 0
+        assert backend.calls == []
+        assert units[1].translated_text == "ã¯ã˜ã‚ã«"

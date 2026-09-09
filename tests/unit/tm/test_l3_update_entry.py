@@ -199,6 +199,7 @@ class TestSkipL3Flag:
         tm.l3 = mock_l3
         tm.override = mock_override
         tm.improvement_queue = None
+        tm.intent_spool = None
 
         tm.store(
             site_id="site",
@@ -234,6 +235,7 @@ class TestSkipL3Flag:
         tm.l3 = mock_l3
         tm.override = mock_override
         tm.improvement_queue = None
+        tm.intent_spool = None
 
         tm.store(
             site_id="site",

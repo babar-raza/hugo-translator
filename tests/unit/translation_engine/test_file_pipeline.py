@@ -98,6 +98,48 @@ def test_zero_defect_warning_block_preserves_verification_result_in_memory():
     engine._write_accepted_output.assert_not_called()
 
 
+def test_zero_defect_blocks_structural_warning_before_any_write():
+    """A topology warning is blocking under the configured campaign policy."""
+    from src.translation_engine.validation.post_translation_validator import (
+        ValidationDecision as PostValidationDecision,
+    )
+
+    engine = _make_engine(validation_enabled=True)
+    engine.validation_policy = "zero-defect"
+    structure_warning = SimpleNamespace(
+        severity="warning",
+        validator="StructureValidator",
+        check_name="structure",
+        location="links",
+        message="Link/image count mismatch: source has 1, translation has 2",
+        details={"source_count": 1, "translation_count": 2},
+    )
+    validation_result = SimpleNamespace(
+        issues=[structure_warning], error_count=0, warning_count=1, info_count=0
+    )
+    engine.validation_suite.validate_aggregated.return_value = validation_result
+    engine.decision_engine.make_decision.return_value = SimpleNamespace(
+        decision=PostValidationDecision.ACCEPT,
+        decision_reason="ordinary validator policy would accept",
+    )
+    verification_result = SimpleNamespace(
+        passed=True, issues=[], error_count=0, warning_count=0
+    )
+    engine._get_verification_agent.return_value.verify.return_value = verification_result
+    engine.parser.parse_string.return_value = SimpleNamespace(
+        frontmatter={"title": "Translated"}, body="Translated body"
+    )
+
+    result = _make_result()
+    language = FileTranslationPipeline(engine).translate_language(
+        _make_ctx(should_validate=True, should_verify=True), result
+    )
+
+    assert not language.success
+    assert result.error == "Zero-defect validation requires zero errors and zero warnings"
+    engine._write_output.assert_not_called()
+
+
 def _make_engine(
     validation_enabled=False,
     review_cache=None,

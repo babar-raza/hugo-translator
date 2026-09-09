@@ -191,13 +191,20 @@ class L2PersistentTM:
         max_size_bytes = max_size_mb * 1024 * 1024
 
         # Open LMDB environment
-        self.env = lmdb.open(
-            str(self.db_path),
-            map_size=max_size_bytes,
-            max_dbs=4,  # TC-APT-008: main + by_config_fingerprint lineage index
-            sync=True,  # Ensure durability
-            writemap=False,  # Safer for concurrent access
-        )
+        from src.tm.environment_lease import EnvironmentLease
+
+        self._environment_lease = EnvironmentLease(self.db_path)
+        try:
+            self.env = lmdb.open(
+                str(self.db_path),
+                map_size=max_size_bytes,
+                max_dbs=4,  # main + by_config_fingerprint lineage index
+                sync=True,
+                writemap=False,
+            )
+        except BaseException:
+            self._environment_lease.close()
+            raise
 
         self._lock = threading.RLock()
         self._lang_detector = None  # lazy-loaded; set externally or on first use
@@ -919,6 +926,9 @@ class L2PersistentTM:
         """Close database connection."""
         if self.env:
             self.env.close()
+        lease = getattr(self, "_environment_lease", None)
+        if lease is not None:
+            lease.close()
 
     def __enter__(self):
         """Context manager entry."""
