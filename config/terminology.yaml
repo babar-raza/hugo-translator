@@ -321,6 +321,51 @@ global:
       case_sensitive: false
       preserve_mode: protect
       severity: warning
+
+    # Brand-navigation-label suffixes (RB-002/RB-006, found 2026-09-09 reviewing
+    # wave24-blog-lowdensity): the portfolio-wide "[Aspose.X for <platform> —
+    # Enterprise <Suffix>]" footer link (products.aspose.com / reference.aspose.com
+    # / blog.aspose.com CTAs) is meant to keep its "Enterprise ..." tail in
+    # English by curated convention (config/review_rubric.yaml RB-002), same as
+    # "API Reference" above. It was NOT previously governed here, and the
+    # extractor's _link_text_is_brand_navigation_label only protects a link
+    # text when EVERY word after the brand token is Title-Case/ALL-CAPS -- this
+    # exact link shape fails that test because of the lowercase "for" in
+    # "Aspose.Words for Python", so the whole link (including the Enterprise
+    # suffix) falls through to ordinary translatable prose. Confirmed as a real,
+    # recurring defect, not isolated variance: wave24-blog-lowdensity/words-python
+    # mistranslated the "Enterprise Product" tail in 4/4 non-English-preserving
+    # locales tried (ar, hu, ja, ro) while ~20 other locales got it right by
+    # model judgment alone -- i.e. protection is currently down to luck, not a
+    # guarantee. Confirmed present (grep, 2026-09-09) across blog.aspose.org
+    # (Enterprise Blog / Enterprise Product / Enterprise Product Family),
+    # docs.aspose.org (Enterprise Documentation), and reference.aspose.org
+    # (Enterprise API Reference) -- portfolio-scale, not one site.
+    - term: "Enterprise Product Family"
+      category: brand_nav_phrase
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "Enterprise Product"
+      category: brand_nav_phrase
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "Enterprise Blog"
+      category: brand_nav_phrase
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "Enterprise Documentation"
+      category: brand_nav_phrase
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "Enterprise API Reference"
+      category: brand_nav_phrase
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
     - term: "API"
       category: technical_term
       case_sensitive: true
