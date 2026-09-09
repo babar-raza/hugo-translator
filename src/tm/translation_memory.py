@@ -516,6 +516,26 @@ class TranslationMemory:
         Returns:
             Number of entries stored
         """
+        if self.intent_spool is not None:
+            # Preserve the single-writer contract for bulk producers as well as
+            # individual segment stores.  The writer batches L2/L3 mutation;
+            # this reader merely records deterministic, idempotent intents.
+            for entry in entries:
+                self.intent_spool.enqueue(
+                    {
+                        "site_id": entry.site_id,
+                        "src_lang": entry.src_lang,
+                        "tgt_lang": entry.tgt_lang,
+                        "text": entry.source_text,
+                        "translation": entry.translation,
+                        "context": entry.context,
+                        "metadata": entry.metadata,
+                        "field_name": entry.field_name,
+                        "overwrite": True,
+                    }
+                )
+            return len(entries)
+
         # Store in L2 persistent (batch)
         count = self.l2.batch_store(entries)
 

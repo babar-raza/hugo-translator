@@ -79,6 +79,7 @@ def _make_worker(tmp_path: Path, stub_l3: StubL3 | None) -> TMImprovementWorker:
     # Use a mock with a real spec so call args are inspectable
     worker.tm = mock.MagicMock()
     worker.tm.l3 = stub_l3
+    worker.tm.intent_spool = None
     worker.tm.store.return_value = True  # simulate successful store
 
     return worker
@@ -205,3 +206,18 @@ class TestCaseCL3IsNone:
         assert kwargs.get("skip_l3") is False, (
             f"skip_l3 must be False when L3 is None; actual kwargs: {kwargs}"
         )
+
+
+class TestCaseDIntentSpoolConfigured:
+    def test_reader_never_mutates_l3_directly_when_spool_is_configured(self, tmp_path):
+        candidate = _make_candidate()
+        stub_l3 = StubL3(pre_populated_ids={_entry_id(candidate)})
+        worker = _make_worker(tmp_path, stub_l3)
+        worker.tm.intent_spool = object()
+
+        result = worker._improve_candidate(candidate)
+
+        assert result == "improved"
+        assert stub_l3.update_calls == []
+        _, kwargs = worker.tm.store.call_args
+        assert kwargs.get("skip_l3") is False

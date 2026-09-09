@@ -1187,7 +1187,11 @@ class TMImprovementWorker:
             # Attempt in-place L3 metadata update first (avoids duplicate vectors).
             # The entry_id format matches translation_memory.py:218.
             l3_updated = False
-            if self.tm is not None and self.tm.l3 is not None:
+            if (
+                self.tm is not None
+                and self.tm.l3 is not None
+                and getattr(self.tm, "intent_spool", None) is None
+            ):
                 entry_id = (
                     f"{candidate.site_id}:{candidate.src_lang}:"
                     f"{candidate.tgt_lang}:{hash_text(candidate.text)}"
