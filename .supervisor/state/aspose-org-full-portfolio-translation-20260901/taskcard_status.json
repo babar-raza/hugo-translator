@@ -1428,7 +1428,19 @@
  "last_wake_summary": "Continued: launched wave25 (4 zero-translation docs.aspose.org 3d/net/developer-guide pages, back to normal strict-tier-order since the breach was resolved). It hit 0% acceptance across ar+cs fully quarantined (RepetitionDetectorValidator) before I stopped it (SIGTERM, freed the TM lease deliberately rather than burn through 19 more locales blindly). Root-caused via sha256 3-gram matching against the real source: all failures traced to ONE shared template link, 'Aspose.3D for .NET -- Enterprise Documentation' (## See Also footer, identical across all 4 pages), which both models hallucinate/duplicate ~13x. Fixed the real gap: this link shape ('Aspose.X for <Platform> -- Enterprise <Suffix>') was never recognized as a protected brand-nav-label (lowercase 'for' connector defeated the existing check) -- extended text_unit_extractor.py with a narrow carve-out (commit 75bf700e, 13 new regression tests, 739 total unit+regression tests pass). Live-reverified against BOTH originally-failing cell sets per plan SS10.1 step 2: fix is correct (do_not_translate=True now confirmed set) but does NOT fully unblock either -- wave25 still fails identically (model hallucinates NEW copies elsewhere regardless of the original's protection status -- a generation-time issue, not an extraction gap) and wave24 words/python now hits the SAME 'both wrong language: en' symptom the earlier reverted terminology.yaml fix also produced (likely the short Related-Resources section's aggregate language-purity ratio tipping once the link is fully protected, not yet confirmed with a live text read). Kept the fix (it's independently correct and tested); quarantined both wave families from further blind retry pending separate follow-up investigation (heal_queue.jsonl manual-brand-nav-fix-75bf700e-status-both-waves). Released the 4 wave25 page claims. cells_committed_total still 385 (no new commits this segment -- this iteration was entirely root-cause/fix/verify work). wave_scale halved 4->2 (wave25 acceptance 0% < 60%, plan SS0.9 STEP-UP/DOWN rule).",
  "cells_committed_total": 385,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "run_id": "wave26-barcode-llm-20260910-r2",
+   "pid": 42048,
+   "manifest": "data/campaigns/manifests/wave26-barcode-llm-20260910-r2.yaml",
+   "purpose": "wave26 (wave_scale=2, post-halving): blog.aspose.org/barcode/python/_index.md, 22 LLM-primary locales. Deliberately carries the just-fixed 'Aspose.BarCode -- Enterprise Blog' for-Platform-Enterprise-Suffix link as a bonus live check of commit 75bf700e on a fresh, uncomplicated page (no code blocks, unlike wave25; not the short words/python page that hit the language-purity issue).",
+   "log_stdout": "logs/wave26-barcode-llm-20260910-r2.out.log",
+   "log_stderr": "logs/wave26-barcode-llm-20260910-r2.err.log",
+   "launched_at": "2026-09-09T19:56:00+00:00",
+   "status": "RUNNING",
+   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml (pay attention to whether the Enterprise Blog link is now correctly preserved in every locale); commit page-complete per plan section 19.2; THEN sequentially (never concurrently) build+launch: (1) the barcode/python m2m hu/ja/ro companion, (2) the docs.aspose.org/html/_index.md LLM wave (manifest not yet built), (3) its m2m companion"
+  }
+ ],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 2,
