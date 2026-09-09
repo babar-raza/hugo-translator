@@ -1425,22 +1425,10 @@
    ]
   }
  },
- "last_wake_summary": "Continued: launched wave25 (4 zero-translation docs.aspose.org 3d/net/developer-guide pages, back to normal strict-tier-order since the breach was resolved). It hit 0% acceptance across ar+cs fully quarantined (RepetitionDetectorValidator) before I stopped it (SIGTERM, freed the TM lease deliberately rather than burn through 19 more locales blindly). Root-caused via sha256 3-gram matching against the real source: all failures traced to ONE shared template link, 'Aspose.3D for .NET -- Enterprise Documentation' (## See Also footer, identical across all 4 pages), which both models hallucinate/duplicate ~13x. Fixed the real gap: this link shape ('Aspose.X for <Platform> -- Enterprise <Suffix>') was never recognized as a protected brand-nav-label (lowercase 'for' connector defeated the existing check) -- extended text_unit_extractor.py with a narrow carve-out (commit 75bf700e, 13 new regression tests, 739 total unit+regression tests pass). Live-reverified against BOTH originally-failing cell sets per plan SS10.1 step 2: fix is correct (do_not_translate=True now confirmed set) but does NOT fully unblock either -- wave25 still fails identically (model hallucinates NEW copies elsewhere regardless of the original's protection status -- a generation-time issue, not an extraction gap) and wave24 words/python now hits the SAME 'both wrong language: en' symptom the earlier reverted terminology.yaml fix also produced (likely the short Related-Resources section's aggregate language-purity ratio tipping once the link is fully protected, not yet confirmed with a live text read). Kept the fix (it's independently correct and tested); quarantined both wave families from further blind retry pending separate follow-up investigation (heal_queue.jsonl manual-brand-nav-fix-75bf700e-status-both-waves). Released the 4 wave25 page claims. cells_committed_total still 385 (no new commits this segment -- this iteration was entirely root-cause/fix/verify work). wave_scale halved 4->2 (wave25 acceptance 0% < 60%, plan SS0.9 STEP-UP/DOWN rule).",
- "cells_committed_total": 385,
+ "last_wake_summary": "Continued: wave26 (barcode/python, wave_scale=2) shipped clean. LLM half 22/22 accepted 0 failed; m2m half (hu/ja/ro) 3/3 accepted. Review: 21 APPROVE (19 LLM + hu/ro m2m), 4 REJECT (hi/ko/tr from subagent review + ja found on my own direct read) all sharing ONE recurring defect: the frontmatter title field inverts the 'for'-postposition attachment in every postpositional/particle language tried ('Aspose.BarCode <postposition> Python' instead of 'Python <postposition> Aspose.BarCode'), while each document's own body/description gets the identical relationship right -- ticketed as a likely title-path-specific producer gap (heal_queue.jsonl manual-wave26-barcode-title-postposition-inversion), TM purged, quarantined pending a second-page recurrence check. Committed 21 cells (0d98ffadd1) -- LIVE-CONFIRMS the brand-nav-link fix (75bf700e) works cleanly on an uncomplicated page: 'Aspose.BarCode -- Enterprise Blog' correctly preserved in English across all 21, zero RB-006 findings. cells_committed_total 385 -> 406. barcode/python now 21/25 (missing hi/ko/tr/ja, quarantined not blocked).",
+ "cells_committed_total": 406,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [
-  {
-   "run_id": "wave26-barcode-m2m-20260910",
-   "pid": 39000,
-   "manifest": "data/campaigns/manifests/wave26-barcode-m2m-20260910.yaml",
-   "purpose": "wave26 companion: barcode/python hu/ja/ro on m2m100_418m. LLM half (wave26-barcode-llm-20260910-r2) already COMPLETE: 22/22 accepted, 0 failed -- live-confirmed 'Aspose.BarCode -- Enterprise Blog' correctly preserved in English in the ar output. Review of the 22 LLM cells running in parallel (background subagent, not a translator-repo process, no lease conflict).",
-   "log_stdout": "logs/wave26-barcode-m2m-20260910.out.log",
-   "log_stderr": "logs/wave26-barcode-m2m-20260910.err.log",
-   "launched_at": "2026-09-09T19:56:00+00:00",
-   "status": "RUNNING",
-   "next_step_after_completion": "commit the 22 reviewed-approved LLM cells + the 3 m2m cells together (or separately if review finds any rejects) per plan section 19.2; THEN sequentially build+launch the docs.aspose.org/html/_index.md LLM wave (manifest already built: data/campaigns/manifests/wave26-html-llm-20260910.yaml) and its m2m companion"
-  }
- ],
+ "active_detached_runs": [],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 2,
