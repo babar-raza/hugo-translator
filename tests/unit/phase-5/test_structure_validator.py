@@ -201,6 +201,32 @@ Plus de texte sans code en ligne.
         assert result.success is True
         assert not any("code block" in issue.message.lower() for issue in result.issues)
 
+    def test_code_block_count_drift_tolerated_on_very_dense_page(self, validator):
+        """TC-APT-104: a flat +/-2 tolerance does not scale to very
+        code-reference-dense pages. Live-instrumented on
+        cells/go/developer-guide/features.md -> de (professionalize_llm,
+        scripts/ops/debug_code_block_count_diff.py): source=93 code elements
+        (5 fenced + 88 inline), translation=90 -- correctly rejected under the
+        old flat tolerance of 2, but diffing the actual source/translation
+        inline-span sets found no dropped identifier: every apparent
+        difference was the counting regex losing backtick pairing sync after
+        a benign adjacent-span merge in a dense API-summary table, the same
+        class of noise test_code_block_count_small_drift_tolerated_on_dense_page
+        already exists to absorb, just past its fixed ceiling.
+        """
+        # 45 lines x 2 inline spans = 90 code elements; add 3 fenced blocks to
+        # reach 93, matching the real page's 5 fenced + 88 inline = 93 total.
+        source = "\n".join(f"Use `member_{i}()` and `Field_{i}` together." for i in range(45))
+        source = "```go\ncode\n```\n\n" + source + "\n\n```go\ncode\n```\n\n```go\ncode\n```\n"
+        translation = "\n".join(
+            f"Utilisez `member_{i}()` et `Field_{i}` ensemble." for i in range(43)
+        )
+        translation = "```go\ncode\n```\n\n" + translation + "\n\n```go\ncode\n```\n\n```go\ncode\n```\n"
+        result = validator.validate(source, translation)
+
+        assert result.success is True
+        assert not any("code block" in issue.message.lower() for issue in result.issues)
+
     def test_link_preservation(self, validator):
         """Test link/image preservation."""
         source = """

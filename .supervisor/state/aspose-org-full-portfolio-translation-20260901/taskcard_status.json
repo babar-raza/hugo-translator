@@ -1380,6 +1380,19 @@
    "title": "producer_heading_compound_api_class_name_translated: bare (non-backtick) PascalCase compound identifiers (2+ camel-case humps, e.g. AnnotationCollection, TextAnnotation) had no preserve_pattern coverage outside code spans -- headings/prose transliterated them (hi: \"AnnotationCollection\" -> garbled phonetic mash; ar/it/nl: translated into generic nouns). Added global preserve_pattern (config/global.yaml body.preserve_patterns) matching bare 2+-hump PascalCase runs, single-hump words deliberately excluded (RB-006 carve-out). Regression: tests/regression/test_pascal_compound_identifier_protection.py (9 cases incl. 788-heading portfolio-sample false-positive check). Subsumes narrower TypeScript-only fix (eca736e). Fixes heal tickets heal-pdf-annotations-cpp-heading-class-name-untranslated, heal-pdf-annotations-cpp-hi-annotationcollection-glued, heal-pdf-annotations-cpp-hi-annotationcollection-summary -- reverification pending against a fresh regeneration (wave9 llm-retry candidates on disk predate this fix, config mtime is later than their generation).",
    "depends_on": [],
    "owner": "loop"
+  },
+  "TC-APT-104": {
+   "status": "IN_PROGRESS",
+   "gate": null,
+   "title": "Fix StructureValidator code-block-count false positive on very code-dense pages (found on wave23-cells-go)",
+   "depends_on": [],
+   "owner": "loop",
+   "blocking_reason": null,
+   "evidence_path": "data/summaries/fp-wave23-cells-go-structurevalidator-codeblock-20260909.json, data/summaries/fp-tc-apt-104-structurevalidator-live-verified-20260909.json, tests/unit/phase-5/test_structure_validator.py::test_code_block_count_drift_tolerated_on_very_dense_page, scripts/ops/debug_code_block_count_diff.py",
+   "commit": null,
+   "last_updated": "2026-09-09T14:45:00+00:00",
+   "blocker_type": null,
+   "note": "Live-instrumented root cause (features.md -> de, professionalize_llm): 93 source code elements (5 fenced + 88 inline) vs 90 translation -- benign adjacent-span-merge noise in a dense API table, not dropped content; confirmed no genuine identifier loss by diffing actual inline-span sets. Fix landed: structure_validator.py tolerance scaled from flat 2 to max(2, round(source_blocks*0.05)) for source_blocks>=10. Full validation suite green (510 passed, 0 failed). Reverification against the exact original failing file+lang launched as a background process, result pending -- do not mark DONE until read. RECURRENCE ESCALATION step 3 (retrigger the actual quarantined wave23-cells-go cells through campaign_runner.py) also still pending."
   }
  },
  "gate_closures": {
@@ -1401,7 +1414,19 @@
  "last_wake_summary": "Continued: dove deeper into the emphasis-exclusion investigation (found + fixed the nested-placeholder root cause via pattern ordering, validated clean across effectively all of blog.aspose.org + 3/5 other sites -- but found 2 MORE distinct block-structure failure modes, blockquote-multi-paragraph and table-row collapse -- correctly still deferred, documented precisely for a proper multi-stage landing). Then shipped barcode-rendering-svg-png-python 0->18/25 (f7a13b623c), the healthiest wave in several iterations -- 7 heal tickets filed (2 cross-locale zh/ja frontmatter residual, others isolated). TM purged. cells_committed_total now 292.",
  "cells_committed_total": 292,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "run_id": "tc-apt-104-reverify-features-de",
+   "pid": 53252,
+   "purpose": "RECURRENCE ESCALATION reverification: retranslate the exact original failing file+lang (cells/go/developer-guide/features.md -> de, professionalize_llm) with the TC-APT-104 tolerance fix live, via scripts/ops/debug_code_block_count_diff.py",
+   "log_stdout": "logs/tc-apt-104-reverify-features-de.out.log",
+   "log_stderr": "logs/tc-apt-104-reverify-features-de.err.log",
+   "launched_at": "2026-09-09T14:59:30+00:00",
+   "status": "RUNNING",
+   "note": "first attempt (bash-tool auto-backgrounded after 600s timeout) did not survive the turn boundary -- confirms the runbook L-note lesson about harness-level backgrounding not persisting. Relaunched as a genuine PowerShell Start-Process OS-detached child.",
+   "next_step_after_completion": "read the TranslationResult; if success=True (or fails for an unrelated reason with no code-block ERROR), that closes TC-APT-104 reverification step; then retrigger the actual quarantined wave23-cells-go campaign cells per RECURRENCE ESCALATION step 3"
+  }
+ ],
  "wave_scale": {
   "value": 4,
   "previous": 2,
