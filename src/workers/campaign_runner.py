@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -1031,6 +1032,56 @@ class CampaignRunner:
             self.ledger.write_summary(summary)
             return summary
 
+    # GC-01: git's own ref update uses a compare-and-swap lock, so a race
+    # between two sessions committing to the same shared checkout at the
+    # same instant fails loudly and safely (no corruption) with a message
+    # matching one of these patterns -- confirmed live this session
+    # ("fatal: cannot lock ref 'HEAD': is at X but expected Y"). This is a
+    # transient, always-safely-retryable condition, unlike a genuine hook
+    # rejection or merge conflict, which must still fail immediately.
+    _GIT_REF_LOCK_RETRY_PATTERNS = ("cannot lock ref", "unable to lock")
+    _GIT_REF_LOCK_MAX_ATTEMPTS = 3
+    _GIT_REF_LOCK_RETRY_DELAY_S = 1.5
+
+    def _git_commit_with_ref_lock_retry(self, message: list[str]) -> None:
+        """Run `git commit` with a bounded retry for ref-lock contention only.
+
+        Every other failure (hook rejection, nothing to commit, merge
+        conflict, ...) propagates immediately on the first attempt -- this
+        never masks a real failure, it only absorbs the specific, git-native,
+        always-safe-to-retry race two concurrent sessions committing to the
+        same shared checkout can hit.
+        """
+        last_exc: subprocess.CalledProcessError | None = None
+        for attempt in range(1, self._GIT_REF_LOCK_MAX_ATTEMPTS + 1):
+            try:
+                subprocess.run(
+                    ["git", "commit", "-m", *message],
+                    cwd=self.content_repo,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                return
+            except subprocess.CalledProcessError as exc:
+                stderr = (exc.stderr or "").lower()
+                is_ref_lock = any(pattern in stderr for pattern in self._GIT_REF_LOCK_RETRY_PATTERNS)
+                if not is_ref_lock or attempt == self._GIT_REF_LOCK_MAX_ATTEMPTS:
+                    if exc.stderr:
+                        logger.error("git commit failed: %s", exc.stderr.strip())
+                    raise
+                logger.warning(
+                    "git commit hit ref-lock contention (attempt %d/%d), retrying in %.1fs: %s",
+                    attempt,
+                    self._GIT_REF_LOCK_MAX_ATTEMPTS,
+                    self._GIT_REF_LOCK_RETRY_DELAY_S,
+                    exc.stderr.strip() if exc.stderr else exc,
+                )
+                last_exc = exc
+                time.sleep(self._GIT_REF_LOCK_RETRY_DELAY_S)
+        if last_exc:  # pragma: no cover - unreachable, loop always returns or raises
+            raise last_exc
+
     def _commit_verified_outputs(self, shard_id: str) -> str | None:
         """Commit only checksum-verified, receipted campaign outputs."""
         branch = self.manifest.commit_policy.get("branch")
@@ -1105,11 +1156,7 @@ class CampaignRunner:
                 ]
             )
         try:
-            subprocess.run(
-                ["git", "commit", "-m", *message],
-                cwd=self.content_repo,
-                check=True,
-            )
+            self._git_commit_with_ref_lock_retry(message)
         except Exception:
             self._finalize_governed_skill_run(run_id, "failure")
             raise
