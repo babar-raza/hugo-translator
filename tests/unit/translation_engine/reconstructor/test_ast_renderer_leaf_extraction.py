@@ -156,6 +156,16 @@ def test_list_item_with_link_text_in_unit_map_no_fallback(caplog):
     )
     assert "AST_FALLBACK" not in caplog.text
 
+    # TD-01 (TC-APT-105 audit): the diagnostic-counter/log-absence assertions
+    # above do NOT prove the rendered output is actually correct -- see
+    # test_ast_renderer_do_not_translate_leaf_matrix.py's module docstring
+    # for why this exact gap let TC-APT-105 ship undetected. Retrofitted
+    # here as the template: assert the real rendered markdown too.
+    output = renderer.render_to_markdown([list_node])
+    assert output.count("Hier klicken für Details") == 1, (
+        f"translated link text must appear exactly once in rendered output: {output!r}"
+    )
+
 
 # ---------------------------------------------------------------------------
 # Test 4: Mixed paragraph — one sibling translated, one not
