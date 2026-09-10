@@ -1960,58 +1960,122 @@ class SegmentTranslator:
             stats.ast_units_protected = protected_units
 
             # E2E FIX: Reuse existing translations if available
+            #
+            # HT-QUALITY-GATES-001 AST-reuse identity fix (2026-09-10): this
+            # used to key `source_to_translation` by re-normalized,
+            # placeholder-protected TEXT -- running `strip_markdown()` +
+            # a FRESH `PlaceholderManager()` per segment/unit. That was
+            # broken two ways:
+            #   1. False match: `PlaceholderManager.protect()` resets its
+            #      counter on every call, so ANY two single-span units
+            #      anywhere on the page (e.g. a lone `.xlsx` code span in a
+            #      table cell and an unrelated single-link nav paragraph)
+            #      reduce to the identical literal key "{PLACEHOLDER_0}" and
+            #      silently collide in the dict -- the wrong one's stored
+            #      translation gets reused.
+            #   2. False miss: the normalization here used only
+            #      `site_profile.body.preserve_patterns`, while the legacy
+            #      `segments` were originally built against the MERGED
+            #      baseline (`_merged_preserve_patterns` above, mirroring
+            #      SegmentExtractor's own `_get_global_body_preserve_patterns()
+            #      + site profile` merge). A unit protected differently by
+            #      the two normalizations missed its real match, fell into
+            #      `unmatched_units`, and got independently retranslated --
+            #      producing a second, different result for the same logical
+            #      content, which then failed the frontmatter placement-
+            #      consistency check under zero-defect policy
+            #      (`frontmatter_segment_not_applied`).
+            #
+            # Fix: key by stable node identity instead of re-derived text.
+            # Both legacy `Segment`s and AST `TextUnit`s are extracted from
+            # the SAME `doc.ast` node instances (this method receives the
+            # identical `doc` used to build `segments` earlier; there is no
+            # reparse in between), so every node already carries a stable
+            # address assigned once at parse time
+            # (`ASTNode.assign_addresses()`). `TextUnit.node_addr` already
+            # exposes this. Frontmatter `Segment`s already carry the matching
+            # key as `context.frontmatter_key` (identical to the
+            # `frontmatter.<key>` / `frontmatter.<key>[i]` addresses
+            # `TextUnitExtractor._extract_frontmatter_units()` assigns).
+            # Body `Segment`s (paragraph/heading/list-item granularity) did
+            # not previously carry their own node's address at all --
+            # `SegmentContext.node_addr` (segment_extractor.py) threads the
+            # already-existing `ASTNode.node_addr` through instead of
+            # inventing a new identity scheme.
+            #
+            # A body Segment's translation covers ALL of that node's
+            # descendant text as one combined string, so reuse is only sound
+            # when the node has EXACTLY ONE translatable AST leaf descendant
+            # (the segment truly IS that one leaf -- e.g. a paragraph that is
+            # just a single link). Otherwise the combined translation cannot
+            # be correctly split across multiple independent TextUnits, and
+            # each is left to translate independently, same as before.
             reused_count = 0
             not_matched_count = 0
             if segments and translations:
-                import re
+                source_to_translation: dict[str, str] = {}
 
-                def strip_markdown(text: str) -> str:
-                    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
-                    text = re.sub(r"\*(.+?)\*", r"\1", text)
-                    text = re.sub(r"`(.+?)`", r"\1", text)
-                    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
-                    return text
+                _body_units = [
+                    u
+                    for u in plan.units
+                    if not u.do_not_translate
+                    and u.source_text
+                    and not (u.node_addr or "").startswith("frontmatter.")
+                ]
 
-                from .extractor.placeholder_manager import PlaceholderManager
-
-                pm = PlaceholderManager()
-                preserve_patterns = site_profile.body.preserve_patterns or []
-
-                source_to_translation = {}
                 for segment in segments:
-                    if segment.id in translations and translations[segment.id]:
-                        if not self._can_reuse_ast_translation(
-                            segment, translations[segment.id], model_id_override
-                        ):
-                            continue
-                        normalized_source = strip_markdown(segment.source_text)
-                        protected_source, _ = pm.protect(normalized_source, preserve_patterns)
-                        source_to_translation[protected_source] = translations[segment.id]
+                    if segment.id not in translations or not translations[segment.id]:
+                        continue
+                    translation = translations[segment.id]
+                    if not self._can_reuse_ast_translation(
+                        segment, translation, model_id_override
+                    ):
+                        continue
+
+                    ctx = segment.context
+                    if (
+                        ctx
+                        and str(ctx.context_type) == "SegmentContextType.FRONTMATTER"
+                        and ctx.frontmatter_key
+                    ):
+                        source_to_translation[f"frontmatter.{ctx.frontmatter_key}"] = translation
+                        continue
+
+                    seg_addr = getattr(ctx, "node_addr", None) if ctx else None
+                    if not seg_addr:
+                        continue
+
+                    sole_unit = None
+                    match_count = 0
+                    for u in _body_units:
+                        if u.node_addr == seg_addr or u.node_addr.startswith(seg_addr + "."):
+                            match_count += 1
+                            if match_count > 1:
+                                sole_unit = None
+                                break
+                            sole_unit = u
+                    if sole_unit is not None:
+                        source_to_translation[sole_unit.node_addr] = translation
 
                 logger.debug(
                     f"E2E DEBUG: Built mapping with {len(source_to_translation)} segment translations"
                 )
                 logger.debug(
-                    f"E2E DEBUG: First 3 normalized segment source_texts: {list(source_to_translation.keys())[:3]}"
+                    f"E2E DEBUG: First 3 mapped node addresses: {list(source_to_translation.keys())[:3]}"
                 )
 
                 unmatched_units = []
                 for unit in plan.units:
                     if not unit.do_not_translate and unit.source_text:
-                        normalized_unit_source = strip_markdown(unit.source_text)
-                        protected_unit_source, _ = pm.protect(
-                            normalized_unit_source, preserve_patterns
-                        )
-
-                        if protected_unit_source in source_to_translation:
-                            unit.translated_text = source_to_translation[protected_unit_source]
+                        if unit.node_addr in source_to_translation:
+                            unit.translated_text = source_to_translation[unit.node_addr]
                             reused_count += 1
                         else:
                             not_matched_count += 1
                             unmatched_units.append(unit)
                             if not_matched_count <= 5:
                                 logger.debug(
-                                    f"E2E DEBUG: Unmatched unit [{unit.kind}]: normalized={normalized_unit_source[:80]}"
+                                    f"E2E DEBUG: Unmatched unit [{unit.kind}]: node_addr={unit.node_addr}"
                                 )
 
                 logger.info(

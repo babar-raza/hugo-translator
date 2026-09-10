@@ -767,3 +767,220 @@ class TestAstModelOverride:
             )
 
         engine.model_loader.load_model.assert_called_once_with("professionalize_llm")
+
+
+# ---------------------------------------------------------------------------
+# HT-QUALITY-GATES-001 AST-reuse identity fix (2026-09-10)
+#
+# `_translate_body_ast()`'s legacy-translation reuse map used to key
+# `source_to_translation` by re-normalized, placeholder-protected TEXT (a
+# fresh `PlaceholderManager` instance per lookup). That was broken two ways:
+#   1. False match: `PlaceholderManager.protect()` resets its counter on
+#      every call, so any two single-span units anywhere on the page reduce
+#      to the identical literal key "{PLACEHOLDER_0}" and silently collide --
+#      confirmed live: a table's `.xlsx`/`.csv` code-span cell got restored
+#      with an unrelated brand-navigation link's already-translated text,
+#      identically across every locale.
+#   2. False miss: the re-normalization used only
+#      `site_profile.body.preserve_patterns`, diverging from whatever
+#      protection the two source strings actually carry, sending a unit to
+#      independent re-translation that disagreed with the legacy
+#      `translations[]` entry for the same frontmatter field -- raising
+#      `frontmatter_segment_not_applied` under zero-defect policy.
+#
+# The fix keys reuse by stable node identity instead: `TextUnit.node_addr`
+# for body units (restricted to Segments with exactly one translatable AST
+# leaf descendant), and the shared `frontmatter.<key>` address for
+# frontmatter Segments/TextUnits. These tests construct the exact collision/
+# divergence conditions the old text-keyed map was vulnerable to and assert
+# the new identity-keyed map is immune by construction.
+# ---------------------------------------------------------------------------
+
+
+class TestASTReuseIdentityFix:
+    """Regression tests for the identity-keyed AST-reuse map."""
+
+    @staticmethod
+    def _run(doc, site_profile, segments, translations, plan, target_lang="tr"):
+        engine = _make_engine()
+        translator = SegmentTranslator(engine)
+
+        with (
+            patch("src.translation_engine.extractor.TextUnitExtractor") as MockExt,
+            patch("src.translation_engine.reconstructor.ASTRenderer") as MockRenderer,
+        ):
+            mock_ext = MagicMock()
+            mock_ext.extract_from_ast.return_value = plan
+            mock_ext.batch_translate_units.return_value = plan.units
+            mock_ext.batch_stats = {}
+            mock_ext._batch_calls = 0
+            mock_ext._individual_fallbacks = 0
+            MockExt.return_value = mock_ext
+
+            mock_renderer = MagicMock()
+            mock_renderer.placeholder_leak_count = 0
+            mock_renderer._missing_node_count = 0
+            mock_renderer.applied_units = []
+            mock_renderer.render_to_markdown.return_value = "body\n"
+            MockRenderer.return_value = mock_renderer
+
+            translator._translate_body_ast(
+                doc=doc,
+                target_lang=target_lang,
+                site_profile=site_profile,
+                stats=_make_stats(),
+                segments=segments,
+                translations=translations,
+                model_id_override="m2m100_418m",
+            )
+
+    def test_two_single_span_units_that_would_collide_under_old_text_key_stay_independent(self):
+        """Bug 1 regression: a single-link paragraph and an unrelated single
+        code-span table cell reduce to the IDENTICAL literal key under the
+        retired strip_markdown()+fresh-PlaceholderManager() scheme -- proven
+        directly below -- but must not collide under the new address-keyed
+        map.
+        """
+        import re as _re
+
+        from src.translation_engine.extractor.placeholder_manager import (
+            PlaceholderManager,
+        )
+        from src.translation_engine.extractor.segment_extractor import (
+            Segment,
+            SegmentContext,
+            SegmentContextType,
+        )
+        from src.translation_engine.extractor.text_unit import (
+            BodyTranslationPlan,
+            TextUnit,
+            TextUnitKind,
+        )
+
+        def _old_style_key(text: str) -> str:
+            stripped = _re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+            stripped = _re.sub(r"`(.+?)`", r"\1", stripped)
+            protected, _ = PlaceholderManager().protect(stripped, [r".+"])
+            return protected
+
+        link_key = _old_style_key("[Free Support Forum](https://x.example/forum)")
+        code_key = _old_style_key("`.xlsx`")
+        assert link_key == code_key == "{PLACEHOLDER_0}", (
+            "sanity check: this is exactly the collision the retired "
+            "text-keyed reuse map was vulnerable to"
+        )
+
+        link_segment = Segment(
+            id="seg-link",
+            source_text="[Free Support Forum](https://x.example/forum)",
+            context=SegmentContext(
+                context_type=SegmentContextType.BODY_TEXT,
+                node_addr="body.para[7]",
+            ),
+            site_id="blog.aspose.org",
+            source_lang="en",
+        )
+        code_segment = Segment(
+            id="seg-code",
+            source_text="`.xlsx`",
+            context=SegmentContext(
+                context_type=SegmentContextType.BODY_TEXT,
+                node_addr="body.table[0].tablerow[1].tablecell[1]",
+            ),
+            site_id="blog.aspose.org",
+            source_lang="en",
+        )
+        segments = [link_segment, code_segment]
+        translations = {
+            "seg-link": "Ücretsiz Destek Forumu",
+            "seg-code": ".xlsx",
+        }
+
+        link_unit = TextUnit(
+            unit_id="u-link",
+            node_addr="body.para[7].link[0].text[0]",
+            kind=TextUnitKind.LINK_TEXT,
+            source_text="Free Support Forum",
+        )
+        code_unit = TextUnit(
+            unit_id="u-code",
+            node_addr="body.table[0].tablerow[1].tablecell[1]",
+            kind=TextUnitKind.TABLE_CELL_TEXT,
+            source_text="`.xlsx`",
+        )
+        plan = BodyTranslationPlan(
+            ast=[], units=[link_unit, code_unit], ast_fingerprint="test-fp"
+        )
+
+        doc = MagicMock()
+        doc.ast = []
+        doc.frontmatter = {}
+        doc.source_path = None
+
+        site_profile = MagicMock()
+        site_profile.default_source_lang = "en"
+        site_profile.body.preserve_patterns = [r".+"]
+
+        self._run(doc, site_profile, segments, translations, plan)
+
+        assert link_unit.translated_text == "Ücretsiz Destek Forumu"
+        assert code_unit.translated_text == ".xlsx"
+
+    def test_frontmatter_reuse_matches_by_address_despite_source_text_divergence(self):
+        """Bug 2 regression: the legacy Segment's and the AST TextUnit's
+        source strings are made to diverge on purpose here (simulating the
+        historical merged-vs-unmerged preserve_patterns mismatch, or any
+        other cause of textual disagreement between the two extraction
+        paths). Reuse must still succeed because both sides share the same
+        `frontmatter.<key>` address -- text content is no longer compared at
+        all.
+        """
+        from src.translation_engine.extractor.segment_extractor import (
+            Segment,
+            SegmentContext,
+            SegmentContextType,
+        )
+        from src.translation_engine.extractor.text_unit import (
+            BodyTranslationPlan,
+            TextUnit,
+            TextUnitKind,
+        )
+
+        segment = Segment(
+            id="seg-description",
+            source_text="Learn how to work with {PLACEHOLDER_0} in C++.",
+            context=SegmentContext(
+                context_type=SegmentContextType.FRONTMATTER,
+                frontmatter_key="description",
+            ),
+            site_id="blog.aspose.org",
+            source_lang="en",
+        )
+        translations = {"seg-description": "Tanulja meg, hogyan dolgozzon."}
+
+        unit = TextUnit(
+            unit_id="u-description",
+            node_addr="frontmatter.description",
+            kind=TextUnitKind.TEXT,
+            # Deliberately raw/unprotected text -- would NOT textually match
+            # segment.source_text under any strip_markdown()+protect() scheme.
+            source_text="Learn how to work with AnnotationCollection in C++.",
+            metadata={
+                "field_name": "description",
+                "original_text": "Learn how to work with AnnotationCollection in C++.",
+            },
+        )
+        plan = BodyTranslationPlan(ast=[], units=[unit], ast_fingerprint="test-fp")
+
+        doc = MagicMock()
+        doc.ast = []
+        doc.frontmatter = {"description": "Learn how to work with AnnotationCollection in C++."}
+        doc.source_path = None
+
+        site_profile = MagicMock()
+        site_profile.default_source_lang = "en"
+        site_profile.body.preserve_patterns = []
+
+        self._run(doc, site_profile, [segment], translations, plan, target_lang="hu")
+
+        assert unit.translated_text == translations["seg-description"]
