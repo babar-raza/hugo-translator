@@ -1425,24 +1425,16 @@
    ]
   }
  },
- "last_wake_summary": "Continued: wave26 (barcode/python, wave_scale=2) shipped clean. LLM half 22/22 accepted 0 failed; m2m half (hu/ja/ro) 3/3 accepted. Review: 21 APPROVE (19 LLM + hu/ro m2m), 4 REJECT (hi/ko/tr from subagent review + ja found on my own direct read) all sharing ONE recurring defect: the frontmatter title field inverts the 'for'-postposition attachment in every postpositional/particle language tried ('Aspose.BarCode <postposition> Python' instead of 'Python <postposition> Aspose.BarCode'), while each document's own body/description gets the identical relationship right -- ticketed as a likely title-path-specific producer gap (heal_queue.jsonl manual-wave26-barcode-title-postposition-inversion), TM purged, quarantined pending a second-page recurrence check. Committed 21 cells (0d98ffadd1) -- LIVE-CONFIRMS the brand-nav-link fix (75bf700e) works cleanly on an uncomplicated page: 'Aspose.BarCode -- Enterprise Blog' correctly preserved in English across all 21, zero RB-006 findings. cells_committed_total 385 -> 406. barcode/python now 21/25 (missing hi/ko/tr/ja, quarantined not blocked).",
- "cells_committed_total": 406,
+ "last_wake_summary": "Continued: wave26's second page (docs.aspose.org/html) shipped clean. The original detached launch (PID 47648) died silently across an ~8h multi-turn session gap after only 6/22 cells -- no traceback. Root-caused the launch mechanism itself: a second attempt adding CREATE_BREAKAWAY_FROM_JOB crashed immediately with a Fortran-runtime 'window-CLOSE event' abort (console-control-event propagation, not Job Object lifetime); switched to PowerShell Start-Process -WindowStyle Hidden (real independent console) and resumed via --resume against the existing 6 receipts -- this survived to completion: 22/22 accepted, 0 failed. Review: 22/22 APPROVE, zero rejects -- second independent live confirmation the brand-nav-link fix (75bf700e) works ('Aspose.HTML -- Enterprise Documentation' preserved in all 22); also confirmed the title-postposition-inversion ticket is page-shape-dependent, not universal (this page's title 'Aspose.HTML FOSS' has no for-Y structure, so hi/ko/tr show no defect here -- inapplicable, not a counter-example). Committed 22 cells (d77242dce2). cells_committed_total 406 -> 428. html/_index now 22/25 pending its m2m hu/ja/ro companion (manifest built, launch blocked by a live peer edit on segment_extractor.py/segment_translator.py/campaign_runner.py -- not touched, waiting for it to land). LESSON recorded for future launches: always use PowerShell Start-Process -WindowStyle Hidden for detached campaigns, never subprocess.Popen with DETACHED_PROCESS flags alone -- confirmed unreliable across session gaps in this environment.",
+ "cells_committed_total": 428,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [
-  {
-   "run_id": "wave26-html-llm-20260910-r2-resume2",
-   "pid": 25680,
-   "manifest": "data/campaigns/manifests/wave26-html-llm-20260910-r2.yaml",
-   "purpose": "wave26 second page (wave_scale=2): docs.aspose.org/en/html/_index.md, 22 LLM-primary locales, --resume (6/22 already accepted from the original PID 47648 run). Also carries a for-Platform-Enterprise-Suffix link ('Aspose.HTML -- Enterprise Documentation') -- second independent live check of commit 75bf700e.",
-   "log_stdout": "logs/wave26-html-resume2.out.log",
-   "log_stderr": "logs/wave26-html-resume2.err.log",
-   "launched_at": "2026-09-10T04:43:00+00:00",
-   "status": "RUNNING",
-   "lesson": "PID 47648 (original launch, subprocess.Popen with DETACHED_PROCESS|CREATE_NEW_PROCESS_GROUP) died silently across a session boundary after 6/22 cells -- no traceback, stderr empty. A second attempt adding CREATE_BREAKAWAY_FROM_JOB (PID 38428) crashed immediately with 'forrtl: error (200): program aborting due to window-CLOSE event' (a Fortran-runtime/MKL console-control-event handler treating something as a close signal) -- so the issue is console-control-event propagation, not Job Object lifetime. Switched launch mechanism entirely to PowerShell Start-Process -WindowStyle Hidden -RedirectStandardOutput/-RedirectStandardError -PassThru (this run, PID 25680), which gives the child a real independent console rather than none at all. If THIS also dies at a session boundary, the mechanism is not the variable -- something at the session-teardown layer itself is signaling detached children, and this needs a different mitigation (e.g. checkpoint more eagerly, treat any detached campaign as unreliable across a multi-turn gap and always resume rather than trust it finished).",
-   "next_step_after_completion": "review accepted candidates; commit page-complete per plan section 19.2; THEN sequentially build+launch the m2m hu/ja/ro companion"
-  }
- ],
- "blocked_pending_clean_translator_repo": null,
+ "active_detached_runs": [],
+ "blocked_pending_clean_translator_repo": {
+  "reason": "live peer edit on src/translation_engine/extractor/segment_extractor.py, src/translation_engine/segment_translator.py, src/workers/campaign_runner.py + new test tests/unit/workers/test_campaign_runner_deterministic_retry_collapse.py -- not touched, blocking any new campaign launch until it lands.",
+  "queued_work": [
+   "html/_index m2m hu/ja/ro companion, manifest already built: data/campaigns/manifests/wave26-html-m2m-20260910.yaml (rebuild fresh before use, sha/TM fingerprint will drift)"
+  ]
+ },
  "wave_scale": {
   "value": 2,
   "previous": 4,
