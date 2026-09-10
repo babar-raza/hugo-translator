@@ -1458,9 +1458,9 @@
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [
   {
-   "campaign_id": "wave-cellsrust-getstart-20260911r3",
-   "pid": 49532,
-   "manifest": "data/campaigns/manifests/wave-cellsrust-getstart-20260911r3.yaml",
+   "campaign_id": "wave-cellsrust-getstart-20260911r4",
+   "pid": null,
+   "manifest": "data/campaigns/manifests/wave-cellsrust-getstart-20260911r4.yaml",
    "sources": [
     "content/docs.aspose.org/en/cells/rust/developer-guide/working-with-spreadsheet-management.md",
     "content/docs.aspose.org/en/cells/rust/getting-started/_index.md",
@@ -1472,7 +1472,7 @@
    "expected_output_count": 125,
    "launched_at": "2026-09-11T01:02:00+05:00",
    "launched_by": "interactive-continue-20260910f",
-   "notes": "r1 (PID 64688, dirty-tree) and r2 (PID 25872, SHA drift) both instantly died on verify_environment races, zero summary.json either time -- confirmed via log inspection, not assumed. r3 launched clean, surviving past the initial check this time."
+   "notes": "r1/r2/r3 all instantly died on verify_environment (dirty/SHA-drift) -- root-caused: self-inflicted, this session was committing a taskcard_status.json bookkeeping update immediately AFTER each launch, moving HEAD again while the just-started process was still pre-verify_environment. See project/loop-prompt.md 2026-09-11 field note. Fix applied: this commit (bookkeeping for r4) lands BEFORE r4 launches, and no further translator-repo commits happen until r4 shows real progress. PID to be filled in once launched."
   }
  ],
  "blocked_pending_clean_translator_repo": null,
