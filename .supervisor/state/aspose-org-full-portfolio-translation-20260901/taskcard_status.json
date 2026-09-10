@@ -1430,14 +1430,15 @@
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [
   {
-   "run_id": "wave26-html-llm-20260910-r2",
-   "pid": 47648,
+   "run_id": "wave26-html-llm-20260910-r2-resume2",
+   "pid": 25680,
    "manifest": "data/campaigns/manifests/wave26-html-llm-20260910-r2.yaml",
-   "purpose": "wave26 second page (wave_scale=2): docs.aspose.org/en/html/_index.md, 22 LLM-primary locales. Also carries a for-Platform-Enterprise-Suffix link ('Aspose.HTML -- Enterprise Documentation') -- second independent live check of commit 75bf700e.",
-   "log_stdout": "logs/wave26-html-llm-20260910-r2.out.log",
-   "log_stderr": "logs/wave26-html-llm-20260910-r2.err.log",
-   "launched_at": "2026-09-09T20:36:00+00:00",
+   "purpose": "wave26 second page (wave_scale=2): docs.aspose.org/en/html/_index.md, 22 LLM-primary locales, --resume (6/22 already accepted from the original PID 47648 run). Also carries a for-Platform-Enterprise-Suffix link ('Aspose.HTML -- Enterprise Documentation') -- second independent live check of commit 75bf700e.",
+   "log_stdout": "logs/wave26-html-resume2.out.log",
+   "log_stderr": "logs/wave26-html-resume2.err.log",
+   "launched_at": "2026-09-10T04:43:00+00:00",
    "status": "RUNNING",
+   "lesson": "PID 47648 (original launch, subprocess.Popen with DETACHED_PROCESS|CREATE_NEW_PROCESS_GROUP) died silently across a session boundary after 6/22 cells -- no traceback, stderr empty. A second attempt adding CREATE_BREAKAWAY_FROM_JOB (PID 38428) crashed immediately with 'forrtl: error (200): program aborting due to window-CLOSE event' (a Fortran-runtime/MKL console-control-event handler treating something as a close signal) -- so the issue is console-control-event propagation, not Job Object lifetime. Switched launch mechanism entirely to PowerShell Start-Process -WindowStyle Hidden -RedirectStandardOutput/-RedirectStandardError -PassThru (this run, PID 25680), which gives the child a real independent console rather than none at all. If THIS also dies at a session boundary, the mechanism is not the variable -- something at the session-teardown layer itself is signaling detached children, and this needs a different mitigation (e.g. checkpoint more eagerly, treat any detached campaign as unreliable across a multi-turn gap and always resume rather than trust it finished).",
    "next_step_after_completion": "review accepted candidates; commit page-complete per plan section 19.2; THEN sequentially build+launch the m2m hu/ja/ro companion"
   }
  ],
