@@ -1430,15 +1430,15 @@
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [
   {
-   "run_id": "wave27-llm-20260910-r2",
-   "pid": 49700,
-   "manifest": "data/campaigns/manifests/wave27-llm-20260910-r2.yaml",
-   "purpose": "wave27 (wave_scale=4, stepped back up): 4 zero-translation docs.aspose.org product category pages (pdf/cpp, pdf/python, pdf/typescript, words/net/_index.md), 22 LLM-primary locales. All 4 have 'for'-structured titles (Aspose.X FOSS for Platform) and the Enterprise Documentation link pattern -- more data on both open tickets (title-postposition-inversion, brand-nav-link fix) while shipping. Launched via PowerShell Start-Process (proven mechanism).",
-   "log_stdout": "logs/wave27-llm-20260910-r2.out.log",
-   "log_stderr": "logs/wave27-llm-20260910-r2.err.log",
-   "launched_at": "2026-09-10T05:35:00+00:00",
+   "run_id": "wave27b-llm-20260910",
+   "pid": 48096,
+   "manifest": "data/campaigns/manifests/wave27b-llm-20260910.yaml",
+   "purpose": "wave27 rescoped: stopped the original 4-page run (PID 49700) after 9/9 locales tried for pdf/cpp all failed identically on FrontmatterLanguageCheck/title (100% failure) -- ticketed (heal_queue.jsonl manual-wave27-pdf-cpp-title-frontmatterlanguagecheck), claim released, page pulled from scope. Relaunched with just the other 3 pages (pdf/python, pdf/typescript, words/net), 22 LLM-primary locales, 66 cells.",
+   "log_stdout": "logs/wave27b-llm-20260910.out.log",
+   "log_stderr": "logs/wave27b-llm-20260910.err.log",
+   "launched_at": "2026-09-10T06:00:00+00:00",
    "status": "RUNNING",
-   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml (pay special attention to titles in hi/ko/tr/ja for the postposition-inversion pattern -- 4 pages of live data now); commit page-complete per plan section 19.2; THEN sequentially build+launch the m2m hu/ja/ro companion (manifest already built: data/campaigns/manifests/wave27-m2m-20260910.yaml, will need a fresh rebuild for sha/TM drift)"
+   "next_step_after_completion": "review accepted candidates (watch for the title-postposition-inversion pattern in hi/ko/tr/ja, and whether pdf/typescript's title -- alphabetic C++ vs symbol-heavy -- also trips FrontmatterLanguageCheck like pdf/cpp did); commit page-complete per plan section 19.2; THEN sequentially build+launch the m2m hu/ja/ro companion for these 3 pages"
   }
  ],
  "blocked_pending_clean_translator_repo": null,
