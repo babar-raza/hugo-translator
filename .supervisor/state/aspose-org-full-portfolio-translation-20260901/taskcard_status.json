@@ -1453,24 +1453,10 @@
    ]
   }
  },
- "last_wake_summary": "wave-cellsgorust-index-20260910 finished 49/100. Shipped cleanly: cells/go/getting-started/_index.md 25/25, cells/rust/developer-guide/_index.md 24/25 (zh single-cell LanguageConsistencyValidator/TC-SAS-01 failure, own ticket) -> commit 7339ec8652, work_ledger updated. Two sources did not ship: cells/rust/_index.md quarantined 0/25 (ar/cs/de FrontmatterLanguageCheck on title \"Aspose.Cells FOSS for Rust\" -- reclassified as the known TC-APT-040 short-technical-field langdetect false-positive class, not a new defect); cells/go/getting-started/license.md quarantined 0/25 for the VA-06 placeholder-nesting bug (now fixed, commit da01aac6) -- this campaign ran with pre-fix code, so license.md needs a fresh retrigger to reverify.",
+ "last_wake_summary": "VA-06 placeholder-nesting fix (commit da01aac6) fully reverified: wave-license-retrigger-20260911r2 shipped license.md 25/25 locales, 0 failures, including all 3 originally-failing ones (ar, cs, de) -- commit 16faebffa8. reverification_receipts.jsonl written; all 3 original heal tickets closed FIXED_VERIFIED. Also discovered and worked around a second QU-02 gap along the way: --include-known-broken only bypasses build_campaign_manifest.py's build-time check, not campaign_runner.py's own runtime is_source_path_quarantined re-check -- a first retrigger attempt (wave-license-retrigger-20260911, no r2) instantly quarantine-rejected all 25 with zero real calls for this reason, generating cascade tickets that needed cleanup (commit 1ad913af) before the real retry could run. This closes out the wave-cellsgorust-index-20260910 family entirely: getting-started/_index.md 25/25, rust/developer-guide/_index.md 24/25, license.md 25/25 all shipped; only rust/_index.md remains open (known TC-APT-040 title-field class, Track-B scope).",
  "cells_committed_total": 432,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [
-  {
-   "campaign_id": "wave-license-retrigger-20260911r2",
-   "pid": 65512,
-   "manifest": "data/campaigns/manifests/wave-license-retrigger-20260911r2.yaml",
-   "sources": [
-    "content/docs.aspose.org/en/cells/go/getting-started/license.md"
-   ],
-   "locales": 25,
-   "expected_output_count": 25,
-   "launched_at": "2026-09-11T00:31:00+05:00",
-   "launched_by": "interactive-continue-20260910f",
-   "notes": "Reverification of the VA-06 placeholder-nesting fix (commit da01aac6). r1 (wave-license-retrigger-20260911) instantly quarantine-rejected all 25 -- QU-02 runtime check not bypassed by --include-known-broken (manifest-build-time only); fixed by provisionally closing the 3 real tickets (MODEL_LIMITATION_DEFERRED, not a real verdict) and waiving 110 cascade artifacts across both failed attempts (commit 1ad913af). r2 launched clean, no --include-known-broken needed. Next wake: check summary.json -- if accepted, update the 3 tickets to FIXED_VERIFIED with a proper reverification_receipts.jsonl row and ship; if it reproduces the placeholder error, the fix has a gap and needs re-investigation."
-  }
- ],
+ "active_detached_runs": [],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 4,
