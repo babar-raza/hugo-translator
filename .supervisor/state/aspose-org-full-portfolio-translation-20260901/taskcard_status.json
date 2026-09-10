@@ -1428,13 +1428,20 @@
  "last_wake_summary": "Continued: wave26's second page (docs.aspose.org/html) shipped clean. The original detached launch (PID 47648) died silently across an ~8h multi-turn session gap after only 6/22 cells -- no traceback. Root-caused the launch mechanism itself: a second attempt adding CREATE_BREAKAWAY_FROM_JOB crashed immediately with a Fortran-runtime 'window-CLOSE event' abort (console-control-event propagation, not Job Object lifetime); switched to PowerShell Start-Process -WindowStyle Hidden (real independent console) and resumed via --resume against the existing 6 receipts -- this survived to completion: 22/22 accepted, 0 failed. Review: 22/22 APPROVE, zero rejects -- second independent live confirmation the brand-nav-link fix (75bf700e) works ('Aspose.HTML -- Enterprise Documentation' preserved in all 22); also confirmed the title-postposition-inversion ticket is page-shape-dependent, not universal (this page's title 'Aspose.HTML FOSS' has no for-Y structure, so hi/ko/tr show no defect here -- inapplicable, not a counter-example). Committed 22 cells (d77242dce2). cells_committed_total 406 -> 428. html/_index now 22/25 pending its m2m hu/ja/ro companion (manifest built, launch blocked by a live peer edit on segment_extractor.py/segment_translator.py/campaign_runner.py -- not touched, waiting for it to land). LESSON recorded for future launches: always use PowerShell Start-Process -WindowStyle Hidden for detached campaigns, never subprocess.Popen with DETACHED_PROCESS flags alone -- confirmed unreliable across session gaps in this environment.",
  "cells_committed_total": 428,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
- "blocked_pending_clean_translator_repo": {
-  "reason": "live peer edit on src/translation_engine/extractor/segment_extractor.py, src/translation_engine/segment_translator.py, src/workers/campaign_runner.py + new test tests/unit/workers/test_campaign_runner_deterministic_retry_collapse.py -- not touched, blocking any new campaign launch until it lands.",
-  "queued_work": [
-   "html/_index m2m hu/ja/ro companion, manifest already built: data/campaigns/manifests/wave26-html-m2m-20260910.yaml (rebuild fresh before use, sha/TM fingerprint will drift)"
-  ]
- },
+ "active_detached_runs": [
+  {
+   "run_id": "wave26-html-m2m-20260910-r2",
+   "pid": 44872,
+   "manifest": "data/campaigns/manifests/wave26-html-m2m-20260910-r2.yaml",
+   "purpose": "wave26 html/_index m2m companion: hu/ja/ro on m2m100_418m. Peer edit that blocked launch landed as a604650f (TC-APT-106, deterministic-MT wasted-retry skip) -- tree cleared, rebuilt fresh, launched via PowerShell Start-Process (the now-standard mechanism after the PID 47648 lesson).",
+   "log_stdout": "logs/wave26-html-m2m-20260910-r2.out.log",
+   "log_stderr": "logs/wave26-html-m2m-20260910-r2.err.log",
+   "launched_at": "2026-09-10T05:10:00+00:00",
+   "status": "RUNNING",
+   "next_step_after_completion": "review the 3 cells; commit page-complete per plan section 19.2 -- this closes out html/_index at up to 25/25 (or 22-24/25 if any of hu/ja/ro reject)"
+  }
+ ],
+ "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 2,
   "previous": 4,
