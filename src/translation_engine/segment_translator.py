@@ -26,6 +26,7 @@ from ..utils.log_sanitizer import sanitize_for_log
 from .engine import estimate_token_count
 from .exceptions import TranslationRetryableError
 from .extractor import SegmentExtractor, TextUnitKind
+from .extractor.leaf_inventory import LeafClassification, classify_sole_leaf
 from .models import TranslationStats, ValidationIssue, ValidationResult
 from .reconstructor import MarkdownReconstructor
 from .terminology.classification import get_default_protected_terms
@@ -2122,26 +2123,18 @@ class SegmentTranslator:
                     if not seg_addr:
                         continue
 
-                    sole_unit = None
-                    match_count = 0
-                    for u in _body_units:
-                        if u.node_addr == seg_addr or u.node_addr.startswith(seg_addr + "."):
-                            match_count += 1
-                            if match_count > 1:
-                                sole_unit = None
-                                break
-                            sole_unit = u
-                    # TC-APT-105: exactly one leaf total (checked above via
-                    # match_count) is necessary but not sufficient -- that
-                    # sole leaf must also not be do_not_translate, or reusing
-                    # the legacy segment's translation for it would overwrite
-                    # a protected value with translated (or re-rendered)
-                    # prose. This is belt-and-suspenders: the downstream apply
-                    # loop already skips do_not_translate units, but making
-                    # the intent explicit here avoids populating the map with
-                    # an entry that only looks reusable.
-                    if sole_unit is not None and not sole_unit.do_not_translate:
-                        source_to_translation[sole_unit.node_addr] = translation
+                    # TD-02: shared reference implementation of this exact
+                    # check (leaf_inventory.py) -- exactly one leaf total,
+                    # AND that leaf not do_not_translate, or reusing the
+                    # legacy segment's combined translation for it would
+                    # overwrite a protected value with translated (or
+                    # re-rendered) prose. Belt-and-suspenders: the downstream
+                    # apply loop already skips do_not_translate units, but
+                    # making the intent explicit here avoids populating the
+                    # map with an entry that only looks reusable.
+                    leaf_result = classify_sole_leaf(seg_addr, _body_units)
+                    if leaf_result.classification == LeafClassification.ORDINARY_SOLE_LEAF:
+                        source_to_translation[leaf_result.sole_unit.node_addr] = translation
 
                 logger.debug(
                     f"E2E DEBUG: Built mapping with {len(source_to_translation)} segment translations"
