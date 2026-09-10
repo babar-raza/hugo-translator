@@ -1490,16 +1490,37 @@ class CampaignRunner:
             "with",
             "without",
         }
-        for token in tokens:
-            is_identifier = (
+
+        def _is_identifier(token: str) -> bool:
+            return (
                 "." in token
                 or token.isupper()
                 or bool(re.search(r"[a-z][A-Z]", token))
                 or token in known_protected
             )
+
+        connectors: list[str] = []
+        for idx, token in enumerate(tokens):
+            is_identifier = _is_identifier(token)
             target = protected if is_identifier else ordinary
             if token not in target:
                 target.append(token)
+            # TC-APT-108: a stopword sandwiched between two preserved tokens
+            # (e.g. "FOSS for Python") is exactly the shape the model was
+            # observed leaving untranslated -- it reads as part of a fixed
+            # product-name idiom. Naming it explicitly, instead of only
+            # covering it under the generic "translate every other token"
+            # instruction, is the channel the retry loop actually responds to.
+            if (
+                not is_identifier
+                and token.casefold() in stopwords
+                and idx > 0
+                and _is_identifier(tokens[idx - 1])
+                and idx + 1 < len(tokens)
+                and _is_identifier(tokens[idx + 1])
+                and token not in connectors
+            ):
+                connectors.append(token)
         substantive = [
             token for token in ordinary if token.casefold() not in stopwords and len(token) >= 4
         ][:40]
@@ -1507,11 +1528,19 @@ class CampaignRunner:
         protected_text = ", ".join(protected) if protected else "none"
         substantive_text = ", ".join(substantive) if substantive else "all ordinary words"
         locale_label = CampaignRunner._target_locale_label(target_lang)
-        return (
+        guidance = (
             f"For source field(s) {field_text}, preserve exactly only these source tokens: "
             f"{protected_text}. Translate every other English source token into {locale_label}, "
             f"including these ordinary technical terms: {substantive_text}."
         )
+        if connectors:
+            connector_text = ", ".join(f'"{token}"' for token in connectors)
+            guidance += (
+                f" These preserved tokens are not a single fixed phrase: connector words between "
+                f"them, such as {connector_text}, are ordinary language and must still be "
+                f"translated into {locale_label}, not left in English."
+            )
+        return guidance
 
     @classmethod
     def _target_locale_label(cls, target_lang: str) -> str:
