@@ -505,6 +505,25 @@ class CampaignManifest:
             errors.append("translator repository SHA drift")
         if require_clean:
             dirty = git_dirty_paths(translator_repo)
+            if self.dirty_scope == "campaign_paths":
+                # TC-APT-032 companion fix (found via the vsprint107 validation sprint's real
+                # concurrent-launcher test, 2026-09-10): this mission runs as a multi-session
+                # fleet against ONE shared hugo-translator checkout. Sibling campaigns write to
+                # the shared data/campaigns/ ledger area (heal_queue.jsonl, claims.jsonl,
+                # work_ledger.sqlite3 + _events.jsonl, per-campaign summary/receipt directories,
+                # manifests/) at any moment while THIS campaign is trying to (re)launch --
+                # that is expected concurrent bookkeeping, not a hazard to this campaign's own
+                # translation work. Unlike the content-repo side just above (~line 447), which
+                # already scopes "campaign_paths" to ignore paths outside its own
+                # sources/outputs, this translator-repo check never got the same treatment and
+                # unconditionally failed on ANY dirty path fleet-wide -- confirmed live: a
+                # second launcher's verify_environment call was refused with "translator
+                # repository is dirty (1 paths)" solely because a SIBLING campaign had an
+                # in-flight, uncommitted append to data/campaigns/heal_queue.jsonl. Code/config
+                # dirtiness elsewhere in the tree still fails the check, as before.
+                dirty = [
+                    item for item in dirty if not Path(item).as_posix().startswith("data/campaigns/")
+                ]
             if dirty:
                 errors.append(f"translator repository is dirty ({len(dirty)} paths)")
         registry_path = translator_repo / "config/model_registry.yaml"

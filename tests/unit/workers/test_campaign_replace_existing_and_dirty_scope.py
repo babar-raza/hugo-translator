@@ -163,6 +163,92 @@ def _dirty_paths_excluding(translator):
     return _dirty
 
 
+def _real_translator_repo(tmp_path: Path) -> Path:
+    """A REAL git-backed translator-repo fixture (unlike `_env_ok`, which mocks
+    `git_dirty_paths` away for the translator repo entirely) -- needed to exercise
+    the translator-repo half of the TC-APT-032 dirty-scope check, which the
+    existing `_env_ok`-based tests never touch."""
+    translator = tmp_path / "real-translator"
+    translator.mkdir()
+    _git(translator, "init", "-b", "main")
+    _git(translator, "config", "user.email", "t@example.invalid")
+    _git(translator, "config", "user.name", "T")
+    (translator / "config").mkdir()
+    (translator / "config/model_registry.yaml").write_text("models: {}\n", encoding="utf-8")
+    (translator / "src").mkdir()
+    (translator / "src/tracked.py").write_text("x = 1\n", encoding="utf-8")
+    (translator / "data").mkdir()
+    (translator / "data/campaigns").mkdir()
+    _git(translator, "add", ".")
+    _git(translator, "commit", "-q", "-m", "baseline")
+    return translator
+
+
+def _env_ok_real_translator(manifest: CampaignManifest, translator: Path, monkeypatch, *, accepted=None):
+    """Like `_env_ok`, but exercises the REAL `git_dirty_paths(translator_repo)` path
+    (a real git-backed translator repo, sha pinned to match) instead of mocking it
+    away -- the only way to reach the code under test for TC-APT-032's translator-repo
+    half."""
+    import src.workers.campaign_manifest as cm
+
+    monkeypatch.setattr(cm, "fingerprint_files", lambda *_a, **_k: manifest.tm_fingerprint)
+    monkeypatch.setattr(cm, "sha256_file", _sha_with_registry_override(manifest, translator))
+    real_git_sha = cm.git_sha
+    monkeypatch.setattr(
+        cm,
+        "git_sha",
+        lambda repo: manifest.translator_repo_sha
+        if Path(repo) == translator.resolve()
+        else real_git_sha(repo),
+    )
+    manifest.verify_environment(
+        translator_repo=translator, require_clean=True, allow_existing_accepted=accepted
+    )
+
+
+# ------------------------------------------------------- TC-APT-032 companion (translator repo)
+def test_sibling_campaign_ledger_churn_in_translator_repo_does_not_block_under_campaign_paths(
+    tmp_path, monkeypatch
+):
+    """A sibling launcher's in-flight, uncommitted write to the shared
+    data/campaigns/ ledger area (heal_queue.jsonl, claims.jsonl, work_ledger.*,
+    per-campaign summary/receipt dirs, manifests/) must never block THIS
+    campaign's own (re)launch under dirty_scope=campaign_paths -- this is
+    exactly the multi-session-fleet scenario that scope exists for. Found live
+    (2026-09-10, vsprint107 validation sprint): a second concurrent launcher was
+    refused with "translator repository is dirty (1 paths)" solely because a
+    sibling campaign had an in-flight append to data/campaigns/heal_queue.jsonl.
+    """
+    content_repo = _repo(tmp_path)
+    translator = _real_translator_repo(tmp_path)
+    (translator / "data/campaigns/heal_queue.jsonl").write_text(
+        '{"ticket_id": "sibling-campaign-ticket"}\n', encoding="utf-8"
+    )  # untracked -- a sibling launcher's live, uncommitted ledger write
+
+    manifest = _load(tmp_path, _payload(content_repo, dirty_scope="campaign_paths"))
+    _env_ok_real_translator(manifest, translator, monkeypatch)  # must NOT raise
+
+    frozen = _load(tmp_path, _payload(content_repo, dirty_scope="frozen_baseline"))
+    with pytest.raises(CampaignManifestError, match="translator repository is dirty"):
+        _env_ok_real_translator(frozen, translator, monkeypatch)
+
+
+def test_translator_code_dirtiness_outside_data_campaigns_still_blocks_under_campaign_paths(
+    tmp_path, monkeypatch
+):
+    """The campaign_paths exemption is scoped to data/campaigns/ only -- an
+    uncommitted CODE change elsewhere in the translator repo (e.g. src/) is a
+    real hazard (the running engine may not match translator_repo_sha) and
+    must still refuse the launch, exactly as before this fix."""
+    content_repo = _repo(tmp_path)
+    translator = _real_translator_repo(tmp_path)
+    (translator / "src/tracked.py").write_text("x = 2  # uncommitted edit\n", encoding="utf-8")
+
+    manifest = _load(tmp_path, _payload(content_repo, dirty_scope="campaign_paths"))
+    with pytest.raises(CampaignManifestError, match="translator repository is dirty"):
+        _env_ok_real_translator(manifest, translator, monkeypatch)
+
+
 # ----------------------------------------------------------------------------- TC-APT-032
 def test_unrelated_dirty_paths_do_not_block_under_campaign_paths(tmp_path, monkeypatch):
     repo = _repo(tmp_path)
