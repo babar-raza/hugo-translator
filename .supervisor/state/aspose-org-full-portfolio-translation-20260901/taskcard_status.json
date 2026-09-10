@@ -1428,13 +1428,20 @@
  "last_wake_summary": "Continued: wave26's second page (docs.aspose.org/html) finished in full -- 25/25, the mission's second fully-live page this run (after font/python in wave24). Recovered from the PID 47648 detached-process death (see prior notes) via PowerShell Start-Process; the m2m companion (hu/ja/ro) also needed that mechanism after a live peer edit on segment_extractor.py/segment_translator.py/campaign_runner.py landed (a604650f, TC-APT-106) and freed the tree. All 3 (hu/ja/ro) accepted the gate battery; direct review (no subagent needed for 3 files): Enterprise Documentation preserved in all 3, titles correctly untranslated (no for-Y structure), one RB-003-level note (ro missing a few diacritics, meaning-preserving). Committed (199a7c7d46). Hit the documented multi-session index-collision gotcha again mid-commit: the shared index carried a large batch of another session's staged knowledge/*, scripts/seo/*, skills/.claude/.kilocode/.agents/* files -- unstaged everything except my own 3 paths before committing, per the runbook's own known-gotcha note. cells_committed_total 428 -> 431. pages_newly_live_total 19 -> 20 (html/_index).",
  "cells_committed_total": 431,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
- "blocked_pending_clean_translator_repo": {
-  "reason": "wave27b (PID 48096) hit 'translator repository is dirty (2 paths)' at its OWN verify_environment call -- not a race with my own commits, the peer resumed editing src/translation_engine/models.py + segment_translator.py in the ~20s window between my launch-confirmation check and the process's actual verify call. Process exited immediately, nothing run.",
-  "queued_work": [
-   "wave27b LLM (pdf/python, pdf/typescript, words/net), 22 locales -- rebuild data/campaigns/manifests/wave27b-llm-20260910.yaml fresh once the tree clears (content unchanged, just sha/TM fingerprint drift)"
-  ]
- },
+ "active_detached_runs": [
+  {
+   "run_id": "wave27b-llm-20260910-r2",
+   "pid": 48464,
+   "manifest": "data/campaigns/manifests/wave27b-llm-20260910-r2.yaml",
+   "purpose": "wave27b retry (pdf/python, pdf/typescript, words/net), 22 LLM-primary locales, 66 cells. Peer's models.py/segment_translator.py/test edit that caused the PID 48096 verify_environment failure cleared without a new commit appearing (tree just went clean at HEAD 7c780a83 -- unclear if reverted/stashed elsewhere, not investigated, not my concern). Confirmed past verify_environment before this commit.",
+   "log_stdout": "logs/wave27b-llm-20260910-r2.out.log",
+   "log_stderr": "logs/wave27b-llm-20260910-r2.err.log",
+   "launched_at": "2026-09-10T06:40:00+00:00",
+   "status": "RUNNING",
+   "next_step_after_completion": "review accepted candidates (watch for title-postposition-inversion in hi/ko/tr/ja, and whether pdf/typescript's title trips FrontmatterLanguageCheck like pdf/cpp did); commit page-complete per plan section 19.2; THEN sequentially build+launch the m2m hu/ja/ro companion"
+  }
+ ],
+ "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 4,
   "previous": 2,
