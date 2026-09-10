@@ -1992,6 +1992,37 @@ class CampaignRunner:
                 shard_ids=normalized or None,
             )
 
+    def _primary_backend_is_deterministic(self, model_id: str) -> bool:
+        """Whether ``model_id`` is a fully deterministic (non-LLM) backend.
+
+        Every MT backend in config/model_registry.yaml (m2m100, nllb, opus,
+        marian, small100 -- anything routed to HuggingFaceBackend or
+        CTranslate2Backend) runs with do_sample=False and a fixed num_beams
+        (src/model_runtime/loader.py) and never receives retry-feedback text
+        (src/translation_engine/segment_translator.py only attaches it for
+        ``isinstance(mt_model, LLMModelBackend)``).  So once such a backend
+        rejects attempt 1, attempts 2 and 3 are guaranteed to reproduce
+        byte-identical output -- there is no code path that could make them
+        differ, and spending them is pure waste.
+
+        This reads the same registry `backend` field ``_llm_identity_gate``
+        already reads rather than instantiating a backend or hardcoding a
+        model-id allowlist: ``ModelLoader._create_backend``
+        (src/model_runtime/loader.py) routes backend in ("llm", "local_llm")
+        to LLMModelBackend and everything else to a deterministic backend, so
+        that field is the actual source of truth for the isinstance split.
+        A model_id the registry can't resolve (e.g. a lightweight engine
+        double in tests, or a future manifest field this campaign runner
+        doesn't otherwise validate) is "unknown" -- preserve today's full
+        3-attempt behaviour rather than guess.
+        """
+        try:
+            registry = self.engine.model_loader.registry
+            info = registry.get_model(model_id)
+        except Exception:
+            return False
+        return getattr(info, "backend", None) not in ("llm", "local_llm")
+
     def _run_campaign_job(
         self,
         *,
@@ -2076,8 +2107,23 @@ class CampaignRunner:
 
         # The primary invocation owns initial output plus its two guided
         # retries.  LLM escalation has exactly two one-attempt invocations.
+        #
+        # A fully deterministic primary backend (do_sample=False, fixed
+        # num_beams, no retry-feedback channel -- see
+        # _primary_backend_is_deterministic) reproduces byte-identical output
+        # on every attempt, so its 2 guided retries are guaranteed no-ops:
+        # collapse the primary retry budget to 0 (exactly 1 real invocation)
+        # and fail fast to LLM escalation instead of burning 2 wasted GPU
+        # generation cycles per cell. The manifest's declared primary_attempts
+        # (and therefore the LLM phases' attempt numbering, which still
+        # starts at primary_attempts + 1 for audit-trail continuity) is
+        # unchanged -- only the wasted runtime re-invocations are skipped. An
+        # LLM primary backend keeps today's exact 3-attempt behaviour.
+        primary_retry_budget = primary_attempts - 1
+        if self._primary_backend_is_deterministic(primary_model):
+            primary_retry_budget = 0
         phases = [
-            (False, primary_attempts - 1, primary_attempts),
+            (False, primary_retry_budget, primary_attempts),
             *[(True, 0, primary_attempts + index) for index in range(1, llm_attempts + 1)],
         ]
         next_feedback = self._retry_feedback_from_failures(
