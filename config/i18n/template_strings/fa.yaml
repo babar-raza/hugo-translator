@@ -257,3 +257,15 @@ translations:
       برنامه {platform} قابل دسترسی هستند.
     - تمام اعضای عمومی پس از نصب بسته Aspose.{family} FOSS for {platform} برای هر
       برنامه {platform} در دسترس هستند.
+  table.header.issue:
+    value: مشکل
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.header.cause:
+    value: علت
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence

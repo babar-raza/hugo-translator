@@ -298,3 +298,15 @@ translations:
     rejected_variants:
     - सभी सार्वजनिक सदस्य किसी भी {platform} एप्लिकेशन के लिए Aspose.{family} FOSS
       for {platform} पैकेज स्थापित करने के बाद उपलब्ध हैं।
+  table.header.issue:
+    value: समस्या
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.header.cause:
+    value: कारण
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence

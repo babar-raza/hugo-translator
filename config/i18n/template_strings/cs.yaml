@@ -283,3 +283,15 @@ translations:
     rejected_variants:
     - Všechny veřejné členy jsou přístupné jakékoli aplikaci {platform} po instalaci
       balíčku Aspose.{family} FOSS for {platform}.
+  table.header.issue:
+    value: Problém
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.header.cause:
+    value: Příčina
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence

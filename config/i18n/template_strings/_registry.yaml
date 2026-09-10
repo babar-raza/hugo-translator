@@ -493,3 +493,15 @@ entries:
   status: pending
   first_seen_incident: TC-APT-053-gate5-pdf-foss-cpp
   evidence_count: 20
+- id: table.header.issue
+  en: Issue
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-108-wave-cellsrust-go-t1a
+  evidence_count: 0
+- id: table.header.cause
+  en: Cause
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-108-wave-cellsrust-go-t1a
+  evidence_count: 0
