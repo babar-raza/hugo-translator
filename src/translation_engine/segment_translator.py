@@ -2067,11 +2067,27 @@ class SegmentTranslator:
             #
             # A body Segment's translation covers ALL of that node's
             # descendant text as one combined string, so reuse is only sound
-            # when the node has EXACTLY ONE translatable AST leaf descendant
-            # (the segment truly IS that one leaf -- e.g. a paragraph that is
-            # just a single link). Otherwise the combined translation cannot
-            # be correctly split across multiple independent TextUnits, and
-            # each is left to translate independently, same as before.
+            # when the node has EXACTLY ONE AST leaf descendant, period (the
+            # segment truly IS that one leaf -- e.g. a paragraph that is just
+            # a single link), AND that leaf is not do_not_translate. Otherwise
+            # the combined translation cannot be correctly split across
+            # multiple independent TextUnits, and each is left to translate
+            # independently, same as before.
+            #
+            # TC-APT-105: the leaf count below MUST include do_not_translate
+            # leaves. Excluding them (as this used to) makes a container with
+            # one protected leaf + one ordinary leaf look like "exactly one"
+            # leaf -- so the whole legacy flattened translation (markdown
+            # syntax and all) gets assigned to the ordinary sibling, which
+            # then renders adjacent to the protected leaf's own, independently
+            # correct render, duplicating it. Confirmed live and root-caused
+            # on content/docs.aspose.org/en/cells/go/getting-started/
+            # quickstart.md's "Next Steps" list (`**[API Reference](url)**:
+            # Full class and method documentation`): "API Reference" is a
+            # config/terminology.yaml protect-mode term, so its LINK_TEXT leaf
+            # is do_not_translate=True; the sibling ": Full class..." leaf is
+            # not. Counting only the ordinary leaf made this container look
+            # like a single-leaf reuse candidate when it has two.
             reused_count = 0
             not_matched_count = 0
             if segments and translations:
@@ -2080,8 +2096,7 @@ class SegmentTranslator:
                 _body_units = [
                     u
                     for u in plan.units
-                    if not u.do_not_translate
-                    and u.source_text
+                    if u.source_text
                     and not (u.node_addr or "").startswith("frontmatter.")
                 ]
 
@@ -2116,7 +2131,16 @@ class SegmentTranslator:
                                 sole_unit = None
                                 break
                             sole_unit = u
-                    if sole_unit is not None:
+                    # TC-APT-105: exactly one leaf total (checked above via
+                    # match_count) is necessary but not sufficient -- that
+                    # sole leaf must also not be do_not_translate, or reusing
+                    # the legacy segment's translation for it would overwrite
+                    # a protected value with translated (or re-rendered)
+                    # prose. This is belt-and-suspenders: the downstream apply
+                    # loop already skips do_not_translate units, but making
+                    # the intent explicit here avoids populating the map with
+                    # an entry that only looks reusable.
+                    if sole_unit is not None and not sole_unit.do_not_translate:
                         source_to_translation[sole_unit.node_addr] = translation
 
                 logger.debug(

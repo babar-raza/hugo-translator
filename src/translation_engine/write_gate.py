@@ -2125,15 +2125,72 @@ class WriteGateEvaluator:
     # Gate 16: Duplicate content detection (auto-clean)
     # ------------------------------------------------------------------
 
+    # TC-APT-105: a markdown link, optionally wrapped in bold -- matches
+    # "[text](url)" and "**[text](url)**" as one construct so the bold
+    # wrapper never causes a false "these are different" mismatch.
+    _INLINE_LINK_RE = re.compile(r"\*\*\[[^\]]+\]\([^)]+\)\*\*|\[[^\]]+\]\([^)]+\)")
+
+    def _strip_adjacent_duplicate_inline_links(self, body: str) -> tuple[str, int]:
+        """Remove a link/bold-link construct immediately followed by a
+        byte-identical repeat of itself, separated only by punctuation.
+
+        This is a narrower, lower-threshold companion to the whole-paragraph
+        3x-occurrence check below it: it catches an inline span duplicated
+        exactly TWICE, back-to-back, inside what is otherwise a single
+        unique paragraph -- a shape the paragraph-level check structurally
+        cannot see (its unit is a whole paragraph, and it only fires at 3+
+        occurrences). Confirmed live on content/docs.aspose.org/en/cells/go/
+        getting-started/quickstart.md: "**[API Reference](url)**:**[API
+        Reference](url)**: Full class and method documentation" -- the
+        second copy is dropped along with the punctuation-only gap between
+        the two, leaving "**[API Reference](url)**: Full class and method
+        documentation".
+
+        The gap between the two occurrences must be punctuation/whitespace
+        only (colon, comma, semicolon, period, space, tab) -- if any other
+        character sits between two occurrences of the same link, this is not
+        the reported defect shape and is left untouched, to avoid discarding
+        a case that might indicate a different problem.
+        """
+        matches = list(self._INLINE_LINK_RE.finditer(body))
+        if len(matches) < 2:
+            return body, 0
+
+        drop_ranges: list[tuple[int, int]] = []
+        prev = matches[0]
+        for cur in matches[1:]:
+            gap = body[prev.end() : cur.start()]
+            if cur.group(0) == prev.group(0) and len(gap) <= 3 and gap.strip(":,;. \t") == "":
+                drop_ranges.append((prev.end(), cur.end()))
+                # Do not chain off the dropped duplicate -- compare the NEXT
+                # match against the kept (prev) occurrence, not the just-
+                # dropped one, so 3+ identical adjacent copies collapse to
+                # exactly one kept copy rather than alternating keep/drop.
+                continue
+            prev = cur
+
+        if not drop_ranges:
+            return body, 0
+
+        cleaned_parts = []
+        pos = 0
+        for start, end in drop_ranges:
+            cleaned_parts.append(body[pos:start])
+            pos = end
+        cleaned_parts.append(body[pos:])
+        return "".join(cleaned_parts), len(drop_ranges)
+
     def _gate_duplicate_content(
         self,
         translated_content: str,
         output_path: Path,
         result: WriteGateResult,
     ) -> str:
-        """Remove paragraphs that appear 3+ times (model repetition artifact).
+        """Remove paragraphs that appear 3+ times (model repetition artifact),
+        and separately strip an inline link/bold-link construct duplicated
+        exactly twice back-to-back (see `_strip_adjacent_duplicate_inline_links`).
 
-        Two exclusions keep this from stripping legitimate content:
+        Two exclusions keep the paragraph-level check from stripping legitimate content:
 
         - Paragraphs that overlap a fenced code block are never eligible:
           distinct code examples on the same page routinely share a short
@@ -2158,6 +2215,16 @@ class WriteGateEvaluator:
           are heading-separated, not merely fence-separated).
         """
         body = self._get_body(translated_content)
+        fm_prefix = translated_content[: len(translated_content) - len(body)]
+
+        body, inline_dup_count = self._strip_adjacent_duplicate_inline_links(body)
+        if inline_dup_count:
+            logger.info(
+                "GATE16 removed %d duplicated inline link construct(s) in %s",
+                inline_dup_count,
+                output_path.name,
+            )
+
         heading_spans = [(m.start(), m.end()) for m in re.finditer(r"^#{1,6}[ \t].*$", body, re.M)]
 
         def has_structural_boundary_between(a: int, b: int) -> bool:
@@ -2210,7 +2277,7 @@ class WriteGateEvaluator:
 
         duplicates = {k for k, v in seen.items() if v >= 3 and not structurally_separated(k)}
         if not duplicates:
-            return translated_content
+            return fm_prefix + body if inline_dup_count else translated_content
 
         # Keep only first occurrence of each duplicate
         kept: set[str] = set()
@@ -2229,7 +2296,6 @@ class WriteGateEvaluator:
                 cleaned_paragraphs.append(para)
 
         cleaned_body = "\n\n".join(cleaned_paragraphs)
-        fm_prefix = translated_content[: len(translated_content) - len(body)]
         logger.info(
             "GATE16 removed %d duplicate paragraph(s) in %s",
             len(duplicates),

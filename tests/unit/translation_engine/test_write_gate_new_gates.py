@@ -464,6 +464,93 @@ class TestGateDuplicateContent:
         result_body = r.cleaned_content if r.cleaned_content else tr
         assert result_body.count(note) == 1
 
+    def test_adjacent_duplicate_bold_link_stripped(self):
+        """TC-APT-105 regression: an inline bold-link construct duplicated
+        exactly twice, back-to-back, separated only by a colon, inside an
+        otherwise-unique paragraph -- the whole-paragraph 3x check above
+        cannot see this (2 occurrences, sub-paragraph granularity), but this
+        gate must still catch and clean it. Reproduces the real live output:
+        "**[API Reference](url)**:**[API Reference](url)**: Full class and
+        method documentation" -> "**[API Reference](url)**: Full class and
+        method documentation".
+        """
+        body = (
+            "- **[Developer Guide](../../developer-guide/)**: Styling and more\n"
+            "- **[API Reference](https://reference.aspose.org/cells/go/)**:"
+            "**[API Reference](https://reference.aspose.org/cells/go/)**: "
+            "Full class and method documentation\n"
+            "- **[Knowledge Base](https://kb.aspose.org/cells/go/)**: How-to guides\n"
+        )
+        tr = _md(body=body)
+        src = _src_md(body=body)
+        gate = _make_gate(force_accept=True)
+
+        r = gate.evaluate(tr, src, "ar", Path("test.md"))
+
+        result_body = r.cleaned_content if r.cleaned_content else tr
+        assert result_body.count("**[API Reference](https://reference.aspose.org/cells/go/)**") == 1
+        assert (
+            "**[API Reference](https://reference.aspose.org/cells/go/)**: "
+            "Full class and method documentation" in result_body
+        )
+        # Untouched siblings still present exactly once.
+        assert result_body.count("**[Developer Guide](../../developer-guide/)**") == 1
+        assert result_body.count("**[Knowledge Base](https://kb.aspose.org/cells/go/)**") == 1
+
+    def test_adjacent_duplicate_plain_link_stripped(self):
+        """Same shape without bold wrapping: "[text](url)[text](url)" with
+        zero-character gap must also be caught."""
+        body = (
+            "See also [API Reference](https://reference.aspose.org/cells/go/)"
+            "[API Reference](https://reference.aspose.org/cells/go/) for details.\n"
+        )
+        tr = _md(body=body)
+        src = _src_md(body=body)
+        gate = _make_gate(force_accept=True)
+
+        r = gate.evaluate(tr, src, "ar", Path("test.md"))
+
+        result_body = r.cleaned_content if r.cleaned_content else tr
+        assert result_body.count("[API Reference](https://reference.aspose.org/cells/go/)") == 1
+
+    def test_link_repeated_far_apart_with_real_prose_between_not_touched(self):
+        """A link legitimately appearing twice in genuinely different
+        locations, with real prose (not just punctuation) between the two
+        occurrences, must NOT be treated as the adjacent-duplicate defect --
+        only a punctuation-only gap is eligible."""
+        body = (
+            "First mention: [API Reference](https://reference.aspose.org/cells/go/) "
+            "is the place to start.\n\n"
+            "Later in the document, [API Reference](https://reference.aspose.org/cells/go/) "
+            "is mentioned again for a different reason.\n"
+        )
+        tr = _md(body=body)
+        src = _src_md(body=body)
+        gate = _make_gate(force_accept=True)
+
+        r = gate.evaluate(tr, src, "ar", Path("test.md"))
+
+        result_body = r.cleaned_content if r.cleaned_content else tr
+        assert result_body.count("[API Reference](https://reference.aspose.org/cells/go/)") == 2
+
+    def test_two_different_adjacent_links_not_touched(self):
+        """Two DIFFERENT links sitting back-to-back (not a duplicate of the
+        same link) must never be affected by the new adjacent-duplicate
+        check."""
+        body = (
+            "- **[Developer Guide](../../developer-guide/)**:"
+            "**[Knowledge Base](https://kb.aspose.org/cells/go/)**: two distinct links\n"
+        )
+        tr = _md(body=body)
+        src = _src_md(body=body)
+        gate = _make_gate(force_accept=True)
+
+        r = gate.evaluate(tr, src, "ar", Path("test.md"))
+
+        result_body = r.cleaned_content if r.cleaned_content else tr
+        assert "**[Developer Guide](../../developer-guide/)**" in result_body
+        assert "**[Knowledge Base](https://kb.aspose.org/cells/go/)**" in result_body
+
 
 # ---------------------------------------------------------------------------
 # Gate 17: Newline Explosion (blocking)

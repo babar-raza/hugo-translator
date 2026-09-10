@@ -1074,6 +1074,199 @@ class TestASTReuseIdentityFix:
 
         assert unit.translated_text == translations["seg-description"]
 
+    def test_protected_leaf_plus_ordinary_sibling_does_not_reuse_whole_segment(self):
+        """TC-APT-105 regression: a list item with one do_not_translate
+        LINK_TEXT leaf (a governed/protected term, e.g. "API Reference") and
+        one ordinary sibling TEXT leaf (e.g. ": Full class and method
+        documentation") must NOT reuse the legacy segment's combined
+        translation for the ordinary leaf. The old `_body_units` filter
+        excluded do_not_translate units from the "does this container have
+        exactly one leaf" count, so this exact shape (2 real leaves, 1
+        visible to the filter) miscounted as "exactly one" and assigned the
+        whole legacy translation -- including the protected leaf's own
+        already-correct markdown -- onto the ordinary sibling. That sibling
+        then renders adjacent to the independently-rendered protected leaf,
+        duplicating it (confirmed live on content/docs.aspose.org/en/cells/
+        go/getting-started/quickstart.md's "Next Steps" list).
+
+        `batch_translate_units` is mocked here to actually fill in a
+        (distinct, obviously-not-reused) translation for any unit still
+        missing one -- simulating what the real MT/LLM batch step does for a
+        unit reuse correctly declined to touch -- so the assertion can prove
+        the sibling got its OWN translation, not the corrupted duplicate-
+        bearing legacy string, rather than merely asserting `is None` (which
+        a real run would never leave true).
+        """
+        from src.translation_engine.extractor.segment_extractor import (
+            Segment,
+            SegmentContext,
+            SegmentContextType,
+        )
+        from src.translation_engine.extractor.text_unit import (
+            BodyTranslationPlan,
+            TextUnit,
+            TextUnitKind,
+        )
+
+        list_item_segment = Segment(
+            id="seg-listitem",
+            source_text=(
+                "**[API Reference](https://reference.aspose.org/cells/go/)**: "
+                "Full class and method documentation"
+            ),
+            context=SegmentContext(
+                context_type=SegmentContextType.BODY_TEXT,
+                node_addr="body.list[0].listitem[1]",
+            ),
+            site_id="docs.aspose.org",
+            source_lang="en",
+        )
+        translations = {
+            "seg-listitem": (
+                "**[API Reference](https://reference.aspose.org/cells/go/)**: "
+                "Vollstaendige Klassen- und Methodendokumentation"
+            ),
+        }
+
+        protected_link_unit = TextUnit(
+            unit_id="u-protected-link",
+            node_addr="body.list[0].listitem[1].strong[0].link[0].text[0]",
+            kind=TextUnitKind.LINK_TEXT,
+            source_text="API Reference",
+            do_not_translate=True,
+        )
+        ordinary_sibling_unit = TextUnit(
+            unit_id="u-ordinary-sibling",
+            node_addr="body.list[0].listitem[1].text[0]",
+            kind=TextUnitKind.TEXT,
+            source_text=": Full class and method documentation",
+        )
+        plan = BodyTranslationPlan(
+            ast=[],
+            units=[protected_link_unit, ordinary_sibling_unit],
+            ast_fingerprint="test-fp",
+        )
+
+        doc = MagicMock()
+        doc.ast = []
+        doc.frontmatter = {}
+        doc.source_path = None
+
+        site_profile = MagicMock()
+        site_profile.default_source_lang = "en"
+        site_profile.body.preserve_patterns = []
+
+        def _fake_batch_translate(units, *_a, **_k):
+            for u in units:
+                if u.translated_text is None:
+                    u.translated_text = (
+                        u.source_text if u.do_not_translate else f"[translated] {u.source_text}"
+                    )
+            return units
+
+        engine = _make_engine()
+        translator = SegmentTranslator(engine)
+
+        with (
+            patch("src.translation_engine.extractor.TextUnitExtractor") as MockExt,
+            patch("src.translation_engine.reconstructor.ASTRenderer") as MockRenderer,
+        ):
+            mock_ext = MagicMock()
+            mock_ext.extract_from_ast.return_value = plan
+            mock_ext.batch_translate_units.side_effect = _fake_batch_translate
+            mock_ext.batch_stats = {}
+            mock_ext._batch_calls = 0
+            mock_ext._individual_fallbacks = 0
+            MockExt.return_value = mock_ext
+
+            mock_renderer = MagicMock()
+            mock_renderer.placeholder_leak_count = 0
+            mock_renderer._missing_node_count = 0
+            mock_renderer.applied_units = []
+            mock_renderer.render_to_markdown.return_value = "body\n"
+            MockRenderer.return_value = mock_renderer
+
+            translator._translate_body_ast(
+                doc=doc,
+                target_lang="de",
+                site_profile=site_profile,
+                stats=_make_stats(),
+                segments=[list_item_segment],
+                translations=translations,
+                model_id_override="m2m100_418m",
+            )
+
+        assert protected_link_unit.translated_text == "API Reference", (
+            "protected leaf must go through the normal do_not_translate "
+            "copy-through, not be overwritten by the reuse map"
+        )
+        assert ordinary_sibling_unit.translated_text == (
+            "[translated] : Full class and method documentation"
+        ), (
+            "ordinary sibling must receive its OWN independent translation, "
+            "not the legacy segment's combined string -- reusing that would "
+            "duplicate the protected leaf's markdown when both are rendered"
+        )
+        assert "API Reference" not in ordinary_sibling_unit.translated_text, (
+            "the corrupted-duplicate signature: the protected leaf's anchor "
+            "text must never appear inside the sibling's own translation"
+        )
+
+    def test_sole_do_not_translate_leaf_container_is_harmless(self):
+        """Edge case: a container whose ONLY leaf descendant is
+        do_not_translate (zero ordinary siblings) must not crash and must
+        not have any effect -- the downstream apply loop already skips
+        do_not_translate units, so populating (or not populating) the reuse
+        map for it is a no-op either way. This pins that the explicit
+        `not sole_unit.do_not_translate` guard doesn't regress this case.
+        """
+        from src.translation_engine.extractor.segment_extractor import (
+            Segment,
+            SegmentContext,
+            SegmentContextType,
+        )
+        from src.translation_engine.extractor.text_unit import (
+            BodyTranslationPlan,
+            TextUnit,
+            TextUnitKind,
+        )
+
+        segment = Segment(
+            id="seg-solo-protected",
+            source_text="[API Reference](https://reference.aspose.org/cells/go/)",
+            context=SegmentContext(
+                context_type=SegmentContextType.BODY_TEXT,
+                node_addr="body.list[1].listitem[1]",
+            ),
+            site_id="docs.aspose.org",
+            source_lang="en",
+        )
+        translations = {
+            "seg-solo-protected": "[API Reference](https://reference.aspose.org/cells/go/)",
+        }
+
+        solo_unit = TextUnit(
+            unit_id="u-solo-protected",
+            node_addr="body.list[1].listitem[1].link[0].text[0]",
+            kind=TextUnitKind.LINK_TEXT,
+            source_text="API Reference",
+            do_not_translate=True,
+        )
+        plan = BodyTranslationPlan(ast=[], units=[solo_unit], ast_fingerprint="test-fp")
+
+        doc = MagicMock()
+        doc.ast = []
+        doc.frontmatter = {}
+        doc.source_path = None
+
+        site_profile = MagicMock()
+        site_profile.default_source_lang = "en"
+        site_profile.body.preserve_patterns = []
+
+        self._run(doc, site_profile, [segment], translations, plan, target_lang="de")
+
+        assert solo_unit.translated_text is None
+
 
 # ---------------------------------------------------------------------------
 # HT-QUALITY-GATES-001 RC2 (follow-up to TC-APT-042 / TC-APT-106, 2026-09-10)
