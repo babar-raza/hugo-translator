@@ -14,7 +14,7 @@ import logging
 from collections import deque
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .engine import TranslationEngine
@@ -295,35 +295,94 @@ class EngineBuilder:
         max_retries = p["max_retries"]
         validation_mode = p["validation_mode"]
 
+        # CFG-01 (TC-APT-105 audit): read decision-rule defaults from
+        # config/validation.yaml instead of a second, hardcoded literal set
+        # that could (and did) silently diverge from it -- editing the YAML
+        # previously had zero effect on runtime behavior (confirmed:
+        # decision_rules.reject_on_error_count=2 in the YAML, hardcoded to 3
+        # here; validation_modes.strict.max_retry_attempts=1 in the YAML,
+        # never read at all). Falls back to the exact pre-existing hardcoded
+        # values if the config is missing/malformed, so a deployment without
+        # this file (or an older copy missing a newer key) behaves exactly
+        # as before this change.
+        _base_rules = None
+        _mode_overrides: dict[str, Any] = {}
+        try:
+            _validation_cfg = engine.config.get_validation_config()
+            _base_rules = _validation_cfg.decision_rules
+            _mode_overrides = _validation_cfg.validation_modes
+        except Exception as _cfg_exc:
+            logger.debug(
+                "CFG-01: config/validation.yaml unavailable (%s); using built-in "
+                "decision-rule defaults",
+                _cfg_exc,
+            )
+
         decision_config = {
             "decision_rules": {
-                "max_retry_attempts": max_retries if max_retries is not None else 2,
-                "reject_on_error_count": 3,
-                "accept_warnings": True,
-                "accept_after_max_retries": False,
-                "reject_on_placeholder_error": True,
-                "reject_on_code_block_error": True,
-                "reject_on_link_error": True,
-                "reject_on_repetition_error": True,
-                "retry_on_structure_error": True,
-                "retry_on_terminology_warning": True,
+                "max_retry_attempts": (
+                    max_retries
+                    if max_retries is not None
+                    else (_base_rules.max_retry_attempts if _base_rules else 2)
+                ),
+                "reject_on_error_count": (
+                    _base_rules.reject_on_error_count if _base_rules else 3
+                ),
+                "accept_warnings": _base_rules.accept_warnings if _base_rules else True,
+                "accept_after_max_retries": (
+                    _base_rules.accept_after_max_retries if _base_rules else False
+                ),
+                "reject_on_placeholder_error": (
+                    _base_rules.reject_on_placeholder_error if _base_rules else True
+                ),
+                "reject_on_code_block_error": (
+                    _base_rules.reject_on_code_block_error if _base_rules else True
+                ),
+                "reject_on_link_error": _base_rules.reject_on_link_error if _base_rules else True,
+                "reject_on_repetition_error": (
+                    _base_rules.reject_on_repetition_error if _base_rules else True
+                ),
+                "retry_on_structure_error": (
+                    _base_rules.retry_on_structure_error if _base_rules else True
+                ),
+                "retry_on_terminology_warning": (
+                    _base_rules.retry_on_terminology_warning if _base_rules else True
+                ),
             }
         }
 
+        _mode_cfg = _mode_overrides.get(validation_mode) if validation_mode else None
+
         if validation_mode == "strict":
-            decision_config["decision_rules"]["reject_on_error_count"] = 1
-            decision_config["decision_rules"]["accept_warnings"] = False
+            decision_config["decision_rules"]["reject_on_error_count"] = (
+                _mode_cfg.reject_on_error_count if _mode_cfg else 1
+            )
+            decision_config["decision_rules"]["accept_warnings"] = (
+                _mode_cfg.accept_warnings if _mode_cfg else False
+            )
         elif validation_mode == "lenient":
-            decision_config["decision_rules"]["reject_on_error_count"] = 5
-            decision_config["decision_rules"]["accept_warnings"] = True
+            decision_config["decision_rules"]["reject_on_error_count"] = (
+                _mode_cfg.reject_on_error_count if _mode_cfg else 5
+            )
+            decision_config["decision_rules"]["accept_warnings"] = (
+                _mode_cfg.accept_warnings if _mode_cfg else True
+            )
         elif validation_mode == "fast":
             # Fast mode for MT batch runs: accepts non-critical single errors.
             # max_retry_attempts=0 skips RETRY→REJECT loop; accept_after_max_retries=True
             # allows non-critical validator failures to pass (LanguageConsistency, etc.).
             # Critical validators (Placeholder, CodeBlock, Link, Structure) still block.
-            decision_config["decision_rules"]["max_retry_attempts"] = 0
-            decision_config["decision_rules"]["accept_after_max_retries"] = True
-            decision_config["decision_rules"]["accept_warnings"] = True
+            decision_config["decision_rules"]["max_retry_attempts"] = (
+                _mode_cfg.max_retry_attempts if _mode_cfg else 0
+            )
+            decision_config["decision_rules"]["accept_after_max_retries"] = (
+                _mode_cfg.accept_after_max_retries
+                if _mode_cfg and _mode_cfg.accept_after_max_retries is not None
+                else True
+            )
+            decision_config["decision_rules"]["accept_warnings"] = (
+                _mode_cfg.accept_warnings if _mode_cfg else True
+            )
 
         if p["decision_engine"] is not None:
             engine.decision_engine = p["decision_engine"]
