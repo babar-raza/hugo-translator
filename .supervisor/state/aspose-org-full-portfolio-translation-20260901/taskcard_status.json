@@ -1456,7 +1456,25 @@
  "last_wake_summary": "VA-06 placeholder-nesting fix (commit da01aac6) fully reverified: wave-license-retrigger-20260911r2 shipped license.md 25/25 locales, 0 failures, including all 3 originally-failing ones (ar, cs, de) -- commit 16faebffa8. reverification_receipts.jsonl written; all 3 original heal tickets closed FIXED_VERIFIED. Also discovered and worked around a second QU-02 gap along the way: --include-known-broken only bypasses build_campaign_manifest.py's build-time check, not campaign_runner.py's own runtime is_source_path_quarantined re-check -- a first retrigger attempt (wave-license-retrigger-20260911, no r2) instantly quarantine-rejected all 25 with zero real calls for this reason, generating cascade tickets that needed cleanup (commit 1ad913af) before the real retry could run. This closes out the wave-cellsgorust-index-20260910 family entirely: getting-started/_index.md 25/25, rust/developer-guide/_index.md 24/25, license.md 25/25 all shipped; only rust/_index.md remains open (known TC-APT-040 title-field class, Track-B scope).",
  "cells_committed_total": 432,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "campaign_id": "wave-cellsrust-getstart-20260911",
+   "pid": 64688,
+   "manifest": "data/campaigns/manifests/wave-cellsrust-getstart-20260911.yaml",
+   "sources": [
+    "content/docs.aspose.org/en/cells/rust/developer-guide/working-with-spreadsheet-management.md",
+    "content/docs.aspose.org/en/cells/rust/getting-started/_index.md",
+    "content/docs.aspose.org/en/cells/rust/getting-started/installation.md",
+    "content/docs.aspose.org/en/cells/rust/getting-started/license.md",
+    "content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md"
+   ],
+   "locales": 25,
+   "expected_output_count": 125,
+   "launched_at": "2026-09-11T01:02:00+05:00",
+   "launched_by": "interactive-continue-20260910f",
+   "notes": "Tier-1a, all 5 first-ever attempts (0/25 prior each), all confirmed clean of open heal tickets at launch. Sibling go/-family pages in the same directories (working-with-spreadsheet-management.md, installation.md) were excluded -- real open tickets (auto:SemanticSimilarityValidator/LinkValidator), not this session's scope."
+  }
+ ],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 4,
