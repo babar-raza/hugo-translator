@@ -389,6 +389,57 @@ class TestBasicPipelineFlow:
         assert result.validation_result is validation_result
         assert "LanguageConsistencyValidator" in result.error
 
+    def test_rejection_records_retry_attempts_matching_the_retry_count(self):
+        """RT-02: result.retry_attempts (read by campaign_runner.py's
+        _failure_metadata() as `internal_retries=` in every failure ledger
+        row) used to be set ONLY inside the success/accept branch -- on a
+        TranslationRejectedError exit, it was silently left unset, so the
+        campaign ledger recorded `internal_retries=0` even when real retries
+        happened, disagreeing with the "High retry overhead" log line
+        (sourced from the always-correct `lang_result.retry_count`).
+        """
+        engine = _make_engine()
+        engine._translate_to_language.side_effect = TranslationRejectedError(
+            message="Rejected",
+            file_path="/tmp/test.md",
+            validation_result=SimpleNamespace(issues=[]),
+            rejection_reason="LinkValidator source_count=6 translation_count=7",
+        )
+        result = _make_result()
+
+        language = FileTranslationPipeline(engine).translate_language(
+            _make_ctx(max_retry_attempts=2), result
+        )
+
+        assert not language.success
+        assert result.retry_attempts == language.retry_count, (
+            f"result.retry_attempts ({result.retry_attempts}) must match "
+            f"language.retry_count ({language.retry_count}) -- these are the "
+            f"two counters campaign_runner.py's ledger and its stderr log "
+            f"line read independently, and they must never disagree"
+        )
+
+    def test_exhausted_retryable_error_records_nonzero_retry_attempts(self):
+        """Companion to the rejection case above, for the exhausted-
+        TranslationRetryableError exit path -- the other branch RT-02 found
+        silently skipping result.retry_attempts."""
+        engine = _make_engine()
+        engine._translate_to_language.side_effect = TranslationRetryableError(
+            message="Retry",
+            file_path="/tmp/test.md",
+            validation_result=SimpleNamespace(issues=[]),
+            retry_feedback="try again",
+        )
+        result = _make_result()
+
+        language = FileTranslationPipeline(engine).translate_language(
+            _make_ctx(max_retry_attempts=0), result
+        )
+
+        assert not language.success
+        assert language.retry_count > 0, "sanity check: a real retry must have happened"
+        assert result.retry_attempts == language.retry_count
+
     def test_unexpected_exception_preserves_class_and_cause_in_memory(self):
         engine = _make_engine()
         engine._translate_to_language.side_effect = ValueError("SECRET REJECTED CANDIDATE")

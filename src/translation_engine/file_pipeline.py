@@ -1184,6 +1184,21 @@ class FileTranslationPipeline:
 
         # BM-08: Record retry metrics after retry loop completes
         lang_result.retry_count = retry_count
+        # RT-02: result.retry_attempts (read by campaign_runner.py's
+        # _failure_metadata() as `internal_retries=` in every failure ledger
+        # row) was previously set ONLY inside the success/accept branch
+        # above (~line 1039) -- on every rejection/failure exit (
+        # TranslationRejectedError, TranslationRetryableError exhausting its
+        # budget, an unexpected exception, OOM without a retry handler),
+        # `result.retry_attempts` was never assigned at all, so
+        # campaign_runner.py's getattr(result, "retry_attempts", 0) silently
+        # read the default 0 -- while this same line's `lang_result.retry_count`
+        # (and the "High retry overhead" log right below) correctly showed the
+        # real count. Confirmed live: a phase logging "3 retries in 94839.8ms"
+        # simultaneously recorded internal_retries=0 in the ledger for the
+        # identical attempt. Setting it here, unconditionally, after the loop
+        # exits by any path, makes both counters agree in every case.
+        result.retry_attempts = retry_count
         retry_duration_ms = (time.perf_counter() - retry_start_time) * 1000
         with engine._retry_metrics_lock:
             engine._retry_metrics["retry_attempts"].append(retry_count)
