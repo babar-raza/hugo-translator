@@ -84,8 +84,26 @@ class PlaceholderManager:
         """Apply a single protection pattern."""
 
         def replace_match(match: re.Match) -> str:
+            value = match.group(0)
+            # TC-APT-105 audit (VA-06): a later pattern in this protect()
+            # call can match a span that already contains an earlier
+            # pattern's placeholder token -- e.g. preserve_patterns
+            # protects the bare identifier "GitHub" first, then the link
+            # pattern protects the whole "[{PLACEHOLDER_0} repository]
+            # (url)" as one match. Storing that match verbatim would leave
+            # this new placeholder's value containing another placeholder
+            # token, which restore() cannot safely unwind (see
+            # PlaceholderMapIntegrityError) and which previously surfaced
+            # only as that loud, blocking guard. Unpack any such nested
+            # token back to its original text before storing -- this new,
+            # larger match supersedes the earlier, now fully-covered one,
+            # so that entry is removed rather than left orphaned in the map.
+            for existing_token, existing_original in list(self.placeholder_map.items()):
+                if existing_token in value:
+                    value = value.replace(existing_token, existing_original)
+                    del self.placeholder_map[existing_token]
             placeholder = f"{{{self.token_prefix}{self.counter}}}"
-            self.placeholder_map[placeholder] = match.group(0)
+            self.placeholder_map[placeholder] = value
             self.counter += 1
             return placeholder
 

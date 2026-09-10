@@ -106,3 +106,83 @@ class TestNestedMapGuardFires:
 
         with pytest.raises(PlaceholderMapIntegrityError):
             manager.restore("irrelevant", malformed_map)
+
+
+class TestProtectNeverProducesNestedPlaceholders:
+    """VA-06 (TC-APT-105 audit): root cause of the only live
+    PlaceholderMapIntegrityError this guard has actually caught --
+    content/docs.aspose.org/en/cells/go/getting-started/license.md's "See
+    the full license text in the [GitHub repository](url)" sentence.
+    protect() applies multiple patterns sequentially on the same mutating
+    text: an earlier pattern (e.g. a bare PascalCase identifier like
+    "GitHub") can be fully inside the span a LATER pattern also matches
+    (e.g. the enclosing markdown link). Before this fix, the later
+    placeholder's stored value was the raw regex match -- including the
+    earlier pattern's already-substituted token literally -- so
+    restore() would later hit PlaceholderMapIntegrityError. protect()
+    itself must never produce such a map: a later, larger match unpacks
+    and supersedes any placeholder token it subsumes.
+    """
+
+    def test_identifier_inside_later_link_match_is_unpacked_not_nested(self):
+        """Exact live shape: identifier pattern runs first (matches
+        "GitHub" alone), then a link pattern's match subsumes that
+        placeholder token inside a larger "[GitHub repository](url)" span."""
+        manager = PlaceholderManager()
+        text = (
+            'See the full license text in the [GitHub repository]'
+            '(https://github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go/'
+            "blob/main/LICENSE) for the complete terms."
+        )
+        protected, placeholder_map = manager.protect(
+            text,
+            [
+                r"\b[A-Z][a-z]+(?:[A-Z][a-z0-9]*)+\b",  # PascalCase compound (e.g. GitHub)
+                r"\[([^\]]+)\]\(([^)]+)\)",  # markdown link
+            ],
+        )
+
+        # No stored value may contain another key from this same map.
+        for key, value in placeholder_map.items():
+            for other_key in placeholder_map:
+                if other_key != key:
+                    assert other_key not in value, (
+                        f"{key}'s value {value!r} still contains {other_key} -- "
+                        "protect() produced a nested placeholder"
+                    )
+
+        # restore() must not raise, and must recover the exact original text.
+        restored = manager.restore(protected, placeholder_map)
+        assert restored == text
+
+    def test_earlier_subsumed_placeholder_is_removed_from_the_map(self):
+        """The earlier, now fully-covered placeholder must not survive as an
+        orphaned, unused entry -- the later match's stored value already
+        carries its original text back out."""
+        manager = PlaceholderManager()
+        text = "The [GitHub repository](https://example.com/repo) has the source."
+        _protected, placeholder_map = manager.protect(
+            text,
+            [
+                r"\b[A-Z][a-z]+(?:[A-Z][a-z0-9]*)+\b",
+                r"\[([^\]]+)\]\(([^)]+)\)",
+            ],
+        )
+
+        assert len(placeholder_map) == 1
+        (sole_value,) = placeholder_map.values()
+        assert sole_value == "[GitHub repository](https://example.com/repo)"
+
+    def test_two_independent_identifiers_outside_any_link_stay_distinct(self):
+        """Sanity check the fix doesn't over-collapse: two identifier
+        matches that are NOT subsumed by any later match must remain two
+        separate, independently-restorable placeholders."""
+        manager = PlaceholderManager()
+        text = "TypeScript and JavaScript are both supported."
+        protected, placeholder_map = manager.protect(
+            text, [r"\b[A-Z][a-z]+(?:[A-Z][a-z0-9]*)+\b"]
+        )
+
+        assert len(placeholder_map) == 2
+        restored = manager.restore(protected, placeholder_map)
+        assert restored == text
