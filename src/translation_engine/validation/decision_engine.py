@@ -192,6 +192,7 @@ class ValidationDecisionEngine:
         *,
         site_id: str | None = None,
         target_lang: str | None = None,
+        effective_max_retries: int | None = None,
     ) -> DecisionResult:
         """Make ACCEPT/RETRY/REJECT decision based on validation result.
 
@@ -201,10 +202,34 @@ class ValidationDecisionEngine:
             source: Original source text (for feedback generation)
             site_id: Optional site identifier for adaptive threshold lookup
             target_lang: Optional target language for adaptive threshold lookup
+            effective_max_retries: VA-01 (TC-APT-105 audit): the actual per-call
+                retry budget the caller is enforcing this attempt against (e.g.
+                file_pipeline.py's loop-scoped `retry_budget_override`), when it
+                differs from this engine's own config-lifetime
+                `self.max_retry_attempts`. Defaults to None, meaning "use
+                self.max_retry_attempts" -- fully backward compatible.
+
+                Without this, an LLM-escalation phase configured with a
+                tighter budget than this engine's static config (e.g.
+                `retry_budget_override=0`) would still have Rule 4 return
+                RETRY here (since retry_count < self.max_retry_attempts, a
+                larger number this call knows nothing about), only for the
+                caller's own separate retry-count tracking to then hard-reject
+                unconditionally once ITS budget was exhausted -- bypassing
+                Rule 5's accept_after_max_retries arbitration entirely, even
+                for a WARNING-only, non-critical result Rule 5 would have
+                accepted as best-effort. Passing the real per-call budget here
+                makes Rule 4/5 reason about the SAME number the caller
+                actually enforces, so Rule 5 arbitrates correctly on the very
+                call where the budget is exhausted, instead of the caller
+                needing to duplicate that logic afterward.
 
         Returns:
             DecisionResult with decision and optional retry feedback
         """
+        max_retry_attempts = (
+            effective_max_retries if effective_max_retries is not None else self.max_retry_attempts
+        )
         # Count errors and warnings for telemetry
         error_count = len(
             [i for i in validation_result.issues if i.severity == ValidationSeverity.ERROR]
@@ -276,12 +301,12 @@ class ValidationDecisionEngine:
                 return decision_result
 
         # Rule 4: Errors + retries available → RETRY
-        if retry_count < self.max_retry_attempts:
+        if retry_count < max_retry_attempts:
             if self._is_retryable(validation_result):
                 retry_feedback = self._generate_retry_feedback(validation_result, retry_count)
                 decision_result = DecisionResult(
                     decision=ValidationDecision.RETRY,
-                    decision_reason=f"Retryable errors, attempt {retry_count + 1}/{self.max_retry_attempts}",
+                    decision_reason=f"Retryable errors, attempt {retry_count + 1}/{max_retry_attempts}",
                     retry_feedback=retry_feedback,
                     validation_result=validation_result,
                 )
