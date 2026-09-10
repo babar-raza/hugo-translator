@@ -262,11 +262,17 @@ class L2PersistentTM:
             return True  # validation error → allow
         return True
 
-    def _warn_on_sibling_l2_dirs(self) -> None:
+    def _warn_on_sibling_l2_dirs(self, *, strict: bool = False) -> None:
         """Emit a UserWarning if sibling l2*.lmdb directories exist alongside the canonical path.
 
-        Two live LMDB databases imply split writes (TC-TM-02 gap).  This is a
-        warning, not a hard error, so the worker can still start.  To fix, run::
+        Two live LMDB databases imply split writes (TC-TM-02 gap).  By default
+        this only warns so the worker can still start.  Pass ``strict=True``
+        (TM-01) to raise instead -- for a pre-flight/CI check that wants to
+        hard-fail on this condition rather than let it linger unresolved, as
+        happened live: five scripts kept opening a hardcoded sibling path
+        indefinitely with only a warning that nothing consumed.  Not the
+        default, to avoid surprising existing callers that only expect a
+        warning. To fix, run::
 
             python scripts/tm/migrate_l2_lmdb.py --dry-run
             python scripts/tm/migrate_l2_lmdb.py --apply
@@ -279,13 +285,14 @@ class L2PersistentTM:
         siblings = [p for p in parent.glob("l2*") if p.is_dir() and p.name != canonical_name]
         if siblings:
             names = ", ".join(p.name for p in siblings)
-            warnings.warn(
+            message = (
                 f"L2PersistentTM: sibling LMDB director{'y' if len(siblings) == 1 else 'ies'} "
                 f"found alongside canonical '{canonical_name}': {names}. "
-                "This indicates split writes. Run scripts/tm/migrate_l2_lmdb.py to consolidate.",
-                UserWarning,
-                stacklevel=3,
+                "This indicates split writes. Run scripts/tm/migrate_l2_lmdb.py to consolidate."
             )
+            if strict:
+                raise RuntimeError(message)
+            warnings.warn(message, UserWarning, stacklevel=3)
             logger.warning(
                 "TC-TM-02: sibling L2 LMDB dir(s) detected: %s (canonical: %s). "
                 "Run scripts/tm/migrate_l2_lmdb.py --apply to consolidate.",

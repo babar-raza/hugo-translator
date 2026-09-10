@@ -18,6 +18,18 @@ REPO_ROOT = Path(__file__).parent.resolve()
 SOURCE_DIR = Path("D:/onedrive/Documents/GitHub/aspose.net/content/products.aspose.net/slides/en")
 
 
+def _resolve_l2_lmdb_path() -> Path:
+    """TM-01: canonical L2 LMDB path, matching the resolution already used
+    correctly by scripts/campaign/run_gate5_batch.py (tm_data_dir / L2_DB_NAME
+    from config) -- so this script never opens a second, sibling LMDB
+    directory invisible to real campaigns."""
+    from src.tm.l2_persistent import L2_DB_NAME
+    from src.utils.config_loader import get_global_config
+
+    tm_data_dir = Path(get_global_config().get("paths", {}).get("tm_data_dir", "data/tm"))
+    return tm_data_dir / L2_DB_NAME
+
+
 def main():
     import torch
 
@@ -41,7 +53,7 @@ def main():
 
     # Simplified TM init
     l1_cache = L1Cache(max_size=1000)
-    lmdb_path = REPO_ROOT / "data" / "tm" / "l2_lmdb"
+    lmdb_path = _resolve_l2_lmdb_path()
     lmdb_path.parent.mkdir(parents=True, exist_ok=True)
     l2_persistent = L2PersistentTM(str(lmdb_path))
     faiss_path = REPO_ROOT / "data" / "tm" / "l3_faiss"
