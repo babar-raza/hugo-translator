@@ -1458,9 +1458,9 @@
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [
   {
-   "campaign_id": "wave-cellsrust-getstart-20260911",
-   "pid": 64688,
-   "manifest": "data/campaigns/manifests/wave-cellsrust-getstart-20260911.yaml",
+   "campaign_id": "wave-cellsrust-getstart-20260911r2",
+   "pid": 25872,
+   "manifest": "data/campaigns/manifests/wave-cellsrust-getstart-20260911r2.yaml",
    "sources": [
     "content/docs.aspose.org/en/cells/rust/developer-guide/working-with-spreadsheet-management.md",
     "content/docs.aspose.org/en/cells/rust/getting-started/_index.md",
@@ -1472,7 +1472,7 @@
    "expected_output_count": 125,
    "launched_at": "2026-09-11T01:02:00+05:00",
    "launched_by": "interactive-continue-20260910f",
-   "notes": "Tier-1a, all 5 first-ever attempts (0/25 prior each), all confirmed clean of open heal tickets at launch. Sibling go/-family pages in the same directories (working-with-spreadsheet-management.md, installation.md) were excluded -- real open tickets (auto:SemanticSimilarityValidator/LinkValidator), not this session's scope."
+   "notes": "r1 (PID 64688) instantly died on verify_environment dirty-tree race (0 real work, no summary.json written) -- rebuilt and relaunched clean as r2. Tier-1a, all 5 first-ever attempts (0/25 prior each), all confirmed clean of open heal tickets at launch. Sibling go/-family pages in the same directories (working-with-spreadsheet-management.md, installation.md) were excluded -- real open tickets (auto:SemanticSimilarityValidator/LinkValidator), not this session's scope."
   }
  ],
  "blocked_pending_clean_translator_repo": null,
