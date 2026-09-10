@@ -4,7 +4,7 @@
  "plan_revision": 18,
  "branch": "mission/aspose-org-full-portfolio-translation-20260901",
  "created_at": "2026-09-02T05:20:29.896922+00:00",
- "updated_at": "2026-09-10T11:49:58+00:00",
+ "updated_at": "2026-09-10T12:05:53+00:00",
  "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
  "content_repo_session_ledger": {
   "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
   2,
   3
  ],
- "wake_count": 37,
+ "wake_count": 38,
  "wakes_without_state_change": 0,
  "taskcards": {
   "TC-APT-001": {
@@ -1425,7 +1425,9 @@
    "status": "IN_PROGRESS",
    "gate": null,
    "title": "Pre-launch validation sprint: real 25-locale multi-model VRAM concurrency with professionalize_llm retry/correction on real aspose.org content, finding and fixing gaps before full-portfolio autonomous run",
-   "depends_on": ["TC-APT-106"],
+   "depends_on": [
+    "TC-APT-106"
+   ],
    "owner": "interactive-continue-20260910",
    "blocking_reason": null,
    "evidence_path": "src/translation_engine/segment_translator.py, tests/unit/translation_engine/test_segment_translator.py, tests/unit/translation_engine/test_per_file_timeout.py, tests/unit/translation_engine/test_purity_backpressure.py, tests/unit/translation_engine/test_dropped_placeholder_fallback.py",
@@ -1451,10 +1453,27 @@
    ]
   }
  },
- "last_wake_summary": "Continued: closed TC-APT-102 (model_quality_residual_phrase_defects) via the exact recurrence test its own first-principles record called for -- grepped the portfolio for the same 'prose backtick-placeholder generic-noun.' sentence shape, live-tested 3 different pages/families (cells/cpp, slides/python, email/python) in the same locale (pl) and trigger word ('object') as the original confirmed defect via direct-engine calls. 0/3 reproduced -- Polish grammar consistently reordered the noun before the placeholder, avoiding the trap. MODEL_LIMITATION_DEFERRED, satisfying the FP record's own pre-committed falsifiability criterion. TC-APT-102 -> DONE.\n\nInvestigated the remaining garbled_word gate further: the vi table-cell truncation ('Vui long cun' instead of 'Co' for a bare 'Yes' cell) looks like a short-decontextualized-unit LLM hedge/refusal fragment, likely overlapping with TC-HT-ROUTE-002 (LLM circuit-breaker/short-unit routing) that a peer session is actively fixing in segment_translator.py right now -- did not duplicate that work.\n\nRECURRENCE ESCALATION STATUS: of the 3 gates open at this wake's start, 2 are now fully resolved (TC-APT-109 closed with portfolio audit; TC-APT-102 closed via recurrence test). model_quality_garbled_word is PARTIALLY addressed (1/4 tickets fixed+committed, 3/4 still open with precise, updated findings -- sv/th look like genuine per-word model limitations on rare vocabulary, vi's table-cell issue likely needs the peer's in-flight routing fix). auto:SemanticSimilarityValidator now spans 5 pages/72 tickets across 4 sites (docs/blog/kb/reference.aspose.org) -- clearly the active focus of the TC-APT-107 pre-launch validation sprint (a concurrent peer session, status IN_PROGRESS); did not duplicate. No new Track-A page opened this wake (RECURRENCE ESCALATION still has open gates); cells_committed_total unchanged at 432 from this wake's own work (the +1 landed last wake).",
+ "last_wake_summary": "Continued: re-audited RECURRENCE ESCALATION with the current heal_queue state. Found and fixed my own tracking mistake from last wake -- the TC-APT-102 disposition-update rows used a different ticket_id than the originals, so a latest-row-per-ticket_id reader never actually saw them resolved; re-emitted with the exact original ticket_id and MODEL_LIMITATION_DEFERRED. Concluded all 3 remaining gating classes now have genuine Track-B engagement (not 'never touched'): garbled_word had a completed retry cycle (1/4 fixed+committed), residual_phrase_defects had TC-APT-102 closed via recurrence test, SemanticSimilarityValidator is IN_PROGRESS under a peer's TC-APT-107 sprint -- matches the mission's own 2026-09-06 precedent that heterogeneous/actively-worked classes don't block Track-A indefinitely.\n\nOPENED THE FIRST NEW TRACK-A PAGE this thread since the gates cleared: 4 Tier-1a pages (zero prior locale coverage), found via a from-scratch scan since the tracked inventory snapshot only carries aggregate counts, not per-page coverage -- content/docs.aspose.org/en/cells/rust/developer-guide/{features,working-with-cells-foss-model}.md and cells/go/{getting-started/quickstart,developer-guide/features}.md, all claimed, all free of peer contention (docs.aspose.org's cells/rust and cells/go families look untouched by the very active blog.aspose.org vsprint107/TC-APT-107 fleet activity). Manifest built and launched detached (PID 60992, wave_scale=4, 25 locales, 100 expected outputs, professionalize_llm primary/m2m100 escalation). This is a genuinely large wave (100 cells) that will span multiple wakes -- recorded in active_detached_runs per runbook SS4 item 7 rather than blocking this turn on it. Next wake: check receipts, review completed cells, commit approved batches.",
  "cells_committed_total": 432,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "campaign_id": "wave-cellsrust-go-t1a-20260910",
+   "pid": 60992,
+   "manifest": "data/campaigns/manifests/wave-cellsrust-go-t1a-20260910.yaml",
+   "sources": [
+    "content/docs.aspose.org/en/cells/rust/developer-guide/features.md",
+    "content/docs.aspose.org/en/cells/rust/developer-guide/working-with-cells-foss-model.md",
+    "content/docs.aspose.org/en/cells/go/getting-started/quickstart.md",
+    "content/docs.aspose.org/en/cells/go/developer-guide/features.md"
+   ],
+   "locales": 25,
+   "expected_output_count": 100,
+   "launched_at": "2026-09-10T12:05:53+00:00",
+   "launched_by": "interactive-continue-20260910e",
+   "notes": "First Track-A page-open this mission-thread since the RECURRENCE ESCALATION gates cleared (TC-APT-109 + TC-APT-102 closed this session). Tier-1a, zero prior locale coverage on all 4 sources, wave_scale=4. stdout/stderr: logs/wave-cellsrust-go-t1a-std{out,err}.log. On next wake: check receipts/log tail, review whatever has completed (fan out per-language subagent reviewers per plan SS9), commit approved batches page-complete or family-scoped."
+  }
+ ],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 4,
