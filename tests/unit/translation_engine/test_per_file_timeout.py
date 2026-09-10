@@ -39,7 +39,7 @@ def test_per_file_timeout_config_key_present():
     cfg_path = Path("config/global.yaml")
     if not cfg_path.exists():
         pytest.skip("config/global.yaml not present in working directory")
-    with open(cfg_path) as f:
+    with open(cfg_path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     te = cfg.get("translation_engine", {})
     assert "per_file_timeout_s" in te, "per_file_timeout_s missing from translation_engine config"
@@ -98,7 +98,7 @@ def test_timeout_config_default_is_reasonable():
     cfg_path = Path("config/global.yaml")
     if not cfg_path.exists():
         pytest.skip("config/global.yaml not present in working directory")
-    with open(cfg_path) as f:
+    with open(cfg_path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     timeout_s = float(cfg.get("translation_engine", {}).get("per_file_timeout_s", 600))
     assert 60 <= timeout_s <= 3600, (
