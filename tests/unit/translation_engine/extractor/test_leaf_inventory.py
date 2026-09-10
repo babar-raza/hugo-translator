@@ -15,11 +15,17 @@ from src.translation_engine.extractor.leaf_inventory import (
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
 
 
-def _unit(node_addr: str, *, source_text: str = "text", do_not_translate: bool = False) -> TextUnit:
+def _unit(
+    node_addr: str,
+    *,
+    source_text: str = "text",
+    do_not_translate: bool = False,
+    kind: TextUnitKind = TextUnitKind.TEXT,
+) -> TextUnit:
     return TextUnit(
         unit_id=f"unit-{node_addr}",
         node_addr=node_addr,
-        kind=TextUnitKind.TEXT,
+        kind=kind,
         source_text=source_text,
         prefix_ws="",
         suffix_ws="",
@@ -136,3 +142,59 @@ class TestNotSoleLeaf:
         result = classify_sole_leaf("para[0]", units)
 
         assert result.classification == LeafClassification.NOT_SOLE_LEAF
+
+
+class TestLinkAndImageSoleLeafNeverReused:
+    """VA-07 (TC-APT-105 audit): a LINK_TEXT/IMAGE_ALT sole leaf must never
+    classify as ORDINARY_SOLE_LEAF, even though it passes the
+    do_not_translate test -- the renderer re-adds "[...](url)"/"![...](src)"
+    around its own translated_text, so reusing the segment's full combined
+    text (wrapper included) double-wraps it. Live shape: a "Next Steps"
+    list item that is nothing but a plain markdown link, e.g.
+    "- [Developer Guide Features](../../developer-guide/features/)" --
+    no do_not_translate leaf anywhere in it, so the existing
+    do_not_translate-based exclusion never applied."""
+
+    def test_sole_link_text_leaf_is_not_sole_leaf(self):
+        units = [_unit("listitem[2].link[0].text[0]", kind=TextUnitKind.LINK_TEXT)]
+
+        result = classify_sole_leaf("listitem[2]", units)
+
+        assert result.classification == LeafClassification.NOT_SOLE_LEAF
+        assert result.sole_unit is None
+
+    def test_sole_image_alt_leaf_is_not_sole_leaf(self):
+        units = [_unit("para[0].image[0].alt[0]", kind=TextUnitKind.IMAGE_ALT)]
+
+        result = classify_sole_leaf("para[0]", units)
+
+        assert result.classification == LeafClassification.NOT_SOLE_LEAF
+        assert result.sole_unit is None
+
+    def test_do_not_translate_link_text_is_still_protected_sole_leaf(self):
+        """do_not_translate is checked first -- a protected LINK_TEXT leaf
+        keeps its existing, correct PROTECTED_SOLE_LEAF classification
+        (unaffected by this fix; the downstream apply loop already skips
+        do_not_translate units regardless)."""
+        units = [
+            _unit(
+                "listitem[0].link[0].text[0]",
+                kind=TextUnitKind.LINK_TEXT,
+                do_not_translate=True,
+            )
+        ]
+
+        result = classify_sole_leaf("listitem[0]", units)
+
+        assert result.classification == LeafClassification.PROTECTED_SOLE_LEAF
+        assert result.sole_unit is units[0]
+
+    def test_sole_plain_text_leaf_is_unaffected(self):
+        """Sanity check the fix is scoped to LINK_TEXT/IMAGE_ALT only --
+        an ordinary TEXT sole leaf still reuses normally."""
+        units = [_unit("para[0].text[0]", kind=TextUnitKind.TEXT)]
+
+        result = classify_sole_leaf("para[0]", units)
+
+        assert result.classification == LeafClassification.ORDINARY_SOLE_LEAF
+        assert result.sole_unit is units[0]

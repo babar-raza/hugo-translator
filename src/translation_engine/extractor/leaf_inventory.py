@@ -60,7 +60,20 @@ class LeafClassification(Enum):
 
     ORDINARY_SOLE_LEAF = "ordinary_sole_leaf"
     """Exactly one leaf descendant in total, and it is NOT do_not_translate
-    -- safe to reuse a container-level combined translation for it."""
+    -- safe to reuse a container-level combined translation for it.
+
+    VA-07 (TC-APT-105 audit): NOT returned for a LINK_TEXT or IMAGE_ALT sole
+    leaf, even though it is "ordinary" by the do_not_translate test alone.
+    The container's combined translation is the segment's FULL text --
+    including the markdown link/image syntax the renderer independently
+    re-adds around a LINK_TEXT/IMAGE_ALT unit's own translated_text (which
+    must hold ONLY the anchor/alt text, not '[text](url)'). Reusing the
+    combined text here means the renderer wraps an already-complete
+    "[text](url)" in a second "[...](url)", corrupting the output into
+    "[[text](url)](url)" -- confirmed live on content/docs.aspose.org/en/
+    cells/rust/getting-started/quickstart.md's "Next Steps" list (plain,
+    single-link list items with no do_not_translate leaf at all, so the
+    existing do_not_translate-based exclusion never applied)."""
 
     PROTECTED_SOLE_LEAF = "protected_sole_leaf"
     """Exactly one leaf descendant in total, but it IS do_not_translate --
@@ -113,9 +126,18 @@ def classify_sole_leaf(node_addr: str, units: list[TextUnit]) -> LeafInventoryRe
     if sole_unit is None:
         return LeafInventoryResult(LeafClassification.NOT_SOLE_LEAF, None)
 
-    classification = (
-        LeafClassification.PROTECTED_SOLE_LEAF
-        if sole_unit.do_not_translate
-        else LeafClassification.ORDINARY_SOLE_LEAF
-    )
-    return LeafInventoryResult(classification, sole_unit)
+    if sole_unit.do_not_translate:
+        return LeafInventoryResult(LeafClassification.PROTECTED_SOLE_LEAF, sole_unit)
+
+    # VA-07: a LINK_TEXT/IMAGE_ALT sole leaf's own translated_text must hold
+    # only the anchor/alt text -- the renderer independently re-adds the
+    # "[...](url)"/"![...](src)" wrapper. The segment-level combined
+    # translation being reused here is the segment's FULL text, wrapper
+    # included, so reuse would double-wrap it. Not a "sole leaf" for reuse
+    # purposes even though it passes the do_not_translate test.
+    from .text_unit import TextUnitKind
+
+    if sole_unit.kind in (TextUnitKind.LINK_TEXT, TextUnitKind.IMAGE_ALT):
+        return LeafInventoryResult(LeafClassification.NOT_SOLE_LEAF, None)
+
+    return LeafInventoryResult(LeafClassification.ORDINARY_SOLE_LEAF, sole_unit)

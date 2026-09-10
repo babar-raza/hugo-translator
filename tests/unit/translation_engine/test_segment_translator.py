@@ -1010,10 +1010,169 @@ class TestASTReuseIdentityFix:
         site_profile.default_source_lang = "en"
         site_profile.body.preserve_patterns = [r".+"]
 
-        self._run(doc, site_profile, segments, translations, plan)
+        # VA-07: link_unit (LINK_TEXT) is no longer a reuse candidate at
+        # all (see leaf_inventory.py) -- its own translated_text must come
+        # from an independent batch_translate_units call, same as the real
+        # pipeline would provide, not this test's default static
+        # return_value=plan.units (which leaves it empty and trips the
+        # "empty outputs for substantial text" retry). code_unit
+        # (TABLE_CELL_TEXT) is unaffected and still reuses its segment
+        # translation via the address-keyed map -- the collision-avoidance
+        # this test exists to prove.
+        def _fake_batch_translate(units, *_a, **_k):
+            for u in units:
+                if u.translated_text is None:
+                    u.translated_text = "Ücretsiz Destek Forumu (independent)"
+            return units
 
-        assert link_unit.translated_text == "Ücretsiz Destek Forumu"
-        assert code_unit.translated_text == ".xlsx"
+        engine = _make_engine()
+        translator = SegmentTranslator(engine)
+        with (
+            patch("src.translation_engine.extractor.TextUnitExtractor") as MockExt,
+            patch("src.translation_engine.reconstructor.ASTRenderer") as MockRenderer,
+        ):
+            mock_ext = MagicMock()
+            mock_ext.extract_from_ast.return_value = plan
+            mock_ext.batch_translate_units.side_effect = _fake_batch_translate
+            mock_ext.batch_stats = {}
+            mock_ext._batch_calls = 0
+            mock_ext._individual_fallbacks = 0
+            MockExt.return_value = mock_ext
+
+            mock_renderer = MagicMock()
+            mock_renderer.placeholder_leak_count = 0
+            mock_renderer._missing_node_count = 0
+            mock_renderer.applied_units = []
+            mock_renderer.render_to_markdown.return_value = "body\n"
+            MockRenderer.return_value = mock_renderer
+
+            translator._translate_body_ast(
+                doc=doc,
+                target_lang="tr",
+                site_profile=site_profile,
+                stats=_make_stats(),
+                segments=segments,
+                translations=translations,
+                model_id_override="m2m100_418m",
+            )
+
+        assert link_unit.translated_text == "Ücretsiz Destek Forumu (independent)", (
+            "a LINK_TEXT sole leaf must get its OWN translation, never reuse the "
+            "segment's combined text -- reusing it would double-wrap the link "
+            "syntax the renderer independently re-adds"
+        )
+        assert code_unit.translated_text == ".xlsx", (
+            "a non-link sole leaf still correctly reuses its segment translation, "
+            "unaffected by sharing an old-style text key with link_unit"
+        )
+
+    def test_plain_link_only_list_item_does_not_double_wrap(self):
+        """VA-07 (TC-APT-105 audit): the exact live shape --
+        content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md's
+        "Next Steps" list, "- [Developer Guide Features](../../developer-guide/
+        features/)" -- a list item that is NOTHING but a plain markdown link,
+        no bold wrapper, no trailing prose, no do_not_translate leaf anywhere
+        (so TC-APT-105's own fix, keyed off do_not_translate, never applied
+        here). Before this fix, the sole LINK_TEXT leaf absorbed the
+        segment's own combined translation ("[Developer Guide Features]
+        (url)", markdown syntax and all, since the whole segment IS the
+        link), and the renderer wrapped that AGAIN in its own "[...]()",
+        producing "[[Developer Guide Features](url)](url)" in the rendered
+        output. Confirmed live via .local/m2m100-25locale-quality-test/
+        trace_quickstart_nested_link.py (gitignored scratch).
+        """
+        from src.translation_engine.extractor.segment_extractor import (
+            Segment,
+            SegmentContext,
+            SegmentContextType,
+        )
+        from src.translation_engine.extractor.text_unit import (
+            BodyTranslationPlan,
+            TextUnit,
+            TextUnitKind,
+        )
+
+        list_item_segment = Segment(
+            id="seg-listitem",
+            source_text="[Developer Guide Features](../../developer-guide/features/)",
+            context=SegmentContext(
+                context_type=SegmentContextType.BODY_TEXT,
+                node_addr="body.list[1].listitem[2]",
+            ),
+            site_id="docs.aspose.org",
+            source_lang="en",
+        )
+        translations = {
+            # The real pipeline's segment-level translation for a
+            # sole-link segment retains the full markdown syntax --
+            # confirmed live, not just plausible.
+            "seg-listitem": "[دليل المطور الميزات](../../developer-guide/features/)",
+        }
+
+        link_unit = TextUnit(
+            unit_id="u-link",
+            node_addr="body.list[1].listitem[2].link[0].text[0]",
+            kind=TextUnitKind.LINK_TEXT,
+            source_text="Developer Guide Features",
+        )
+        plan = BodyTranslationPlan(ast=[], units=[link_unit], ast_fingerprint="test-fp")
+
+        doc = MagicMock()
+        doc.ast = []
+        doc.frontmatter = {}
+        doc.source_path = None
+
+        site_profile = MagicMock()
+        site_profile.default_source_lang = "en"
+        site_profile.body.preserve_patterns = []
+
+        def _fake_batch_translate(units, *_a, **_k):
+            for u in units:
+                if u.translated_text is None:
+                    u.translated_text = "دليل المطور الميزات"
+            return units
+
+        engine = _make_engine()
+        translator = SegmentTranslator(engine)
+        with (
+            patch("src.translation_engine.extractor.TextUnitExtractor") as MockExt,
+            patch("src.translation_engine.reconstructor.ASTRenderer") as MockRenderer,
+        ):
+            mock_ext = MagicMock()
+            mock_ext.extract_from_ast.return_value = plan
+            mock_ext.batch_translate_units.side_effect = _fake_batch_translate
+            mock_ext.batch_stats = {}
+            mock_ext._batch_calls = 0
+            mock_ext._individual_fallbacks = 0
+            MockExt.return_value = mock_ext
+
+            mock_renderer = MagicMock()
+            mock_renderer.placeholder_leak_count = 0
+            mock_renderer._missing_node_count = 0
+            mock_renderer.applied_units = []
+            mock_renderer.render_to_markdown.return_value = "body\n"
+            MockRenderer.return_value = mock_renderer
+
+            translator._translate_body_ast(
+                doc=doc,
+                target_lang="ar",
+                site_profile=site_profile,
+                stats=_make_stats(),
+                segments=[list_item_segment],
+                translations=translations,
+                model_id_override="m2m100_418m",
+            )
+
+        assert link_unit.translated_text == "دليل المطور الميزات", (
+            "must be the independently-batch-translated anchor text only -- "
+            f"not the segment's markdown-wrapped translation, got: "
+            f"{link_unit.translated_text!r}"
+        )
+        assert "[" not in link_unit.translated_text and "(" not in link_unit.translated_text, (
+            "the corrupted-duplicate signature: link_unit's own translated_text "
+            "must never itself contain markdown link syntax, or the renderer's "
+            "independent [...](url) wrapper double-wraps it"
+        )
 
     def test_frontmatter_reuse_matches_by_address_despite_source_text_divergence(self):
         """Bug 2 regression: the legacy Segment's and the AST TextUnit's
