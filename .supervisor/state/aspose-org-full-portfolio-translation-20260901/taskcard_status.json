@@ -4,7 +4,7 @@
  "plan_revision": 18,
  "branch": "mission/aspose-org-full-portfolio-translation-20260901",
  "created_at": "2026-09-02T05:20:29.896922+00:00",
- "updated_at": "2026-09-10T10:23:41+00:00",
+ "updated_at": "2026-09-10T11:24:03+00:00",
  "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
  "content_repo_session_ledger": {
   "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
   2,
   3
  ],
- "wake_count": 35,
+ "wake_count": 36,
  "wakes_without_state_change": 0,
  "taskcards": {
   "TC-APT-001": {
@@ -1451,8 +1451,8 @@
    ]
   }
  },
- "last_wake_summary": "Continued: audited all RECURRENCE ESCALATION gating classes (17 classes, 2+ open pages each) via subagent -- 3 genuinely gate (model_quality_garbled_word, model_quality_residual_phrase_defects/TC-APT-102, auto:SemanticSimilarityValidator on fresh vsprint107 pdf/cpp failures). Investigating TC-APT-102 (words-foss-net 'round-trip' sentence) surfaced a NEW defect class, TC-APT-109: ast_renderer.py's TC-APT-078 cross-reference correction (~line 726) was gated only on kind_value != 'heading_text', no do_not_translate check -- a heading's translation ('### Charts' -> '### Diagramme') got word-boundary-regex-substituted into a protected C# code block ('using Aspose.Words.Drawing.Charts;' -> '...Diagramme;'). FIXED (commit 57c6167a): added 'and not unit.do_not_translate'. 2 new regression tests (confirmed failing without the fix via git-stash, passing with it); full 316-test ast_renderer suite green. LIVE REVERIFIED against the exact originally-failing file via direct TranslationEngine.translate_file() (manifest/verify_environment is currently racy under heavy concurrent fleet TM writes -- ~6 failed launches this wake from SHA/TM-fingerprint drift races). RECURRENCE ESCALATION steps 1+2 done; step 3 has no broader quarantined batch yet (only this page ticketed so far); portfolio-wide blast-radius audit not run. cells_committed_total unchanged at 431 (root-cause work only, no Track-A page opened this wake -- very active concurrent fleet: vsprint107 sprint, TC-APT-107 campaign_manifest.py fix, TC-HT-ROUTE-002 LLM circuit-breaker work, all observed and correctly left untouched).",
- "cells_committed_total": 431,
+ "last_wake_summary": "Continued: closed TC-APT-109 fully (fix + reverify + portfolio-wide blast-radius audit, 0 confirmed corruption in committed content -- see prior wake summary/heal_queue for detail). Moved to the remaining RECURRENCE ESCALATION gate model_quality_garbled_word: ran the standard cross-model-retry step (never previously attempted on these tickets) on pdf-engine-in-python's sv/th/uk/vi cells. All 4 passed the automated 44-gate zero-defect battery, but a dedicated RB-004 rubric subagent review (not just gate-trust) found only uk genuinely clean -- committed to content repo local main (6e1547498b, single-cell heal commit). sv/th/vi each still carry a confirmed RB-004 garbled/nonsense-word defect (sv: 'delegaterar' persists plus 2 NEW hybrid words found in review; th: the 'facade' fix only landed on 1 of 2 occurrences; vi: original duplication fixed but a NEW truncated-fragment table-cell defect found) -- kept open with updated, specific notes; TM purged (141 entries). This confirms garbled_word is NOT simple isolated sampling noise resolvable by one retry -- worth flagging for closer investigation before more blind retries. Hit and recovered from the known multi-session git-index collision (a `git add <single-file>` on top of another session's already-staged 323-file index) via `git reset` (unstage only, no data loss) + precise re-add -- confirms the documented lesson still applies exactly as written. cells_committed_total 431 -> 432 (+1, uk/pdf-engine-in-python). garbled_word and residual_phrase_defects/TC-APT-102 and SemanticSimilarityValidator (claimed by vsprint107 peer) remain open RECURRENCE ESCALATION gates.",
+ "cells_committed_total": 432,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [],
  "blocked_pending_clean_translator_repo": null,
