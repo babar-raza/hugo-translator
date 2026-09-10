@@ -124,6 +124,20 @@ class TranslationStats:
     multiline_lines: int = 0  # Translatable multiline lines
     multiline_backend_calls: int = 0  # Backend calls for multiline batching
 
+    # HT-QUALITY-GATES-001 RC2 (follow-up to TC-APT-042/TC-APT-106): frontmatter
+    # keys a downstream AST-side repair pass (_repair_cross_field_frontmatter_
+    # residuals) legitimately re-translated, mapped to the actual accepted
+    # rendered value(s) -- read from doc.frontmatter via the same accessor the
+    # placement-consistency check uses. translate_to_language's stale legacy-
+    # segment snapshot (_fm_expected_by_key) never sees this repair (it mutates
+    # the separate AST translated_units, not the legacy segments/translations
+    # dict), so without this the check compares a genuinely-fixed value against
+    # a pre-repair expectation and raises a false-positive
+    # frontmatter_segment_not_applied. Reset at the start of each
+    # _translate_body_ast() call -- it must never leak across retry attempts of
+    # the same file+language, since `stats` is reused across the retry loop.
+    fm_repair_overrides: dict[str, list[str]] = field(default_factory=dict)
+
     @property
     def tm_hit_rate(self) -> float:
         """Calculate TM hit rate."""

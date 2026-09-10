@@ -1729,6 +1729,23 @@ class SegmentTranslator:
                             _fm_key = _seg.context.frontmatter_key
                             _expected = translations[_seg.id]
                             _fm_expected_by_key.setdefault(_fm_key, []).append(_expected)
+                    # HT-QUALITY-GATES-001 RC2: a downstream AST-side repair
+                    # (_repair_cross_field_frontmatter_residuals, TC-APT-042)
+                    # may have legitimately overwritten a frontmatter unit's
+                    # translated_text AFTER the legacy-segment snapshot above
+                    # was taken -- the repair mutates the separate AST
+                    # translated_units, never this `translations` dict, so
+                    # the snapshot has no way to know about it on its own.
+                    # `stats.fm_repair_overrides` was populated from this
+                    # same `doc.frontmatter` (the check's own comparison
+                    # target) via the same accessor the check uses, so this
+                    # only widens acceptance for keys a repair actually
+                    # touched -- a key the repair never touched, or a value
+                    # the repair failed to actually fix, is still caught.
+                    for _fm_repair_key, _fm_repair_values in stats.fm_repair_overrides.items():
+                        _fm_expected_by_key.setdefault(_fm_repair_key, []).extend(
+                            _fm_repair_values
+                        )
                 _fm_not_applied = _unapplied_frontmatter_keys(
                     _fm_expected_by_key,
                     translated_frontmatter,
@@ -1958,6 +1975,11 @@ class SegmentTranslator:
             stats.ast_units_extracted = total_units
             stats.ast_units_translatable = translatable_units
             stats.ast_units_protected = protected_units
+            # HT-QUALITY-GATES-001 RC2: must not leak a previous retry
+            # attempt's repair overrides into this attempt's frontmatter
+            # placement check -- `stats` is the same object reused across
+            # the retry loop in file_pipeline.translate_language().
+            stats.fm_repair_overrides = {}
 
             # E2E FIX: Reuse existing translations if available
             #
@@ -2522,6 +2544,41 @@ class SegmentTranslator:
             renderer.apply_translations(
                 doc.ast, translated_units, frontmatter=doc.frontmatter, target_lang=target_lang
             )
+
+            # HT-QUALITY-GATES-001 RC2 (follow-up to TC-APT-042/TC-APT-106):
+            # _repair_cross_field_frontmatter_residuals (above) legitimately
+            # mutates a frontmatter unit's translated_text to fix a near-
+            # duplicate field's untranslated shared phrase -- AFTER
+            # translate_to_language's placement-consistency snapshot
+            # (_fm_expected_by_key, sourced from the separate legacy
+            # segments/translations pass) has typically already been taken,
+            # and that snapshot is never updated by this AST-side repair.
+            # Record the ACTUAL rendered value for every frontmatter key a
+            # repair touched, read via the exact accessor
+            # (`YAMLFormatter.get_nested_value`) the placement check itself
+            # uses against this same `doc.frontmatter`, so that check can
+            # accept the legitimate repair as an additional valid expectation
+            # instead of flagging it as frontmatter_segment_not_applied. Keys
+            # the repair never touched are untouched here, so a genuinely
+            # wrong/unapplied frontmatter translation is still caught.
+            _repaired_fm_keys = {
+                str(_u.node_addr)[len("frontmatter.") :]
+                for _u in translated_units
+                if str(getattr(_u, "node_addr", "") or "").startswith("frontmatter.")
+                and "cross_field_repair_phrase" in (getattr(_u, "metadata", None) or {})
+            }
+            if _repaired_fm_keys:
+                from .reconstructor.yaml_formatter import YAMLFormatter as _FmRepairYamlFormatter
+
+                _fm_repair_yaml_formatter = _FmRepairYamlFormatter()
+                for _fm_repair_key in _repaired_fm_keys:
+                    _repaired_value = _fm_repair_yaml_formatter.get_nested_value(
+                        doc.frontmatter, _fm_repair_key
+                    )
+                    if _repaired_value is not None:
+                        stats.fm_repair_overrides.setdefault(_fm_repair_key, []).append(
+                            _repaired_value
+                        )
 
             # P0-D: Placeholder leak = blocking failure
             if renderer.placeholder_leak_count > 0:

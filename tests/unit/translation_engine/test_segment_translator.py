@@ -984,3 +984,281 @@ class TestASTReuseIdentityFix:
         self._run(doc, site_profile, [segment], translations, plan, target_lang="hu")
 
         assert unit.translated_text == translations["seg-description"]
+
+
+# ---------------------------------------------------------------------------
+# HT-QUALITY-GATES-001 RC2 (follow-up to TC-APT-042 / TC-APT-106, 2026-09-10)
+#
+# commit b7ba0813 fixed the AST-reuse identity bug above but explicitly left
+# a SECOND, independent cause of `frontmatter_segment_not_applied` unfixed:
+# `_repair_cross_field_frontmatter_residuals` legitimately mutates a
+# frontmatter TextUnit's `translated_text` (e.g. fixing a near-duplicate
+# description/summary field that left a shared English phrase untranslated)
+# AFTER `translate_to_language`'s `_fm_expected_by_key` snapshot -- sourced
+# from the separate, earlier legacy segments/translations pass -- has
+# already been taken. That snapshot has no way to learn about an AST-side
+# repair on its own, so the placement-consistency check
+# (`_unapplied_frontmatter_keys`) compared the repaired-and-now-CORRECT
+# rendered value against a stale pre-repair expectation and raised a false
+# positive under zero-defect policy.
+#
+# The fix: `_translate_body_ast` records the ACTUAL accepted rendered value
+# for every frontmatter key a repair pass touched into
+# `stats.fm_repair_overrides` (read via the same `YAMLFormatter.
+# get_nested_value` accessor the check itself uses against the same
+# `doc.frontmatter`), and `translate_to_language` merges those overrides
+# into `_fm_expected_by_key` before running the check -- widening acceptance
+# only for keys a repair actually touched, so a genuinely wrong/unapplied
+# frontmatter translation is still caught.
+# ---------------------------------------------------------------------------
+
+
+class TestFrontmatterRepairPlacementCheck:
+    """Direct tests of `_unapplied_frontmatter_keys`'s contract once a repair
+    override has been merged into its `expected_by_key` argument."""
+
+    def test_accepts_a_repaired_value_when_present_in_expected_by_key(self):
+        from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter
+        from src.translation_engine.segment_translator import _unapplied_frontmatter_keys
+
+        # Mirrors the merged _fm_expected_by_key: the stale legacy pre-repair
+        # value plus the repaired value stats.fm_repair_overrides recorded.
+        expected_by_key = {
+            "summary": ["Stale untranslated summary text", "Repaired summary text"]
+        }
+        translated_frontmatter = {"summary": "Repaired summary text"}
+
+        not_applied = _unapplied_frontmatter_keys(
+            expected_by_key, translated_frontmatter, YAMLFormatter()
+        )
+
+        assert not_applied == []
+
+    def test_still_flags_a_genuinely_wrong_value_not_in_expected_by_key(self):
+        """Regression guard: the check's original defect-catching purpose
+        must survive the fix. A rendered value matching NEITHER the legacy
+        translation NOR any repair override is still a real
+        frontmatter_segment_not_applied defect."""
+        from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter
+        from src.translation_engine.segment_translator import _unapplied_frontmatter_keys
+
+        expected_by_key = {"summary": ["Correct expected summary text"]}
+        translated_frontmatter = {
+            "summary": "Something else entirely, unrelated to any expectation"
+        }
+
+        not_applied = _unapplied_frontmatter_keys(
+            expected_by_key, translated_frontmatter, YAMLFormatter()
+        )
+
+        assert not_applied == ["summary"]
+
+
+class TestFrontmatterRepairOverrideCapture:
+    """`_translate_body_ast` must record a genuine cross-field repair's
+    accepted value into `stats.fm_repair_overrides`."""
+
+    def test_cross_field_repair_is_captured_into_stats_fm_repair_overrides(self):
+        from src.translation_engine.extractor.text_unit import (
+            BodyTranslationPlan,
+            TextUnit,
+            TextUnitKind,
+        )
+
+        # Two near-duplicate frontmatter fields sharing "MIT-licensed,
+        # zero-dependency": description translated it, summary left it as an
+        # untranslated English residual -- the exact TC-APT-042 shape.
+        description_unit = TextUnit(
+            unit_id="fm-description",
+            node_addr="frontmatter.description",
+            kind=TextUnitKind.TEXT,
+            source_text="A MIT-licensed, zero-dependency PDF library.",
+            translated_text="Knihovna PDF s licenci MIT bez zavislosti.",
+            metadata={
+                "field_name": "description",
+                "original_text": "A MIT-licensed, zero-dependency PDF library.",
+            },
+        )
+        summary_unit = TextUnit(
+            unit_id="fm-summary",
+            node_addr="frontmatter.summary",
+            kind=TextUnitKind.TEXT,
+            source_text="Overview of the MIT-licensed, zero-dependency PDF library.",
+            translated_text="Prehled MIT-licensed, zero-dependency PDF knihovny.",
+            metadata={
+                "field_name": "summary",
+                "original_text": "Overview of the MIT-licensed, zero-dependency PDF library.",
+            },
+        )
+        plan = BodyTranslationPlan(
+            ast=[], units=[description_unit, summary_unit], ast_fingerprint="test-fp"
+        )
+
+        engine = _make_engine()
+        # A MagicMock's auto-vivified .campaign_context.get(...) is truthy,
+        # which would make _repair_cross_field_frontmatter_residuals treat
+        # "defer_llm_fallbacks" as set and skip the repair entirely -- must
+        # be a real dict, same as production's default {}.
+        engine.campaign_context = {}
+        repaired_summary = "Prehled knihovny PDF s licenci MIT bez zavislosti."
+        backend = engine.model_loader.load_model.return_value
+        backend.translate_with_context.return_value = [repaired_summary]
+
+        translator = SegmentTranslator(engine)
+        site_profile = MagicMock()
+        site_profile.default_source_lang = "en"
+        site_profile.body.preserve_patterns = []
+
+        # `renderer.apply_translations` (mocked below, existing/unrelated
+        # rendering code) is what would normally copy a repaired unit's
+        # translated_text into doc.frontmatter -- set directly here so this
+        # test isolates the NEW capture logic rather than re-testing
+        # ASTRenderer.
+        doc = MagicMock()
+        doc.ast = []
+        doc.frontmatter = {"summary": repaired_summary}
+        doc.source_path = None
+
+        stats = _make_stats()
+
+        with (
+            patch("src.translation_engine.extractor.TextUnitExtractor") as MockExt,
+            patch("src.translation_engine.reconstructor.ASTRenderer") as MockRenderer,
+        ):
+            mock_ext = MagicMock()
+            mock_ext.extract_from_ast.return_value = plan
+            mock_ext.batch_translate_units.return_value = plan.units
+            mock_ext.batch_stats = {}
+            mock_ext._batch_calls = 0
+            mock_ext._individual_fallbacks = 0
+            MockExt.return_value = mock_ext
+
+            mock_renderer = MagicMock()
+            mock_renderer.placeholder_leak_count = 0
+            mock_renderer._missing_node_count = 0
+            mock_renderer.applied_units = []
+            mock_renderer.render_to_markdown.return_value = "body\n"
+            MockRenderer.return_value = mock_renderer
+
+            translator._translate_body_ast(
+                doc=doc,
+                target_lang="cs",
+                site_profile=site_profile,
+                stats=stats,
+                model_id_override="m2m100_418m",
+            )
+
+        assert summary_unit.metadata.get(
+            "cross_field_repair_phrase"
+        ), "cross-field repair pass should have fired for this residual shape"
+        assert stats.fm_repair_overrides.get("summary") == [repaired_summary]
+
+
+class TestFrontmatterRepairOverrideIntegration:
+    """End-to-end (through `translate_to_language`) regression coverage for
+    the false-positive fix and its regression guard."""
+
+    def test_accepts_legitimate_post_repair_frontmatter_value(self):
+        from src.translation_engine.extractor.segment_extractor import (
+            SegmentContext,
+            SegmentContextType,
+        )
+
+        engine = _make_engine()
+        engine.validation_policy = "zero-defect"
+        tm_result = MagicMock()
+        tm_result.hit = True
+        tm_result.translation = "Stale pre-repair summary"
+        tm_result.source = "l1_cache"
+        tm_result.candidates = []
+        engine.tm.lookup.return_value = tm_result
+
+        translator = SegmentTranslator(engine)
+        stats = _make_stats()
+        seg = _make_segment(
+            source_text="Summary source text",
+            seg_id="seg-summary",
+            context=SegmentContext(
+                context_type=SegmentContextType.FRONTMATTER,
+                frontmatter_key="summary",
+            ),
+        )
+
+        repaired_value = "Repaired summary text (cross-field fix)"
+        doc = MagicMock(ast=None, frontmatter={"summary": repaired_value})
+
+        def _fake_translate_body_ast(doc_arg, target_lang_arg, site_profile_arg, stats_arg, **kwargs):
+            # Simulates what the real _translate_body_ast does once a
+            # cross-field repair fires: record the accepted value, then
+            # return the (already-rendered) body.
+            stats_arg.fm_repair_overrides["summary"] = [repaired_value]
+            return f"Body"
+
+        with patch.object(
+            translator, "_translate_body_ast", side_effect=_fake_translate_body_ast
+        ):
+            # Must not raise -- this is the exact false positive this fix
+            # closes (previously: ValueError frontmatter_segment_not_applied).
+            translator.translate_to_language(
+                site_id="test",
+                site_profile=MagicMock(),
+                doc=doc,
+                segments=[seg],
+                source_lang="en",
+                target_lang="cs",
+                force=False,
+                stats=stats,
+            )
+
+    def test_still_raises_when_frontmatter_value_is_genuinely_unapplied(self):
+        """Regression guard: with NO repair override recorded, a rendered
+        frontmatter value that disagrees with the legacy expectation must
+        still raise -- this is the original defect class the check exists
+        to catch, and the fix must not weaken it."""
+        from src.translation_engine.extractor.segment_extractor import (
+            SegmentContext,
+            SegmentContextType,
+        )
+
+        engine = _make_engine()
+        engine.validation_policy = "zero-defect"
+        tm_result = MagicMock()
+        tm_result.hit = True
+        tm_result.translation = "Correct expected title"
+        tm_result.source = "l1_cache"
+        tm_result.candidates = []
+        engine.tm.lookup.return_value = tm_result
+
+        translator = SegmentTranslator(engine)
+        stats = _make_stats()
+        seg = _make_segment(
+            source_text="Title source text",
+            seg_id="seg-title",
+            context=SegmentContext(
+                context_type=SegmentContextType.FRONTMATTER,
+                frontmatter_key="title",
+            ),
+        )
+
+        # No repair fired this attempt (stats.fm_repair_overrides stays
+        # empty) -- the rendered value matches neither the legacy
+        # expectation nor any override.
+        doc = MagicMock(ast=None, frontmatter={"title": "Wrong unrelated rendered title"})
+
+        def _fake_translate_body_ast(doc_arg, target_lang_arg, site_profile_arg, stats_arg, **kwargs):
+            return "Body"
+
+        with patch.object(
+            translator, "_translate_body_ast", side_effect=_fake_translate_body_ast
+        ):
+            with pytest.raises(ValueError, match="frontmatter_segment_not_applied"):
+                translator.translate_to_language(
+                    site_id="test",
+                    site_profile=MagicMock(),
+                    doc=doc,
+                    segments=[seg],
+                    source_lang="en",
+                    target_lang="cs",
+                    force=False,
+                    stats=stats,
+                )
