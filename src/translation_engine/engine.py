@@ -2201,6 +2201,24 @@ class TranslationEngine:
                     source_signal = _frontmatter_language_signal_text(source_value.strip())
                     similarity = _residue_similarity(source_signal, signal_text)
                     if _residue_is_untranslated(source_signal, signal_text):
+                        # TC-APT-108: the message above names the field but never the
+                        # actual leftover text, so a retry built from it (decision_engine
+                        # ._generate_retry_feedback reads details["suggestion"] verbatim)
+                        # told the model only that *something* was untranslated, not
+                        # *which word*. Confirmed live on "Aspose.PDF FOSS for Python"
+                        # -type titles: the residue is a short connector ("for") sitting
+                        # between two tokens that read as protected/technical, and 3
+                        # straight attempts (professionalize_llm + 2x m2m100) left it
+                        # untouched because nothing ever named it explicitly.
+                        residue_preview = signal_text.strip()
+                        suggestion = (
+                            f"The word(s) \"{residue_preview}\" in this field were left "
+                            f"in English -- translate them into {target_lang}. Every "
+                            "other part of the field (product names, API identifiers, "
+                            "platform/language names) is already correctly preserved "
+                            "and must stay exactly as-is; only this leftover text needs "
+                            "to change."
+                        ) if residue_preview else None
                         issues.append(
                             _ValIssue(
                                 severity=_ValSeverity.ERROR,
@@ -2216,6 +2234,7 @@ class TranslationEngine:
                                     "residue_similarity": round(similarity, 4),
                                     "signal_alpha": signal_alpha_count,
                                     "reason": "untranslated_frontmatter_field",
+                                    **({"suggestion": suggestion} if suggestion else {}),
                                 },
                             )
                         )
