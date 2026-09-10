@@ -31,7 +31,7 @@ from src.workers.git_provenance import (
     governed_subject_pattern,
     verify_governed_add,
 )
-from src.workers.heal_queue import is_quarantined, is_source_path_quarantined
+from src.workers.heal_queue import active_hold, is_quarantined, is_source_path_quarantined
 
 from .campaign_manifest import (
     CampaignManifest,
@@ -2124,13 +2124,25 @@ class CampaignRunner:
             )
         resolved_output = str(expected.resolve())
 
+        # QU-03: an active advisory hold is a deliberate operator "stop
+        # touching this file" signal, distinct from and taking precedence
+        # over any automated quarantine dimension below -- checked first,
+        # regardless of prior failure history, so an unseen locale on a held
+        # file is skipped too, not silently attempted.
+        heal_queue_path = self.ledger.root.parent / "heal_queue.jsonl"
+        hold = active_hold(source.source_path, heal_queue_path=heal_queue_path)
+        if hold is not None:
+            self._append_advisory_hold_skip(
+                shard=shard, source=source, locale=locale, hold=hold
+            )
+            return False, resolved_output
+
         # QU-02: a (source_path, root_cause_class) pair whose OPEN heal tickets
         # span >=PER_FILE_QUARANTINE_THRESHOLD distinct locales is a systemic,
         # file-level defect -- skip it even for a locale that has never been
         # attempted, unlike the per-locale dimension below (the live case:
         # quickstart.md kept accumulating fresh single-locale LinkValidator
         # tickets across 7+ locales, never tripping the per-locale threshold).
-        heal_queue_path = self.ledger.root.parent / "heal_queue.jsonl"
         file_quarantined, _file_root_cause = is_source_path_quarantined(
             source.source_path, heal_queue_path=heal_queue_path
         )
@@ -2664,3 +2676,31 @@ class CampaignRunner:
                 gate=gate,
                 failure=failure,
             )
+
+    def _append_advisory_hold_skip(
+        self,
+        *,
+        shard: dict[str, Any],
+        source: Any,
+        locale: str,
+        hold: dict[str, Any],
+    ) -> None:
+        """QU-03: record that a job was skipped because of an active advisory
+        hold, distinct from a heal ticket -- a hold is an operator decision,
+        not a validator finding, and must never count toward either
+        quarantine dimension in heal_queue.py. Written to its own file so
+        campaign output clearly distinguishes a held job from a
+        genuinely-attempted-and-failed one."""
+        record = {
+            "campaign_id": self.manifest.campaign_id,
+            "shard_id": shard.get("shard_id"),
+            "site_id": shard.get("site_id", getattr(source, "site_id", "")),
+            "source_path": source.source_path,
+            "target_lang": locale,
+            "outcome": "held_by_advisory",
+            "hold_reason": hold.get("reason"),
+            "hold_expiry": hold.get("expiry"),
+            "hold_created_at": hold.get("created_at"),
+            "skipped_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self.ledger._append(self.ledger.root / "advisory_holds_skipped.jsonl", record)

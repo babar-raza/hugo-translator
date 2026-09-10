@@ -6,17 +6,24 @@ against heal_queue.jsonl's real on-disk schema.
 """
 
 import json
+from datetime import datetime, timedelta, timezone
+
+import pytest
 
 from src.workers.heal_queue import (
     PER_FILE_QUARANTINE_THRESHOLD,
     QUARANTINE_THRESHOLD,
+    active_hold,
+    add_hold,
     is_quarantined,
     is_source_path_quarantined,
+    main as heal_queue_main,
     open_ticket_counts_by_pair,
     open_tickets_by_root_cause_class,
     open_tickets_for_source_path,
     quarantined_files,
     quarantined_pairs,
+    release_hold,
 )
 
 
@@ -372,3 +379,123 @@ class TestPerFileQuarantineDimension:
         for page in ("page1", "page2", "page3"):
             tripped, _ = is_source_path_quarantined(page, heal_queue_path=queue)
             assert tripped is False
+
+
+# --- QU-03 advisory holds -----------------------------------------------------
+# A hold is a distinct event kind from the automated ticket lifecycle above:
+# a deliberate, human/agent-authored "stop touching this file" signal with a
+# mandatory reason, that must have real, code-enforced effect on scheduling
+# rather than being an unread prose note, as happened in the incident this
+# closes.
+
+
+class TestAdvisoryHoldLifecycle:
+    def test_a_new_hold_is_active(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        add_hold("content/x/broken.md", "investigating link corruption", heal_queue_path=queue)
+
+        hold = active_hold("content/x/broken.md", heal_queue_path=queue)
+
+        assert hold is not None
+        assert hold["reason"] == "investigating link corruption"
+
+    def test_hold_requires_a_non_empty_reason(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        with pytest.raises(ValueError):
+            add_hold("content/x/broken.md", "", heal_queue_path=queue)
+        with pytest.raises(ValueError):
+            add_hold("content/x/broken.md", "   ", heal_queue_path=queue)
+
+    def test_release_clears_an_active_hold(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        add_hold("content/x/broken.md", "investigating", heal_queue_path=queue)
+        assert active_hold("content/x/broken.md", heal_queue_path=queue) is not None
+
+        release_hold("content/x/broken.md", heal_queue_path=queue)
+
+        assert active_hold("content/x/broken.md", heal_queue_path=queue) is None
+
+    def test_a_new_hold_after_release_is_active_again(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        add_hold("content/x/broken.md", "first pass", heal_queue_path=queue)
+        release_hold("content/x/broken.md", heal_queue_path=queue)
+        add_hold("content/x/broken.md", "second pass", heal_queue_path=queue)
+
+        hold = active_hold("content/x/broken.md", heal_queue_path=queue)
+
+        assert hold is not None
+        assert hold["reason"] == "second pass"
+
+    def test_a_hold_on_one_file_does_not_affect_another(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        add_hold("content/x/broken.md", "investigating", heal_queue_path=queue)
+
+        assert active_hold("content/x/other.md", heal_queue_path=queue) is None
+
+    def test_an_unexpired_hold_is_still_active(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        add_hold("content/x/broken.md", "investigating", expiry=future, heal_queue_path=queue)
+
+        assert active_hold("content/x/broken.md", heal_queue_path=queue) is not None
+
+    def test_an_expired_hold_stops_blocking_automatically_without_release(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        add_hold("content/x/broken.md", "investigating", expiry=past, heal_queue_path=queue)
+
+        assert active_hold("content/x/broken.md", heal_queue_path=queue) is None
+
+    def test_a_hold_never_matches_the_quarantine_dimensions(self, tmp_path):
+        """A hold has no root_cause_class/target_lang -- it must be invisible
+        to every quarantine query, since it isn't a validator finding."""
+        queue = tmp_path / "heal_queue.jsonl"
+        add_hold("content/x/broken.md", "investigating", heal_queue_path=queue)
+
+        assert open_ticket_counts_by_pair(heal_queue_path=queue) == {}
+        assert quarantined_pairs(heal_queue_path=queue) == set()
+        assert quarantined_files(heal_queue_path=queue) == set()
+        tripped, _ = is_source_path_quarantined("content/x/broken.md", heal_queue_path=queue)
+        assert tripped is False
+
+    def test_release_with_no_prior_hold_leaves_nothing_active(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        release_hold("content/x/broken.md", heal_queue_path=queue)
+
+        assert active_hold("content/x/broken.md", heal_queue_path=queue) is None
+
+    def test_missing_file_has_no_active_hold(self, tmp_path):
+        queue = tmp_path / "does_not_exist.jsonl"
+        assert active_hold("content/x/broken.md", heal_queue_path=queue) is None
+
+
+class TestAdvisoryHoldCli:
+    def test_hold_subcommand_places_a_hold(self, tmp_path, monkeypatch):
+        queue = tmp_path / "heal_queue.jsonl"
+        monkeypatch.setattr("src.workers.heal_queue._HEAL_QUEUE_FILE", queue)
+
+        exit_code = heal_queue_main(
+            ["hold", "--source-path", "content/x/broken.md", "--reason", "investigating"]
+        )
+
+        assert exit_code == 0
+        hold = active_hold("content/x/broken.md", heal_queue_path=queue)
+        assert hold is not None
+        assert hold["reason"] == "investigating"
+
+    def test_release_subcommand_clears_a_hold(self, tmp_path, monkeypatch):
+        queue = tmp_path / "heal_queue.jsonl"
+        monkeypatch.setattr("src.workers.heal_queue._HEAL_QUEUE_FILE", queue)
+        add_hold("content/x/broken.md", "investigating", heal_queue_path=queue)
+
+        exit_code = heal_queue_main(["release", "--source-path", "content/x/broken.md"])
+
+        assert exit_code == 0
+        assert active_hold("content/x/broken.md", heal_queue_path=queue) is None
+
+    def test_hold_subcommand_requires_reason_argument(self, tmp_path, monkeypatch):
+        queue = tmp_path / "heal_queue.jsonl"
+        monkeypatch.setattr("src.workers.heal_queue._HEAL_QUEUE_FILE", queue)
+
+        with pytest.raises(SystemExit):
+            heal_queue_main(["hold", "--source-path", "content/x/broken.md"])

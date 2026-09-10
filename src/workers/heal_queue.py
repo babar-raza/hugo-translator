@@ -21,7 +21,9 @@ when that lands.
 
 from __future__ import annotations
 
+import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -219,3 +221,150 @@ def is_source_path_quarantined(
         if path == source_path and len(langs) >= threshold:
             return True, root_cause_class
     return False, None
+
+
+# --- QU-03: human/agent-authored advisory holds -----------------------------
+#
+# A hold is a distinct event kind from the automated ticket lifecycle above
+# (status/disposition): it is a deliberate "stop touching this file" signal a
+# person or session leaves, with a mandatory reason, appended the same
+# append-only way as everything else in this file. It carries no
+# root_cause_class/target_lang, so it can never be picked up by
+# is_quarantined()/is_source_path_quarantined() or count toward either
+# quarantine dimension above -- an advisory hold is an operator decision, not
+# a validator finding, and must never be conflated with one.
+#
+# Closes the confirmed gap where a prior incident's human note describing a
+# problem file had zero enforcement effect on the running automation -- it
+# was prose nobody's code ever read. This gives that note a machine-checked
+# effect instead.
+
+_HOLD_KIND = "hold"
+_RELEASE_KIND = "release"
+
+
+def add_hold(
+    source_path: str,
+    reason: str,
+    *,
+    expiry: str | None = None,
+    heal_queue_path: Path | None = None,
+) -> dict[str, Any]:
+    """Place an advisory hold on ``source_path``. Mandatory ``reason``; an
+    optional ISO-8601 ``expiry`` (UTC) stops the hold from blocking
+    automatically once passed, so a forgotten hold cannot block work
+    indefinitely. Appended, never mutates prior entries -- release with
+    ``release_hold()``."""
+    if not reason or not reason.strip():
+        raise ValueError("add_hold requires a non-empty reason")
+    path = heal_queue_path or _HEAL_QUEUE_FILE
+    ticket: dict[str, Any] = {
+        "kind": _HOLD_KIND,
+        "source_path": source_path,
+        "reason": reason.strip(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expiry": expiry,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(ticket) + "\n")
+    return ticket
+
+
+def release_hold(
+    source_path: str, *, heal_queue_path: Path | None = None
+) -> dict[str, Any]:
+    """Release any active advisory hold on ``source_path``."""
+    path = heal_queue_path or _HEAL_QUEUE_FILE
+    ticket: dict[str, Any] = {
+        "kind": _RELEASE_KIND,
+        "source_path": source_path,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(ticket) + "\n")
+    return ticket
+
+
+def active_hold(
+    source_path: str,
+    *,
+    heal_queue_path: Path | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    """Return the active hold ticket for ``source_path``, or None.
+
+    Replays hold/release events for this path in file (== chronological,
+    append-only) order: the latest event wins. A hold past its ``expiry``
+    (if any) is treated as not active, without requiring an explicit
+    release.
+    """
+    path = heal_queue_path or _HEAL_QUEUE_FILE
+    current = datetime.now(timezone.utc) if now is None else now
+    latest_hold: dict[str, Any] | None = None
+    for ticket in _load_tickets(path):
+        if ticket.get("source_path") != source_path:
+            continue
+        kind = ticket.get("kind")
+        if kind == _HOLD_KIND:
+            latest_hold = ticket
+        elif kind == _RELEASE_KIND:
+            latest_hold = None
+    if latest_hold is None:
+        return None
+    expiry = latest_hold.get("expiry")
+    if expiry:
+        try:
+            expiry_dt = datetime.fromisoformat(str(expiry).replace("Z", "+00:00"))
+        except ValueError:
+            return latest_hold  # malformed expiry -- fail safe by still holding
+        if current >= expiry_dt:
+            return None
+    return latest_hold
+
+
+def _build_cli_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m src.workers.heal_queue",
+        description=(
+            "Advisory hold management (QU-03). Use `hold` to stop campaign "
+            "scheduling on a source_path immediately, without a code deploy, "
+            "while investigating a problem file -- prefer this over a plain "
+            "comment or Slack note, which have no enforcement effect on the "
+            "running automation. Use `release` once done. Use a normal heal "
+            "ticket instead of a hold for an automated validator finding."
+        ),
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    hold = sub.add_parser("hold", help="Place an advisory hold on a source_path.")
+    hold.add_argument("--source-path", required=True)
+    hold.add_argument("--reason", required=True)
+    hold.add_argument(
+        "--expiry",
+        default=None,
+        help="Optional ISO-8601 UTC timestamp (e.g. 2026-09-12T00:00:00Z) after which "
+        "the hold stops blocking automatically.",
+    )
+
+    release = sub.add_parser("release", help="Release an active advisory hold on a source_path.")
+    release.add_argument("--source-path", required=True)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _build_cli_parser().parse_args(argv)
+    if args.command == "hold":
+        ticket = add_hold(args.source_path, args.reason, expiry=args.expiry)
+        suffix = f" (expires {ticket['expiry']})" if ticket.get("expiry") else ""
+        print(f"Hold placed on {ticket['source_path']}: {ticket['reason']}{suffix}")
+    elif args.command == "release":
+        release_hold(args.source_path)
+        print(f"Hold released on {args.source_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

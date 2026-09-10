@@ -15,6 +15,7 @@ import json
 from types import SimpleNamespace
 
 from src.workers.campaign_runner import CampaignLedger, CampaignRunner
+from src.workers.heal_queue import add_hold
 
 SOURCE_REL = "content/blog.aspose.org/words/net/words-document-net/index.md"
 
@@ -56,9 +57,12 @@ def _make_runner(tmp_path, *, heal_queue_tickets=(), with_prior_failure=False, g
         source_path=SOURCE_REL,
         replacement_for=lambda locale: None,
     )
-    calls = {"heal_ticket": 0}
+    calls = {"heal_ticket": 0, "advisory_hold_skip": 0}
     runner._append_heal_ticket = lambda **kwargs: calls.__setitem__(
         "heal_ticket", calls["heal_ticket"] + 1
+    )
+    runner._append_advisory_hold_skip = lambda **kwargs: calls.__setitem__(
+        "advisory_hold_skip", calls["advisory_hold_skip"] + 1
     )
     return runner, source, str(expected), calls
 
@@ -180,4 +184,84 @@ class TestQuarantineSkip:
             )
         except KeyError:
             pass
+        assert calls["heal_ticket"] == 0
+
+
+class TestAdvisoryHoldSkip:
+    """QU-03: an active advisory hold must be checked before, and take
+    precedence over, every automated quarantine dimension -- including for a
+    locale that has never been attempted on this file (an unseen candidate),
+    unlike the automated per-locale dimension."""
+
+    def test_a_held_file_is_skipped_even_for_an_unseen_locale(self, tmp_path):
+        runner, source, expected_output, calls = _make_runner(tmp_path, with_prior_failure=False)
+        heal_queue_path = runner.ledger.root.parent / "heal_queue.jsonl"
+        add_hold(SOURCE_REL, "investigating a suspected corruption", heal_queue_path=heal_queue_path)
+
+        accepted, output = runner._run_campaign_job(
+            shard={"shard_id": "s0"}, source=source, locale="ar", expected_output=expected_output
+        )
+
+        assert accepted is False
+        assert output == str((tmp_path / "content_repo" / "index.ar.md").resolve())
+        assert calls["advisory_hold_skip"] == 1
+        assert calls["heal_ticket"] == 0
+
+    def test_a_hold_on_a_different_file_does_not_skip_this_one(self, tmp_path):
+        runner, source, expected_output, calls = _make_runner(tmp_path, with_prior_failure=False)
+        runner.manifest = SimpleNamespace(retry_policy={})
+        heal_queue_path = runner.ledger.root.parent / "heal_queue.jsonl"
+        add_hold("content/other/file.md", "unrelated", heal_queue_path=heal_queue_path)
+
+        try:
+            runner._run_campaign_job(
+                shard={"shard_id": "s0"},
+                source=source,
+                locale="ar",
+                expected_output=expected_output,
+            )
+        except KeyError:
+            pass
+        assert calls["advisory_hold_skip"] == 0
+
+    def test_a_released_hold_no_longer_skips(self, tmp_path):
+        from src.workers.heal_queue import release_hold
+
+        runner, source, expected_output, calls = _make_runner(tmp_path, with_prior_failure=False)
+        runner.manifest = SimpleNamespace(retry_policy={})
+        heal_queue_path = runner.ledger.root.parent / "heal_queue.jsonl"
+        add_hold(SOURCE_REL, "investigating", heal_queue_path=heal_queue_path)
+        release_hold(SOURCE_REL, heal_queue_path=heal_queue_path)
+
+        try:
+            runner._run_campaign_job(
+                shard={"shard_id": "s0"},
+                source=source,
+                locale="ar",
+                expected_output=expected_output,
+            )
+        except KeyError:
+            pass
+        assert calls["advisory_hold_skip"] == 0
+
+    def test_a_hold_takes_precedence_over_an_active_quarantine(self, tmp_path):
+        """Even a file/locale that would ALSO trip the per-locale quarantine
+        dimension is reported and skipped as held, not as quarantined --
+        the operator's explicit hold is the more specific, deliberate signal."""
+        runner, source, expected_output, calls = _make_runner(
+            tmp_path,
+            heal_queue_tickets=[
+                _ticket("ar", "auto:StructureValidator", f"page{i}") for i in range(3)
+            ],
+            with_prior_failure=True,
+        )
+        heal_queue_path = runner.ledger.root.parent / "heal_queue.jsonl"
+        add_hold(SOURCE_REL, "investigating", heal_queue_path=heal_queue_path)
+
+        accepted, _ = runner._run_campaign_job(
+            shard={"shard_id": "s0"}, source=source, locale="ar", expected_output=expected_output
+        )
+
+        assert accepted is False
+        assert calls["advisory_hold_skip"] == 1
         assert calls["heal_ticket"] == 0
