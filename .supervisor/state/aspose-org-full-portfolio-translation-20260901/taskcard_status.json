@@ -1458,9 +1458,9 @@
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [
   {
-   "campaign_id": "wave-cellsrust-go-t1a-20260910",
-   "pid": 60992,
-   "manifest": "data/campaigns/manifests/wave-cellsrust-go-t1a-20260910.yaml",
+   "campaign_id": "wave-cellsrust-go-t1a-20260910r2",
+   "pid": 48348,
+   "manifest": "data/campaigns/manifests/wave-cellsrust-go-t1a-20260910r2.yaml",
    "sources": [
     "content/docs.aspose.org/en/cells/rust/developer-guide/features.md",
     "content/docs.aspose.org/en/cells/rust/developer-guide/working-with-cells-foss-model.md",
@@ -1469,9 +1469,9 @@
    ],
    "locales": 25,
    "expected_output_count": 100,
-   "launched_at": "2026-09-10T12:05:53+00:00",
+   "launched_at": "2026-09-10T12:08:12+00:00",
    "launched_by": "interactive-continue-20260910e",
-   "notes": "First Track-A page-open this mission-thread since the RECURRENCE ESCALATION gates cleared (TC-APT-109 + TC-APT-102 closed this session). Tier-1a, zero prior locale coverage on all 4 sources, wave_scale=4. stdout/stderr: logs/wave-cellsrust-go-t1a-std{out,err}.log. On next wake: check receipts/log tail, review whatever has completed (fan out per-language subagent reviewers per plan SS9), commit approved batches page-complete or family-scoped."
+   "notes": "SUPERSEDES the earlier wave-cellsrust-go-t1a-20260910 record (PID 60992): that launch died immediately on translator repository SHA drift because a mission-state commit landed right after the launch, moving HEAD past the manifest's pinned SHA -- confirmed dead via CimInstance, rebuilt with a fresh SHA, relaunched, confirmed alive and past verify_environment 40s later with no further commits in between this time. On next wake: check receipts/log tail, review whatever has completed (fan out per-language subagent reviewers per plan SS9), commit approved batches page-complete or family-scoped."
   }
  ],
  "blocked_pending_clean_translator_repo": null,
