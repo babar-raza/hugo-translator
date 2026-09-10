@@ -4,7 +4,7 @@
  "plan_revision": 18,
  "branch": "mission/aspose-org-full-portfolio-translation-20260901",
  "created_at": "2026-09-02T05:20:29.896922+00:00",
- "updated_at": "2026-09-09T13:04:07+00:00",
+ "updated_at": "2026-09-10T07:57:23+00:00",
  "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
  "content_repo_session_ledger": {
   "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
   2,
   3
  ],
- "wake_count": 33,
+ "wake_count": 34,
  "wakes_without_state_change": 0,
  "taskcards": {
   "TC-APT-001": {
@@ -1438,7 +1438,7 @@
    ]
   }
  },
- "last_wake_summary": "Continued: wave27/wave27b both aborted mid-run and NOT relaunched -- found a genuine, confirmed, cross-model content defect, not a validator bug. pdf/cpp (9/9 locales) and pdf/python (5/5 locales) both failed FrontmatterLanguageCheck on the title field with 100% consistency; live-debugged pdf/python x de with monkeypatched instrumentation (logs/debug_title_check.py, transient, gitignored, not committed) and got a definitive answer: is_untranslated() returns True with similarity=1.000 -- the translated title's residue is BYTE-IDENTICAL to the English source's ('for'), for ALL 3 attempts across BOTH models (professionalize_llm + 2x m2m100 escalation). The model genuinely leaves the single connector word 'for' untranslated in 'Aspose.X FOSS for <Platform>'-shaped titles -- almost the whole title is protected/governed terms with only that one word as real prose, and a masking-then-prompting mechanism plausibly (not yet confirmed) starves the model of enough context to recognize it as translatable. This recurs across 2 confirmed pages, same root cause, no producer fix landed -- meets the plan section 10.1 RECURRENCE ESCALATION bar. Did NOT attempt a fix this session (needs deeper prompt/masking-level instrumentation than time allowed); corrected the earlier (wrong) validator-false-positive hypothesis in heal_queue.jsonl and documented the masking hypothesis + next steps for whoever picks this up. Released the pdf/python, pdf/typescript, words/net claims (all three share the same title shape and would very likely hit the identical defect) -- per the escalation rule, no new page of this shape opens until a real producer fix lands and is reverified. cells_committed_total unchanged at 431 this segment (root-cause work only, matching the earlier wave25/terminology.yaml session's pattern of pure investigation turns).",
+ "last_wake_summary": "Continued TC-APT-108: refuted the masking hypothesis (instrumented the actual LLM prompt text -- short but plainly readable, only the brand name masked, not opaque). Found and fixed TWO real bugs in the retry-feedback pipeline: (1) campaign_runner._frontmatter_source_guidance's stopword filter excluded 'for' from retry guidance entirely (commit 9ce1b807); (2) the REAL gap -- decision_engine._generate_retry_feedback, the builder that actually fires before file_pipeline.py's repeated-identical-feedback early-stop, had no FrontmatterLanguageCheck special-casing and the issue never populated details['suggestion'], so the model was told a field failed but never told which word (commit 1e42f200). Both fixes are correct, safe, additive, covered by 9 new unit/regression tests (all green), verified via direct debug instrumentation to change model behavior (model correctly produced 'für' for 'for' in one run, never observed pre-fix). BUT: live-reverified statistically across the real 5-locale originally-failing set (ar/cs/de/el/es, production retry_policy shape) and got 0/5 accepted -- IDENTICAL to the pre-fix rate; quality_stop_recommendations escalated to recommend_pause_and_investigate for both models. Root cause of the shortfall is structural, not a wording problem: m2m100 (2 of the 3 attempt budget) architecturally cannot consume retry-feedback text at all (only LLMModelBackend instances get _RetryFeedbackModel-wrapped), and the one LLM attempt is subject to real sampling variance on this short, protected-token-dominated string. Both fixes are KEPT (net-positive infra improvement) but the defect class stays OPEN and blocking per RECURRENCE ESCALATION -- see manual-foss-for-platform-title-undertranslation-STATISTICAL-RESULT in heal_queue.jsonl for full findings + candidate next steps (don't escalate to m2m100 for feedback-fixable frontmatter-only failures; try not masking protected terms in very short fields; consider a scoped manual-review carve-out for this title shape). pdf/cpp, pdf/python, pdf/typescript, words/net claims released, held back from Track-A. cells_committed_total unchanged at 431 (root-cause work only).",
  "cells_committed_total": 431,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [],
