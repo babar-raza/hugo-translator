@@ -109,8 +109,19 @@ class GlossaryCorrector:
         if not self.corrections:
             return text, []
 
+        # CU-01 (TC-APT-105/106/109 hardening): this class operates on a flat
+        # string with no concept of do_not_translate/protected spans -- it is
+        # only reachable via the legacy MarkdownReconstructor fallback, which
+        # is itself hard-blocked under validation_policy="zero-defect"
+        # (segment_translator.py's _allow_legacy_ast_fallback), but a
+        # "standard"-policy site can still legitimately reach this path.
+        # Mask fenced code blocks and inline code spans -- the two most
+        # common protected-content shapes a plain word-replace pass could
+        # otherwise corrupt -- before applying corrections, and restore them
+        # unchanged afterward.
+        corrected, code_map = self._mask_code_spans(text)
+
         corrections_applied = []
-        corrected = text
 
         for incorrect, correct in self.corrections.items():
             # Use word boundary matching to avoid partial replacements
@@ -140,7 +151,44 @@ class GlossaryCorrector:
                 f"Applied {len(corrections_applied)} corrections: {corrections_applied}"
             )
 
+        corrected = self._restore_code_spans(corrected, code_map)
+
         return corrected, corrections_applied
+
+    @staticmethod
+    def _mask_code_spans(text: str) -> tuple[str, dict[str, str]]:
+        """Replace fenced code blocks and inline code spans with tokens.
+
+        Returns (masked_text, {token: original_span}). Fenced blocks are
+        masked first so a backtick inside a fence is never mistaken for the
+        start of an inline span.
+        """
+        code_map: dict[str, str] = {}
+        counter = 0
+
+        def _mask(pattern: str, source: str) -> str:
+            nonlocal counter
+
+            def _replace(match: re.Match) -> str:
+                nonlocal counter
+                token = f"GLOSSARY_CODE_{counter}"
+                counter += 1
+                code_map[token] = match.group(0)
+                return token
+
+            return re.sub(pattern, _replace, source, flags=re.DOTALL)
+
+        masked = _mask(r"```.*?```", text)
+        masked = _mask(r"`[^`\n]+`", masked)
+        return masked, code_map
+
+    @staticmethod
+    def _restore_code_spans(text: str, code_map: dict[str, str]) -> str:
+        """Restore tokens produced by `_mask_code_spans` to their originals."""
+        restored = text
+        for token, original in code_map.items():
+            restored = restored.replace(token, original)
+        return restored
 
     def get_correction_count(self) -> int:
         """Get number of correction rules in glossary."""
