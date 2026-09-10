@@ -722,8 +722,21 @@ class ASTRenderer:
             # TC-APT-078: fix a body reference that echoed a heading's SOURCE text
             # verbatim after that heading itself was translated. Before placeholder
             # restoration, same reasoning as the normalizer above.
+            #
+            # TC-APT-109: `unit.do_not_translate` (code spans/blocks, and any other
+            # content that must stay byte-for-byte identical) must also be excluded.
+            # Confirmed live: a fenced ```csharp block containing
+            # `using Aspose.Words.Drawing.Charts;` came back as
+            # `using Aspose.Words.Drawing.Diagramme;` whenever the page also has a
+            # "### Charts" heading -- the word-boundary regex substitution below
+            # matched "Charts" inside the namespace path (a dot is a non-word
+            # character, so `\bCharts\b` matches right after `Drawing.`) and replaced
+            # it with the heading's German translation, corrupting protected code.
+            # The heading_text exclusion alone only prevents a heading from
+            # "correcting" itself; it says nothing about code, which has its own,
+            # stronger, orthogonal protection contract that this call was bypassing.
             kind_value = getattr(unit.kind, "value", unit.kind)
-            if kind_value != "heading_text":
+            if kind_value != "heading_text" and not unit.do_not_translate:
                 final_text = self._correct_cross_references(final_text)
 
             # Restore placeholders (if any were applied during extraction)

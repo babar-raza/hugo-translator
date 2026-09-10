@@ -32,6 +32,23 @@ def _paragraph(source, translated, node_addr="body.paragraph[0]"):
     return node, unit
 
 
+def _code_block(source, node_addr="body.code_block[0]"):
+    """Mirrors _extract_code_block (text_unit_extractor.py): do_not_translate=True,
+    kind=CODE_SPAN, translated_text copied verbatim from source_text (never sent
+    through translation)."""
+    node = ASTNode(type=NodeType.CODE_BLOCK, children=[], attrs={"lang": "csharp"}, node_addr=node_addr)
+    unit = TextUnit(
+        unit_id=node_addr,
+        node_addr=node_addr,
+        source_text=source,
+        kind=TextUnitKind.CODE_SPAN,
+        do_not_translate=True,
+    )
+    unit.translated_text = source
+    unit.metadata = {}
+    return node, unit
+
+
 def test_the_real_words_document_net_repro():
     heading_node, heading_unit = _heading("Quick Start", "Démarrage rapide")
     para_node, para_unit = _paragraph(
@@ -105,3 +122,44 @@ def test_a_page_with_no_headings_is_unaffected():
     renderer = ASTRenderer()
     renderer.apply_translations([para_node], [para_unit])
     assert renderer._render_node(para_node) == "Juste un paragraphe simple.\n\n"
+
+
+def test_a_code_block_is_never_touched_by_cross_reference_correction():
+    """TC-APT-109: confirmed live on blog.aspose.org/words/net/introducing-words-foss-net --
+    a page with a "### Charts" heading (correctly translated to "### Diagramme") and two
+    fenced ```csharp blocks containing `using Aspose.Words.Drawing.Charts;`. Both code
+    blocks came back as `using Aspose.Words.Drawing.Diagramme;`: the word-boundary regex
+    in _correct_cross_references matched "Charts" inside the namespace path (a dot is a
+    non-word character, so \\bCharts\\b matches right after "Drawing.") and replaced it
+    with the heading's translation, corrupting code that must stay byte-for-byte
+    identical. The heading_text exclusion alone only stops a heading correcting itself;
+    it says nothing about do_not_translate content, which has its own, stronger,
+    orthogonal protection contract."""
+    heading_node, heading_unit = _heading("Charts", "Diagramme")
+    code_source = "using Aspose.Words;\nusing Aspose.Words.Drawing.Charts;\n"
+    code_node, code_unit = _code_block(code_source)
+    renderer = ASTRenderer()
+    renderer.apply_translations([heading_node, code_node], [heading_unit, code_unit])
+
+    assert renderer._render_node(code_node) == f"```csharp\n{code_source}```\n\n"
+
+
+def test_a_code_span_is_never_touched_by_cross_reference_correction():
+    """Same protection, inline code span form (single backticks) rather than a fenced
+    block -- both extraction paths mark do_not_translate=True and must be excluded."""
+    heading_node, heading_unit = _heading("Chart", "Diagramm")
+    node_addr = "body.code_span[0]"
+    code_node = ASTNode(type=NodeType.CODE_SPAN, children=[], attrs={}, node_addr=node_addr)
+    code_unit = TextUnit(
+        unit_id=node_addr,
+        node_addr=node_addr,
+        source_text="Chart",
+        kind=TextUnitKind.CODE_SPAN,
+        do_not_translate=True,
+    )
+    code_unit.translated_text = "Chart"
+    code_unit.metadata = {}
+    renderer = ASTRenderer()
+    renderer.apply_translations([heading_node, code_node], [heading_unit, code_unit])
+
+    assert renderer._render_node(code_node) == "`Chart`"
