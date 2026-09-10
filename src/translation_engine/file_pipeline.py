@@ -266,12 +266,20 @@ class FileTranslationPipeline:
                         validation_result.issues.extend(_fm_issues)
 
                         # Make decision
+                        # VA-01: pass this call's actual per-attempt budget
+                        # (which may be tighter than the engine's own static
+                        # config, e.g. an LLM-escalation phase's
+                        # retry_budget_override=0) so Rule 4/5 arbitrate
+                        # against the same number this loop enforces below,
+                        # instead of exhausting silently and unconditionally
+                        # rejecting a WARNING-only result Rule 5 would accept.
                         decision_result = engine.decision_engine.make_decision(
                             validation_result=validation_result,
                             retry_count=retry_count,
                             source=source_body,
                             site_id=site_id,
                             target_lang=target_lang,
+                            effective_max_retries=max_retry_attempts,
                         )
 
                         final_decision = decision_result
@@ -390,12 +398,14 @@ class FileTranslationPipeline:
                                             source_content=content,
                                         )
                                         validation_result.issues.extend(_fm_issues)
+                                        # VA-01: see the note on the first call site.
                                         decision_result = engine.decision_engine.make_decision(
                                             validation_result=validation_result,
                                             retry_count=retry_count,
                                             source=source_body,
                                             site_id=site_id,
                                             target_lang=target_lang,
+                                            effective_max_retries=max_retry_attempts,
                                         )
                                         final_decision = decision_result
                                         final_validation_result = validation_result
