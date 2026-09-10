@@ -1431,11 +1431,11 @@
  "active_detached_runs": [],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
-  "value": 2,
-  "previous": 4,
-  "stepped_at": "2026-09-10T00:19:00+00:00",
-  "decision": "HALVE 4 -> 2 per plan SS0.9/TC-APT-080",
-  "trigger": "wave25 (3d/net/developer-guide, docs.aspose.org) closed at 0% acceptance (0/N across ar+cs fully quarantined before stopping the run) -- below the 60% floor",
+  "value": 4,
+  "previous": 2,
+  "stepped_at": "2026-09-10T05:20:00+00:00",
+  "decision": "STEP UP 2 -> 4 per plan SS0.9/TC-APT-080",
+  "trigger": "both wave26 pages closed >=80% (barcode/python 21/25=84%, html/_index 25/25=100%); recurrence gate clear (title-postposition and link-hallucination tickets are each isolated to one page so far, no active RECURRENCE ESCALATION block); KPI 139 >= floor 25",
   "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
  },
  "capacity_clause": {
