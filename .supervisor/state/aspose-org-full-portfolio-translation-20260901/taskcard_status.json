@@ -1364,15 +1364,15 @@
    "blocker_type": null
   },
   "TC-APT-102": {
-   "status": "TODO",
+   "status": "DONE",
    "gate": null,
-   "title": "model_quality_residual_phrase_defects: a generic classifier noun (e.g. 'object') gets translated once AND left as a second bare-English copy immediately after a backtick placeholder at a sentence's end -- confirmed reproducing identically on BOTH professionalize_llm and m2m100_418m for pdf-document-management-in-cpp/pl, line 170. es/th (same sentence) both correct, so not a universal producer bug; not model-specific either, since both engines converge on the same duplication. Needs live instrumentation across 2-3 more same-shape sentences before deciding fix-vs-MODEL_LIMITATION_DEFERRED.",
+   "title": "model_quality_residual_phrase_defects: a generic classifier noun (e.g. 'object') gets translated once AND left as a second bare-English copy immediately after a backtick placeholder at a sentence's end -- confirmed reproducing identically on BOTH professionalize_llm and m2m100_418m for pdf-document-management-in-cpp/pl, line 170. es/th (same sentence) both correct, so not a universal producer bug; not model-specific either, since both engines converge on the same duplication. Needs live instrumentation across 2-3 more same-shape sentences before deciding fix-vs-MODEL_LIMITATION_DEFERRED. RESOLVED 2026-09-10: recurrence test (3 same-shape sentences, same locale/trigger word, different pages) found 0/3 reproduced -- MODEL_LIMITATION_DEFERRED, no fix warranted. See heal_queue.jsonl ticket TC-APT-102-recurrence-test-MODEL_LIMITATION_DEFERRED.",
    "depends_on": [],
    "owner": "loop",
-   "blocking_reason": "Not started. First-principles record written instead of a 3rd blind retry: data/summaries/fp-pdf-docmgmt-cpp-pl-object-duplication-20260907.json. Heal ticket: heal-pdf-docmgmt-cpp-pl-document-object-duplication.",
+   "blocking_reason": null,
    "evidence_path": "data/summaries/fp-pdf-docmgmt-cpp-pl-object-duplication-20260907.json",
    "commit": null,
-   "last_updated": "2026-09-07T05:20:00.000000+00:00",
+   "last_updated": "2026-09-10T11:48:13.000000+00:00",
    "blocker_type": null
   },
   "TC-APT-103": {
