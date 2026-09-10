@@ -1456,7 +1456,21 @@
  "last_wake_summary": "Closed out wave-cellsrust-go-t1a-20260910r3 (dead process, PID 48812): reviewed and committed its 15 accepted cells for content/docs.aspose.org/en/cells/go/developer-guide/features.md (this page has no markdown link matching the TC-APT-105 defect class, so it was never at risk). Landed via a concurrent peer session's own commit 5037a6b194 (shared single-checkout staging race -- content verified byte-identical; see project/loop-prompt.md SSL 2026-09-10 field note). work_ledger updated, skill run record finalized against the actual landing SHA. Remaining outstanding from that same manifest: 10 locales of go/developer-guide/features.md (ar,cs,de,el,es,fa,fr,he,hi,hu) and all 25 locales of cells/rust/developer-guide/working-with-cells-foss-model.md (0/25 accepted in r3, failures tagged generic pipeline gate -- consistent with the process being killed mid-attempt, not a content defect) never successfully attempted -- candidate for a fresh wave.",
  "cells_committed_total": 432,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "campaign_id": "wave-followup-wcfm-20260910r3",
+   "pid": 44124,
+   "manifest": "data/campaigns/manifests/wave-followup-wcfm-20260910r3.yaml",
+   "sources": [
+    "content/docs.aspose.org/en/cells/rust/developer-guide/working-with-cells-foss-model.md"
+   ],
+   "locales": 25,
+   "expected_output_count": 25,
+   "launched_at": "2026-09-10T17:19:00+00:00",
+   "launched_by": "interactive-continue-20260910f",
+   "notes": "First-ever attempt at this page (0/25 prior). r1/r2 launches failed pre-flight on QU-02 per-file quarantine (stale tickets, since fixed in place -- see commit 9752f463 and project/loop-prompt.md 2026-09-10 field note). Next wake: check summary.json/failure_metadata.jsonl, review + commit accepted cells per the same procedure used for quickstart.md/features.md this session."
+  }
+ ],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 4,
