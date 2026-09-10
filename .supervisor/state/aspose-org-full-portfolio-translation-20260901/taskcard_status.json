@@ -1428,7 +1428,19 @@
  "last_wake_summary": "Continued: wave26's second page (docs.aspose.org/html) finished in full -- 25/25, the mission's second fully-live page this run (after font/python in wave24). Recovered from the PID 47648 detached-process death (see prior notes) via PowerShell Start-Process; the m2m companion (hu/ja/ro) also needed that mechanism after a live peer edit on segment_extractor.py/segment_translator.py/campaign_runner.py landed (a604650f, TC-APT-106) and freed the tree. All 3 (hu/ja/ro) accepted the gate battery; direct review (no subagent needed for 3 files): Enterprise Documentation preserved in all 3, titles correctly untranslated (no for-Y structure), one RB-003-level note (ro missing a few diacritics, meaning-preserving). Committed (199a7c7d46). Hit the documented multi-session index-collision gotcha again mid-commit: the shared index carried a large batch of another session's staged knowledge/*, scripts/seo/*, skills/.claude/.kilocode/.agents/* files -- unstaged everything except my own 3 paths before committing, per the runbook's own known-gotcha note. cells_committed_total 428 -> 431. pages_newly_live_total 19 -> 20 (html/_index).",
  "cells_committed_total": 431,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "run_id": "wave27-llm-20260910-r2",
+   "pid": 49700,
+   "manifest": "data/campaigns/manifests/wave27-llm-20260910-r2.yaml",
+   "purpose": "wave27 (wave_scale=4, stepped back up): 4 zero-translation docs.aspose.org product category pages (pdf/cpp, pdf/python, pdf/typescript, words/net/_index.md), 22 LLM-primary locales. All 4 have 'for'-structured titles (Aspose.X FOSS for Platform) and the Enterprise Documentation link pattern -- more data on both open tickets (title-postposition-inversion, brand-nav-link fix) while shipping. Launched via PowerShell Start-Process (proven mechanism).",
+   "log_stdout": "logs/wave27-llm-20260910-r2.out.log",
+   "log_stderr": "logs/wave27-llm-20260910-r2.err.log",
+   "launched_at": "2026-09-10T05:35:00+00:00",
+   "status": "RUNNING",
+   "next_step_after_completion": "review accepted candidates against config/review_rubric.yaml (pay special attention to titles in hi/ko/tr/ja for the postposition-inversion pattern -- 4 pages of live data now); commit page-complete per plan section 19.2; THEN sequentially build+launch the m2m hu/ja/ro companion (manifest already built: data/campaigns/manifests/wave27-m2m-20260910.yaml, will need a fresh rebuild for sha/TM drift)"
+  }
+ ],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 4,
