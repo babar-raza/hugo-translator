@@ -31,7 +31,7 @@ from src.workers.git_provenance import (
     governed_subject_pattern,
     verify_governed_add,
 )
-from src.workers.heal_queue import is_quarantined
+from src.workers.heal_queue import is_quarantined, is_source_path_quarantined
 
 from .campaign_manifest import (
     CampaignManifest,
@@ -2124,6 +2124,22 @@ class CampaignRunner:
             )
         resolved_output = str(expected.resolve())
 
+        # QU-02: a (source_path, root_cause_class) pair whose OPEN heal tickets
+        # span >=PER_FILE_QUARANTINE_THRESHOLD distinct locales is a systemic,
+        # file-level defect -- skip it even for a locale that has never been
+        # attempted, unlike the per-locale dimension below (the live case:
+        # quickstart.md kept accumulating fresh single-locale LinkValidator
+        # tickets across 7+ locales, never tripping the per-locale threshold).
+        heal_queue_path = self.ledger.root.parent / "heal_queue.jsonl"
+        file_quarantined, _file_root_cause = is_source_path_quarantined(
+            source.source_path, heal_queue_path=heal_queue_path
+        )
+        if file_quarantined:
+            self._append_heal_ticket(
+                shard=shard, source=source, locale=locale, expected_output=expected_output
+            )
+            return False, resolved_output
+
         # TC-APT-038: a (target_lang, root_cause_class) pair with >=3 OPEN heal
         # tickets anywhere in the portfolio is quarantined -- skip spending
         # fresh retry attempts on this job (no manifest/retry_policy needed)
@@ -2137,7 +2153,7 @@ class CampaignRunner:
             if is_quarantined(
                 locale,
                 prior_root_cause,
-                heal_queue_path=self.ledger.root.parent / "heal_queue.jsonl",
+                heal_queue_path=heal_queue_path,
             ):
                 self._append_heal_ticket(
                     shard=shard, source=source, locale=locale, expected_output=expected_output

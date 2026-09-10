@@ -135,3 +135,49 @@ class TestQuarantineSkip:
         except KeyError:
             pass
         assert calls["heal_ticket"] == 0
+
+    def test_a_file_quarantined_across_many_locales_is_skipped_even_for_an_unseen_locale(
+        self, tmp_path
+    ):
+        """QU-02: reproduces the exact live gap. quickstart.md-shaped source
+        accumulated one LinkValidator ticket each across 7 distinct locales --
+        no single locale reaches the per-locale threshold of 3, and the
+        locale under test ("ar") has never failed at all (an unseen
+        candidate), yet the file-level dimension must still skip it."""
+        runner, source, expected_output, calls = _make_runner(
+            tmp_path,
+            heal_queue_tickets=[
+                _ticket(lang, "auto:LinkValidator", SOURCE_REL)
+                for lang in ("de", "fr", "es", "it", "hi", "ja", "ko")
+            ],
+            with_prior_failure=False,
+        )
+
+        accepted, output = runner._run_campaign_job(
+            shard={"shard_id": "s0"}, source=source, locale="ar", expected_output=expected_output
+        )
+
+        assert accepted is False
+        assert output == str((tmp_path / "content_repo" / "index.ar.md").resolve())
+        assert calls["heal_ticket"] == 1
+
+    def test_a_file_below_the_per_file_threshold_is_not_skipped(self, tmp_path):
+        runner, source, expected_output, calls = _make_runner(
+            tmp_path,
+            heal_queue_tickets=[
+                _ticket(lang, "auto:LinkValidator", SOURCE_REL) for lang in ("de", "fr")
+            ],
+            with_prior_failure=False,
+        )
+        runner.manifest = SimpleNamespace(retry_policy={})
+
+        try:
+            runner._run_campaign_job(
+                shard={"shard_id": "s0"},
+                source=source,
+                locale="ar",
+                expected_output=expected_output,
+            )
+        except KeyError:
+            pass
+        assert calls["heal_ticket"] == 0

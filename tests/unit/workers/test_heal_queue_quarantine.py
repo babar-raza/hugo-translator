@@ -8,11 +8,14 @@ against heal_queue.jsonl's real on-disk schema.
 import json
 
 from src.workers.heal_queue import (
+    PER_FILE_QUARANTINE_THRESHOLD,
     QUARANTINE_THRESHOLD,
     is_quarantined,
+    is_source_path_quarantined,
     open_ticket_counts_by_pair,
     open_tickets_by_root_cause_class,
     open_tickets_for_source_path,
+    quarantined_files,
     quarantined_pairs,
 )
 
@@ -263,3 +266,109 @@ def test_a_non_open_status_closes_it():
 
 def test_status_is_compared_case_insensitively():
     assert _counts_toward_quarantine({"status": "open"}) is True
+
+
+# --- QU-02 per-file quarantine dimension -------------------------------------
+# The per-locale dimension above requires 3 OPEN tickets for ONE locale before
+# tripping. The live incident showed this is blind to a source file whose
+# defect reproduces identically across MANY locales, one ticket each: e.g.
+# quickstart.md hit LinkValidator on 7+ distinct locales and never
+# accumulated 3 tickets for any single locale, so is_quarantined() never
+# fired for any of them even though the file was clearly, systemically
+# broken.
+
+
+class TestPerFileQuarantineDimension:
+    def test_many_locales_one_ticket_each_trips_the_file_dimension(self, tmp_path):
+        """Reproduces the exact live gap: no single locale reaches
+        QUARANTINE_THRESHOLD, but the file-level dimension still trips."""
+        queue = tmp_path / "heal_queue.jsonl"
+        locales = ["de", "fr", "es", "it", "hi", "ja", "ko"]
+        _write_tickets(
+            queue,
+            [
+                _ticket(lang, "auto:LinkValidator", source_path="content/x/quickstart.md")
+                for lang in locales
+            ],
+        )
+        assert PER_FILE_QUARANTINE_THRESHOLD == 3
+
+        # Old per-locale-only logic never trips: each locale has exactly 1 ticket.
+        for lang in locales:
+            assert not is_quarantined("de", "auto:LinkValidator", heal_queue_path=queue)
+
+        # New per-file dimension does trip.
+        tripped, root_cause = is_source_path_quarantined(
+            "content/x/quickstart.md", heal_queue_path=queue
+        )
+        assert tripped is True
+        assert root_cause == "auto:LinkValidator"
+        assert ("content/x/quickstart.md", "auto:LinkValidator") in quarantined_files(
+            heal_queue_path=queue
+        )
+
+    def test_below_threshold_distinct_locales_does_not_trip(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        _write_tickets(
+            queue,
+            [
+                _ticket("de", "auto:LinkValidator", source_path="content/x/quickstart.md"),
+                _ticket("fr", "auto:LinkValidator", source_path="content/x/quickstart.md"),
+            ],
+        )
+        tripped, root_cause = is_source_path_quarantined(
+            "content/x/quickstart.md", heal_queue_path=queue
+        )
+        assert tripped is False
+        assert root_cause is None
+
+    def test_resolved_tickets_do_not_count_toward_the_file_dimension(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        _write_tickets(
+            queue,
+            [
+                _ticket(
+                    "de",
+                    "auto:LinkValidator",
+                    source_path="content/x/quickstart.md",
+                    disposition="FIXED_VERIFIED",
+                ),
+                _ticket("fr", "auto:LinkValidator", source_path="content/x/quickstart.md"),
+                _ticket("es", "auto:LinkValidator", source_path="content/x/quickstart.md"),
+            ],
+        )
+        # Only 2 unresolved distinct locales remain -- below threshold.
+        tripped, _ = is_source_path_quarantined("content/x/quickstart.md", heal_queue_path=queue)
+        assert tripped is False
+
+    def test_other_files_are_unaffected(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        _write_tickets(
+            queue,
+            [
+                _ticket(lang, "auto:LinkValidator", source_path="content/x/quickstart.md")
+                for lang in ("de", "fr", "es")
+            ],
+        )
+        tripped, _ = is_source_path_quarantined("content/x/other.md", heal_queue_path=queue)
+        assert tripped is False
+
+    def test_existing_per_locale_dimension_is_unchanged_by_the_new_file_dimension(self, tmp_path):
+        """Same scenario as TestCountingAndThreshold.test_at_threshold_across_different_pages_is_quarantined
+        (three tickets, same locale, different files): both dimensions must
+        agree it's per-locale-quarantined without the new per-file helper
+        interfering, since each ticket's file only has 1 distinct locale."""
+        queue = tmp_path / "heal_queue.jsonl"
+        _write_tickets(
+            queue,
+            [
+                _ticket("ar", "auto:StructureValidator", source_path="page1"),
+                _ticket("ar", "auto:StructureValidator", source_path="page2"),
+                _ticket("ar", "auto:StructureValidator", source_path="page3"),
+            ],
+        )
+        assert is_quarantined("ar", "auto:StructureValidator", heal_queue_path=queue)
+        # Neither page individually reaches the per-file distinct-locale threshold.
+        for page in ("page1", "page2", "page3"):
+            tripped, _ = is_source_path_quarantined(page, heal_queue_path=queue)
+            assert tripped is False

@@ -27,6 +27,17 @@ from typing import Any
 
 _HEAL_QUEUE_FILE = Path("data/campaigns/heal_queue.jsonl")
 QUARANTINE_THRESHOLD = 3
+# QU-01 (TC-APT-105 audit): a per-locale threshold of 3 misses a source file
+# whose defect reproduces identically across many locales but never
+# accumulates 3 tickets for any single one (the live case: quickstart.md hit
+# LinkValidator on 7+ distinct locales, one ticket each -- systemic, but
+# invisible to the per-locale count). Reusing QUARANTINE_THRESHOLD's own
+# number keeps the two dimensions consistent rather than inventing an
+# arbitrary second constant: 3 independent signals (here, 3 separate locales
+# hitting the same root_cause_class on the same file) is this mission's
+# established bar for "this is systemic, not noise" before halting further
+# spend on a cell.
+PER_FILE_QUARANTINE_THRESHOLD = QUARANTINE_THRESHOLD
 _RESOLVED_DISPOSITIONS = frozenset(
     {"FIXED_VERIFIED", "WAIVED_RUBRIC", "MODEL_LIMITATION_DEFERRED"}
 )
@@ -144,3 +155,67 @@ def is_quarantined(
     return (target_lang, root_cause_class) in quarantined_pairs(
         heal_queue_path=heal_queue_path, threshold=threshold
     )
+
+
+def open_ticket_locales_by_file_class(
+    *, heal_queue_path: Path | None = None
+) -> dict[tuple[str, str], set[str]]:
+    """Distinct target_lang values with an OPEN, unresolved ticket, grouped by
+    (source_path, root_cause_class) -- the per-file quarantine dimension (QU-02).
+
+    A source file whose same defect class reproduces across many locales is
+    systemic even when no single locale individually reaches
+    QUARANTINE_THRESHOLD tickets of its own.
+    """
+    path = heal_queue_path or _HEAL_QUEUE_FILE
+    locales: dict[tuple[str, str], set[str]] = {}
+    for ticket in _load_tickets(path):
+        if not _counts_toward_quarantine(ticket):
+            continue
+        source_path = ticket.get("source_path")
+        root_cause_class = ticket.get("root_cause_class")
+        lang = ticket.get("target_lang")
+        if not source_path or not root_cause_class or not lang:
+            continue
+        locales.setdefault((source_path, root_cause_class), set()).add(lang)
+    return locales
+
+
+def quarantined_files(
+    *,
+    heal_queue_path: Path | None = None,
+    threshold: int = PER_FILE_QUARANTINE_THRESHOLD,
+) -> set[tuple[str, str]]:
+    """Return every (source_path, root_cause_class) pair whose OPEN tickets span
+    >=threshold distinct locales -- quarantined for that file/class regardless
+    of how few tickets any single locale has."""
+    locales = open_ticket_locales_by_file_class(heal_queue_path=heal_queue_path)
+    return {key for key, langs in locales.items() if len(langs) >= threshold}
+
+
+def is_source_path_quarantined(
+    source_path: str,
+    *,
+    heal_queue_path: Path | None = None,
+    threshold: int = PER_FILE_QUARANTINE_THRESHOLD,
+) -> tuple[bool, str | None]:
+    """Whether this exact source_path has a root_cause_class quarantined under
+    the per-file dimension (QU-02): OPEN tickets for that class spanning
+    >=threshold distinct locales, regardless of this call's own locale or
+    whether it has any prior failure history at all -- an unseen locale on an
+    already-systemic file is still skipped, matching the live incident where
+    the same file kept accumulating fresh single-locale tickets for the same
+    defect indefinitely.
+
+    Returns (True, root_cause_class) for the first quarantined class found on
+    this path, else (False, None). Independent of, and coexists with,
+    ``is_quarantined``'s (target_lang, root_cause_class) dimension -- neither
+    double-counts the other's tickets since each reads the same underlying
+    OPEN-ticket set through its own grouping key.
+    """
+    for (path, root_cause_class), langs in open_ticket_locales_by_file_class(
+        heal_queue_path=heal_queue_path
+    ).items():
+        if path == source_path and len(langs) >= threshold:
+            return True, root_cause_class
+    return False, None
