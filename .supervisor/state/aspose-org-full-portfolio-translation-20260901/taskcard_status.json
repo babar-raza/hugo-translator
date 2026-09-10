@@ -1458,9 +1458,9 @@
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [
   {
-   "campaign_id": "wave-va07-remediate-20260911",
+   "campaign_id": "wave-va07-remediate-20260911r2",
    "pid": null,
-   "manifest": "data/campaigns/manifests/wave-va07-remediate-20260911.yaml",
+   "manifest": "data/campaigns/manifests/wave-va07-remediate-20260911r2.yaml",
    "sources": [
     "content/docs.aspose.org/en/cells/rust/getting-started/installation.md",
     "content/docs.aspose.org/en/cells/rust/getting-started/license.md"
@@ -1469,7 +1469,7 @@
    "expected_output_count": 50,
    "launched_at": null,
    "launched_by": "interactive-continue-20260910f",
-   "notes": "URGENT remediation: VA-07 (nested-link double-wrap, commit 0328ef5b) was confirmed to have already shipped into BOTH pages committed this session (53ff82d3b0) -- their own Next Steps sections link to 'Developer Guide' (not a protected term), hitting the exact same bug. Found via a routine site-wide grep for the corruption pattern immediately after fixing VA-07, NOT caught by the zero-defect gate battery (LinkValidator link-count checks do not detect nesting). Governed replacement manifest (--existing replace) built; launching next."
+   "notes": "r1 died on SHA drift (this session's own follow-up commits). MAJOR ESCALATION found while investigating: a site-wide grep for the VA-07 corruption shape found 10,856 matching files PORTFOLIO-WIDE (confirmed on reference.aspose.org, never touched this session) -- a long-standing, pre-existing defect, not a new regression. Full writeup: data/summaries/fp-va07-portfolio-wide-nested-link-corruption-20260911.json, heal ticket manual-va07-portfolio-wide-nested-link-corruption-20260911. Recommend folding into TC-APT-083. This session remediates ONLY the 2 pages it itself shipped with the bug -- r2 launching next, no further commits until confirmed progress."
   }
  ],
  "blocked_pending_clean_translator_repo": null,
