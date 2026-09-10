@@ -431,64 +431,26 @@ class FileTranslationPipeline:
 
                         # After correction attempt, re-check decision
                         if decision_result.decision == PostValidationDecision.REJECT:
-                            # BUG-022-FIX: MT backends (NLLB, m2m100) cannot improve on rejection
-                            # with feedback. For non-critical rejections (terminology, completeness,
-                            # language consistency) accept best-effort — write gates (unconditional,
-                            # gates 9-17) provide adequate quality protection. Critical failures
-                            # (placeholder corruption, code blocks, shortcodes, links, structure)
-                            # still hard-reject. LLM backends can benefit from correction, so they
-                            # retain the original reject behaviour. Pattern matches BUG-010 / TC-RETRY-FIX-018.
-                            _model_used_rej = getattr(result.stats, "model_used", "") or ""
-                            _is_llm_rej = "llm" in _model_used_rej.lower()
-                            if not _is_llm_rej:
-                                _critical_rej = (
-                                    engine.decision_engine._check_critical_failure(
-                                        validation_result
-                                    )
-                                    if validation_result is not None
-                                    and hasattr(engine, "decision_engine")
-                                    and engine.decision_engine is not None
-                                    else None
-                                )
-                                if _critical_rej:
-                                    logger.warning(
-                                        f"MT backend ({_model_used_rej or 'tm/passthrough'}) CRITICAL reject "
-                                        f"({_critical_rej}) — hard-rejecting {file_path} to {target_lang}"
-                                    )
-                                    raise TranslationRejectedError(
-                                        message=f"Translation rejected: {decision_result.decision_reason}",
-                                        file_path=str(file_path),
-                                        validation_result=validation_result,
-                                        rejection_reason=decision_result.decision_reason,
-                                    )
-                                else:
-                                    # Non-critical REJECT: accept best-effort, fall through to write.
-                                    _issue_summary_rej = "; ".join(
-                                        f"{getattr(iss, 'validator', '?')}: "
-                                        f"{str(getattr(iss, 'message', ''))[:60]}"
-                                        for iss in (
-                                            validation_result.issues if validation_result else []
-                                        )
-                                    )
-                                    logger.info(
-                                        f"MT backend ({_model_used_rej or 'tm/passthrough'}): non-critical REJECT, "
-                                        f"accepting best-effort for {file_path} to {target_lang}. "
-                                        f"Issues: [{_issue_summary_rej}]"
-                                    )
-                                    # (fall through to ACCEPT path below — no raise)
-                            else:
-                                raise TranslationRejectedError(
-                                    message=f"Translation rejected: {decision_result.decision_reason}",
-                                    file_path=str(file_path),
-                                    validation_result=validation_result,
-                                    rejection_reason=decision_result.decision_reason,
-                                )
+                            # VA-02 (TC-APT-105 audit): honor decision_engine's own
+                            # REJECT verdict uniformly for every backend. BUG-022's
+                            # original fix (below, removed) special-cased MT backends
+                            # to silently downgrade a non-critical REJECT to
+                            # accept-best-effort -- regardless of the operator's own
+                            # accept_after_max_retries policy setting, which this
+                            # engine already has and Rule 5 already arbitrates by.
+                            # A REJECT reaching this point means Rule 1/2 (critical/
+                            # error-count) or Rule 5 (accept_after_max_retries=False,
+                            # non-critical) already declined best-effort acceptance --
+                            # file_pipeline.py must not maintain its own competing,
+                            # policy-blind copy of that decision.
+                            raise TranslationRejectedError(
+                                message=f"Translation rejected: {decision_result.decision_reason}",
+                                file_path=str(file_path),
+                                validation_result=validation_result,
+                                rejection_reason=decision_result.decision_reason,
+                            )
 
                     elif decision_result.decision == PostValidationDecision.RETRY:
-                        # TC-RETRY-FIX-018: MT backends produce identical output on retry.
-                        # Split by severity: critical issues still reject; non-critical → accept best-effort.
-                        # This aligns with accept_after_max_retries=True semantics (skip futile retries).
-                        # LLM backends (professionalize_llm) CAN improve on retry — leave their path unchanged.
                         # BUG-019-FIX: model_used can be empty when all content is TM/passthrough (no model call).
                         # In that case _is_llm_backend=False; the old `if _model_used and ...` skipped the MT path.
                         # Drop _model_used from the guard — empty model_used is definitely not an LLM backend.
@@ -499,42 +461,53 @@ class FileTranslationPipeline:
                         _model_used = getattr(result.stats, "model_used", "") or ""
                         _is_llm_backend = "llm" in _model_used.lower()
                         if not _is_llm_backend:
-                            _critical = (
-                                engine.decision_engine._check_critical_failure(validation_result)
-                                if validation_result is not None
-                                and hasattr(engine, "decision_engine")
-                                and engine.decision_engine is not None
-                                else None
+                            # VA-02 (TC-APT-105 audit): MT backends (NLLB, m2m100)
+                            # produce identical output on retry -- they have no
+                            # feedback channel (only isinstance(mt_model,
+                            # LLMModelBackend) consumes retry_feedback text, see
+                            # segment_translator.py), so looping one through the
+                            # LLM retry path below would just burn its full retry
+                            # budget reproducing the same result before finally
+                            # reaching Rule 5. BUG-022's original fix avoided that
+                            # waste by re-deriving its own "is this critical" check
+                            # here and unconditionally accepting best-effort when
+                            # not critical -- silently ignoring the operator's own
+                            # accept_after_max_retries policy in the process.
+                            #
+                            # Instead of maintaining that separate, policy-blind
+                            # copy of Rule 5, ask the SAME decision engine what
+                            # Rule 5 says right now, by re-invoking make_decision()
+                            # with the budget pretend-exhausted at this exact
+                            # retry_count. This is authoritative (never a second,
+                            # competing implementation), respects
+                            # accept_after_max_retries correctly, and can only
+                            # return ACCEPT or REJECT -- never RETRY, since Rule 4
+                            # cannot fire once retry_count >= its own effective
+                            # budget.
+                            decision_result = engine.decision_engine.make_decision(
+                                validation_result=validation_result,
+                                retry_count=retry_count,
+                                source=source_body,
+                                site_id=site_id,
+                                target_lang=target_lang,
+                                effective_max_retries=retry_count,
                             )
-                            if _critical:
+                            final_decision = decision_result
+                            if decision_result.decision == PostValidationDecision.REJECT:
                                 logger.warning(
-                                    f"MT backend ({_model_used or 'tm/passthrough'}) CRITICAL validation failure "
-                                    f"({_critical}) — escalating to reject + retranslate queue "
-                                    f"for {file_path} to {target_lang}"
+                                    f"MT backend ({_model_used or 'tm/passthrough'}) cannot retry "
+                                    f"with feedback and Rule 5 declined best-effort for {file_path} "
+                                    f"to {target_lang}: {decision_result.decision_reason}"
                                 )
                                 raise TranslationRejectedError(
                                     message=f"MT backend cannot retry with feedback: {decision_result.decision_reason}",
                                     file_path=str(file_path),
                                     validation_result=validation_result,
-                                    rejection_reason=f"MT backend: critical issue ({_critical}) cannot be resolved by retrying",
+                                    rejection_reason=decision_result.decision_reason,
                                 )
-                            else:
-                                # Non-critical issues (terminology warnings, minor checks).
-                                # MT model cannot improve on retry. Accept best-effort.
-                                # Fall through to line 500 (ACCEPT) → write path runs normally.
-                                _issue_summary = "; ".join(
-                                    f"{getattr(iss, 'validator', '?')}: "
-                                    f"{str(getattr(iss, 'message', ''))[:60]}"
-                                    for iss in (
-                                        validation_result.issues if validation_result else []
-                                    )
-                                )
-                                logger.info(
-                                    f"MT backend ({_model_used or 'tm/passthrough'}): non-critical validation issues, "
-                                    f"accepting best-effort for {file_path} to {target_lang}. "
-                                    f"Issues: [{_issue_summary}]"
-                                )
-                                # (no break, no continue — fall through to ACCEPT path below)
+                            # else: ACCEPT -- fall through to the write path below,
+                            # matching accept_after_max_retries semantics exactly
+                            # as Rule 5 itself computed them, not a duplicate guess.
                         else:
                             # LLM backend: repeated feedback guard + retry with feedback
                             try:

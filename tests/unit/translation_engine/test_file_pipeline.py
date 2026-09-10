@@ -614,7 +614,19 @@ class TestRetryAndFeedbackGuard:
 
 class TestMTRetryGuard:
     def test_mt_backend_retry_escalates_to_reject(self):
-        """MT backend on RETRY decision → immediate rejection (no futile retry)."""
+        """MT backend on RETRY decision → immediate rejection (no futile retry).
+
+        VA-02 (TC-APT-105 audit): file_pipeline.py no longer re-derives its
+        own "is this critical" check for MT backends (the old, policy-blind
+        BUG-022 logic this test used to exercise via an unconfigured
+        MagicMock's default-truthy return value from
+        `decision_engine._check_critical_failure`, not genuine critical-
+        failure semantics). It instead re-invokes the SAME
+        `make_decision()` with the budget pretend-exhausted, so this
+        scenario is now expressed as a second call returning REJECT --
+        exactly mirroring `test_llm_backend_retry_allowed`'s existing
+        two-call `side_effect` pattern below.
+        """
         from src.translation_engine.validation.post_translation_validator import (
             ValidationDecision as PostValidationDecision,
         )
@@ -625,7 +637,12 @@ class TestMTRetryGuard:
         decision_retry.decision = PostValidationDecision.RETRY
         decision_retry.retry_feedback = "Fix terminology"
         decision_retry.decision_reason = "Terminology issues"
-        engine.decision_engine.make_decision.return_value = decision_retry
+
+        decision_reject = MagicMock()
+        decision_reject.decision = PostValidationDecision.REJECT
+        decision_reject.decision_reason = "Failed after 0 retries"
+
+        engine.decision_engine.make_decision.side_effect = [decision_retry, decision_reject]
 
         vr = MagicMock()
         vr.issues = []
@@ -641,6 +658,111 @@ class TestMTRetryGuard:
         lang_result = pipeline.translate_language(ctx, result)
         assert not lang_result.success
         # Only 1 translation call — no futile retry
+        assert engine._translate_to_language.call_count == 1
+        # Re-arbitrated via the SAME decision engine, not a separate guess.
+        assert engine.decision_engine.make_decision.call_count == 2
+
+    def test_mt_backend_honors_real_decision_engines_reject_policy(self):
+        """VA-02 (TC-APT-105 audit), against the REAL ValidationDecisionEngine
+        (not a mock): with accept_after_max_retries=False, a WARNING-only,
+        non-critical result must REJECT for an MT backend, exactly as it
+        already does for LLM backends -- not silently downgrade to
+        accept-best-effort just because nothing is ERROR-severity, which is
+        the exact live incident shape this taskcard closes."""
+        from src.translation_engine.validation.base import (
+            ValidationIssue,
+            ValidationResult,
+            ValidationSeverity,
+        )
+        from src.translation_engine.validation.decision_engine import (
+            ValidationDecisionEngine,
+        )
+
+        engine = _make_engine(validation_enabled=True)
+        engine.decision_engine = ValidationDecisionEngine(
+            {
+                "decision_rules": {
+                    "reject_on_error_count": 3,
+                    "max_retry_attempts": 2,
+                    "accept_warnings": False,
+                    "accept_after_max_retries": False,
+                }
+            }
+        )
+        validation_result = ValidationResult(
+            success=True,
+            issues=[
+                ValidationIssue(
+                    severity=ValidationSeverity.WARNING,
+                    validator="TerminologyPreservationValidator",
+                    message="term suggestion",
+                )
+            ],
+        )
+        engine.validation_suite.validate_aggregated.return_value = validation_result
+
+        pipeline = FileTranslationPipeline(engine)
+        # A positive budget so Rule 4 genuinely returns RETRY on the first
+        # call (exercising this taskcard's new re-arbitration code in the
+        # RETRY branch), not VA-01's separate zero-budget-on-first-call fix.
+        ctx = _make_ctx(should_validate=True, max_retry_attempts=2)
+        result = _make_result()
+        result.stats.model_used = "m2m100_418M"  # MT backend (not LLM)
+
+        lang_result = pipeline.translate_language(ctx, result)
+
+        assert not lang_result.success
+        # Only 1 translation call — re-arbitrated without a futile retranslation.
+        assert engine._translate_to_language.call_count == 1
+
+    def test_mt_backend_honors_real_decision_engines_accept_policy(self):
+        """Inverse of the above, same real decision engine: with
+        accept_after_max_retries=True (the production default), the same
+        WARNING-only, non-critical result IS accepted best-effort -- this
+        fix changes WHO decides (the shared decision engine, policy-aware),
+        not the production-default outcome for the common case."""
+        from src.translation_engine.validation.base import (
+            ValidationIssue,
+            ValidationResult,
+            ValidationSeverity,
+        )
+        from src.translation_engine.validation.decision_engine import (
+            ValidationDecisionEngine,
+        )
+
+        engine = _make_engine(validation_enabled=True)
+        engine.decision_engine = ValidationDecisionEngine(
+            {
+                "decision_rules": {
+                    "reject_on_error_count": 3,
+                    "max_retry_attempts": 2,
+                    "accept_warnings": False,
+                    "accept_after_max_retries": True,
+                }
+            }
+        )
+        validation_result = ValidationResult(
+            success=True,
+            issues=[
+                ValidationIssue(
+                    severity=ValidationSeverity.WARNING,
+                    validator="TerminologyPreservationValidator",
+                    message="term suggestion",
+                )
+            ],
+        )
+        engine.validation_suite.validate_aggregated.return_value = validation_result
+
+        pipeline = FileTranslationPipeline(engine)
+        # See the reject-policy test above: a positive budget exercises this
+        # taskcard's new re-arbitration code, not VA-01's separate fix.
+        ctx = _make_ctx(should_validate=True, max_retry_attempts=2)
+        result = _make_result()
+        result.stats.model_used = "m2m100_418M"  # MT backend (not LLM)
+
+        lang_result = pipeline.translate_language(ctx, result)
+
+        assert lang_result.success
         assert engine._translate_to_language.call_count == 1
 
     def test_llm_backend_retry_allowed(self):
