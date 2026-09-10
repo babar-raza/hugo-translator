@@ -13,6 +13,7 @@ from typing import Any
 import structlog
 
 from .base import ValidationResult, ValidationSeverity, Validator
+from .link_utils import extract_markdown_links
 
 logger = structlog.get_logger(__name__)
 
@@ -348,9 +349,11 @@ class StructureValidator(Validator):
         Returns:
             Total number of links and images
         """
-        # Match [text](url) and ![alt](url)
-        links = len(re.findall(r"!?\[([^\]]+)\]\(([^)]+)\)", text))
-        return links
+        # VA-04 (TC-APT-105): shared with LinkValidator._extract_links so the
+        # two validators can never disagree on what counts as a link (the
+        # previous local pattern required non-empty anchor/URL, silently
+        # missing a legitimate empty-alt image like `![](image.png)`).
+        return len(extract_markdown_links(text))
 
     def _check_formatting(
         self, source: str, translation: str, result: ValidationResult
