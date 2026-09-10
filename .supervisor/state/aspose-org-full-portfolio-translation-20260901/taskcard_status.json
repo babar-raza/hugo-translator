@@ -1438,22 +1438,10 @@
    ]
   }
  },
- "last_wake_summary": "Continued: wave26's second page (docs.aspose.org/html) finished in full -- 25/25, the mission's second fully-live page this run (after font/python in wave24). Recovered from the PID 47648 detached-process death (see prior notes) via PowerShell Start-Process; the m2m companion (hu/ja/ro) also needed that mechanism after a live peer edit on segment_extractor.py/segment_translator.py/campaign_runner.py landed (a604650f, TC-APT-106) and freed the tree. All 3 (hu/ja/ro) accepted the gate battery; direct review (no subagent needed for 3 files): Enterprise Documentation preserved in all 3, titles correctly untranslated (no for-Y structure), one RB-003-level note (ro missing a few diacritics, meaning-preserving). Committed (199a7c7d46). Hit the documented multi-session index-collision gotcha again mid-commit: the shared index carried a large batch of another session's staged knowledge/*, scripts/seo/*, skills/.claude/.kilocode/.agents/* files -- unstaged everything except my own 3 paths before committing, per the runbook's own known-gotcha note. cells_committed_total 428 -> 431. pages_newly_live_total 19 -> 20 (html/_index).",
+ "last_wake_summary": "Continued: wave27/wave27b both aborted mid-run and NOT relaunched -- found a genuine, confirmed, cross-model content defect, not a validator bug. pdf/cpp (9/9 locales) and pdf/python (5/5 locales) both failed FrontmatterLanguageCheck on the title field with 100% consistency; live-debugged pdf/python x de with monkeypatched instrumentation (logs/debug_title_check.py, transient, gitignored, not committed) and got a definitive answer: is_untranslated() returns True with similarity=1.000 -- the translated title's residue is BYTE-IDENTICAL to the English source's ('for'), for ALL 3 attempts across BOTH models (professionalize_llm + 2x m2m100 escalation). The model genuinely leaves the single connector word 'for' untranslated in 'Aspose.X FOSS for <Platform>'-shaped titles -- almost the whole title is protected/governed terms with only that one word as real prose, and a masking-then-prompting mechanism plausibly (not yet confirmed) starves the model of enough context to recognize it as translatable. This recurs across 2 confirmed pages, same root cause, no producer fix landed -- meets the plan section 10.1 RECURRENCE ESCALATION bar. Did NOT attempt a fix this session (needs deeper prompt/masking-level instrumentation than time allowed); corrected the earlier (wrong) validator-false-positive hypothesis in heal_queue.jsonl and documented the masking hypothesis + next steps for whoever picks this up. Released the pdf/python, pdf/typescript, words/net claims (all three share the same title shape and would very likely hit the identical defect) -- per the escalation rule, no new page of this shape opens until a real producer fix lands and is reverified. cells_committed_total unchanged at 431 this segment (root-cause work only, matching the earlier wave25/terminology.yaml session's pattern of pure investigation turns).",
  "cells_committed_total": 431,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [
-  {
-   "run_id": "wave27b-llm-20260910-r2",
-   "pid": 48464,
-   "manifest": "data/campaigns/manifests/wave27b-llm-20260910-r2.yaml",
-   "purpose": "wave27b retry (pdf/python, pdf/typescript, words/net), 22 LLM-primary locales, 66 cells. Peer's models.py/segment_translator.py/test edit that caused the PID 48096 verify_environment failure cleared without a new commit appearing (tree just went clean at HEAD 7c780a83 -- unclear if reverted/stashed elsewhere, not investigated, not my concern). Confirmed past verify_environment before this commit.",
-   "log_stdout": "logs/wave27b-llm-20260910-r2.out.log",
-   "log_stderr": "logs/wave27b-llm-20260910-r2.err.log",
-   "launched_at": "2026-09-10T06:40:00+00:00",
-   "status": "RUNNING",
-   "next_step_after_completion": "review accepted candidates (watch for title-postposition-inversion in hi/ko/tr/ja, and whether pdf/typescript's title trips FrontmatterLanguageCheck like pdf/cpp did); commit page-complete per plan section 19.2; THEN sequentially build+launch the m2m hu/ja/ro companion"
-  }
- ],
+ "active_detached_runs": [],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 4,
