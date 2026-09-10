@@ -1357,7 +1357,11 @@ class SegmentTranslator:
 
                         for _seg, _hint in zip(_llm_segments, _llm_hints_seg):
                             _seg_translation = None
-                            if _llm_backend_seg is not None:
+                            _seg_via_llm = False
+                            _llm_capable_seg = _llm_backend_seg is not None and hasattr(
+                                _llm_backend_seg, "translate_with_context"
+                            )
+                            if _llm_capable_seg:
                                 try:
                                     _llm_result_seg = _llm_backend_seg.translate_with_context(
                                         [_seg.source_text],
@@ -1369,26 +1373,62 @@ class SegmentTranslator:
                                     )
                                     if _llm_result_seg and _llm_result_seg[0]:
                                         _seg_translation = _llm_result_seg[0]
+                                        _seg_via_llm = True
                                 except Exception as _llm_err_seg:
                                     logger.warning(
                                         f"ContentTypeRouter LLM pre-translate failed for "
                                         f"segment ({type(_llm_err_seg).__name__}): {_llm_err_seg}; "
                                         f"segment marked as passthrough"
                                     )
+                            elif _llm_backend_seg is not None:
+                                # TC-HT-ROUTE-002: the circuit breaker can
+                                # transparently substitute a non-LLM fallback
+                                # (e.g. m2m100) for `_llm_model_id_seg` without
+                                # raising -- it can't do context-aware
+                                # translate_with_context(), but it CAN
+                                # translate via its normal MT path. Reuse the
+                                # same `_translate_with_multiline_support` call
+                                # Step 2 below uses for ordinary segments
+                                # instead of leaving this one as English
+                                # passthrough.
+                                try:
+                                    _mt_fallback_result_seg = self._translate_with_multiline_support(
+                                        backend=_llm_backend_seg,
+                                        segments=[_seg],
+                                        texts=[_seg.source_text],
+                                        source_lang=source_lang,
+                                        target_lang=target_lang,
+                                        stats=stats,
+                                    )
+                                    if _mt_fallback_result_seg and _mt_fallback_result_seg[0]:
+                                        _seg_translation = _mt_fallback_result_seg[0]
+                                except Exception as _mt_fallback_err_seg:
+                                    logger.warning(
+                                        f"ContentTypeRouter MT-fallback translate failed "
+                                        f"for segment "
+                                        f"({type(_mt_fallback_err_seg).__name__}): "
+                                        f"{_mt_fallback_err_seg}; segment marked as "
+                                        f"passthrough"
+                                    )
 
                             if _seg_translation:
                                 _final_translation = self._restore_placeholders(
                                     _seg_translation, _seg
                                 )
-                                # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 4):
-                                # record the per-unit "actually LLM-translated"
-                                # fact (segment-path equivalent of the AST-path
-                                # instrumentation above).
-                                stats.llm_units_translated += 1
+                                if _seg_via_llm:
+                                    # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 4):
+                                    # record the per-unit "actually LLM-translated"
+                                    # fact (segment-path equivalent of the AST-path
+                                    # instrumentation above). Only true when the
+                                    # context-aware LLM call itself produced this
+                                    # text -- not when the MT fallback above did.
+                                    stats.llm_units_translated += 1
                             else:
                                 # TC-LLM-AVAIL-001-style graceful degrade: keep the
-                                # original text rather than sending decontextualized
-                                # short strings to raw MT, which hallucinates worse.
+                                # original text. This is now a true last resort --
+                                # reached only when no backend could be loaded at
+                                # all, the context-aware LLM call itself failed, or
+                                # the MT-fallback attempt above also failed.
                                 _final_translation = self._restore_placeholders(
                                     _seg.source_text, _seg
                                 )
@@ -2162,33 +2202,58 @@ class SegmentTranslator:
                                 if _output_path
                                 else {}
                             )
-                            for _llm_unit, _hint in zip(_llm_units, _llm_hints):
-                                _llm_result = _llm_backend.translate_with_context(
-                                    [_llm_unit.source_text],
-                                    site_profile.default_source_lang,
-                                    target_lang,
-                                    context_hint=_hint,
-                                    file_context=_file_ctx,
-                                    retry_feedback=retry_feedback,
+                            if not hasattr(_llm_backend, "translate_with_context"):
+                                # TC-HT-ROUTE-002: the circuit breaker can
+                                # transparently substitute a non-LLM fallback
+                                # (e.g. m2m100) for `_llm_model_id` without
+                                # raising. That fallback can't do context-aware
+                                # translate_with_context() -- calling it
+                                # unconditionally would AttributeError on the
+                                # very first unit and land every unit in this
+                                # batch in the `except` below as English
+                                # passthrough. Instead, leave these units'
+                                # translated_text unset here and let them flow
+                                # into `units_needing_translation` /
+                                # `batch_translate_units()` below, which
+                                # translates via that same fallback's normal
+                                # (non-context-aware) MT path.
+                                logger.info(
+                                    f"ContentTypeRouter: LLM backend for "
+                                    f"{_llm_model_id} was substituted with a "
+                                    f"non-context-capable fallback "
+                                    f"({type(_llm_backend).__name__}); leaving "
+                                    f"{len(_llm_units)} unit(s) for the normal "
+                                    f"MT batch-translate step instead of LLM "
+                                    f"passthrough"
                                 )
-                                if _llm_result and _llm_result[0]:
-                                    _llm_unit.translated_text = _llm_result[0]
-                                    # TC-HT-003: tag units the LLM backend
-                                    # rejected as prompt-echo/refusal and
-                                    # passed through as source text.
-                                    if 0 in getattr(_llm_backend, "last_reject_reasons", {}):
-                                        if _llm_unit.metadata is None:
-                                            _llm_unit.metadata = {}
-                                        _llm_unit.metadata["llm_passthrough_reason"] = (
-                                            "llm_echo_reject"
-                                        )
-                                    else:
-                                        # HT-QUALITY-GATES-001 Part 22 (plan
-                                        # 5.4 item 4): record the per-unit
-                                        # "actually LLM-translated" fact so
-                                        # write-gate tiering can use it
-                                        # directly instead of a locale proxy.
-                                        stats.llm_units_translated += 1
+                            else:
+                                for _llm_unit, _hint in zip(_llm_units, _llm_hints):
+                                    _llm_result = _llm_backend.translate_with_context(
+                                        [_llm_unit.source_text],
+                                        site_profile.default_source_lang,
+                                        target_lang,
+                                        context_hint=_hint,
+                                        file_context=_file_ctx,
+                                        retry_feedback=retry_feedback,
+                                    )
+                                    if _llm_result and _llm_result[0]:
+                                        _llm_unit.translated_text = _llm_result[0]
+                                        # TC-HT-003: tag units the LLM backend
+                                        # rejected as prompt-echo/refusal and
+                                        # passed through as source text.
+                                        if 0 in getattr(_llm_backend, "last_reject_reasons", {}):
+                                            if _llm_unit.metadata is None:
+                                                _llm_unit.metadata = {}
+                                            _llm_unit.metadata["llm_passthrough_reason"] = (
+                                                "llm_echo_reject"
+                                            )
+                                        else:
+                                            # HT-QUALITY-GATES-001 Part 22 (plan
+                                            # 5.4 item 4): record the per-unit
+                                            # "actually LLM-translated" fact so
+                                            # write-gate tiering can use it
+                                            # directly instead of a locale proxy.
+                                            stats.llm_units_translated += 1
                         except Exception as _llm_err:
                             logger.warning(
                                 f"ContentTypeRouter LLM pre-translate failed "

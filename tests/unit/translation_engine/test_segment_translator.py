@@ -508,7 +508,13 @@ class TestContentTypeRouterLLMPassthrough:
         ]
     }
 
-    def _make_engine(self, *, llm_raises=False, llm_translation="Translated"):
+    def _make_engine(
+        self,
+        *,
+        llm_raises=False,
+        llm_translation="Translated",
+        fallback_lacks_context=False,
+    ):
         engine = MagicMock()
         engine.config.get_config.return_value = {
             "translation_engine": {"content_type_routing": self._ROUTING_CONFIG},
@@ -525,6 +531,22 @@ class TestContentTypeRouterLLMPassthrough:
             def _load(model_id):
                 if "professionalize_llm" in str(model_id):
                     raise ConnectionError("LLM service unavailable")
+                return mt_backend
+
+        elif fallback_lacks_context:
+            # TC-HT-ROUTE-002: simulate the circuit breaker transparently
+            # substituting a non-LLM fallback (e.g. m2m100) for
+            # professionalize_llm -- load_model() does NOT raise, but the
+            # returned backend has no translate_with_context() at all.
+            # `spec=["translate"]` makes hasattr(...) correctly report the
+            # method missing, exactly like the real HuggingFaceBackend.
+            llm_backend = MagicMock(spec=["translate"])
+            llm_backend.translate.return_value = [llm_translation]
+            engine._test_llm_backend = llm_backend
+
+            def _load(model_id):
+                if "professionalize_llm" in str(model_id):
+                    return llm_backend
                 return mt_backend
 
         else:
@@ -561,7 +583,9 @@ class TestContentTypeRouterLLMPassthrough:
         doc.output_path = None
         return doc, plan, unit
 
-    def _run_translate(self, engine, doc, plan, retry_feedback=None):
+    def _run_translate(
+        self, engine, doc, plan, retry_feedback=None, batch_translate_side_effect=None
+    ):
         translator = SegmentTranslator(engine)
         site_profile = MagicMock()
         site_profile.default_source_lang = "en"
@@ -572,7 +596,15 @@ class TestContentTypeRouterLLMPassthrough:
         ):
             mock_ext = MagicMock()
             mock_ext.extract_from_ast.return_value = plan
-            mock_ext.batch_translate_units.return_value = plan.units
+            if batch_translate_side_effect is not None:
+                # TC-HT-ROUTE-002: simulate Step 2b's real MT batch step
+                # (mocked away by default) actually translating whatever
+                # units it's handed, so tests can assert a unit left
+                # unset by the ContentTypeRouter step gets a REAL
+                # translation from here rather than staying English.
+                mock_ext.batch_translate_units.side_effect = batch_translate_side_effect
+            else:
+                mock_ext.batch_translate_units.return_value = plan.units
             mock_ext.batch_stats = {}
             mock_ext._batch_calls = 0
             mock_ext._individual_fallbacks = 0
@@ -592,6 +624,8 @@ class TestContentTypeRouterLLMPassthrough:
                 stats=MagicMock(),
                 retry_feedback=retry_feedback,
             )
+
+            return mock_ext
 
     def test_llm_down_sets_english_passthrough(self):
         """LLM raises ConnectionError → unit gets source_text + passthrough metadata."""
@@ -634,6 +668,61 @@ class TestContentTypeRouterLLMPassthrough:
         kwargs = engine._test_llm_backend.translate_with_context.call_args.kwargs
         assert kwargs["context_hint"] == "api_property_description"
         assert kwargs["retry_feedback"] == "Translate every ordinary word into hi."
+
+    # -----------------------------------------------------------------
+    # TC-HT-ROUTE-002: circuit breaker substitutes a non-LLM fallback
+    # (e.g. m2m100) for professionalize_llm. load_model() does NOT raise
+    # (unlike test_llm_down_sets_english_passthrough above), so the old
+    # code called the returned backend's translate_with_context() anyway
+    # -> AttributeError -> caught by the broad `except Exception` ->
+    # EVERY routed unit in the batch landed as English passthrough, even
+    # though the fallback is perfectly capable of translating via its own
+    # ordinary MT path. Fixed by checking hasattr() first and, when
+    # missing, leaving the unit's translated_text unset instead of
+    # calling the LLM-only method or marking passthrough -- letting it
+    # flow into the normal Step 2b MT batch (`batch_translate_units`)
+    # below, which uses that same fallback for real.
+    # -----------------------------------------------------------------
+
+    def test_llm_backend_lacking_context_support_routes_to_mt_batch_instead_of_passthrough(self):
+        """Fallback lacks translate_with_context -> must not be called (would
+        AttributeError), the unit must NOT be marked English passthrough, and
+        it must actually reach and be translated by the normal MT batch step
+        (Step 2b's batch_translate_units) -- proving genuine fallback
+        translation rather than silent English degradation.
+
+        (The `test_llm_down_sets_english_passthrough` test above already
+        covers the ORIGINAL passthrough safety net for the case this fix
+        does NOT change: `load_model()` itself raising. This test covers
+        the previously-broken case: `load_model()` succeeds but returns a
+        backend that can't do context-aware translation.)
+        """
+        engine = self._make_engine(fallback_lacks_context=True)
+        doc, plan, unit = self._make_doc_and_unit("Gets the width.")
+
+        mt_translation = "Отримує ширину (MT fallback)."
+
+        def _fake_batch_translate_units(units, *args, **kwargs):
+            for u in units:
+                if not u.do_not_translate and not u.translated_text:
+                    u.translated_text = mt_translation
+            return units
+
+        self._run_translate(
+            engine, doc, plan, batch_translate_side_effect=_fake_batch_translate_units
+        )
+
+        # The broken call must never have been attempted -- proves the fix
+        # checks capability before calling, rather than relying on the
+        # AttributeError being swallowed.
+        assert not hasattr(engine._test_llm_backend, "translate_with_context")
+        engine._test_llm_backend.translate.assert_not_called()
+
+        # Old bug: this would be "Gets the width." (English passthrough)
+        # with llm_passthrough_reason="professionalize_llm_unavailable".
+        # Fixed behavior: genuinely translated via the normal MT batch path.
+        assert unit.translated_text == mt_translation
+        assert not (unit.metadata or {}).get("llm_passthrough_reason")
 
 
 # ---------------------------------------------------------------------------
@@ -1262,3 +1351,155 @@ class TestFrontmatterRepairOverrideIntegration:
                     force=False,
                     stats=stats,
                 )
+
+
+# ---------------------------------------------------------------------------
+# TC-HT-ROUTE-002: segment-path (translate_to_language's Step 1b) counterpart
+# of TestContentTypeRouterLLMPassthrough's AST-path fix above.
+#
+# ContentTypeRouter routes a frontmatter Segment to what should be
+# professionalize_llm, but the circuit breaker has transparently substituted
+# a non-LLM fallback backend (e.g. m2m100) for it -- `load_model()` does NOT
+# raise, it just returns something without `translate_with_context()`. The
+# old code called that method unconditionally anyway; the resulting
+# AttributeError was swallowed by a broad `except Exception`, and the
+# segment was left as English passthrough even though the fallback is
+# perfectly capable of translating it via its own ordinary MT path
+# (`translate()`, the same one Step 2 below uses for every other segment).
+#
+# Fixed by checking `hasattr(backend, "translate_with_context")` first and,
+# when missing, routing the segment through
+# `self._translate_with_multiline_support(...)` -- the exact call this same
+# method already uses for ordinary (non-context-aware) MT translation --
+# instead of calling the LLM-only method or jumping straight to passthrough.
+# ---------------------------------------------------------------------------
+
+
+class TestContentTypeRouterSegmentFallbackMTRouting:
+    _ROUTING_CONFIG = {
+        "frontmatter_description": [
+            {
+                "condition": {},
+                "preferred_model": "professionalize_llm",
+                "context_hint": "frontmatter_description",
+            }
+        ]
+    }
+
+    def _make_engine(self, *, fallback_backend):
+        engine = _make_engine()
+        engine.config.get_config.return_value = {
+            "translation_engine": {"content_type_routing": self._ROUTING_CONFIG},
+            "tm_defaults": {},
+        }
+        tm_result = MagicMock()
+        tm_result.hit = False
+        tm_result.source = None
+        engine.tm.lookup.return_value = tm_result
+        # Force the deterministic single-line path in
+        # _translate_with_multiline_support -- a MagicMock's default
+        # truthiness would otherwise route through the far more elaborate
+        # (and here irrelevant) multiline-structure-preservation branch.
+        engine.multiline_handler.is_multiline.return_value = False
+
+        def _load(model_id):
+            if "professionalize_llm" in str(model_id):
+                return fallback_backend
+            raise AssertionError(
+                f"Step 2 (whole-document MT batch) should not run in this "
+                f"test -- the single routed segment is fully consumed by "
+                f"Step 1b; unexpected load_model({model_id!r})"
+            )
+
+        engine.model_loader.load_model.side_effect = _load
+        return engine
+
+    def _make_segment(self, text="Gets the width of the widget."):
+        from src.translation_engine.extractor.segment_extractor import (
+            Segment,
+            SegmentContext,
+            SegmentContextType,
+        )
+
+        return Segment(
+            id="seg-description",
+            source_text=text,
+            context=SegmentContext(
+                context_type=SegmentContextType.FRONTMATTER,
+                frontmatter_key="description",
+            ),
+            site_id="test-site",
+            source_lang="en",
+        )
+
+    def _run(self, engine, segment):
+        translator = SegmentTranslator(engine)
+        stats = _make_stats()
+        doc = MagicMock(ast=None, frontmatter={"description": segment.source_text})
+        doc.source_path = None
+        site_profile = MagicMock()
+        site_profile.default_source_lang = "en"
+
+        with patch.object(translator, "_translate_body_ast") as mock_ast:
+            mock_ast.return_value = "---\ndescription: Test\n---\nBody"
+            translator.translate_to_language(
+                site_id="test",
+                site_profile=site_profile,
+                doc=doc,
+                segments=[segment],
+                source_lang="en",
+                target_lang="de",
+                force=False,
+                stats=stats,
+            )
+        return stats
+
+    def test_fallback_without_context_capability_still_gets_real_translation(self):
+        """Circuit breaker substituted a fallback (e.g. m2m100) lacking
+        translate_with_context -- the segment must be genuinely translated
+        via the fallback's normal translate() path, and that REAL value
+        (not the English source) is what reaches the TM store."""
+        fallback_backend = MagicMock(spec=["translate"])
+        fallback_backend.translate.return_value = ["Erhält die Breite des Widgets."]
+
+        segment = self._make_segment()
+        engine = self._make_engine(fallback_backend=fallback_backend)
+
+        stats = self._run(engine, segment)
+
+        # hasattr() correctly reports the method missing (spec-restricted
+        # mock), exactly like the real HuggingFaceBackend fallback.
+        assert not hasattr(fallback_backend, "translate_with_context")
+        fallback_backend.translate.assert_called_once()
+
+        assert engine.tm.store.call_count == 1
+        stored_kwargs = engine.tm.store.call_args.kwargs
+        assert stored_kwargs["translation"] == "Erhält die Breite des Widgets."
+
+        # Old bug: this would be "professionalize_llm_unavailable" with the
+        # English source text stored instead.
+        assert segment.metadata.get("llm_passthrough_reason") is None
+        # Genuinely MT-translated, not LLM-translated -- the per-unit
+        # "actually LLM-translated" stat must stay unset for this path.
+        assert stats.llm_units_translated == 0
+
+    def test_fallback_translate_failure_still_degrades_gracefully_to_passthrough(self):
+        """Regression guard: when the MT fallback's own translate() call ALSO
+        fails, the ORIGINAL graceful-degrade-to-English-passthrough safety
+        net must still catch it -- no crash, and the English source is what
+        reaches the TM store as a true last resort."""
+        fallback_backend = MagicMock(spec=["translate"])
+        fallback_backend.translate.side_effect = RuntimeError("MT backend exploded")
+
+        segment = self._make_segment()
+        engine = self._make_engine(fallback_backend=fallback_backend)
+
+        stats = self._run(engine, segment)
+
+        fallback_backend.translate.assert_called_once()
+
+        assert segment.metadata.get("llm_passthrough_reason") == "professionalize_llm_unavailable"
+        assert engine.tm.store.call_count == 1
+        stored_kwargs = engine.tm.store.call_args.kwargs
+        assert stored_kwargs["translation"] == segment.source_text
+        assert stats.llm_units_translated == 0
