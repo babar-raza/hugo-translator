@@ -1453,27 +1453,10 @@
    ]
   }
  },
- "last_wake_summary": "wave-followup-wcfm-20260910r3 (working-with-cells-foss-model.md, first-ever attempt) finished 0/25 -- genuinely quarantined, not a false positive this time. Root-caused via the isolated harness (2 independent repros): FINAL PURITY CHECK rejects because 2 specific body TextUnits (a list-item sentence containing `try_get_value`, and a one-word \"Diagnostics\" heading) come back from batch_translate_units echoed identical to source_text while every sibling in the same 60-unit batch call translates correctly. NOT the TC-APT-105 defect (no duplication observed). Filed as data/summaries/fp-wave-followup-wcfm-20260910r3-purity-check.json per plan SS10.1 -- two candidate causes not yet distinguished (short-heading purity false positive vs genuine model omission on that sentence shape), needs Track-B investigation of the batch response-to-unit mapping before any retry. heal_queue tickets for ar/cs/de carry the diagnosis; 44 downstream cascade tickets (locales never actually attempted once QU-02 quarantine engaged) waived. Do not retry this page blind.",
+ "last_wake_summary": "wave-cellsgorust-index-20260910 finished 49/100. Shipped cleanly: cells/go/getting-started/_index.md 25/25, cells/rust/developer-guide/_index.md 24/25 (zh single-cell LanguageConsistencyValidator/TC-SAS-01 failure, own ticket) -> commit 7339ec8652, work_ledger updated. Two sources did not ship: cells/rust/_index.md quarantined 0/25 (ar/cs/de FrontmatterLanguageCheck on title \"Aspose.Cells FOSS for Rust\" -- reclassified as the known TC-APT-040 short-technical-field langdetect false-positive class, not a new defect); cells/go/getting-started/license.md quarantined 0/25 for the VA-06 placeholder-nesting bug (now fixed, commit da01aac6) -- this campaign ran with pre-fix code, so license.md needs a fresh retrigger to reverify.",
  "cells_committed_total": 432,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [
-  {
-   "campaign_id": "wave-cellsgorust-index-20260910",
-   "pid": 54220,
-   "manifest": "data/campaigns/manifests/wave-cellsgorust-index-20260910.yaml",
-   "sources": [
-    "content/docs.aspose.org/en/cells/go/getting-started/_index.md",
-    "content/docs.aspose.org/en/cells/go/getting-started/license.md",
-    "content/docs.aspose.org/en/cells/rust/_index.md",
-    "content/docs.aspose.org/en/cells/rust/developer-guide/_index.md"
-   ],
-   "locales": 25,
-   "expected_output_count": 100,
-   "launched_at": "2026-09-10T17:56:00+00:00",
-   "launched_by": "interactive-continue-20260910f",
-   "notes": "Tier-1a, first-ever attempt at all 4 (0/25 prior). 2 other candidates in the same directory family (cells/go/_index.md, cells/go/developer-guide/_index.md) were correctly excluded by QU-01 -- real open tickets (auto:FrontmatterLanguageCheck, RB-001 untranslated-section-heading), not this session's scope; claims released."
-  }
- ],
+ "active_detached_runs": [],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 4,
