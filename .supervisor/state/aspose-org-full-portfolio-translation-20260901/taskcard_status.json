@@ -4,7 +4,7 @@
  "plan_revision": 18,
  "branch": "mission/aspose-org-full-portfolio-translation-20260901",
  "created_at": "2026-09-02T05:20:29.896922+00:00",
- "updated_at": "2026-09-10T11:24:03+00:00",
+ "updated_at": "2026-09-10T11:49:58+00:00",
  "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
  "content_repo_session_ledger": {
   "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
   2,
   3
  ],
- "wake_count": 36,
+ "wake_count": 37,
  "wakes_without_state_change": 0,
  "taskcards": {
   "TC-APT-001": {
@@ -1451,7 +1451,7 @@
    ]
   }
  },
- "last_wake_summary": "Continued: closed TC-APT-109 fully (fix + reverify + portfolio-wide blast-radius audit, 0 confirmed corruption in committed content -- see prior wake summary/heal_queue for detail). Moved to the remaining RECURRENCE ESCALATION gate model_quality_garbled_word: ran the standard cross-model-retry step (never previously attempted on these tickets) on pdf-engine-in-python's sv/th/uk/vi cells. All 4 passed the automated 44-gate zero-defect battery, but a dedicated RB-004 rubric subagent review (not just gate-trust) found only uk genuinely clean -- committed to content repo local main (6e1547498b, single-cell heal commit). sv/th/vi each still carry a confirmed RB-004 garbled/nonsense-word defect (sv: 'delegaterar' persists plus 2 NEW hybrid words found in review; th: the 'facade' fix only landed on 1 of 2 occurrences; vi: original duplication fixed but a NEW truncated-fragment table-cell defect found) -- kept open with updated, specific notes; TM purged (141 entries). This confirms garbled_word is NOT simple isolated sampling noise resolvable by one retry -- worth flagging for closer investigation before more blind retries. Hit and recovered from the known multi-session git-index collision (a `git add <single-file>` on top of another session's already-staged 323-file index) via `git reset` (unstage only, no data loss) + precise re-add -- confirms the documented lesson still applies exactly as written. cells_committed_total 431 -> 432 (+1, uk/pdf-engine-in-python). garbled_word and residual_phrase_defects/TC-APT-102 and SemanticSimilarityValidator (claimed by vsprint107 peer) remain open RECURRENCE ESCALATION gates.",
+ "last_wake_summary": "Continued: closed TC-APT-102 (model_quality_residual_phrase_defects) via the exact recurrence test its own first-principles record called for -- grepped the portfolio for the same 'prose backtick-placeholder generic-noun.' sentence shape, live-tested 3 different pages/families (cells/cpp, slides/python, email/python) in the same locale (pl) and trigger word ('object') as the original confirmed defect via direct-engine calls. 0/3 reproduced -- Polish grammar consistently reordered the noun before the placeholder, avoiding the trap. MODEL_LIMITATION_DEFERRED, satisfying the FP record's own pre-committed falsifiability criterion. TC-APT-102 -> DONE.\n\nInvestigated the remaining garbled_word gate further: the vi table-cell truncation ('Vui long cun' instead of 'Co' for a bare 'Yes' cell) looks like a short-decontextualized-unit LLM hedge/refusal fragment, likely overlapping with TC-HT-ROUTE-002 (LLM circuit-breaker/short-unit routing) that a peer session is actively fixing in segment_translator.py right now -- did not duplicate that work.\n\nRECURRENCE ESCALATION STATUS: of the 3 gates open at this wake's start, 2 are now fully resolved (TC-APT-109 closed with portfolio audit; TC-APT-102 closed via recurrence test). model_quality_garbled_word is PARTIALLY addressed (1/4 tickets fixed+committed, 3/4 still open with precise, updated findings -- sv/th look like genuine per-word model limitations on rare vocabulary, vi's table-cell issue likely needs the peer's in-flight routing fix). auto:SemanticSimilarityValidator now spans 5 pages/72 tickets across 4 sites (docs/blog/kb/reference.aspose.org) -- clearly the active focus of the TC-APT-107 pre-launch validation sprint (a concurrent peer session, status IN_PROGRESS); did not duplicate. No new Track-A page opened this wake (RECURRENCE ESCALATION still has open gates); cells_committed_total unchanged at 432 from this wake's own work (the +1 landed last wake).",
  "cells_committed_total": 432,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [],
