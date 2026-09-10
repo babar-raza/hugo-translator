@@ -6,6 +6,24 @@ import difflib
 import re
 
 
+class PlaceholderMapIntegrityError(RuntimeError):
+    """Raised when a placeholder map is not safe to restore().
+
+    CU-02 (TC-APT-105/TC-APT-106 hardening): every `protect()`/`restore()`
+    pair must be scoped to one unit's own map -- maps must never be merged
+    or nested before a single `restore()` call. `restore()`'s substitution
+    is a sequential, non-atomic loop over `dict.items()`; if a stored
+    "original" value itself contains another placeholder token from the
+    same map, the outcome would silently depend on dict iteration order
+    instead of being well-defined. This is exactly the collision shape
+    behind the already-fixed TC-APT-106 (AST-reuse map keyed by re-derived
+    text) and TC-APT-105 (a container's combined translation duplicating a
+    protected leaf) bugs -- this exception exists so a future caller that
+    accidentally merges two independently-produced maps fails loudly in
+    tests, instead of shipping a silent duplicate/collision.
+    """
+
+
 class PlaceholderManager:
     """Manages placeholder replacement and restoration for protected content."""
 
@@ -77,6 +95,33 @@ class PlaceholderManager:
             # If pattern is invalid, return text unchanged
             return text
 
+    @staticmethod
+    def _check_no_nested_placeholders(placeholder_map: dict[str, str]) -> None:
+        """Raise `PlaceholderMapIntegrityError` if any stored value in
+        `placeholder_map` contains another key from the SAME map as a
+        literal substring -- see that class's docstring for why this is an
+        integrity violation, not a coincidence worth tolerating.
+
+        Deliberately scoped to keys within THIS map only (not any
+        placeholder-shaped string in general): a legitimately-protected
+        value coincidentally looking like `{PLACEHOLDER_0}` text is not this
+        bug; a value containing a key that this very map also defines is.
+        """
+        if len(placeholder_map) < 2:
+            return
+        for key, value in placeholder_map.items():
+            for other_key in placeholder_map:
+                if other_key != key and other_key in value:
+                    raise PlaceholderMapIntegrityError(
+                        f"Placeholder map integrity violation: stored value "
+                        f"for {key!r} contains another placeholder token "
+                        f"{other_key!r} from the same map. This indicates "
+                        "two independently-produced placeholder maps were "
+                        "merged or nested before a single restore() call -- "
+                        "protect()/restore() pairs must stay scoped to one "
+                        "unit's own map (see TC-APT-105/TC-APT-106)."
+                    )
+
     def restore(self, text: str, placeholder_map: dict[str, str]) -> str:
         """
         Restore placeholders to original content.
@@ -87,7 +132,14 @@ class PlaceholderManager:
 
         Returns:
             Text with placeholders restored
+
+        Raises:
+            PlaceholderMapIntegrityError: if `placeholder_map` is not safe to
+                restore (see that class's docstring) -- this never fires for
+                a map produced by a single `protect()` call on its own text,
+                only for a map a caller has incorrectly merged/nested.
         """
+        self._check_no_nested_placeholders(placeholder_map)
         restored = text
 
         # Exact replacements first
