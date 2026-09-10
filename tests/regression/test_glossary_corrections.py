@@ -298,6 +298,72 @@ def test_get_glossary_corrector_cache():
     print("=" * 80)
 
 
+def test_inline_code_span_never_corrected():
+    """CU-01 (TC-APT-105/106/109 hardening): a glossary term appearing
+    verbatim inside an inline code span must survive untouched -- this class
+    has no do_not_translate concept and is only reachable via the legacy
+    reconstruction fallback, so code spans are its own responsibility to
+    protect.
+    """
+    glossary_path = REPO_ROOT / "config" / "glossaries" / "en-fr.yaml"
+    corrector = GlossaryCorrector(glossary_path)
+
+    text = "Utilisez `métrage()` pour fusionner, puis Métrage le résultat."
+    corrected, changes = corrector.apply_corrections(text, "en", "fr")
+
+    assert "`métrage()`" in corrected, (
+        f"code span content must survive unchanged, got: {corrected}"
+    )
+    assert "Fusion le résultat" in corrected, (
+        f"ordinary prose outside the code span must still be corrected, got: {corrected}"
+    )
+    assert changes == ["métrage -> fusion"], (
+        f"expected exactly one correction (the prose occurrence), got: {changes}"
+    )
+
+
+def test_fenced_code_block_never_corrected():
+    """A glossary term inside a fenced code block must survive untouched,
+    including a term that spans what would otherwise be a multi-line match.
+    """
+    glossary_path = REPO_ROOT / "config" / "glossaries" / "en-fr.yaml"
+    corrector = GlossaryCorrector(glossary_path)
+
+    text = (
+        "Avant le bloc: escanner ceci.\n\n"
+        "```python\n"
+        "# escanner les fichiers textile\n"
+        "def escanner():\n"
+        "    pass\n"
+        "```\n\n"
+        "Après le bloc: escanner cela aussi."
+    )
+    corrected, changes = corrector.apply_corrections(text, "en", "fr")
+
+    assert "# escanner les fichiers textile" in corrected
+    assert "def escanner():" in corrected
+    assert "Avant le bloc: analyser ceci." in corrected
+    assert "Après le bloc: analyser cela aussi." in corrected
+    # One log entry per glossary TERM per call (not per occurrence) -- matches
+    # this module's existing bookkeeping convention (see
+    # test_multiple_corrections_in_one_text above).
+    assert changes == ["escanner -> analyser"]
+
+
+def test_no_code_spans_is_a_no_op_for_masking():
+    """Plain text with no backticks at all must round-trip through the new
+    masking/restoration steps with zero observable difference from before
+    this change -- proven by reusing an existing passing scenario."""
+    glossary_path = REPO_ROOT / "config" / "glossaries" / "en-fr.yaml"
+    corrector = GlossaryCorrector(glossary_path)
+
+    text = "Métrage contenu textile avec escanner automatique"
+    corrected, changes = corrector.apply_corrections(text, "en", "fr")
+
+    assert corrected == "Fusion contenu textuel avec analyser automatique"
+    assert len(changes) == 3
+
+
 if __name__ == "__main__":
     print("\n" + "=" * 80)
     print("REGRESSION TEST SUITE: Glossary-Based Translation Corrections")
