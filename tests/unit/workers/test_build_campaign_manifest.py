@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -394,6 +395,163 @@ def test_build_manifest_can_use_1_2b_m2m(content_repo, tmp_path, monkeypatch):
         llm_escalation_mode="deferred",
     )
     assert manifest["retry_policy"]["primary_model"] == "m2m100_1.2b"
+
+
+class TestQU01KnownBrokenExclusion:
+    """QU-01 (TC-APT-105 audit): a source with an OPEN heal_queue.jsonl
+    ticket must be excluded from a new manifest by default."""
+
+    @staticmethod
+    def _write_heal_queue(tmp_path: Path, *rows: dict) -> Path:
+        path = tmp_path / "heal_queue.jsonl"
+        path.write_text(
+            "\n".join(json.dumps(row) for row in rows) + ("\n" if rows else ""),
+            encoding="utf-8",
+        )
+        return path
+
+    def test_open_ticket_excludes_source_by_default(self, content_repo, tmp_path, monkeypatch):
+        translator = tmp_path / "translator"
+        _write_config(translator, ["docs.test.org"])
+        _touch(translator / "config/model_registry.yaml", "models: {}\n")
+        monkeypatch.setattr(builder, "git_sha", lambda repo: "f" * 40)
+        monkeypatch.setattr(builder, "fingerprint_files", lambda *_a, **_k: "c" * 64)
+        monkeypatch.setattr(
+            builder, "tm_fingerprint_inputs", lambda _repo: ["data/tm/l2.lmdb/data.mdb"]
+        )
+        heal_queue_path = self._write_heal_queue(
+            tmp_path,
+            {
+                "ticket_id": "t1",
+                "source_path": "content/docs.test.org/en/cells/net/getting-started.md",
+                "target_lang": "de",
+                "root_cause_class": "auto:LinkValidator",
+                "status": "OPEN",
+            },
+        )
+        profile = _folder_profile(content_repo / "content/docs.test.org")
+        sources, _ = builder.discover_sources(content_repo, profile, KNOWN)
+
+        manifest = builder.build_manifest(
+            content_repo=content_repo,
+            translator_repo=translator,
+            campaign_id="qu01-exclude",
+            sources=sources,
+            target_locales=["ar", "de", "fr"],
+            sites=["docs.test.org"],
+            heal_queue_path=heal_queue_path,
+        )
+
+        scoped_paths = {s["source_path"] for s in manifest["sources"]}
+        assert "content/docs.test.org/en/cells/net/getting-started.md" not in scoped_paths
+        # every OTHER discovered source is still included, unaffected
+        assert len(scoped_paths) == 4
+
+    def test_include_known_broken_flag_overrides_exclusion(
+        self, content_repo, tmp_path, monkeypatch
+    ):
+        translator = tmp_path / "translator"
+        _write_config(translator, ["docs.test.org"])
+        _touch(translator / "config/model_registry.yaml", "models: {}\n")
+        monkeypatch.setattr(builder, "git_sha", lambda repo: "f" * 40)
+        monkeypatch.setattr(builder, "fingerprint_files", lambda *_a, **_k: "c" * 64)
+        monkeypatch.setattr(
+            builder, "tm_fingerprint_inputs", lambda _repo: ["data/tm/l2.lmdb/data.mdb"]
+        )
+        heal_queue_path = self._write_heal_queue(
+            tmp_path,
+            {
+                "ticket_id": "t1",
+                "source_path": "content/docs.test.org/en/cells/net/getting-started.md",
+                "target_lang": "de",
+                "root_cause_class": "auto:LinkValidator",
+                "status": "OPEN",
+            },
+        )
+        profile = _folder_profile(content_repo / "content/docs.test.org")
+        sources, _ = builder.discover_sources(content_repo, profile, KNOWN)
+
+        manifest = builder.build_manifest(
+            content_repo=content_repo,
+            translator_repo=translator,
+            campaign_id="qu01-override",
+            sources=sources,
+            target_locales=["ar", "de", "fr"],
+            sites=["docs.test.org"],
+            heal_queue_path=heal_queue_path,
+            include_known_broken=True,
+        )
+
+        scoped_paths = {s["source_path"] for s in manifest["sources"]}
+        assert "content/docs.test.org/en/cells/net/getting-started.md" in scoped_paths
+        assert len(scoped_paths) == 5
+
+    def test_no_ticket_at_all_includes_source_unchanged(self, content_repo, tmp_path, monkeypatch):
+        """A source with no heal_queue entry at all is unaffected -- matches
+        today's pre-QU-01 behavior exactly."""
+        translator = tmp_path / "translator"
+        _write_config(translator, ["docs.test.org"])
+        _touch(translator / "config/model_registry.yaml", "models: {}\n")
+        monkeypatch.setattr(builder, "git_sha", lambda repo: "f" * 40)
+        monkeypatch.setattr(builder, "fingerprint_files", lambda *_a, **_k: "c" * 64)
+        monkeypatch.setattr(
+            builder, "tm_fingerprint_inputs", lambda _repo: ["data/tm/l2.lmdb/data.mdb"]
+        )
+        heal_queue_path = tmp_path / "heal_queue.jsonl"  # never created -- must not exist
+
+        profile = _folder_profile(content_repo / "content/docs.test.org")
+        sources, _ = builder.discover_sources(content_repo, profile, KNOWN)
+
+        manifest = builder.build_manifest(
+            content_repo=content_repo,
+            translator_repo=translator,
+            campaign_id="qu01-no-tickets",
+            sources=sources,
+            target_locales=["ar", "de", "fr"],
+            sites=["docs.test.org"],
+            heal_queue_path=heal_queue_path,
+        )
+
+        assert len(manifest["sources"]) == 5
+
+    def test_resolved_ticket_does_not_exclude_source(self, content_repo, tmp_path, monkeypatch):
+        """A ticket with a terminal disposition (FIXED_VERIFIED etc.) no
+        longer counts as OPEN -- the source must be included again once a
+        fix has landed and the ticket was properly closed."""
+        translator = tmp_path / "translator"
+        _write_config(translator, ["docs.test.org"])
+        _touch(translator / "config/model_registry.yaml", "models: {}\n")
+        monkeypatch.setattr(builder, "git_sha", lambda repo: "f" * 40)
+        monkeypatch.setattr(builder, "fingerprint_files", lambda *_a, **_k: "c" * 64)
+        monkeypatch.setattr(
+            builder, "tm_fingerprint_inputs", lambda _repo: ["data/tm/l2.lmdb/data.mdb"]
+        )
+        heal_queue_path = self._write_heal_queue(
+            tmp_path,
+            {
+                "ticket_id": "t1",
+                "source_path": "content/docs.test.org/en/cells/net/getting-started.md",
+                "target_lang": "de",
+                "root_cause_class": "auto:LinkValidator",
+                "status": "OPEN",
+                "disposition": "FIXED_VERIFIED",
+            },
+        )
+        profile = _folder_profile(content_repo / "content/docs.test.org")
+        sources, _ = builder.discover_sources(content_repo, profile, KNOWN)
+
+        manifest = builder.build_manifest(
+            content_repo=content_repo,
+            translator_repo=translator,
+            campaign_id="qu01-resolved",
+            sources=sources,
+            target_locales=["ar", "de", "fr"],
+            sites=["docs.test.org"],
+            heal_queue_path=heal_queue_path,
+        )
+
+        scoped_paths = {s["source_path"] for s in manifest["sources"]}
+        assert "content/docs.test.org/en/cells/net/getting-started.md" in scoped_paths
 
 
 def test_tm_fingerprint_inputs_require_l2_and_include_present_l3(tmp_path):

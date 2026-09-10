@@ -110,6 +110,29 @@ def quarantined_pairs(
     return {pair for pair, n in counts.items() if n >= threshold}
 
 
+def open_tickets_for_source_path(
+    source_path: str, *, heal_queue_path: Path | None = None
+) -> list[dict[str, Any]]:
+    """QU-01 (TC-APT-105 audit): OPEN, unresolved tickets naming this exact
+    `source_path` -- the read-helper a manifest builder consults before
+    scheduling new work against a file, so a fresh campaign_id doesn't
+    start blind to a defect a prior campaign already ticketed (confirmed
+    live: `build_campaign_manifest.py` never consulted this file at all,
+    so `quickstart.md`/`features.md` were re-included in a new manifest a
+    day after TC-APT-105's original finding on the same files).
+
+    Matching an exact `source_path` string, not a fuzzy/normalized one --
+    callers own path normalization (e.g. posix vs. native separators)
+    before calling this.
+    """
+    path = heal_queue_path or _HEAL_QUEUE_FILE
+    return [
+        ticket
+        for ticket in _load_tickets(path)
+        if ticket.get("source_path") == source_path and _counts_toward_quarantine(ticket)
+    ]
+
+
 def is_quarantined(
     target_lang: str,
     root_cause_class: str,

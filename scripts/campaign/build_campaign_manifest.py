@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import os
 import sys
 from collections import Counter, defaultdict
@@ -51,6 +52,9 @@ from src.workers.campaign_manifest import (
     git_sha,
     sha256_file,
 )
+from src.workers.heal_queue import open_tickets_for_source_path
+
+logger = logging.getLogger(__name__)
 
 IN_SCOPE_SITES: tuple[str, ...] = (
     "blog.aspose.org",
@@ -422,6 +426,8 @@ def build_manifest(
     missing_only: bool = False,
     primary_model: str = "m2m100_418m",
     llm_escalation_mode: str = "immediate",
+    include_known_broken: bool = False,
+    heal_queue_path: Path | None = None,
 ) -> dict[str, Any]:
     """Assemble a schema-1 zero-defect manifest (validated by ``CampaignManifest.load``).
 
@@ -438,6 +444,13 @@ def build_manifest(
     ``primary_model`` (TC-APT-039, plan revision 8 §6.1): the model tried first. Must be
     ``"m2m100_418m"`` (default; escalates to professionalize_llm) or ``"professionalize_llm"``
     (escalates to m2m100_418m) -- ``CampaignManifest.validate_schema`` enforces this pair.
+
+    ``include_known_broken`` (QU-01, TC-APT-105 audit, default False): by default, a
+    source with any OPEN, unresolved ``heal_queue.jsonl`` ticket (naming its exact
+    ``source_path``) is excluded from the manifest and reported via ``excluded_known_broken``
+    on the returned dict -- a fresh ``campaign_id`` no longer starts blind to a defect a
+    prior campaign already ticketed. Pass True to deliberately re-include such sources
+    (e.g. retriggering after a fix has landed).
     """
     if primary_model not in ("m2m100_418m", "m2m100_1.2b", "professionalize_llm"):
         raise DiscoveryError(
@@ -458,7 +471,23 @@ def build_manifest(
     if unknown:
         raise DiscoveryError(f"locales outside the profile allowlist: {sorted(unknown)}")
     scoped = []
+    excluded_known_broken: dict[str, list[str]] = {}
     for item in sources:
+        if not include_known_broken:
+            open_tickets = open_tickets_for_source_path(
+                item["source_path"], heal_queue_path=heal_queue_path
+            )
+            if open_tickets:
+                root_causes = sorted({t.get("root_cause_class", "unknown") for t in open_tickets})
+                excluded_known_broken[item["source_path"]] = root_causes
+                logger.info(
+                    "QU-01: excluding known-broken source %s (%d open heal_queue ticket(s), "
+                    "root_cause_class=%s) -- pass include_known_broken=True to override",
+                    item["source_path"],
+                    len(open_tickets),
+                    ",".join(root_causes),
+                )
+                continue
         outputs = {lang: item["outputs"][lang] for lang in locales_final}
         if missing_only:
             outputs = {
@@ -475,6 +504,12 @@ def build_manifest(
         }
         scoped.append(entry)
     if not scoped:
+        if excluded_known_broken:
+            raise DiscoveryError(
+                "manifest scope selected zero sources -- all candidates were excluded as "
+                f"known-broken: {excluded_known_broken}. Pass include_known_broken=True "
+                "(CLI: --include-known-broken) to deliberately re-include them."
+            )
         raise DiscoveryError("manifest scope selected zero sources")
     output_count = sum(len(item["outputs"]) for item in scoped)
     sites = tuple(sorted(set(sites)))
@@ -579,6 +614,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--inventory-output", type=Path, default=DEFAULT_INVENTORY_OUTPUT)
     parser.add_argument(
         "--no-existing-check", action="store_true", help="skip on-disk target existence counting"
+    )
+    parser.add_argument(
+        "--include-known-broken",
+        action="store_true",
+        help=(
+            "QU-01: by default, a source with any OPEN heal_queue.jsonl ticket naming its "
+            "exact source_path is excluded from the manifest. Pass this to deliberately "
+            "re-include such sources (e.g. retriggering after a fix has landed)."
+        ),
     )
     parser.add_argument(
         "--no-hash", action="store_true", help="skip source sha256 (inventory-only quick count)"
@@ -700,6 +744,7 @@ def main(argv: list[str] | None = None) -> int:
             missing_only=args.missing_only,
             primary_model=args.primary_model,
             llm_escalation_mode=args.llm_escalation_mode,
+            include_known_broken=args.include_known_broken,
         )
         atomic_write(
             path=args.manifest_output,

@@ -12,6 +12,7 @@ from src.workers.heal_queue import (
     is_quarantined,
     open_ticket_counts_by_pair,
     open_tickets_by_root_cause_class,
+    open_tickets_for_source_path,
     quarantined_pairs,
 )
 
@@ -115,6 +116,56 @@ class TestOpenTicketsByRootCauseClass:
 
     def test_missing_file_returns_empty_list(self, tmp_path):
         assert open_tickets_by_root_cause_class("auto:X", heal_queue_path=tmp_path / "none.jsonl") == []
+
+
+class TestOpenTicketsForSourcePath:
+    """QU-01 (TC-APT-105 audit): the read-helper a manifest builder consults
+    before scheduling new work against a source file."""
+
+    def test_returns_only_tickets_for_the_exact_source_path(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        _write_tickets(
+            queue,
+            [
+                _ticket("de", "auto:LinkValidator", source_path="content/x/quickstart.md"),
+                _ticket("fr", "auto:LinkValidator", source_path="content/x/quickstart.md"),
+                _ticket("de", "auto:LinkValidator", source_path="content/x/other.md"),
+            ],
+        )
+        tickets = open_tickets_for_source_path(
+            "content/x/quickstart.md", heal_queue_path=queue
+        )
+        assert {t["target_lang"] for t in tickets} == {"de", "fr"}
+
+    def test_resolved_ticket_for_the_path_is_excluded(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        _write_tickets(
+            queue,
+            [
+                _ticket(
+                    "de",
+                    "auto:LinkValidator",
+                    source_path="content/x/quickstart.md",
+                    disposition="FIXED_VERIFIED",
+                ),
+            ],
+        )
+        assert open_tickets_for_source_path(
+            "content/x/quickstart.md", heal_queue_path=queue
+        ) == []
+
+    def test_no_matching_path_returns_empty_list(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        _write_tickets(queue, [_ticket("de", "auto:LinkValidator", source_path="content/x/other.md")])
+        assert (
+            open_tickets_for_source_path("content/x/quickstart.md", heal_queue_path=queue) == []
+        )
+
+    def test_missing_file_returns_empty_list(self, tmp_path):
+        assert (
+            open_tickets_for_source_path("content/x/quickstart.md", heal_queue_path=tmp_path / "none.jsonl")
+            == []
+        )
 
 
 class TestReQueueOnResolution:
