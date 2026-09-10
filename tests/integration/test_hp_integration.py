@@ -10,7 +10,6 @@ import re
 
 import pytest
 
-from src.translation_engine.extractor.inline_format_protector import InlineFormatProtector
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
 from src.translation_engine.parser.ast_nodes import NodeType
 from src.translation_engine.parser.hugo_parser import HugoParser
@@ -140,29 +139,6 @@ This has **bold emphasis** in paragraph.
 
         bold_count = output.count("**") // 2
         assert bold_count >= 3, f"Expected ≥3 bold markers in output, got {bold_count}"
-
-    def test_hp05_inline_protection_active(self, test_content):
-        """HP-05: Verify InlineFormatProtector tokenizes inline code content."""
-        parser = HugoParser()
-        parsed = parser.parse_string(test_content)
-
-        extractor = TextUnitExtractor(segmentation_strategy="sentence_only")
-        plan = extractor.extract_from_ast(parsed.ast, parsed.frontmatter)
-
-        # Find a unit with inline code and verify InlineFormatProtector works on it
-        protector = InlineFormatProtector(use_unicode=True)
-        content_with_code = "Use `some_function()` and `another_call()` here."
-        result = protector.protect(content_with_code)
-
-        # Protector should tokenize inline code content
-        assert result.protected is not None
-        restored = protector.restore(result, result.protected)
-        assert "some_function()" in restored, "Inline code should survive protect/restore"
-        assert "⟦" not in restored, "Unicode tokens must not leak into final output"
-
-        # Verify extractor produced units from test content (pipeline is functional)
-        assert len(plan.units) > 0, "TextUnitExtractor produced no units"
-
 
 class TestCampaignHealingFixtureTopology:
     """Pin the real-shaped docs failures to immutable, offline fixtures."""

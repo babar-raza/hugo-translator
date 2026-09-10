@@ -1,14 +1,23 @@
 """
 E2E Integration Test for SHORTCODE-007: Single Protection System
 
-Verifies that Hugo shortcodes are preserved using only InlineFormatProtector
-(PlaceholderManager disabled for shortcodes).
+Verifies that Hugo shortcodes are preserved with PlaceholderManager disabled
+(preserve_patterns: []) -- block-level shortcodes are excluded from
+translation entirely via the AST node-type classifier, never reaching any
+placeholder-protection layer at all.
+
+CU-01 (2026-09-10): the original InlineFormatProtector-specific test
+(`test_inline_format_protector_handles_markdown_formatting`) was removed
+here along with `inline_format_protector.py` itself, confirmed dead in
+production (imported only from tests, no real call site). The two tests
+below never actually exercised InlineFormatProtector -- they test
+TextUnitExtractor's real, current preserve_patterns=[] + AST node-type
+shortcode handling, which is unaffected by that deletion.
 
 Author: SHORTCODE-007-P3
 Date: 2026-01-20
 """
 
-from src.translation_engine.extractor.inline_format_protector import InlineFormatProtector
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
 from src.translation_engine.parser.hugo_parser import HugoParser
 
@@ -17,9 +26,9 @@ class TestShortcodeSingleProtection:
     """
     Test suite verifying single protection system for Hugo shortcodes.
 
-    SHORTCODE-007 eliminates double-protection architecture by:
-    1. Disabling PlaceholderManager for shortcodes (preserve_patterns: [])
-    2. Using only InlineFormatProtector throughout pipeline
+    SHORTCODE-007 eliminates double-protection architecture by disabling
+    PlaceholderManager for shortcodes (preserve_patterns: []) -- block-level
+    shortcodes are protected by the AST node-type classifier instead.
     """
 
     def test_no_placeholder_manager_tokens_when_disabled(self):
@@ -87,55 +96,6 @@ The **Aspose.Slides** plugins provide features for {{< callout >}}presentations{
         assert "Step one" in all_text, (
             "Content inside shortcode blocks should appear in extracted units"
         )
-
-    def test_inline_format_protector_handles_markdown_formatting(self):
-        """
-        Verify InlineFormatProtector protects inline code content.
-
-        InlineFormatProtector protects inline code (``code``) by replacing
-        the code content with a token during translation.
-        Bold/italic (**bold**, *italic*) are left as-is (MT models handle them).
-        Hugo shortcodes are preserved through the AST node-type mechanism, not here.
-
-        Expected:
-        - InlineFormatProtector.protect() replaces `code` content with tokens
-        - Restoration correctly recovers original code content
-        - Bold markers are passed through unchanged (no protection needed)
-        """
-        # Sample text with inline code
-        text = "Use `some_function()` to get results."
-
-        # Create protector
-        protector = InlineFormatProtector(use_unicode=True)
-
-        # STEP 1: Protect
-        result = protector.protect(text)
-
-        # ASSERTION 1: Inline code content is tokenized (or passed through)
-        # The protector either replaces `code` content or leaves it as-is
-        # Either way, restoration should recover original text
-        assert result.protected is not None, "Protected result must not be None"
-        assert result.original == text, "Original text should be preserved in result"
-
-        # STEP 2: Restore (even if no changes, restoration should be a no-op)
-        restored = protector.restore(result, result.protected)
-
-        # ASSERTION 2: Restoration produces original text
-        assert "some_function()" in restored, (
-            f"Code content should appear in restored text. Restored: {restored}"
-        )
-
-        # ASSERTION 3: Bold text passes through unchanged
-        text_with_bold = "The **Aspose.Slides** plugins for presentations."
-        result_bold = protector.protect(text_with_bold)
-        # Bold is intentionally not protected — MT handles **bold** markers
-        assert "Aspose.Slides" in result_bold.protected, (
-            f"Bold content should be present. Protected: {result_bold.protected}"
-        )
-
-        # ASSERTION 4: Restoration is safe (no token leakage)
-        restored_bold = protector.restore(result_bold, result_bold.protected)
-        assert "⟦" not in restored_bold, "Unicode tokens should not leak"
 
     def test_multiple_shortcodes_without_placeholders(self):
         """
