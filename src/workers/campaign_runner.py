@@ -1262,17 +1262,34 @@ class CampaignRunner:
         error_count = len(getattr(result, "errors", None) or [])
         retry_count = int(getattr(result, "retry_attempts", 0) or 0)
         validation_result = getattr(result, "validation_result", None)
+        # VA-01 (TC-APT-105 audit): `validators` names the validator(s) that
+        # actually caused the reject decision -- ERROR severity only, since
+        # the decision engine's own Rule 1/2/5 REJECT paths are ERROR-driven
+        # (a WARNING-only validator can extend a retry loop or factor into
+        # Rule 5's arbitration, but never causes a reject on its own).
+        # Previously any validator reporting an issue at ANY severity showed
+        # up here -- including one that only ever warned -- misattributing
+        # causation, and this value also seeds a heal ticket's
+        # root_cause_class (self._append_heal_ticket), so the inflated set
+        # could quarantine on the wrong signal. warning_only_validators is
+        # kept separately for observability, not causation.
+        _issue_validator_severities: dict[str, set[str]] = {}
+        for issue in getattr(validation_result, "issues", []) or []:
+            severity = str(
+                getattr(getattr(issue, "severity", None), "value", getattr(issue, "severity", ""))
+            )
+            if severity not in {"error", "warning"}:
+                continue
+            _issue_validator_severities.setdefault(
+                str(getattr(issue, "validator", "unknown")), set()
+            ).add(severity)
         validators = sorted(
-            {
-                str(getattr(issue, "validator", "unknown"))
-                for issue in getattr(validation_result, "issues", []) or []
-                if str(
-                    getattr(
-                        getattr(issue, "severity", None), "value", getattr(issue, "severity", "")
-                    )
-                )
-                in {"error", "warning"}
-            }
+            name for name, severities in _issue_validator_severities.items() if "error" in severities
+        )
+        warning_only_validators = sorted(
+            name
+            for name, severities in _issue_validator_severities.items()
+            if severities == {"warning"}
         )
         verification_result = getattr(result, "verification_result", None)
         verification_checks = sorted(
@@ -1472,9 +1489,13 @@ class CampaignRunner:
             )
         )
         validator_text = ",".join(validators) if validators else "unknown"
+        warning_only_validator_text = (
+            ",".join(warning_only_validators) if warning_only_validators else "none"
+        )
         reason = (
             f"translation_rejected; error_count={error_count}; "
             f"internal_retries={retry_count}; validators={validator_text}; "
+            f"warning_only_validators={warning_only_validator_text}; "
             f"codes={','.join(safe_codes) if safe_codes else 'unknown'}; "
             f"exceptions="
             f"{','.join(exception_classes) if exception_classes else 'unknown'}; "

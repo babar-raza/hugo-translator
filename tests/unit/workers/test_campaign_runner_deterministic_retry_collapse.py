@@ -287,3 +287,107 @@ class TestPrimaryBackendIsDeterministic:
         runner = CampaignRunner.__new__(CampaignRunner)
         runner.engine = SimpleNamespace()  # no model_loader at all
         assert runner._primary_backend_is_deterministic(M2M100) is False
+
+
+# ---------------------------------------------------------------------------
+# VA-01 (TC-APT-105 audit): _failure_metadata()'s `validators=` field
+# previously named ANY validator that reported an issue at error OR warning
+# severity, misattributing causation -- a validator that only ever warned
+# never actually drives a REJECT decision (the decision engine's Rule 1/2/5
+# REJECT paths are all ERROR-driven), yet showed up indistinguishably from
+# one whose error genuinely caused the reject. This value also seeds a heal
+# ticket's root_cause_class, so the inflated set could quarantine on the
+# wrong signal. Placed in this file per this taskcard's allowed-paths list,
+# despite the different topic -- _failure_metadata is a bare @staticmethod,
+# trivially testable in isolation without this file's retry-collapse
+# fixtures.
+# ---------------------------------------------------------------------------
+
+
+def _issue(validator: str, severity: str):
+    return SimpleNamespace(severity=severity, validator=validator, details={}, location="")
+
+
+def _result(issues: list):
+    return SimpleNamespace(
+        validation_result=SimpleNamespace(issues=issues),
+        error="translation_rejected",
+        errors=[1],
+        retry_attempts=0,
+        verification_result=None,
+    )
+
+
+class TestFailureMetadataValidatorAttribution:
+    def test_validators_field_includes_only_error_severity_validators(self):
+        result = _result(
+            [
+                _issue("StructureValidator", "error"),
+                _issue("TerminologyPreservationValidator", "warning"),
+            ]
+        )
+
+        _gate, reason = CampaignRunner._failure_metadata(result)
+
+        assert "validators=StructureValidator;" in reason
+        assert "TerminologyPreservationValidator" not in reason.split("validators=")[1].split(
+            ";"
+        )[0]
+
+    def test_warning_only_validators_reported_in_a_separate_field(self):
+        result = _result(
+            [
+                _issue("StructureValidator", "error"),
+                _issue("TerminologyPreservationValidator", "warning"),
+            ]
+        )
+
+        _gate, reason = CampaignRunner._failure_metadata(result)
+
+        assert "warning_only_validators=TerminologyPreservationValidator;" in reason
+
+    def test_a_validator_with_both_severities_is_only_in_the_error_field(self):
+        """A validator reporting both an error AND a warning issue must not
+        also appear in warning_only_validators -- it genuinely has an error."""
+        result = _result(
+            [
+                _issue("StructureValidator", "error"),
+                _issue("StructureValidator", "warning"),
+            ]
+        )
+
+        _gate, reason = CampaignRunner._failure_metadata(result)
+
+        assert "validators=StructureValidator;" in reason
+        assert "warning_only_validators=none;" in reason
+
+    def test_gate_reflects_the_error_validator_not_a_warning_only_one(self):
+        result = _result(
+            [
+                _issue("StructureValidator", "error"),
+                _issue("TerminologyPreservationValidator", "warning"),
+            ]
+        )
+
+        gate, _reason = CampaignRunner._failure_metadata(result)
+
+        assert gate == "StructureValidator"
+
+    def test_pure_warning_only_result_reports_unknown_validators_and_none(self):
+        """No ERROR-severity issue at all: validators= is unknown (nothing
+        actually caused a reject via Rule 1/2), warning_only_validators=
+        still names the validator for observability."""
+        result = _result([_issue("TerminologyPreservationValidator", "warning")])
+
+        _gate, reason = CampaignRunner._failure_metadata(result)
+
+        assert "validators=unknown;" in reason
+        assert "warning_only_validators=TerminologyPreservationValidator;" in reason
+
+    def test_no_issues_at_all_reports_unknown_and_none(self):
+        result = _result([])
+
+        _gate, reason = CampaignRunner._failure_metadata(result)
+
+        assert "validators=unknown;" in reason
+        assert "warning_only_validators=none;" in reason

@@ -630,7 +630,14 @@ def test_failure_metadata_records_payload_free_repetition_fingerprint():
 
     gate, reason = CampaignRunner._failure_metadata(result)
 
-    assert gate == "RepetitionDetectorValidator"
+    # VA-01 (TC-APT-105 audit): a WARNING-only validator never actually
+    # causes a REJECT decision (Rule 1/2/5 are ERROR-driven), so it no
+    # longer drives `gate` -- it falls back to the next tier ("pipeline",
+    # since no verification_checks/safe_codes exist here either) instead of
+    # misattributing causation to a validator that only warned. Still
+    # recorded, distinctly, via warning_only_validators=.
+    assert gate == "pipeline"
+    assert "warning_only_validators=RepetitionDetectorValidator;" in reason
     assert "RepetitionDetectorValidator:warning:word_frequency:" in reason
     assert "count=4" in reason
     assert "threshold=0.2" in reason
