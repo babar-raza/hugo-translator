@@ -1456,7 +1456,21 @@
  "last_wake_summary": "VA-07 fix (leaf_inventory.classify_sole_leaf, commit 0328ef5b) fully reverified: wave-va07-remediate-20260911r2 shipped installation.md 24/25 (zh blocked on unrelated TC-APT-040-class FrontmatterLanguageCheck failure across all 3 attempts, left un-replaced and still VA-07-corrupted -- separate open ticket auto-wave-va07-remediate-20260911r2-w0:docs.aspose.org:cells:rust:zh:1-installation) + license.md 25/25, 49 cells total, commit 26c8038b28. work_ledger updated UP_TO_DATE for all 49 cells; reverification_receipts.jsonl written (2 entries). No heal_queue tickets existed for these two files pre-fix (VA-07 corruption passed all 44 gates silently -- only found via the later portfolio-wide audit grep, not by quarantine), so none needed closing here. Session bookkeeping closed: skill_run_manager finalized run 20260911-010806-sht02, session_ledger session dbfc7da1-ff42-48e6-988a-c5c9f1a1c237 closed. Still open/deferred: rust/getting-started/quickstart.md (24 tickets, ar/cs/de/el still OPEN pending real-campaign retrigger -- code fix verified via isolated harness only, not yet reverified through campaign_runner.py); working-with-cells-foss-model.md (rust) still fully blocked on a distinct purity-check defect (fp-wave-followup-wcfm-20260910r3-purity-check.json); the 10,856-file portfolio-wide VA-07 backlog remains explicitly out of scope, cross-referenced to TC-APT-083 (manual-va07-portfolio-wide-nested-link-corruption-20260911).",
  "cells_committed_total": 481,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
- "active_detached_runs": [],
+ "active_detached_runs": [
+  {
+   "campaign_id": "wave-cellsrust-quickstart-retrigger-20260911",
+   "pid": null,
+   "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-retrigger-20260911.yaml",
+   "sources": [
+    "content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md"
+   ],
+   "locales": 25,
+   "expected_output_count": 25,
+   "launched_at": null,
+   "launched_by": "interactive-continue-20260911",
+   "notes": "VA-07 reverification for the one page that originated the fix (leaf_inventory.classify_sole_leaf, commit 0328ef5b): all 25 locales still MISSING_TRANSLATION in work_ledger (never shipped -- ar/cs/de/el hit the pre-fix corruption and were left OPEN, es..zh were cascade-quarantined and never actually attempted). Provisionally closed the 4 OPEN tickets to unblock QU-01/QU-02 before building this manifest (--missing-only --include-known-broken). About to launch as a detached process; pid/launched_at will be filled in immediately after Start-Process, before any further git activity in this repo."
+  }
+ ],
  "blocked_pending_clean_translator_repo": null,
  "wave_scale": {
   "value": 4,
