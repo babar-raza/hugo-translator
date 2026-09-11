@@ -1456,7 +1456,34 @@
   "last_wake_summary": "cells/rust quickstart.md: 24/25 locales committed (ba68fdaeae 17/25, f7ab0f5089 +5, b57a1586c1 +pt, c366c0b118 +hu). Root cause chain for the glued-identifier defect class fully closed: TC-APT-110 (PlaceholderManager restore-time), TC-APT-111 (TerminologyProtector restore-time, b092b687), TC-APT-112 (GluedIdentifierValidator gate never ran against frontmatter text at all -- fixed, b6218866). cs is the sole holdout: 3 separate post-fix relaunches (r4/r5/r6) all correctly REJECTED by the now-working gate (proof the fix works) but never produced a clean generation -- the underlying professionalize_llm stochastic glue rate on Czech \"pomocí X\" phrasing is high enough that plain retries are not converging. data/quarantine.jsonl auto-quarantined it (max_retries_exceeded) after r6 -- per that mechanisms own design, this now needs manual review/a differently-shaped retry (e.g. cs-specific retry feedback), not another identical retrigger. Left un-shipped and ticketed rather than force-committed or hand-translated.",
   "cells_committed_total": 481,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "campaign_id": "words-foss-net-headnoun-retrigger-20260911-llm",
+      "pid": null,
+      "manifest": "data/campaigns/manifests/words-foss-net-headnoun-retrigger-20260911-llm.yaml",
+      "sources": [
+        "content/blog.aspose.org/words/net/introducing-words-foss-net/index.md"
+      ],
+      "locales": 13,
+      "expected_output_count": 13,
+      "launched_at": null,
+      "launched_by": "interactive-continue-20260911",
+      "notes": "RECURRENCE ESCALATION step 3 retrigger for producer_protected_span_blocks_head_noun_reordering (TC-APT-042) after terminology.yaml fix 488b16e4 (FOSS+platform merged into one protected span). 13 LLM-primary locales: ar,cs,de,el,es,fa,fr,he,hi,id,it,pl,sv. Log: .local/logs/words-foss-net-headnoun-retrigger-20260911-llm.*.log; pid to be cross-referenced from that log until confirmed progress, per loop-prompt.md field note on avoiding a post-launch git touch race."
+    },
+    {
+      "campaign_id": "words-foss-net-headnoun-retrigger-20260911-m2m",
+      "pid": null,
+      "manifest": "data/campaigns/manifests/words-foss-net-headnoun-retrigger-20260911-m2m.yaml",
+      "sources": [
+        "content/blog.aspose.org/words/net/introducing-words-foss-net/index.md"
+      ],
+      "locales": 2,
+      "expected_output_count": 2,
+      "launched_at": null,
+      "launched_by": "interactive-continue-20260911",
+      "notes": "Same retrigger as the LLM manifest, but hu/ro run m2m100_418m-primary per plan SS6.1 model policy (m2m100 measured better for hu/ja/ro). Log: .local/logs/words-foss-net-headnoun-retrigger-20260911-m2m.*.log."
+    }
+  ],
   "blocked_pending_clean_translator_repo": null,
   "wave_scale": {
     "value": 4,
