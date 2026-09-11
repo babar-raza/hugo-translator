@@ -1459,7 +1459,7 @@
   "active_detached_runs": [
     {
       "campaign_id": "wave-pdfgeneratedpython-20260911",
-      "pid": 56272,
+      "pid": 55468,
       "manifest": "data/campaigns/manifests/wave-pdfgeneratedpython-20260911.yaml",
       "sources": [
         "content/blog.aspose.org/pdf/python/pdf-generated-in-python/index.md"
@@ -1468,7 +1468,7 @@
       "expected_output_count": 25,
       "launched_at": "2026-09-11T09:47:00+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "New Tier-1a page after pdf-core-api-typescript landed (23/25). Verified 0 existing locale files on disk and 0 heal tickets before claiming (not just work_ledger, which has been found stale/incomplete before). Committing incrementally as locales complete, per the established pattern from the previous campaign, rather than waiting for full completion."
+      "notes": "New Tier-1a page after pdf-core-api-typescript landed (23/25). Verified 0 existing locale files on disk and 0 heal tickets before claiming (not just work_ledger, which has been found stale/incomplete before). Committing incrementally as locales complete, per the established pattern from the previous campaign, rather than waiting for full completion. First launch (PID 56272) died instantly on transient dirty-repo race with a peer session; relaunched clean as PID 55468."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
