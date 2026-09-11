@@ -1453,24 +1453,10 @@
       ]
     }
   },
-  "last_wake_summary": "AUDIT COMPLETE (3 parallel reviewers, 6 shipped locales): glue class ABSENT everywhere -- 6 space-loss tickets closed FIXED_VERIFIED (refs f7ab0f5089/b57a1586c1). NEW systemic find: title+H2 'Quickstart' English in 25/25 (single-hump identifier FP, Prerequisites class); fixed via i18n registry heading.quickstart (f92b2603, direct-extraction verified both units flip), 25 tickets FIX_LANDED_PENDING_REVERIFY. RB-008 (link-text slug-exclusion design, record-only, 1 representative OPEN ticket) + RB-009 (digit-script, 1 fa OPEN ticket) added to rubric. NEXT: when peer hugo-translator-fc's claim lapses (06:40:50Z) and their r4 stays dead, claim the page and launch a full 25-locale retrigger under all landed fixes (glue gate + frontmatter wiring + registry title fix), then review+commit page-complete.",
+  "last_wake_summary": "cells/rust quickstart.md: 24/25 locales committed (ba68fdaeae 17/25, f7ab0f5089 +5, b57a1586c1 +pt, c366c0b118 +hu). Root cause chain for the glued-identifier defect class fully closed: TC-APT-110 (PlaceholderManager restore-time), TC-APT-111 (TerminologyProtector restore-time, b092b687), TC-APT-112 (GluedIdentifierValidator gate never ran against frontmatter text at all -- fixed, b6218866). cs is the sole holdout: 3 separate post-fix relaunches (r4/r5/r6) all correctly REJECTED by the now-working gate (proof the fix works) but never produced a clean generation -- the underlying professionalize_llm stochastic glue rate on Czech \"pomocí X\" phrasing is high enough that plain retries are not converging. data/quarantine.jsonl auto-quarantined it (max_retries_exceeded) after r6 -- per that mechanisms own design, this now needs manual review/a differently-shaped retry (e.g. cs-specific retry feedback), not another identical retrigger. Left un-shipped and ticketed rather than force-committed or hand-translated.",
   "cells_committed_total": 481,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "campaign_id": "wave-cellsrust-quickstart-glueretrigger-20260911r5",
-      "pid": 45620,
-      "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-glueretrigger-20260911r5.yaml",
-      "sources": [
-        "content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md"
-      ],
-      "locales": 1,
-      "expected_output_count": 1,
-      "launched_at": "2026-09-11T06:05:00+00:00",
-      "launched_by": "hugo-translator-fc",
-      "notes": "r5: cs alone, single-locale retry. r4 (PID 12180/48732) correctly REJECTED cs 3/3 attempts via the now-fixed GluedIdentifierValidator frontmatter gate (b6218866) -- a real gate-catch, not a broken gate letting it ship (contrast r2/r3). hu accepted clean in r4, committed c366c0b118. This is stochastic professionalize_llm generation variance (ar/es/fa/nl/pt/uk/hu all succeeded on this exact page), not a deterministic defect -- a plain retry is appropriate, not a RECURRENCE ESCALATION case."
-    }
-  ],
+  "active_detached_runs": [],
   "blocked_pending_clean_translator_repo": null,
   "wave_scale": {
     "value": 4,
