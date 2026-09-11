@@ -1453,30 +1453,10 @@
       ]
     }
   },
-  "last_wake_summary": "wave-tier1b-batch1-20260911 continues (PID 50404): reviewed and committed pdf/java/developer-guide/cos.md nl/pl (clean, 5934e82142). cells_committed_total 534 -> 536.",
+  "last_wake_summary": "wave-tier1b-batch1-20260911 CLOSED (PID 50404 exited, status PARTIAL_WITH_TICKETS): final 20/56 accepted and committed across font/python/type1.md (6/6), pdf/go/docs-pdf-go-overview.md (8/8), pdf/java/developer-guide/cos.md (6/6). 36/56 failed with auto-opened OPEN heal tickets across 5 sources: email/net + email/python compound-file-support.md, slides/cpp working-with-presentation-content.md, slides/net working-with-app-properties.md (all 4 = the SAME already-fixed linktitle language_detection bug, commit 291c23f3 -- confirmed proven-retriggerable); pdf/go/getting-started/installation.md failed on a DIFFERENT, not-yet-investigated class (GATE18/GATE23/FrontmatterLanguageCheck) -- left as backlog, not chased this session per RECURRENCE ESCALATION practical reading. Claim released. Next: heal-retrigger campaign for the 4 linktitle-bug victims.",
   "cells_committed_total": 536,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
-    {
-      "campaign_id": "wave-tier1b-batch1-20260911",
-      "pid": 50404,
-      "manifest": "data/campaigns/manifests/wave-tier1b-batch1-20260911.yaml",
-      "sources": [
-        "content/docs.aspose.org/en/email/net/developer-guide/compound-file-support.md",
-        "content/docs.aspose.org/en/email/python/developer-guide/compound-file-support.md",
-        "content/docs.aspose.org/en/font/python/developer-guide/type1.md",
-        "content/docs.aspose.org/en/pdf/go/docs-pdf-go-overview.md",
-        "content/docs.aspose.org/en/pdf/go/getting-started/installation.md",
-        "content/docs.aspose.org/en/pdf/java/developer-guide/cos.md",
-        "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
-        "content/docs.aspose.org/en/slides/net/developer-guide/working-with-app-properties.md"
-      ],
-      "locales": 25,
-      "expected_output_count": 56,
-      "launched_at": "2026-09-11T16:11:13.659355+00:00",
-      "launched_by": "hugo-translator-fc",
-      "notes": "First Tier-1b batch this mission: true Tier-1a (0-translation) supply on docs.aspose.org is now exhausted outside excluded families (confirmed via full-tree scan). Moving to Tier-1b per runbook strict tier order (plan section 17.1.0), fewest-missing-first: 8 pages across email/net, email/python, font/python, pdf/go, pdf/java, slides/cpp, slides/net, 0 heal_queue history on any (manual missing-count-per-page estimate via glob was wrong -- trust build_campaign_manifest.py's own --missing-only computation instead, which found 56 real missing cells across the 8 sources, not 8). Built as ONE multi-source manifest via --source-list + --missing-only so it actually benefits from --max-parallel-jobs 4 (unlike the single-page Tier-1a manifests, which shard to 1 job each regardless of the setting). First launch attempt (PID 58284) died instantly with 'translator repository is dirty (1 paths)' -- root cause: rebuilding the manifest a second time (after an unplanned heal_queue.jsonl commit moved HEAD) re-dirtied config/inventory/aspose_org_profile_inventory.json and it was not re-discarded before Start-Process; NEW STANDING LESSON: after ANY manifest (re)build, always re-check git status is clean immediately before Start-Process, even on a rebuild you think you already handled. Fixed, relaunched, confirmed alive with real progress via llm_calls.jsonl growth (443 bytes) ~18s after launch. VERIFIED max_parallel_jobs=4 is legitimate: TC-APT-043..047 all read DONE in this file -- the plan SS0.3 gate condition is satisfied, this is not a concurrency-rule violation (checked directly after noticing the manifest's execution_policy, since my own context predated these landing). A peer's structural-only-verified commit (bee80f05a9) shipped this wave's type1.md ja/ko/nl/pl + pdf/go de (already reviewed clean by this session) alongside a DEFECTIVE it cell -- RB-014 (meta-response-instead-of-translation, new rubric rule) heal-retriggered separately, see below."
-    }
   ],
   "blocked_pending_clean_translator_repo": null,
   "wave_scale": {
