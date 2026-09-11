@@ -161,12 +161,29 @@ rules:
       RECORD occurrences with this rule id but do NOT charge the cell a
       REJECT for this class alone. A REJECT verdict may still rest on other
       rules in the same cell.
+      MECHANISM VARIANT (2026-09-11): the same RECORD-only treatment covers
+      multi-word, NON slug-identical link text left in the source language in
+      a MINORITY of a page's locales while the majority translate it -- the
+      extractor demonstrably emits the unit (most locales translate it) and
+      the model echoed it unchanged, so the reader-visible class is identical
+      even though _link_text_matches_url_slug is not the mechanism. Same
+      scope, same pending adjudication, same representative-ticket handling.
+      ESCALATION: when the SAME link text comes back untranslated in EVERY
+      locale of a page, the split is deterministic, RB-005 applies, and the
+      cell is a REJECT pending a producer fix -- minority recurrence is not
+      that case.
     evidence: >-
       cells-rust quickstart, glueretrigger-20260911r2 audit, 2026-09-11:
       "[Installation]"/"[License]" English in ar/es/fa/nl/uk/pt while
       sibling multi-word links translated; raised independently as UNCOVERED
       by all three reviewers. Representative heal ticket opened (es);
       Track-B design decision pending.
+      MECHANISM VARIANT evidence: blog.aspose.org/pdf/typescript/
+      pdf-core-api-typescript, wave-pdftypescript-coreapi-20260911,
+      2026-09-11: body link text "introductory post" (slug
+      introducing-pdf-foss-typescript, not slug-identical) untranslated in
+      6 of 16 locales (de, el, fa, ja, ko, pl) while ar, cs, es, he, hi, hu,
+      id, it, nl, pt translate it.
   - id: RB-009
     name: digit-script-consistency
     verdict: REJECT
