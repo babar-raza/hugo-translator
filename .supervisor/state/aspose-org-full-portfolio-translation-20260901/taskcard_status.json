@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-11T17:55:00+05:00",
+  "updated_at": "2026-09-11T18:15:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 48,
+  "wake_count": 49,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "Found a governance gap while checking the peer's pdfgeneratedpython-retrigger close-out: the peer's final batch (cfc15331a0, th/vi/zh) and separate nl commit (34f6a2c685) used structural-only verification (heading/fence/link counts, duplicate-link scan, glued-identifier auto-check) and shipped nl+th to local main DESPITE both already carrying OPEN RB-012 (markdown-bold-in-frontmatter) tickets this session had recorded in heal_queue.jsonl/qualification/cells.jsonl -- the peer evidently never cross-checked those records before committing. vi/zh from the same batch verified clean. Launched pdfgeneratedpython-nlth-heal-20260911 (PID 53652) to retranslate nl+th under professionalize_llm now that the frontmatter-plaintext prompt fix (af2e29d3) is live in fresh processes (the original campaign that produced the defective content had already loaded the old code before that commit landed, so it never benefited). Not reverting/deleting the defective commits -- a follow-up fix commit lands once reverified, same pattern as de/RB-011 (f332c80c11). cells_committed_total 492 -> 496 (th/vi/zh/nl landed by the peer, 2 of the 4 still defective pending this retrigger).",
-  "cells_committed_total": 496,
+  "last_wake_summary": "pdfgeneratedpython-nlth-heal-20260911 (PID 53652, now exited) succeeded cleanly on the first attempt for both cells -- nl and th description fields grepped for '**': 0 matches (were 4 and 5 respectively), confirming the frontmatter-plaintext prompt fix (af2e29d3) closes RB-012 for the professionalize_llm path. Committed content repo 6ed7b80716, replacing the peer-shipped defective versions; both heal tickets FIXED_VERIFIED. pdf-generated-in-python now stands at 23/25 committed clean -- only es/fa remain (real, repeatedly-exhausted GluedIdentifierValidator failures, documented residual, not chased further this iteration). Note: 2 untracked debug-harness byproduct files (index.es.md, index.fa.md) sit on disk from this session's earlier investigation -- never went through a real campaign receipt, intentionally NOT committed; a future real campaign attempt for es/fa will naturally declare replace_existing over them. Renewed the lapsed claim on wave-cellsnet-features-20260911 (PID 66160, still running, 3/9 accepted) without touching its files -- session-id string match is ambiguous across the fleet, treating it as a peer's live work.",
+  "cells_committed_total": 498,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1469,19 +1469,6 @@
       "launched_at": "2026-09-11T12:51:15.506510+00:00",
       "launched_by": "hugo-translator-fc",
       "notes": "Tier-1b (16/25 locales already existed, 9 missing) -- picked as freed capacity after wave-htmlcssompython-20260911 closed. 0 heal_queue history for the whole cells/net family. pid/launched_at filled in after Start-Process + ~90s confirmation per standing launch-race lesson (never commit real pid immediately after Start-Process). Confirmed alive with real progress (yaml_format_success) ~108s after 3rd launch attempt (1st used wrong entry point -m src.workers.campaign_runner; 2nd hit SHA drift from manifest built before a bookkeeping commit moved HEAD; 3rd succeeded after rebuilding manifest fresh immediately before Start-Process with no git touch in between)."
-    },
-    {
-      "campaign_id": "pdfgeneratedpython-nlth-heal-20260911",
-      "pid": 53652,
-      "manifest": "data/campaigns/manifests/pdfgeneratedpython-nlth-heal-20260911.yaml",
-      "sources": [
-        "content/blog.aspose.org/pdf/python/pdf-generated-in-python/index.md"
-      ],
-      "locales": 2,
-      "expected_output_count": 2,
-      "launched_at": "2026-09-11T13:45:00+00:00",
-      "launched_by": "hugo-translator-fc",
-      "notes": "IMPORTANT: a peer session committed the page's 'final batch' (cfc15331a0, th+vi+zh) and 'nl locale' (34f6a2c685) using their own structural-only verification (heading/fence/link counts, duplicate-link scan, U+FFFD, glued-identifier check) -- none of which catch RB-012 (markdown-bold in frontmatter). Both nl and th are LIVE on local main RIGHT NOW still carrying the RB-012 defect this session already ticketed (review-pdfgeneratedpython-retrigger-20260911-rb012-nl/-th, still OPEN) -- the peer evidently didn't cross-check qualification/cells.jsonl's REJECT verdicts or heal_queue.jsonl before shipping. vi/zh from the same batch ARE clean (verified). This is a heal-retrigger, not a fresh translation: forcing professionalize_llm (which the llm_backend.py fix, commit af2e29d3, now covers) for both cells; replace_existing declared against the currently-committed (defective) file shas. On next wake: body-review both outputs specifically for RB-012 (bold markup gone) before committing a follow-up fix commit on top of the already-shipped defective versions -- same pattern as the de/RB-011 fix (f332c80c11). If professionalize_llm still fails to close nl (it's untested against nl's specific content, only against th's), that's real new evidence, not a foregone conclusion -- read the actual output."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
