@@ -285,3 +285,37 @@ rules:
       frontmatter string fields for injected markdown syntax (the 44-gate
       battery treats markdown syntax as expected/valid in BODY text, where it
       legitimately occurs, and does not separately check frontmatter values).
+  - id: RB-013
+    name: isolated-untranslated-list-item-word
+    verdict: REJECT
+    scope: any
+    statement: >-
+      A single ordinary English word left untranslated at the end of an
+      otherwise fully-translated comma/conjunction list -- every sibling item
+      in the same list translated, only the last one partially left in
+      English -- is a visible, reader-facing defect, not RB-003's minor-
+      imperfection carve-out: that carve-out requires the residual fragment
+      to sit ADJACENT TO A PROTECTED API IDENTIFIER (RB-003's own wording);
+      an ordinary common noun with no such adjacency does not qualify, no
+      matter how short. Distinguish from RB-002 (brand-navigation-label,
+      deliberately English by convention) and from a legitimate loanword/
+      abbreviation kept in every language (e.g. "I/O") -- the test is
+      whether THIS locale's own sibling items in the SAME list translated
+      the equivalent English source word, not whether the word looks
+      technical.
+      DIAGNOSTIC: recurrence at the same list position across locales is
+      producer-side per RB-005 (fix producer, retrigger, never hand-edit);
+      a single-locale occurrence is model variance and REJECTs only that
+      cell -- retry on the other model before ticketing.
+    evidence: >-
+      docs.aspose.org/en/cells/net/developer-guide/features.md ko,
+      wave-cellsnet-features-20260911, 2026-09-11: frontmatter description's
+      trailing list item translated "Worksheet Management" as "워크시트
+      management" -- "Worksheet" correctly rendered in Hangul, "management"
+      left in English, while every other list item ("Workbook I/O", "cell
+      data", "styling", "conditional formatting", "validation", "auto-
+      filter", "hyperlinks", "page settings") translated cleanly in the
+      same sentence. Accepted candidate came from m2m100_418m's 2nd
+      escalation attempt (professionalize_llm's own attempt for this cell
+      failed on an unrelated FrontmatterLanguageCheck gate, so it was never
+      compared against this specific defect).

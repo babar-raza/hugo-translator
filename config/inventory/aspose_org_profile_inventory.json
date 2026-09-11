@@ -2,11 +2,11 @@
   "schema_version": 1,
   "mission_id": "aspose-org-full-portfolio-translation-20260901",
   "taskcard": "TC-APT-002",
-  "generated_at": "2026-09-11T13:06:56.305685+00:00",
+  "generated_at": "2026-09-11T13:37:50.008606+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
-  "content_repo_sha": "cfc15331a05640c20b645f26f81321b63c910a98",
-  "content_repo_dirty_paths": 225,
-  "translator_repo_sha": "ef8a1abfd0bf03eaf3f1c934e80e5946a9f4abf3",
+  "content_repo_sha": "289cc881450f9ddcba2d3f7abcc8daf3a945265c",
+  "content_repo_dirty_paths": 220,
+  "translator_repo_sha": "b2bd5f26597fc464c30698ad83b538d4acb573bb",
   "known_language_codes": [
     "ar",
     "bg",
@@ -46,7 +46,7 @@
     "zh"
   ],
   "in_scope_sites": [
-    "blog.aspose.org"
+    "docs.aspose.org"
   ],
   "out_of_scope_sites": [
     "www.aspose.org"
@@ -80,16 +80,16 @@
     "zh"
   ],
   "totals": {
-    "source_count": 184,
-    "cell_count": 4600,
-    "existing_target_cells": 3794,
-    "missing_target_cells": 806,
-    "plan_section4_source_estimate": 157
+    "source_count": 519,
+    "cell_count": 12975,
+    "existing_target_cells": 8075,
+    "missing_target_cells": 4900,
+    "plan_section4_source_estimate": 519
   },
   "sites": {
-    "blog.aspose.org": {
-      "content_root": "D:/onedrive/Documents/GitHub/aspose.org/content/blog.aspose.org",
-      "layout": "file_suffix",
+    "docs.aspose.org": {
+      "content_root": "D:/onedrive/Documents/GitHub/aspose.org/content/docs.aspose.org",
+      "layout": "per_language_folders",
       "source_lang": "en",
       "target_langs": [
         "ar",
@@ -118,157 +118,169 @@
         "vi",
         "zh"
       ],
-      "markdown_files_seen": 5010,
-      "sources_after_governed_filter": 184,
+      "markdown_files_seen": 11314,
+      "sources_after_governed_filter": 519,
       "excluded_locale_legacy_files": {
-        "bg": 128,
-        "ca": 112,
-        "da": 98,
-        "fi": 84,
-        "hr": 128,
-        "lt": 84,
-        "lv": 75,
-        "ms": 81,
-        "no": 80,
-        "sk": 77,
-        "sr": 85
+        "bg": 360,
+        "ca": 345,
+        "da": 190,
+        "fi": 253,
+        "hr": 360,
+        "lt": 265,
+        "lv": 162,
+        "ms": 164,
+        "no": 164,
+        "sk": 189,
+        "sr": 267
       },
-      "source_count": 184,
+      "source_count": 519,
       "target_lang_count": 25,
-      "cell_count": 4600,
+      "cell_count": 12975,
       "families": {
         "": {
           "platforms": {
-            "": 2
+            "": 1
           },
-          "source_count": 2
+          "source_count": 1
         },
         "3d": {
           "platforms": {
-            "java": 8,
-            "net": 9,
-            "python": 8,
-            "typescript": 7
+            "": 1,
+            "java": 10,
+            "net": 17,
+            "python": 11,
+            "typescript": 12
           },
-          "source_count": 32
+          "source_count": 51
         },
         "barcode": {
           "platforms": {
-            "python": 4
+            "": 1,
+            "python": 12
           },
-          "source_count": 4
+          "source_count": 13
         },
         "cells": {
           "platforms": {
-            "cpp": 3,
-            "go": 2,
-            "java": 5,
-            "net": 7,
-            "python": 12,
-            "rust": 2,
-            "typescript": 3
+            "": 1,
+            "cpp": 11,
+            "go": 8,
+            "java": 18,
+            "net": 12,
+            "python": 15,
+            "rust": 9,
+            "typescript": 7
           },
-          "source_count": 34
+          "source_count": 81
         },
         "email": {
           "platforms": {
-            "cpp": 3,
-            "net": 6,
-            "python": 8
+            "": 1,
+            "cpp": 10,
+            "net": 12,
+            "python": 9
           },
-          "source_count": 17
+          "source_count": 32
         },
         "font": {
           "platforms": {
-            "python": 10
+            "": 1,
+            "python": 15
           },
-          "source_count": 10
+          "source_count": 16
         },
         "html": {
           "platforms": {
-            "python": 3
+            "": 1,
+            "python": 18
           },
-          "source_count": 3
+          "source_count": 19
         },
         "note": {
           "platforms": {
-            "python": 9
+            "": 1,
+            "python": 15
           },
-          "source_count": 9
+          "source_count": 16
         },
         "page": {
           "platforms": {
-            "python": 4
+            "": 1,
+            "python": 12
           },
-          "source_count": 4
+          "source_count": 13
         },
         "pdf": {
           "platforms": {
-            "cpp": 5,
-            "go": 5,
-            "java": 4,
-            "net": 5,
-            "python": 4,
-            "typescript": 5
+            "": 1,
+            "cpp": 11,
+            "go": 9,
+            "java": 42,
+            "net": 29,
+            "python": 15,
+            "typescript": 17
           },
-          "source_count": 28
+          "source_count": 124
         },
         "slides": {
           "platforms": {
-            "cpp": 7,
-            "java": 7,
-            "net": 7,
-            "python": 8
+            "": 1,
+            "cpp": 14,
+            "java": 11,
+            "net": 24,
+            "python": 19
           },
-          "source_count": 29
+          "source_count": 69
         },
         "tex": {
           "platforms": {
-            "python": 3
+            "": 1,
+            "python": 9
           },
-          "source_count": 3
+          "source_count": 10
         },
         "words": {
           "platforms": {
-            "net": 5,
-            "python": 4
+            "": 1,
+            "net": 59,
+            "python": 14
           },
-          "source_count": 9
+          "source_count": 74
         }
       },
       "existing_targets_by_lang": {
-        "ar": 175,
-        "cs": 142,
-        "de": 145,
-        "el": 175,
-        "es": 175,
-        "fa": 146,
-        "fr": 173,
-        "he": 176,
-        "hi": 135,
-        "hu": 160,
-        "id": 153,
-        "it": 127,
-        "ja": 126,
-        "ko": 125,
-        "nl": 127,
-        "pl": 130,
-        "pt": 171,
-        "ro": 176,
-        "ru": 155,
-        "sv": 128,
-        "th": 162,
-        "tr": 167,
-        "uk": 160,
-        "vi": 162,
-        "zh": 123
+        "ar": 377,
+        "cs": 273,
+        "de": 209,
+        "el": 375,
+        "es": 375,
+        "fa": 346,
+        "fr": 376,
+        "he": 375,
+        "hi": 308,
+        "hu": 374,
+        "id": 295,
+        "it": 206,
+        "ja": 183,
+        "ko": 291,
+        "nl": 180,
+        "pl": 262,
+        "pt": 375,
+        "ro": 377,
+        "ru": 302,
+        "sv": 381,
+        "th": 374,
+        "tr": 382,
+        "uk": 370,
+        "vi": 380,
+        "zh": 329
       },
-      "existing_target_cells": 3794,
-      "missing_target_cells": 806,
+      "existing_target_cells": 8075,
+      "missing_target_cells": 4900,
       "reconciliation_vs_plan_section4": {
-        "plan_estimate": 157,
-        "exact": 184,
-        "delta_ratio": 0.172,
+        "plan_estimate": 519,
+        "exact": 519,
+        "delta_ratio": 0.0,
         "disposition": "reconciled"
       }
     }
