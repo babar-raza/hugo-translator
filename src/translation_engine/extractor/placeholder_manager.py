@@ -24,6 +24,52 @@ class PlaceholderMapIntegrityError(RuntimeError):
     """
 
 
+# TC-APT-110 (2026-09-11): scripts that conventionally write with NO space
+# between adjacent words/foreign terms -- inserting a synthetic space for
+# these would itself be wrong, so the glued-word fix below never fires when
+# either boundary character falls in one of these ranges. Confirmed by the
+# real defect's own distribution: it only ever appeared in space-delimited
+# scripts (ar cs es fa hu nl pt uk); ja/ko/zh/th candidates on the same page,
+# same run, kept correct spacing around the identical Latin identifiers.
+_NO_SPACE_SCRIPT_RANGES = (
+    (0x3040, 0x30FF),  # Hiragana, Katakana
+    (0x3400, 0x4DBF),  # CJK Unified Ideographs Extension A
+    (0x4E00, 0x9FFF),  # CJK Unified Ideographs
+    (0xF900, 0xFAFF),  # CJK Compatibility Ideographs
+    (0x1100, 0x11FF),  # Hangul Jamo
+    (0xAC00, 0xD7A3),  # Hangul Syllables
+    (0x0E00, 0x0E7F),  # Thai
+    (0x0E80, 0x0EFF),  # Lao
+    (0x1000, 0x109F),  # Myanmar
+    (0x1780, 0x17FF),  # Khmer
+)
+
+
+def _is_no_space_script_char(ch: str) -> bool:
+    codepoint = ord(ch)
+    return any(lo <= codepoint <= hi for lo, hi in _NO_SPACE_SCRIPT_RANGES)
+
+
+def _needs_space_boundary(context_char: str, value_char: str) -> bool:
+    """True if a placeholder's restored value would butt directly against
+    `context_char` with zero separator, in a script where that is never a
+    legitimate construction (see `_NO_SPACE_SCRIPT_RANGES`).
+
+    Deliberately restricted to letter/digit-against-letter/digit: a
+    placeholder boundary against punctuation (parens, colons, quotes) is
+    common and legitimate (e.g. the documented Finnish case-suffix
+    "PLACEHOLDER_0:n" -- the colon is not alnum, so this returns False and
+    that behavior is unchanged).
+    """
+    if not context_char or not value_char:
+        return False
+    if not (context_char.isalnum() and value_char.isalnum()):
+        return False
+    if _is_no_space_script_char(context_char) or _is_no_space_script_char(value_char):
+        return False
+    return True
+
+
 class PlaceholderManager:
     """Manages placeholder replacement and restoration for protected content."""
 
@@ -161,8 +207,32 @@ class PlaceholderManager:
         restored = text
 
         # Exact replacements first
+        # TC-APT-110 (2026-09-11): the MT/LLM model can drop the space that
+        # preceded/followed a placeholder token during generation (confirmed
+        # directly: en "with {PLACEHOLDER_0}" -> pt "com{PLACEHOLDER_0}",
+        # braces intact, just the space gone) -- restoring naively then glues
+        # the restored value directly onto adjacent prose, e.g.
+        # "comWorkbook.save", a reader-facing garbled non-word. Found on
+        # cells/rust/getting-started/quickstart.md's frontmatter `description`
+        # field, 8/25 locales (ar cs es fa hu nl pt uk), because that field
+        # has no backtick delimiter around the protected identifier the way
+        # body markdown does -- nothing else was absorbing the lost space.
+        # Fixed generally here (not field-specific) via regex substitution so
+        # each match's real surrounding context (not the placeholder's
+        # position in the object generically) decides whether a space was
+        # actually lost, using match.string on the ORIGINAL text so context
+        # characters are the model's real output, not a previous iteration's
+        # partially-restored string.
         for placeholder, original in placeholder_map.items():
-            restored = restored.replace(placeholder, original)
+
+            def _restore_one(match: re.Match, _original: str = original) -> str:
+                s = match.string
+                start, end = match.span()
+                prefix = " " if start > 0 and _needs_space_boundary(s[start - 1], _original[0]) else ""
+                suffix = " " if end < len(s) and _needs_space_boundary(s[end], _original[-1]) else ""
+                return f"{prefix}{_original}{suffix}"
+
+            restored = re.sub(re.escape(placeholder), _restore_one, restored)
 
         # HT-QUALITY-GATES-001 RC2: brace-stripped fallback. The MT model can drop
         # the `{`/`}` entirely around a placeholder while translating the
