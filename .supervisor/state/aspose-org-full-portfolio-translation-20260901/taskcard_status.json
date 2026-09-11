@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "wave-tier1b-batch1-retrigger-20260911r2 (PID 52852, still running): the linktitle fix (291c23f3) CONFIRMED with direct evidence -- read all 10 accepted email/net+python compound-file-support.md cells' frontmatter, linktitle stays English in every one while title translates per-language. Committed 1f4d25f5d8 + da153c0c06 (10 cells). All 7 real heal tickets for this source now carry direct per-page proof, not just cross-page. Still waiting on slides/cpp working-with-presentation-content.md and slides/net working-with-app-properties.md (3 tickets each, cross-page-evidence-only pending direct confirmation). cells_committed_total 536 -> 546.",
-  "cells_committed_total": 546,
+  "last_wake_summary": "wave-tier1b-batch1-retrigger-20260911r2 (PID 52852, still running): linktitle fix (291c23f3) now DIRECTLY confirmed on all 3 originally-blocked sources -- compound-file-support.md (net+python, 14 cells), working-with-presentation-content.md (7 of 8 locales so far; hi excluded), working-with-app-properties.md (2 of however many; still running). All real heal tickets for these 3 sources now carry direct per-page evidence, not cross-page inference. NEW separate defect found on working-with-presentation-content.md hi: frontmatter description's trailing sentence 'Covers Presentation.' left entirely untranslated while cs/de/id/it/ja/nl/ru (same wave) all translate it -- ticketed (RB-013), TM purged, not yet retried. cells_committed_total 546 -> 559 (this session's 5 + peer's 8 committed concurrently).",
+  "cells_committed_total": 559,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
