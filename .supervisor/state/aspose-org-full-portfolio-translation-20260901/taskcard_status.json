@@ -1459,7 +1459,7 @@
   "active_detached_runs": [
     {
       "campaign_id": "wave-tier1b-batch1-20260911",
-      "pid": null,
+      "pid": 50404,
       "manifest": "data/campaigns/manifests/wave-tier1b-batch1-20260911.yaml",
       "sources": [
         "content/docs.aspose.org/en/email/net/developer-guide/compound-file-support.md",
@@ -1471,11 +1471,11 @@
         "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
         "content/docs.aspose.org/en/slides/net/developer-guide/working-with-app-properties.md"
       ],
-      "locales": null,
-      "expected_output_count": 8,
-      "launched_at": null,
+      "locales": 25,
+      "expected_output_count": 56,
+      "launched_at": "2026-09-11T16:11:13.659355+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "First Tier-1b batch this mission: true Tier-1a (0-translation) supply on docs.aspose.org is now exhausted outside excluded families (confirmed via full-tree scan). Moving to Tier-1b per runbook strict tier order (plan section 17.1.0), fewest-missing-first: 8 pages across email/net, email/python, font/python, pdf/go, pdf/java, slides/cpp, slides/net, each missing exactly 1 of 25 locales, 0 heal_queue history on any. Built as ONE multi-source manifest via --source-list + --missing-only so it actually benefits from --max-parallel-jobs 4 (unlike the single-page Tier-1a manifests, which shard to 1 job each regardless of the setting). pid/launched_at to be filled in after Start-Process + confirmed real log/llm_calls.jsonl progress per standing launch-race lesson."
+      "notes": "First Tier-1b batch this mission: true Tier-1a (0-translation) supply on docs.aspose.org is now exhausted outside excluded families (confirmed via full-tree scan). Moving to Tier-1b per runbook strict tier order (plan section 17.1.0), fewest-missing-first: 8 pages across email/net, email/python, font/python, pdf/go, pdf/java, slides/cpp, slides/net, 0 heal_queue history on any (manual missing-count-per-page estimate via glob was wrong -- trust build_campaign_manifest.py's own --missing-only computation instead, which found 56 real missing cells across the 8 sources, not 8). Built as ONE multi-source manifest via --source-list + --missing-only so it actually benefits from --max-parallel-jobs 4 (unlike the single-page Tier-1a manifests, which shard to 1 job each regardless of the setting). First launch attempt (PID 58284) died instantly with 'translator repository is dirty (1 paths)' -- root cause: rebuilding the manifest a second time (after an unplanned heal_queue.jsonl commit moved HEAD) re-dirtied config/inventory/aspose_org_profile_inventory.json and it was not re-discarded before Start-Process; NEW STANDING LESSON: after ANY manifest (re)build, always re-check git status is clean immediately before Start-Process, even on a rebuild you think you already handled. Fixed, relaunched, confirmed alive with real progress via llm_calls.jsonl growth (443 bytes) ~18s after launch."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
