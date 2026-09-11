@@ -202,3 +202,26 @@ rules:
       "### 3. اجرا کنید" with Eastern-Arabic numeral vs Latin "### 1." /
       "### 2." siblings; raised as UNCOVERED by the fa reviewer with this
       rule proposed.
+  - id: RB-010
+    name: protected-identifier-restatement-on-sentence-split
+    verdict: APPROVE
+    scope: body
+    statement: >-
+      A protected identifier (code span, API name) occurring MORE times in the
+      target than in the source is NOT a defect when the extra occurrence is a
+      grammatically integrated restatement created by splitting one source
+      sentence into two -- the pattern a target language needs when it cannot
+      carry an English relative clause ("...with `X()`, which builds...") in a
+      single sentence. Code-span COUNT parity is therefore not a rejection
+      criterion on its own; the criteria are that every source identifier is
+      present, spelled identically, and that no meaning is added or lost.
+      DIAGNOSTIC (RB-005): a duplicated span that is NOT grammatically
+      integrated -- bare, adjacent, or repeated at the same structural position
+      across several locales -- is a producer-side protected-span
+      re-injection bug instead, and REJECTs.
+    evidence: >-
+      blog.aspose.org/pdf/typescript/pdf-core-api-typescript ja,
+      wave-pdftypescript-coreapi-20260911, 2026-09-11: 39 code spans vs the
+      source's 38; the extra is `Document.Merge()` opening the second sentence
+      with the topic particle wa, where English used ", which builds...". One
+      locale of 23, grammatically integrated, meaning intact -> APPROVE.
