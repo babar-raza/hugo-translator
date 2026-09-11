@@ -311,6 +311,34 @@ body:
   # prose (confirmed: also subsumes the narrower TypeScript-only fix from
   # eca736e, since "TypeScript" is itself a 2-hump PascalCase compound).
   - '\b[A-Z][a-z]+(?:[A-Z][a-z0-9]*)+\b'
+  # RB-011/GluedIdentifierValidator investigation, wave-pdfgeneratedpython-
+  # 20260911, 2026-09-11: bare (non-backtick) snake_case/dotted module-style
+  # identifiers in frontmatter fields -- "aspose_pdf.generated", "aspose_pdf"
+  # in the description field of pdf-generated-in-python/index.md -- reached
+  # the model as unprotected plain text and correlated with 3 distinct-locale
+  # GluedIdentifierValidator rejections (es, fa, de) on the same field,
+  # tripping heal_queue.py's QU-02 per-file quarantine (>=3 locales) and
+  # halting the rest of that page's campaign. The two existing patterns above
+  # don't reach this shape: it is neither backtick-wrapped (source markdown
+  # frontmatter strings carry no code-span syntax) nor PascalCase (Python
+  # module identifiers are lower_snake_case). Requires an underscore segment
+  # specifically -- unlike a bare dot, natural-language prose in every
+  # portfolio target language never contains an underscore, so this cannot
+  # false-positive on ordinary abbreviations ("e.g.", "U.S.") the way a
+  # dot-only pattern would; it also does not attempt to cover the pure-dot
+  # identifier shape ("Workbook.save") documented in
+  # glued_identifier_validator.py's own docstring as gate-only-catchable
+  # model stochasticity, not a producer bug -- that shape stays out of scope
+  # here on purpose. See data/summaries/fp-glued-identifier-recurrence-
+  # pdfgeneratedpython-20260911.json.
+  # The negative lookahead excludes PlaceholderManager's own reserved
+  # "PLACEHOLDER_<N>" token name: protect() applies preserve_patterns
+  # sequentially against its own cascading output (not the original text in
+  # isolation), so without this guard this pattern re-matches an
+  # already-inserted {PLACEHOLDER_0} token from an earlier pattern in the
+  # same call and double-wraps it into {{PLACEHOLDER_1}} -- caught by the
+  # existing test_pascal_compound_identifier_protection.py regression suite.
+  - '\b(?!PLACEHOLDER_)[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+(?:\.[A-Za-z0-9_]+)*\b'
 
 # Security settings
 security:
