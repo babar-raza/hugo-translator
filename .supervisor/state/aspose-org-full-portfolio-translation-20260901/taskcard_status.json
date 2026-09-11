@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-11T18:15:00+05:00",
+  "updated_at": "2026-09-11T18:35:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 49,
+  "wake_count": 50,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "pdfgeneratedpython-nlth-heal-20260911 (PID 53652, now exited) succeeded cleanly on the first attempt for both cells -- nl and th description fields grepped for '**': 0 matches (were 4 and 5 respectively), confirming the frontmatter-plaintext prompt fix (af2e29d3) closes RB-012 for the professionalize_llm path. Committed content repo 6ed7b80716, replacing the peer-shipped defective versions; both heal tickets FIXED_VERIFIED. pdf-generated-in-python now stands at 23/25 committed clean -- only es/fa remain (real, repeatedly-exhausted GluedIdentifierValidator failures, documented residual, not chased further this iteration). Note: 2 untracked debug-harness byproduct files (index.es.md, index.fa.md) sit on disk from this session's earlier investigation -- never went through a real campaign receipt, intentionally NOT committed; a future real campaign attempt for es/fa will naturally declare replace_existing over them. Renewed the lapsed claim on wave-cellsnet-features-20260911 (PID 66160, still running, 3/9 accepted) without touching its files -- session-id string match is ambiguous across the fleet, treating it as a peer's live work.",
-  "cells_committed_total": 498,
+  "last_wake_summary": "Checked in on wave-cellsnet-features-20260911 (PID 66160): peer had already committed fa/ja (192a657757) and ko/nl/pl (289cc88145) with the SAME structural-only verification gap seen twice before on the pdfgeneratedpython page. Body review found fa/ja/nl/pl clean but ko carries a NEW defect class (RB-013, added to config/review_rubric.yaml): the frontmatter description's trailing list item left 'management' untranslated while all 8 sibling items translated cleanly (m2m100_418m escalation attempt; professionalize_llm's own attempt failed separately on an unrelated gate before ever producing content). TM purged, heal ticket opened, single-cell heal-retrigger launched (cellsnet-features-ko-heal-20260911, PID 58256) forcing professionalize_llm. This peer-verification gap is now a 3rd occurrence (de/RB-011, nl+th/RB-012, now ko/RB-013) -- worth flagging to the operator that structural-only review is systematically missing a class of frontmatter/list-tail defects across sessions, not just this one page. cells_committed_total 498 -> 503 (fa/ja/ko/nl/pl).",
+  "cells_committed_total": 503,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1468,7 +1468,20 @@
       "expected_output_count": 9,
       "launched_at": "2026-09-11T12:51:15.506510+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Tier-1b (16/25 locales already existed, 9 missing) -- picked as freed capacity after wave-htmlcssompython-20260911 closed. 0 heal_queue history for the whole cells/net family. pid/launched_at filled in after Start-Process + ~90s confirmation per standing launch-race lesson (never commit real pid immediately after Start-Process). Confirmed alive with real progress (yaml_format_success) ~108s after 3rd launch attempt (1st used wrong entry point -m src.workers.campaign_runner; 2nd hit SHA drift from manifest built before a bookkeeping commit moved HEAD; 3rd succeeded after rebuilding manifest fresh immediately before Start-Process with no git touch in between)."
+      "notes": "Tier-1b (16/25 locales already existed, 9 missing) -- picked as freed capacity after wave-htmlcssompython-20260911 closed. 0 heal_queue history for the whole cells/net family. pid/launched_at filled in after Start-Process + ~90s confirmation per standing launch-race lesson (never commit real pid immediately after Start-Process). Confirmed alive with real progress (yaml_format_success) ~108s after 3rd launch attempt (1st used wrong entry point -m src.workers.campaign_runner; 2nd hit SHA drift from manifest built before a bookkeeping commit moved HEAD; 3rd succeeded after rebuilding manifest fresh immediately before Start-Process with no git touch in between). Peer committed fa/ja (192a657757) and ko/nl/pl (289cc88145) with structural-only verification -- SAME gap as the pdfgeneratedpython nl/th incident. fa/ja/nl/pl body-reviewed clean by this session; ko REJECTed (RB-013, see the heal-retrigger entry below) and its heal-retrigger already launched separately. Still running on hi(ticketed)/th/uk/zh."
+    },
+    {
+      "campaign_id": "cellsnet-features-ko-heal-20260911",
+      "pid": 58256,
+      "manifest": "data/campaigns/manifests/cellsnet-features-ko-heal-20260911.yaml",
+      "sources": [
+        "content/docs.aspose.org/en/cells/net/developer-guide/features.md"
+      ],
+      "locales": 1,
+      "expected_output_count": 1,
+      "launched_at": "2026-09-11T14:25:00+00:00",
+      "launched_by": "hugo-translator-fc",
+      "notes": "Single-cell RB-013 REJECT_ISOLATED heal-retrigger: ko's peer-committed candidate (289cc88145) left the frontmatter description's trailing list item 'management' untranslated. Forcing professionalize_llm (untried against this specific defect -- its earlier attempt for this cell failed on an unrelated FrontmatterLanguageCheck gate before ever producing content). replace_existing declared against the currently-committed file sha. On next wake: grep the description field for a lone English word after the last translated list item before committing a follow-up fix, same pattern as the pdfgeneratedpython de/RB-011 and nl+th/RB-012 fixes."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
