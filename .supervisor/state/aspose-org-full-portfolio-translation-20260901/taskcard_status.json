@@ -1458,21 +1458,20 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "campaign_id": "wave-tier1b-batch1-retrigger-20260911",
-      "pid": 50572,
-      "manifest": "data/campaigns/manifests/wave-tier1b-batch1-retrigger-20260911.yaml",
+      "campaign_id": "wave-tier1b-batch1-retrigger-20260911r2",
+      "pid": 52852,
+      "manifest": "data/campaigns/manifests/wave-tier1b-batch1-retrigger-20260911r2.yaml",
       "sources": [
         "content/docs.aspose.org/en/email/net/developer-guide/compound-file-support.md",
         "content/docs.aspose.org/en/email/python/developer-guide/compound-file-support.md",
-        "content/docs.aspose.org/en/pdf/go/getting-started/installation.md",
         "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
         "content/docs.aspose.org/en/slides/net/developer-guide/working-with-app-properties.md"
       ],
       "locales": 25,
-      "expected_output_count": 36,
-      "launched_at": "2026-09-11T18:12:00+00:00",
+      "expected_output_count": 30,
+      "launched_at": "2026-09-11T18:20:00+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Retrigger of wave-tier1b-batch1-20260911's 5 fully-blocked sources, now that the linktitle language_detection fix (hugo-translator commit 291c23f3) is live in a fresh process -- the original campaign had already loaded the pre-fix code before that commit landed, so it never benefited. 4 of the 5 sources (email/net+python compound-file-support.md, slides/cpp working-with-presentation-content.md, slides/net working-with-app-properties.md) should now pass cleanly if the fix works as the peer's own verification suggests; installation.md failed on a DIFFERENT, not-yet-diagnosed class (GATE18/GATE23/FrontmatterLanguageCheck) and is included as a fresh attempt, not a proven fix. On next wake: body-review every accepted cell (not just structural) given this session's repeated finding that peer verification misses real content defects; if the 4 linktitle-bug sources still fail the SAME way, that falsifies the fix's completeness and needs a fresh investigation, not a 3rd blind retry."
+      "notes": "r1 (PID 50572) produced 0/36 -- every cell blocked by QU-02, because dispositioning the real tickets FIXED_VERIFIED didn't clear the file-level quarantine on its own: is_source_path_quarantined() also counts the CASCADE artifacts (auto:unclassified, from cells never attempted) as a SEPARATE quarantine trigger once they hit >=3 distinct locales, which r1 itself then added to. Waived 100 cascade tickets across all 5 original sources (commit da3bd2cb), dropped installation.md from THIS retrigger (its real GATE23 tickets are genuinely unfixed, left OPEN/quarantined on purpose -- not a cascade artifact). r2 covers the 4 sources actually cleared. On next wake: body-review every accepted cell for real content (not just structural parity) -- the FIXED_VERIFIED disposition on the 12 real tickets was based on the peer's cross-page evidence, not a direct read of THESE pages' output yet; if r2 fails the SAME way (auto:verification:language_detection again), revert those 12 tickets to OPEN with that evidence, per the runbook's prose-does-not-count standard."
     },
     {
       "campaign_id": "wave-tier1b-batch2-20260911",
