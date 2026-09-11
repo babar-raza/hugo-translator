@@ -1453,7 +1453,7 @@
       ]
     }
   },
-  "last_wake_summary": "User flagged 2h content-commit gap; confirmed real via commit timestamps (last content commit c366c0b118 at 11:03, nothing content-shaped since). Fleet active but stuck on other producer bugs (words-foss-net TC-APT-042, claimed elsewhere). Launched fresh wave (barcode/python _index.md, 21 locales) PID 52432 to keep content landing.",
+  "last_wake_summary": "User flagged no commits landing while wave-pdftypescript-coreapi-20260911 was still mid-run (single-source, max_parallel_jobs=1, slow). Committed the 6 already-accepted, verified locales as a partial batch (dc6e9fd4a4) rather than waiting for the full 25/25 -- will commit remaining locales incrementally or in one final batch as the campaign completes.",
   "cells_committed_total": 481,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
@@ -1468,7 +1468,7 @@
       "expected_output_count": 25,
       "launched_at": "2026-09-11T08:15:00+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "wave-barcodepython-index-20260911 (previous entry) failed instantly: work_ledger was stale for that page -- 20/21 requested locales were already committed weeks/days ago (0d98ffadd1), never reconciled in the ledger. Fixed 21 stale ledger rows to UP_TO_DATE, released the claim, verified this replacement candidate against actual git history/disk (0 existing locale files, not just ledger state) before claiming+launching. User asked for an ongoing watch mechanism over detached campaign processes (loop skill engaged)."
+      "notes": "wave-barcodepython-index-20260911 (previous entry) failed instantly: work_ledger was stale for that page -- 20/21 requested locales were already committed weeks/days ago (0d98ffadd1), never reconciled in the ledger. Fixed 21 stale ledger rows to UP_TO_DATE, released the claim, verified this replacement candidate against actual git history/disk (0 existing locale files, not just ledger state) before claiming+launching. User asked for an ongoing watch mechanism over detached campaign processes (loop skill engaged). Committed partial batch (6/25: ar,cs,de,el,es,fa) as dc6e9fd4a4 while remaining 19 still in flight -- avoids accepted output sitting uncommitted during a long serialized run."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
