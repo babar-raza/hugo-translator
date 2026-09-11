@@ -162,6 +162,21 @@ class LanguageDetectionCheck(VerificationCheck):
         # left open, not a defect masked by a redundant check elsewhere --
         # recorded honestly rather than silently accepted.
         "keywords",
+        # 2026-09-11: linktitle is a structural nav-menu label, already
+        # classified as non-translatable in
+        # frontmatter_integrity_validator.py (grouped with generated_by/
+        # enhanced/howtoimage) -- confirmed live: 5 already-shipped locales
+        # (cs/fr/es/pt/ru) of content/docs.aspose.org/en/3d/java/developer-guide/
+        # format-support.md all kept linktitle: "Format Support" verbatim,
+        # untranslated, and were accepted fine. This check had no matching
+        # exemption, so any page whose linktitle string is long/distinct
+        # enough to cross langdetect's confidence threshold (e.g.
+        # "Compound File Support") fails language_detection on EVERY
+        # locale, unconditionally -- confirmed on
+        # email/net+python/developer-guide/compound-file-support.md during
+        # wave-tier1b-batch1-20260911 (0/56 accepted after ~20min, 2 of 8
+        # sources entirely blocked on this single field).
+        "linktitle",
     }
     # Language classifiers can be dominated by required ASCII product/platform
     # tokens in an otherwise-correct short title.  For example, langdetect

@@ -252,6 +252,27 @@ class TestLanguageDetectionCheck:
 
         assert issues == []
 
+    def test_linktitle_untranslated_navmenu_label_is_skipped(self, check):
+        """2026-09-11: linktitle is a structural nav-menu label, already classified
+        non-translatable in frontmatter_integrity_validator.py -- confirmed live via
+        5 already-shipped locales (cs/fr/es/pt/ru) of a real docs.aspose.org page
+        that all kept linktitle verbatim in English and were accepted fine. Before
+        this fix, any page whose linktitle string was long/distinct enough to cross
+        langdetect's confidence threshold (e.g. "Compound File Support") failed
+        language_detection on every locale unconditionally, confirmed live on
+        email/net+python developer-guide/compound-file-support.md during
+        wave-tier1b-batch1-20260911."""
+        translated = {
+            "frontmatter": {
+                "title": "Das ist ein ausreichend langer deutscher Titel",
+                "linktitle": "Compound File Support",
+            }
+        }
+
+        issues = check.run({}, translated, "de")
+
+        assert issues == []
+
     def test_keywords_short_technical_phrases_are_skipped(self, check):
         """TC-APT-004b (2026-09-03): a hand-written, unambiguously CORRECT German
         translation of a real kb.aspose.org keyword -- confirmed via direct
