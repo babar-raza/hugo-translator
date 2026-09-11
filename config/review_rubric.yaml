@@ -225,3 +225,30 @@ rules:
       source's 38; the extra is `Document.Merge()` opening the second sentence
       with the topic particle wa, where English used ", which builds...". One
       locale of 23, grammatically integrated, meaning intact -> APPROVE.
+  - id: RB-011
+    name: heading-content-mismatch
+    verdict: REJECT
+    scope: body_heading
+    statement: >-
+      A translated section heading that does not describe the content beneath
+      it -- typically because it was rendered as the (correctly-translated)
+      title of a DIFFERENT section of the same document -- is a reader-visible
+      defect distinct from RB-001 (untranslated heading) and RB-007 (stale
+      cross-reference): the heading text itself is valid target-language
+      prose, but it misidentifies its own section, breaking TOC navigation
+      and reader expectation. Test: does the heading match what the section
+      body actually covers, not whether it is grammatical or translated.
+      DIAGNOSTIC: recurrence at the same structural position across locales
+      of one page is producer-side per RB-005 (fix producer, retrigger,
+      never hand-edit); a single-locale occurrence is model variance and
+      REJECTs only that cell -- retry on the other model before ticketing.
+    evidence: >-
+      blog.aspose.org/pdf/python/pdf-generated-in-python de,
+      wave-pdfgeneratedpython-20260911, 2026-09-11: source H3 "### Packaging
+      Unsigned Content" (body covers UnsignedContentAbsorber/UnsignedContent)
+      came back as "### Schnellstart" (= Quick Start) in German -- the
+      correct German Quick Start heading "## Kurzanleitung" also appears,
+      correctly, at its own H2 section further down. Checked all other
+      committed German outputs in blog.aspose.org for the same
+      "### Schnellstart" string: no other occurrence found, so isolated to
+      this one cell, not a recurring producer pattern.
