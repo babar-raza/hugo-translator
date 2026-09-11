@@ -1475,7 +1475,7 @@
     },
     {
       "campaign_id": "wave-tier1b-batch2-20260911",
-      "pid": null,
+      "pid": 66324,
       "manifest": "data/campaigns/manifests/wave-tier1b-batch2-20260911.yaml",
       "sources": [
         "content/docs.aspose.org/en/slides/python/developer-guide/working-with-package-management.md",
@@ -1488,10 +1488,10 @@
         "content/docs.aspose.org/en/email/cpp/developer-guide/eml-conversion.md"
       ],
       "locales": 25,
-      "expected_output_count": null,
-      "launched_at": null,
+      "expected_output_count": 60,
+      "launched_at": "2026-09-11T18:29:14.492046+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Second Tier-1b batch this mission, launched IN PARALLEL with the peer's wave-tier1b-batch1-retrigger-20260911 (different sources, no overlap). 8 fresh fewest-missing-first pages, distinct families from everything touched so far (slides/python, words/python, barcode/python, cells/cpp, tex/python, email/cpp), 0 heal_queue history on any. Built via --source-list + --missing-only + --max-parallel-jobs 4. pid/launched_at to be filled in after Start-Process + confirmed real llm_calls.jsonl progress, with a fresh git-status-clean check immediately before Start-Process."
+      "notes": "Second Tier-1b batch this mission, launched IN PARALLEL with the peer's wave-tier1b-batch1-retrigger-20260911 (different sources, no overlap). 8 fresh fewest-missing-first pages, distinct families from everything touched so far (slides/python, words/python, barcode/python, cells/cpp, tex/python, email/cpp), 0 heal_queue history on any. Built via --source-list + --missing-only + --max-parallel-jobs 4. First TWO launch attempts (PID 59604, then 49636) died within seconds with 'translation memory fingerprint drift' -- root-caused: src/workers/campaign_manifest.py:543-544 re-hashes data/tm/l2.lmdb/data.mdb at runtime against the manifest's baked-in fingerprint, and the peer's actively-accepting concurrent campaign kept mutating that shared TM file faster than the build-to-launch window. NEW STANDING LESSON: launching a new campaign while a peer's campaign is mid-acceptance-burst against the SAME shared TM can race this way; minimize the rebuild-to-Start-Process gap, retry up to 3 times, stand down if it keeps failing. Third attempt (PID 66324) succeeded, confirmed alive with real progress via llm_calls.jsonl growth (425 bytes) ~18s after launch."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
