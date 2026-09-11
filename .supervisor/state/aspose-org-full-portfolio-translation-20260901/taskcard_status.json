@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-11T16:00:00+05:00",
+  "updated_at": "2026-09-11T16:40:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 43,
+  "wake_count": 44,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,22 +1453,22 @@
       ]
     }
   },
-  "last_wake_summary": "wave-pdfgeneratedpython-20260911 complete: 12/25 committed across 4 batches (87954c692b, peer 54e92d8e3a, 1fba1d968e, f47e12d6e8), landed incrementally per the refined batching rule (>=5 files OR ~20min since last commit, always flush on exit). 13 locales exhausted retries (mostly GluedIdentifierValidator), auto-ticketed. Claim released; selecting next candidate.",
+  "last_wake_summary": "RECURRENCE ESCALATION closed for auto:GluedIdentifierValidator (2 source pages, no prior Track-B taskcard): root-caused to bare snake_case/dotted identifiers in frontmatter description fields with zero preserve_pattern coverage; fixed config/global.yaml (commit 1fb13d20) with a new underscore-gated pattern + 8 regression tests (44 total green). Discovered along the way that the peer's 'close out wave-pdfgeneratedpython-20260911 (12/25)' actually left 11 locales NEVER attempted (QU-02 file-level quarantine cascade, not real exhausted failures) -- resolved 3 real tickets FIXED_VERIFIED + 22 cascade artifacts WAIVED_RUBRIC to clear it. Relaunched as pdfgeneratedpython-retrigger-20260911 (PID 16024, 14 locales: es/fa/de + the 11 never-attempted) under the hardened config. Full trail: data/summaries/fp-glued-identifier-recurrence-pdfgeneratedpython-20260911.json.",
   "cells_committed_total": 484,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "campaign_id": "pdfgeneratedpython-de-retry-20260911-m2m-r2",
-      "pid": 62040,
-      "manifest": "data/campaigns/manifests/pdfgeneratedpython-de-retry-20260911-m2m-r2.yaml",
+      "campaign_id": "pdfgeneratedpython-retrigger-20260911",
+      "pid": 16024,
+      "manifest": "data/campaigns/manifests/pdfgeneratedpython-retrigger-20260911.yaml",
       "sources": [
         "content/blog.aspose.org/pdf/python/pdf-generated-in-python/index.md"
       ],
-      "locales": 1,
-      "expected_output_count": 1,
-      "launched_at": "2026-09-11T10:57:00+00:00",
+      "locales": 14,
+      "expected_output_count": 14,
+      "launched_at": "2026-09-11T11:38:00+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Single-cell RB-011 REJECT_ISOLATED retry for de, primary_model forced to m2m100_418m (the untried other model), replace_existing pointed at the current on-disk rejected file's sha256. Two prior launch attempts (PID 18920, then an unlaunched r1 rebuild) died on translator-repo dirty-race -- see last_wake_summary. On next wake: check data/campaigns/pdfgeneratedpython-de-retry-20260911-m2m-r2/{summary.json,acceptance_receipts.jsonl,failure_metadata.jsonl}; if accepted, body-review before committing (do not trust structural gates alone for RB-011); if rejected/exhausted, escalate the heal ticket per plan SS4 item 3 (both models now tried)."
+      "notes": "de-retry-r2 (PID 62040) exhausted both models (m2m100_418m GATE36 warn/score=0.50; professionalize_llm x2 GluedIdentifierValidator field=description) -- root-caused: bare snake_case/dotted identifiers (aspose_pdf.generated, aspose_pdf) in the frontmatter description field had NO preserve_pattern coverage (neither backtick nor PascalCase). Fixed in commit 1fb13d20 (config/global.yaml third preserve_pattern, underscore-gated; regression tests; see data/summaries/fp-glued-identifier-recurrence-pdfgeneratedpython-20260911.json). That fix also revealed the main wave (55468, closed by peer at 12/25) never actually attempted nl/pl/pt/ro/ru/sv/th/tr/uk/vi/zh -- QU-02 file-level quarantine tripped once de's OPEN ticket became the 3rd distinct locale for auto:GluedIdentifierValidator on this source_path, cascading a skip-without-attempt to every remaining locale (mislabeled auto:unclassified, empty note). Resolved the 3 real tickets (FIXED_VERIFIED) + 22 cascade tickets (WAIVED_RUBRIC) to clear the quarantine. This retrigger covers es/fa/de (replace_existing, current on-disk sha declared) plus the 11 never-attempted locales, under the hardened config, primary_model=professionalize_llm. On next wake: check data/campaigns/pdfgeneratedpython-retrigger-20260911/{summary.json,acceptance_receipts.jsonl,failure_metadata.jsonl}; body-review de specifically for the RB-011 heading-content-mismatch class (structural gates don't catch it) before committing, in addition to the normal review pass."
     },
     {
       "campaign_id": "wave-htmlcssompython-20260911",
