@@ -1795,6 +1795,13 @@ class TranslationEngine:
                 translated_content, target_lang, source_content=source_content
             )
         )
+        # TC-APT-112: see _check_frontmatter_glued_identifiers docstring --
+        # the main validator suite above never sees frontmatter text at all.
+        validation_result.issues.extend(
+            self._check_frontmatter_glued_identifiers(
+                translated_content, source_content=source_content
+            )
+        )
         if (
             getattr(validation_result, "error_count", 0) > 0
             or getattr(validation_result, "warning_count", 0) > 0
@@ -2310,6 +2317,75 @@ class TranslationEngine:
                         )
             except Exception:
                 pass  # langdetect is probabilistic; silently skip on any detection error
+
+        return issues
+
+    def _check_frontmatter_glued_identifiers(
+        self, translated_content: str, source_content: str = ""
+    ) -> list:
+        """TC-APT-112 (2026-09-11): GluedIdentifierValidator (TC-APT-110)
+        only ever sees `source_body`/`translated_body` -- both callers of
+        `validation_suite.validate_aggregated()` (this class and
+        file_pipeline.py) build those from content with the frontmatter
+        delimiters stripped out (see the "Match the production file
+        pipeline exactly" comment a few lines above this method's own call
+        site), matching `_check_frontmatter_language`'s equally separate
+        frontmatter-only pass. The main validator suite therefore
+        structurally never evaluates frontmatter field text at all, so a
+        glued technical identifier confined to e.g. the `description`
+        field (every real occurrence found so far: wave-cellsrust-
+        quickstart-glueretrigger-20260911{,r2,r3}, all 3 waves, cs/hu still
+        glued in r3 despite the new gate landing in 17073573) can never
+        reach it regardless of how correct the gate itself is. This mirrors
+        `_check_frontmatter_language`'s own pattern (parse both frontmatter
+        blocks, walk the same CHECKED_FIELDS) but delegates the actual
+        glue detection to GluedIdentifierValidator so the two validation
+        paths cannot drift on what counts as a glued identifier.
+
+        Args:
+            translated_content: Full translated document including frontmatter
+            source_content: Full source document including frontmatter
+
+        Returns:
+            List of _ValIssue objects (empty if no source, no frontmatter,
+            or no glued identifiers found)
+        """
+        import re as _re
+
+        from .validation.glued_identifier_validator import GluedIdentifierValidator
+
+        issues: list = []
+        if not source_content:
+            return issues
+
+        fm_match = _re.match(r"^---\s*\n(.*?)\n?---\s*\n", translated_content, _re.DOTALL)
+        source_match = _re.match(r"^---\s*\n(.*?)\n?---\s*\n", source_content, _re.DOTALL)
+        if not fm_match or not source_match:
+            return issues
+
+        try:
+            import yaml as _yaml
+
+            fm_data = _yaml.safe_load(fm_match.group(1).strip()) or {}
+            source_data = _yaml.safe_load(source_match.group(1).strip()) or {}
+        except Exception:
+            return issues
+        if not isinstance(fm_data, dict) or not isinstance(source_data, dict):
+            return issues
+
+        validator = GluedIdentifierValidator()
+        for field in ("title", "description", "seoTitle", "summary"):
+            translated_value = fm_data.get(field)
+            source_value = source_data.get(field)
+            if not isinstance(translated_value, str) or not isinstance(source_value, str):
+                continue
+            if not translated_value.strip() or not source_value.strip():
+                continue
+            result = validator.validate(source_value, translated_value)
+            for issue in result.issues:
+                issue.location = f"frontmatter.{field}"
+                issue.details = {**(issue.details or {}), "field": field}
+                issues.append(issue)
 
         return issues
 

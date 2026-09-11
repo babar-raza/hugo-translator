@@ -264,6 +264,13 @@ class FileTranslationPipeline:
                             translated_content, target_lang, source_content=content
                         )
                         validation_result.issues.extend(_fm_issues)
+                        # TC-APT-112: see engine._check_frontmatter_glued_identifiers
+                        # docstring -- the suite above never sees frontmatter text.
+                        validation_result.issues.extend(
+                            engine._check_frontmatter_glued_identifiers(
+                                translated_content, source_content=content
+                            )
+                        )
 
                         # Make decision
                         # VA-01: pass this call's actual per-attempt budget
@@ -398,6 +405,12 @@ class FileTranslationPipeline:
                                             source_content=content,
                                         )
                                         validation_result.issues.extend(_fm_issues)
+                                        # TC-APT-112: see the note on the first call site.
+                                        validation_result.issues.extend(
+                                            engine._check_frontmatter_glued_identifiers(
+                                                translated_content, source_content=content
+                                            )
+                                        )
                                         # VA-01: see the note on the first call site.
                                         decision_result = engine.decision_engine.make_decision(
                                             validation_result=validation_result,
