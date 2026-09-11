@@ -1469,6 +1469,19 @@
       "launched_at": "2026-09-11T10:57:00+00:00",
       "launched_by": "hugo-translator-fc",
       "notes": "Single-cell RB-011 REJECT_ISOLATED retry for de, primary_model forced to m2m100_418m (the untried other model), replace_existing pointed at the current on-disk rejected file's sha256. Two prior launch attempts (PID 18920, then an unlaunched r1 rebuild) died on translator-repo dirty-race -- see last_wake_summary. On next wake: check data/campaigns/pdfgeneratedpython-de-retry-20260911-m2m-r2/{summary.json,acceptance_receipts.jsonl,failure_metadata.jsonl}; if accepted, body-review before committing (do not trust structural gates alone for RB-011); if rejected/exhausted, escalate the heal ticket per plan SS4 item 3 (both models now tried)."
+    },
+    {
+      "campaign_id": "wave-htmlcssompython-20260911",
+      "pid": 50836,
+      "manifest": "data/campaigns/manifests/wave-htmlcssompython-20260911.yaml",
+      "sources": [
+        "content/blog.aspose.org/html/python/html-cssom-in-python/index.md"
+      ],
+      "locales": 24,
+      "expected_output_count": 24,
+      "launched_at": "2026-09-11T11:08:00+00:00",
+      "launched_by": "hugo-translator-fc",
+      "notes": "New Tier-1a page after pdf-generated-in-python landed (12/25). 24/25 missing (es already shipped, verified against git log). 0 open tickets. Committing incrementally: >=5 files OR ~20min since last commit, always flush on process exit."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
