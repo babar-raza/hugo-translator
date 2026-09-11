@@ -1458,17 +1458,17 @@
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [
   {
-   "campaign_id": "wave-cellsrust-quickstart-retrigger-20260911",
-   "pid": 57940,
-   "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-retrigger-20260911.yaml",
+   "campaign_id": "wave-cellsrust-quickstart-retrigger-20260911r2",
+   "pid": null,
+   "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-retrigger-20260911r2.yaml",
    "sources": [
     "content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md"
    ],
    "locales": 25,
    "expected_output_count": 25,
-   "launched_at": "2026-09-11T01:21:37+00:00",
+   "launched_at": null,
    "launched_by": "interactive-continue-20260911",
-   "notes": "VA-07 reverification for the one page that originated the fix (leaf_inventory.classify_sole_leaf, commit 0328ef5b): all 25 locales still MISSING_TRANSLATION in work_ledger (never shipped -- ar/cs/de/el hit the pre-fix corruption and were left OPEN, es..zh were cascade-quarantined and never actually attempted). Provisionally closed the 4 OPEN tickets to unblock QU-01/QU-02 before building this manifest (--missing-only --include-known-broken). About to launch as a detached process; pid/launched_at will be filled in immediately after Start-Process, before any further git activity in this repo."
+   "notes": "r1 (pid 57940) died instantly on verify_environment dirty-path check -- see runbook SS L 2026-09-11 entry (uncommitted post-launch edit, not a commit, still counts as dirty). r2: manifest rebuilt fresh against current HEAD (commit 78c507f8) after that fix landed; pid/launched_at intentionally left null in this committed record -- cross-reference .local/logs/wave-cellsrust-quickstart-retrigger-20260911r2.*.log for the real pid instead of writing it here post-launch. No further repo writes until real progress (yaml_format_success or a receipt) is confirmed in that log."
   }
  ],
  "blocked_pending_clean_translator_repo": null,
