@@ -630,13 +630,26 @@ def test_failure_metadata_records_payload_free_repetition_fingerprint():
 
     gate, reason = CampaignRunner._failure_metadata(result)
 
-    # VA-01 (TC-APT-105 audit): a WARNING-only validator never actually
-    # causes a REJECT decision (Rule 1/2/5 are ERROR-driven), so it no
-    # longer drives `gate` -- it falls back to the next tier ("pipeline",
-    # since no verification_checks/safe_codes exist here either) instead of
-    # misattributing causation to a validator that only warned. Still
-    # recorded, distinctly, via warning_only_validators=.
-    assert gate == "pipeline"
+    # VA-01 (TC-APT-105 audit): a WARNING-only validator must not be named in
+    # `validators=` as the CAUSE of a reject.  That still holds -- see the
+    # warning_only_validators= assertion below.
+    #
+    # Corrected 2026-09-11: VA-01's stated premise ("a WARNING-only validator
+    # never actually causes a REJECT decision, Rule 1/2/5 are ERROR-driven")
+    # is false under this portfolio's own configuration.  decision_engine's
+    # Rule 5 reads `accept_after_max_retries` (config/validation.yaml: false)
+    # and its else-branch REJECTs on exhausted retries regardless of issue
+    # severity, so a warning-only result IS terminal under
+    # `validation_policy: zero-defect`.  Live proof: fr and vi of
+    # wave-pdftypescript-coreapi-20260911, three attempts each across both
+    # models, every failure row `validators=unknown;
+    # warning_only_validators=RepetitionDetectorValidator`.  Falling through to
+    # the literal "pipeline" therefore threw away the only actionable signal
+    # the ticket had.  The gate now names the warning validator with an
+    # explicit `warning:` prefix -- distinguishable from error attribution at a
+    # glance and in every root_cause_class derived from it, so VA-01's
+    # anti-misattribution intent survives without the information loss.
+    assert gate == "warning:RepetitionDetectorValidator"
     assert "warning_only_validators=RepetitionDetectorValidator;" in reason
     assert "RepetitionDetectorValidator:warning:word_frequency:" in reason
     assert "count=4" in reason
@@ -2141,3 +2154,66 @@ def test_failure_metadata_preserves_only_safe_sas_unit_fingerprints():
 
     assert gate == "TC-SAS-01"
     assert "unit_fingerprints=link_text:0123456789abcdef:13" in reason
+
+
+def test_failure_metadata_attributes_a_warning_only_reject_to_its_validator():
+    """VA-01 closed over-attribution; this closes the under-attribution half.
+
+    Under `validation_policy: zero-defect` the decision engine's Rule 5 has
+    `accept_after_max_retries=False`, so it REJECTs a candidate whose only
+    remaining issues are WARNING severity.  `validators` is then empty by
+    design (it is ERROR-only), and the gate used to fall all the way through
+    to the literal "pipeline" -- the heal ticket landed as `auto:pipeline`,
+    naming nothing, even though `warning_only_validators` recorded exactly
+    which validator blocked the cell.  Live cases: fr and vi of
+    wave-pdftypescript-coreapi-20260911 (RepetitionDetectorValidator warning,
+    count=6, threshold=5, identical error_sha256 on both).
+    """
+    issue = SimpleNamespace(
+        validator="RepetitionDetectorValidator",
+        severity=SimpleNamespace(value="warning"),
+        message="SECRET REJECTED CANDIDATE",
+        details={"ngram": "x", "count": 6, "threshold": 5},
+        location="body",
+    )
+    result = SimpleNamespace(
+        errors=["rejected"],
+        retry_attempts=2,
+        validation_result=SimpleNamespace(issues=[issue]),
+        error="Translation rejected: Failed after 2 retries",
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "warning:RepetitionDetectorValidator"
+    assert "validators=unknown" in reason
+    assert "warning_only_validators=RepetitionDetectorValidator" in reason
+    assert "SECRET REJECTED CANDIDATE" not in reason
+
+
+def test_failure_metadata_still_prefers_an_error_validator_over_a_warning_one():
+    """The warning fallback must never outrank real error attribution."""
+    error_issue = SimpleNamespace(
+        validator="StructureValidator",
+        severity=SimpleNamespace(value="error"),
+        message="x",
+        details={"source_count": 2, "translation_count": 13},
+        location="body",
+    )
+    warning_issue = SimpleNamespace(
+        validator="LinkValidator",
+        severity=SimpleNamespace(value="warning"),
+        message="x",
+        details={},
+        location="body",
+    )
+    result = SimpleNamespace(
+        errors=["rejected"],
+        retry_attempts=0,
+        validation_result=SimpleNamespace(issues=[error_issue, warning_issue]),
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "StructureValidator"
+    assert "warning_only_validators=LinkValidator" in reason

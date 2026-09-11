@@ -1479,13 +1479,31 @@ class CampaignRunner:
                     ]
                 )
             )
+        # VA-01 closed over-attribution (a warning-only validator must not be
+        # named as the cause).  This closes the under-attribution half: under
+        # `validation_policy: zero-defect` the decision engine's Rule 5 runs with
+        # accept_after_max_retries=False and REJECTs a candidate whose only
+        # remaining issues are WARNING severity, so `validators` is legitimately
+        # empty and the gate fell through to the literal "pipeline" -- the heal
+        # ticket then named nothing (`auto:pipeline`) even though
+        # warning_only_validators recorded exactly what blocked the cell.  The
+        # `warning:` prefix keeps the two kinds of attribution distinguishable at
+        # a glance and in every root_cause_class that derives from this value.
         gate = (
             validators[0]
             if validators
             else (
                 f"verification:{verification_checks[0]}"
                 if verification_checks
-                else (safe_codes[0] if safe_codes else "pipeline")
+                else (
+                    safe_codes[0]
+                    if safe_codes
+                    else (
+                        f"warning:{warning_only_validators[0]}"
+                        if warning_only_validators
+                        else "pipeline"
+                    )
+                )
             )
         )
         validator_text = ",".join(validators) if validators else "unknown"
