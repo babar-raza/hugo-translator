@@ -1459,16 +1459,16 @@
   "active_detached_runs": [
     {
       "campaign_id": "wave-pdfnet-helpers-20260911",
-      "pid": null,
+      "pid": 56568,
       "manifest": "data/campaigns/manifests/wave-pdfnet-helpers-20260911.yaml",
       "sources": [
         "content/docs.aspose.org/en/pdf/net/developer-guide/helpers.md"
       ],
       "locales": 25,
       "expected_output_count": 25,
-      "launched_at": null,
+      "launched_at": "2026-09-11T13:56:20.121030+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Fresh Tier-1a page (0 existing translations, 25/25 missing). 0 heal_queue history for the whole pdf/net family. pid/launched_at filled in after Start-Process + confirmed real log progress per standing launch-race lesson."
+      "notes": "Fresh Tier-1a page (0 existing translations, 25/25 missing). 0 heal_queue history for the whole pdf/net family. pid/launched_at filled in after Start-Process + confirmed real log progress per standing launch-race lesson. Confirmed alive with real progress via llm_calls.jsonl growth (main .log stayed empty this run -- llm_calls.jsonl is the more reliable signal) ~2min after launch."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
