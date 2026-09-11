@@ -1479,14 +1479,14 @@
     },
     {
       "campaign_id": "type1-it-heal-20260911-r2",
-      "pid": null,
+      "pid": 62768,
       "manifest": "data/campaigns/manifests/type1-it-heal-20260911-r2.yaml",
       "sources": [
         "content/docs.aspose.org/en/font/python/developer-guide/type1.md"
       ],
       "locales": 1,
       "expected_output_count": 1,
-      "launched_at": null,
+      "launched_at": "2026-09-11T16:50:00+00:00",
       "launched_by": "hugo-translator-fc",
       "notes": "Single-cell RB-014 REJECT_ISOLATED heal-retrigger for it, forcing m2m100_418m (the untried other model). First launch attempt (PID 59248) died instantly with 'translation memory fingerprint drift' -- wave-tier1b-batch1-20260911 (PID 50404) is still actively running and continuously mutating the shared L2 TM file, so the manifest's captured tm_fingerprint went stale in the ~15s between build and Start-Process. Rebuilt as -r2 immediately before launch to minimize the window; pid intentionally left null here, filled in only after Start-Process + confirmed real progress, never committed immediately after launch. On next wake: read the description field directly before committing a follow-up fix; if m2m100 also produces a non-translation, escalate per plan SS10 (both models tried) rather than retrying a 3rd time blind."
     }
