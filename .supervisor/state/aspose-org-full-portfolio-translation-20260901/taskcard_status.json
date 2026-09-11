@@ -1453,10 +1453,24 @@
       ]
     }
   },
-  "last_wake_summary": "cells/rust quickstart.md: 24/25 locales committed (ba68fdaeae 17/25, f7ab0f5089 +5, b57a1586c1 +pt, c366c0b118 +hu). Root cause chain for the glued-identifier defect class fully closed: TC-APT-110 (PlaceholderManager restore-time), TC-APT-111 (TerminologyProtector restore-time, b092b687), TC-APT-112 (GluedIdentifierValidator gate never ran against frontmatter text at all -- fixed, b6218866). cs is the sole holdout: 3 separate post-fix relaunches (r4/r5/r6) all correctly REJECTED by the now-working gate (proof the fix works) but never produced a clean generation -- the underlying professionalize_llm stochastic glue rate on Czech \"pomocí X\" phrasing is high enough that plain retries are not converging. data/quarantine.jsonl auto-quarantined it (max_retries_exceeded) after r6 -- per that mechanisms own design, this now needs manual review/a differently-shaped retry (e.g. cs-specific retry feedback), not another identical retrigger. Left un-shipped and ticketed rather than force-committed or hand-translated.",
+  "last_wake_summary": "User flagged 2h content-commit gap; confirmed real via commit timestamps (last content commit c366c0b118 at 11:03, nothing content-shaped since). Fleet active but stuck on other producer bugs (words-foss-net TC-APT-042, claimed elsewhere). Launched fresh wave (barcode/python _index.md, 21 locales) PID 52432 to keep content landing.",
   "cells_committed_total": 481,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "campaign_id": "wave-barcodepython-index-20260911",
+      "pid": 52432,
+      "manifest": "data/campaigns/manifests/wave-barcodepython-index-20260911.yaml",
+      "sources": [
+        "content/blog.aspose.org/barcode/python/_index.md"
+      ],
+      "locales": 21,
+      "expected_output_count": 21,
+      "launched_at": "2026-09-11T08:00:00+00:00",
+      "launched_by": "hugo-translator-fc",
+      "notes": "User flagged a ~2h gap with no new translated-content commits landing (last was c366c0b118, hu locale). Investigation: fleet is active (11+ peers), but recent commits in the window were all governance/quality-remediation, not content -- other sessions stuck on a different producer bug (words-foss-net FOSS+platform qualifier merge, TC-APT-042, actively claimed/being fixed, not touched here). Rather than just report the gap, launched a fresh, uncontested Tier-1a page (21/25 locales, excluding hi/ko/tr/ja which have an open unfixed title-postposition-inversion ticket) to land another real content commit."
+    }
+  ],
   "blocked_pending_clean_translator_repo": null,
   "wave_scale": {
     "value": 4,
