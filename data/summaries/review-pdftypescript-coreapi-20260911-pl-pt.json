@@ -18,6 +18,7 @@
     "conclusion": "extractor emits the unit (10/16 translate it); model echo, not _link_text_matches_url_slug; minority recurrence => RECORD_ONLY",
     "link_target": "/pdf/typescript/introducing-pdf-foss-typescript/",
     "source_link_text": "introductory post",
+    "tally_at": "20 of 25 locales accepted",
     "ticket_id": "review-wave-pdftypescript-coreapi-20260911-rb008-linktext-pl",
     "translated_in": [
       "ar",
@@ -29,7 +30,10 @@
       "id",
       "it",
       "nl",
-      "pt"
+      "pt",
+      "ro",
+      "ru",
+      "sv"
     ],
     "untranslated_in": [
       "de",
@@ -37,16 +41,41 @@
       "fa",
       "ja",
       "ko",
-      "pl"
+      "pl",
+      "th"
     ]
   },
   "delivery_note": "pl/pt were committed by a concurrent peer session (371acb7b0a) before this review completed; this session did NOT commit content and stayed on trailing review per session-ledger scoping.",
+  "frontmatter_evidence_sections": {
+    "finding": "evidence.sections[].heading stays English in 20/20 locales",
+    "verdict": "by design, no ticket -- source-anchored provenance metadata (carries source `line:` numbers, `apis:`, `formats:`), not reader-facing content"
+  },
   "governed_term_check": {
     "preserved_in": "16/16 locales",
     "source": "config/terminology.yaml",
     "term": "API Guide",
     "verdict": "correct per RB-002/RB-006"
   },
+  "intermediate_gate_failures": [
+    {
+      "attempt": 3,
+      "gate": "StructureValidator",
+      "outcome": "accepted on a later attempt",
+      "target_lang": "ru"
+    },
+    {
+      "attempt": 3,
+      "gate": "FrontmatterLanguageCheck",
+      "outcome": "accepted on a later attempt",
+      "target_lang": "sv"
+    },
+    {
+      "attempt": 1,
+      "gate": "FrontmatterLanguageCheck",
+      "outcome": "accepted on a later attempt",
+      "target_lang": "cs"
+    }
+  ],
   "kind": "trailing_review",
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "mission": "aspose-org-full-portfolio-translation-20260901",
@@ -105,6 +134,71 @@
       },
       "target_lang": "pt",
       "verdict": "APPROVE"
+    },
+    {
+      "notes": "'Open Source' retained in the licensing heading (brand-grade, RB-002/RB-003)",
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "ro",
+      "verdict": "APPROVE"
+    },
+    {
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "ru",
+      "verdict": "APPROVE"
+    },
+    {
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "sv",
+      "verdict": "APPROVE"
+    },
+    {
+      "recorded_defects": [
+        "RB-008 MECHANISM VARIANT: body link text left in source language",
+        "RB-003: English technical terms (metadata/bookmarks/page labels) in body while the heading uses the Thai transliteration -- terminology inconsistency, not a defect"
+      ],
+      "rule_ids": [
+        "RB-003",
+        "RB-008"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "th",
+      "verdict": "APPROVE_WITH_RECORD"
     }
   ],
   "rubric_change": {
@@ -115,5 +209,38 @@
   },
   "run_id": "review-pdftypescript-coreapi-20260911-pl-pt",
   "source_path": "content/blog.aspose.org/pdf/typescript/pdf-core-api-typescript/index.md",
+  "va01_heal_queue_backfill": {
+    "action": "scripts/ops/reclassify_va01_heal_tickets.py --write (in-place rewrite, 414 rows, audit fields on each)",
+    "claim": "taskcard:heal-queue-va01-class-backfill (opus5-review-20260911)",
+    "consequence": "the mission's largest recurrence class was an artifact of pre-VA-01 attribution; degenerate repetition (RepetitionDetectorValidator), not link validation, is the real #1 target for Track B",
+    "measurement": {
+      "actual_error_validators": {
+        "RepetitionDetectorValidator": 287,
+        "SemanticSimilarityValidator": 16,
+        "StructureValidator": 105,
+        "unparseable": 66
+      },
+      "open_auto_LinkValidator_before": 475,
+      "pre_VA01_note_format": 475,
+      "tickets_where_LinkValidator_reported_an_error": 0
+    },
+    "open_class_ranking_after": {
+      "auto:FrontmatterLanguageCheck": 118,
+      "auto:LinkValidator": 66,
+      "auto:RepetitionDetectorValidator": 322,
+      "auto:SemanticSimilarityValidator": 120,
+      "auto:StructureValidator": 163
+    },
+    "quarantine_impact": {
+      "after": 105,
+      "lang_class_quarantines_before": 96,
+      "newly_added": [
+        "content/docs.aspose.org/en/3d/net/developer-guide/animation.md"
+      ],
+      "released": [],
+      "source_path_quarantines_before": 48
+    },
+    "verification": "pytest tests/unit -k heal_queue -> 43 passed; line count 1636 -> 1636; backup at data/campaigns/heal_queue.jsonl.bak-20260911-va01"
+  },
   "written_at": "2026-09-11T09:10:47.264198+00:00"
 }
