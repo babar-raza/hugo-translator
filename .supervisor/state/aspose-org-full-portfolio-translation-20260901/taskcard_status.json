@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-11T18:35:00+05:00",
+  "updated_at": "2026-09-11T18:55:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 50,
+  "wake_count": 51,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "Closed out wave-cellsnet-features-20260911 (8/9, hi ticketed OPEN) and its follow-up single-cell heal cellsnet-features-ko-heal-20260911 (RB-013 ko fix, FIXED_VERIFIED, d01d58561d). No campaigns currently active -- picking a fresh docs.aspose.org candidate next.",
-  "cells_committed_total": 503,
+  "last_wake_summary": "Body-reviewed wave-pdfnet-helpers-20260911's newly-accepted de/el: de clean (committed 0cf48a4b26), el REJECTed for a new RB-013 variant -- 'integer math' and 'in-memory streams' left entirely untranslated in the intro paragraph AND the corresponding H3 heading, while every sibling item in the same colon-separated list translated cleanly; not adjacent to a protected identifier so RB-003 doesn't excuse it. Checked ar/cs/de for the same phrases: zero matches, isolated to el. TM purged, heal ticket opened, single-cell retry launched (pdfnet-helpers-el-heal-20260911, PID 57324) forcing m2m100_418m (untried -- el's reject came from professionalize_llm). cells_committed_total 503 -> 506 (ar/cs by peer, de by this session).",
+  "cells_committed_total": 506,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1468,7 +1468,20 @@
       "expected_output_count": 25,
       "launched_at": "2026-09-11T13:56:20.121030+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Fresh Tier-1a page (0 existing translations, 25/25 missing). 0 heal_queue history for the whole pdf/net family. pid/launched_at filled in after Start-Process + confirmed real log progress per standing launch-race lesson. Confirmed alive with real progress via llm_calls.jsonl growth (main .log stayed empty this run -- llm_calls.jsonl is the more reliable signal) ~2min after launch."
+      "notes": "Fresh Tier-1a page (0 existing translations, 25/25 missing). 0 heal_queue history for the whole pdf/net family. pid/launched_at filled in after Start-Process + confirmed real log progress per standing launch-race lesson. Confirmed alive with real progress via llm_calls.jsonl growth (main .log stayed empty this run -- llm_calls.jsonl is the more reliable signal) ~2min after launch. Peer committed ar/cs (fc3340cd30); this session reviewed+committed de (0cf48a4b26) and REJECTed el (RB-013 variant: 'integer math'/'in-memory streams' left untranslated in an intro paragraph + H3 heading, isolated to el -- see heal-retrigger entry below)."
+    },
+    {
+      "campaign_id": "pdfnet-helpers-el-heal-20260911",
+      "pid": 57324,
+      "manifest": "data/campaigns/manifests/pdfnet-helpers-el-heal-20260911.yaml",
+      "sources": [
+        "content/docs.aspose.org/en/pdf/net/developer-guide/helpers.md"
+      ],
+      "locales": 1,
+      "expected_output_count": 1,
+      "launched_at": "2026-09-11T14:30:00+00:00",
+      "launched_by": "hugo-translator-fc",
+      "notes": "Single-cell RB-013 REJECT_ISOLATED heal-retrigger for el, forcing m2m100_418m (the untried other model -- el's rejected candidate came from professionalize_llm's first attempt). replace_existing declared against the currently-uncommitted rejected file's sha. On next wake: grep body + description for 'integer math'/'in-memory streams' (or any other bare English phrase) before committing a follow-up; if m2m100 also fails the same way, escalate per plan SS10 (both models tried)."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
