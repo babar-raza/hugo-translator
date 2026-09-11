@@ -1453,23 +1453,10 @@
       ]
     }
   },
-  "last_wake_summary": "wave-pdfgeneratedpython-20260911 continuing (9/25 processed by review time: ar/cs/de/el/fr/he/hi/hu accepted, id accepted-pending-review, es/fa exhausted both models and auto-ticketed). Reviewed ar/cs/de/el body-read (not just structural): de REJECT_ISOLATED on a NEW defect class -- source H3 'Packaging Unsigned Content' rendered as 'Schnellstart' (Quick Start's own heading) -- added RB-011 (heading-content-mismatch) to config/review_rubric.yaml, opened heal ticket review-wave-pdfgeneratedpython-20260911-rb011-de, purged its 75 L2 TM entries, and launched a single-cell m2m100_418m retry (see active_detached_runs). ar/cs/el APPROVE (already shipped by a peer alongside de+fr in commit 87954c692b before this review landed -- peer verified structure/link/glued-identifier only, which does not catch a heading-content mismatch). Reviewed and shipped fr/he/hi/hu myself (commit 54e92d8e3a on content repo local main); hi carries an RB-003-grade minor English fragment, not a defect. Two translator-repo dirty-race failures hit the de retry launch (self-inflicted: build_campaign_manifest.py's own inventory-file side-effect re-dirtying the tree between fingerprint capture and Start-Process) -- fixed by committing the inventory refresh immediately before each relaunch attempt; relaunched clean as r2/PID 62040, still starting up as of this update.",
+  "last_wake_summary": "wave-pdfgeneratedpython-20260911 complete: 12/25 committed across 4 batches (87954c692b, peer 54e92d8e3a, 1fba1d968e, f47e12d6e8), landed incrementally per the refined batching rule (>=5 files OR ~20min since last commit, always flush on exit). 13 locales exhausted retries (mostly GluedIdentifierValidator), auto-ticketed. Claim released; selecting next candidate.",
   "cells_committed_total": 484,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
-    {
-      "campaign_id": "wave-pdfgeneratedpython-20260911",
-      "pid": 55468,
-      "manifest": "data/campaigns/manifests/wave-pdfgeneratedpython-20260911.yaml",
-      "sources": [
-        "content/blog.aspose.org/pdf/python/pdf-generated-in-python/index.md"
-      ],
-      "locales": 25,
-      "expected_output_count": 25,
-      "launched_at": "2026-09-11T09:47:00+00:00",
-      "launched_by": "hugo-translator-fc",
-      "notes": "New Tier-1a page after pdf-core-api-typescript landed (23/25). Verified 0 existing locale files on disk and 0 heal tickets before claiming (not just work_ledger, which has been found stale/incomplete before). Committing incrementally as locales complete, per the established pattern from the previous campaign, rather than waiting for full completion. First launch (PID 56272) died instantly on transient dirty-repo race with a peer session; relaunched clean as PID 55468. As of this update: 8 accepted (ar/cs/de/el/fr/he/hi/hu), 1 more accepted-not-yet-reviewed (id), 2 exhausted/ticketed (es, fa)."
-    },
     {
       "campaign_id": "pdfgeneratedpython-de-retry-20260911-m2m-r2",
       "pid": 62040,
