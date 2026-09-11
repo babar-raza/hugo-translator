@@ -252,3 +252,36 @@ rules:
       committed German outputs in blog.aspose.org for the same
       "### Schnellstart" string: no other occurrence found, so isolated to
       this one cell, not a recurring producer pattern.
+  - id: RB-012
+    name: markdown-syntax-in-plaintext-frontmatter-field
+    verdict: REJECT
+    scope: frontmatter
+    statement: >-
+      Markdown emphasis syntax (`**bold**`, `_italic_`, etc.) injected into a
+      frontmatter field whose source value carries none is a defect: fields
+      like `description`/`seoTitle` are consumed as plain text (HTML meta
+      tags, RSS feeds, search snippets), which do not render markdown -- the
+      literal asterisks/underscores show up as garbage characters to a reader
+      or search engine, not as formatting. This is independent of whether the
+      emphasized term is otherwise correct; the meaning can be perfect and
+      this still REJECTs, the same way RB-004's mechanical-punctuation-
+      artifact bar does not require meaning damage elsewhere in the sentence.
+      Test: does the source frontmatter value contain markdown syntax at the
+      same position -- if not, any that appears in the translation is
+      hallucinated formatting, not translated content.
+      DIAGNOSTIC: recurrence at the same structural position across locales
+      of one page is producer-side per RB-005 (fix producer, retrigger,
+      never hand-edit); a single-locale occurrence is model variance and
+      REJECTs only that cell -- retry on the other model before ticketing.
+    evidence: >-
+      blog.aspose.org/pdf/python/pdf-generated-in-python nl,
+      pdfgeneratedpython-retrigger-20260911, 2026-09-11: frontmatter
+      `description` came back as "...subpackage **aspose_pdf.generated** met
+      een tweede **Document**-implementatie, losstaande **form-content**- en
+      **PDF/A**-helperklassen..." -- four bold-wrapped spans, none present in
+      the English source's plain-prose description. Checked all 12 other
+      already-committed locales of the same page's description field: zero
+      contain any "**" -- isolated to this one cell. No existing gate checks
+      frontmatter string fields for injected markdown syntax (the 44-gate
+      battery treats markdown syntax as expected/valid in BODY text, where it
+      legitimately occurs, and does not separately check frontmatter values).
