@@ -1469,6 +1469,19 @@
       "launched_at": "2026-09-11T11:38:00+00:00",
       "launched_by": "hugo-translator-fc",
       "notes": "de-retry-r2 (PID 62040) exhausted both models (m2m100_418m GATE36 warn/score=0.50; professionalize_llm x2 GluedIdentifierValidator field=description) -- root-caused: bare snake_case/dotted identifiers (aspose_pdf.generated, aspose_pdf) in the frontmatter description field had NO preserve_pattern coverage (neither backtick nor PascalCase). Fixed in commit 1fb13d20 (config/global.yaml third preserve_pattern, underscore-gated; regression tests; see data/summaries/fp-glued-identifier-recurrence-pdfgeneratedpython-20260911.json). That fix also revealed the main wave (55468, closed by peer at 12/25) never actually attempted nl/pl/pt/ro/ru/sv/th/tr/uk/vi/zh -- QU-02 file-level quarantine tripped once de's OPEN ticket became the 3rd distinct locale for auto:GluedIdentifierValidator on this source_path, cascading a skip-without-attempt to every remaining locale (mislabeled auto:unclassified, empty note). Resolved the 3 real tickets (FIXED_VERIFIED) + 22 cascade tickets (WAIVED_RUBRIC) to clear the quarantine. This retrigger covers es/fa/de (replace_existing, current on-disk sha declared) plus the 11 never-attempted locales, under the hardened config, primary_model=professionalize_llm. On next wake: check data/campaigns/pdfgeneratedpython-retrigger-20260911/{summary.json,acceptance_receipts.jsonl,failure_metadata.jsonl}; body-review de specifically for the RB-011 heading-content-mismatch class (structural gates don't catch it) before committing, in addition to the normal review pass."
+    },
+    {
+      "campaign_id": "wave-cellsnet-features-20260911",
+      "pid": null,
+      "manifest": "data/campaigns/manifests/wave-cellsnet-features-20260911.yaml",
+      "sources": [
+        "content/docs.aspose.org/en/cells/net/developer-guide/features.md"
+      ],
+      "locales": 9,
+      "expected_output_count": 9,
+      "launched_at": null,
+      "launched_by": "hugo-translator-fc",
+      "notes": "Tier-1b (16/25 locales already existed, 9 missing) -- picked as freed capacity after wave-htmlcssompython-20260911 closed. 0 heal_queue history for the whole cells/net family. pid/launched_at filled in after Start-Process + ~90s confirmation per standing launch-race lesson (never commit real pid immediately after Start-Process)."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
