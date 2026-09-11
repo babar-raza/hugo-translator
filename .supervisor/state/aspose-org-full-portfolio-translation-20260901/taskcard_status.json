@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-11T21:50:00+05:00",
+  "updated_at": "2026-09-11T22:15:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 57,
+  "wake_count": 58,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "wave-tier1b-batch1-20260911 (PID 50404, still running, max_parallel_jobs=4 VERIFIED legitimate -- TC-APT-043..047 all DONE): reviewed type1.md's 7 accepted cells (de/it/ja/ko/nl/pl + pdf/go/docs-pdf-go-overview de). Found a SEVERE new defect on it: the description field came back as a meta-request for the source text ('Mi serve la descrizione della classe API da tradurre...') instead of an actual translation -- total content substitution, passed all 44 gates since none check output-responsiveness-to-source. Added RB-014 (meta-response-instead-of-translation). A peer committed the whole batch (bee80f05a9, structural-only verification) including the defective it BEFORE this session's ticket could hold it back -- 4th occurrence this session of the same peer-verification gap (RB-011/012/013/014). TM purged, heal-retrigger launched (type1-it-heal-20260911, PID 59248) forcing m2m100_418m.",
-  "cells_committed_total": 523,
+  "last_wake_summary": "type1-it-heal-20260911-r2 exhausted both models with 3 DIFFERENT failure modes (m2m100: StructureValidator content-drop; professionalize_llm escalation x2: RepetitionDetectorValidator, identical fingerprint both times) -- not consistent with one fixable producer bug, unlike the RB-011/012/013 fixes. Marked MODEL_LIMITATION_DEFERRED; the peer-shipped defective it cell (RB-014 meta-response) remains live pending a future dedicated investigation. Reviewed and committed wave-tier1b-batch1-20260911's pdf/go/docs-pdf-go-overview.md hi/id/it/ja (full-page read, all clean -- 360f004121). cells_committed_total 523 -> 527.",
+  "cells_committed_total": 527,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1476,19 +1476,6 @@
       "launched_at": "2026-09-11T16:11:13.659355+00:00",
       "launched_by": "hugo-translator-fc",
       "notes": "First Tier-1b batch this mission: true Tier-1a (0-translation) supply on docs.aspose.org is now exhausted outside excluded families (confirmed via full-tree scan). Moving to Tier-1b per runbook strict tier order (plan section 17.1.0), fewest-missing-first: 8 pages across email/net, email/python, font/python, pdf/go, pdf/java, slides/cpp, slides/net, 0 heal_queue history on any (manual missing-count-per-page estimate via glob was wrong -- trust build_campaign_manifest.py's own --missing-only computation instead, which found 56 real missing cells across the 8 sources, not 8). Built as ONE multi-source manifest via --source-list + --missing-only so it actually benefits from --max-parallel-jobs 4 (unlike the single-page Tier-1a manifests, which shard to 1 job each regardless of the setting). First launch attempt (PID 58284) died instantly with 'translator repository is dirty (1 paths)' -- root cause: rebuilding the manifest a second time (after an unplanned heal_queue.jsonl commit moved HEAD) re-dirtied config/inventory/aspose_org_profile_inventory.json and it was not re-discarded before Start-Process; NEW STANDING LESSON: after ANY manifest (re)build, always re-check git status is clean immediately before Start-Process, even on a rebuild you think you already handled. Fixed, relaunched, confirmed alive with real progress via llm_calls.jsonl growth (443 bytes) ~18s after launch. VERIFIED max_parallel_jobs=4 is legitimate: TC-APT-043..047 all read DONE in this file -- the plan SS0.3 gate condition is satisfied, this is not a concurrency-rule violation (checked directly after noticing the manifest's execution_policy, since my own context predated these landing). A peer's structural-only-verified commit (bee80f05a9) shipped this wave's type1.md ja/ko/nl/pl + pdf/go de (already reviewed clean by this session) alongside a DEFECTIVE it cell -- RB-014 (meta-response-instead-of-translation, new rubric rule) heal-retriggered separately, see below."
-    },
-    {
-      "campaign_id": "type1-it-heal-20260911-r2",
-      "pid": 62768,
-      "manifest": "data/campaigns/manifests/type1-it-heal-20260911-r2.yaml",
-      "sources": [
-        "content/docs.aspose.org/en/font/python/developer-guide/type1.md"
-      ],
-      "locales": 1,
-      "expected_output_count": 1,
-      "launched_at": "2026-09-11T16:50:00+00:00",
-      "launched_by": "hugo-translator-fc",
-      "notes": "Single-cell RB-014 REJECT_ISOLATED heal-retrigger for it, forcing m2m100_418m (the untried other model). First launch attempt (PID 59248) died instantly with 'translation memory fingerprint drift' -- wave-tier1b-batch1-20260911 (PID 50404) is still actively running and continuously mutating the shared L2 TM file, so the manifest's captured tm_fingerprint went stale in the ~15s between build and Start-Process. Rebuilt as -r2 immediately before launch to minimize the window; pid intentionally left null here, filled in only after Start-Process + confirmed real progress, never committed immediately after launch. On next wake: read the description field directly before committing a follow-up fix; if m2m100 also produces a non-translation, escalate per plan SS10 (both models tried) rather than retrying a 3rd time blind."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
