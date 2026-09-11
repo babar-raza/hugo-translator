@@ -1456,7 +1456,21 @@
   "last_wake_summary": "Closed out wave-cellsnet-features-20260911 (8/9, hi ticketed OPEN) and its follow-up single-cell heal cellsnet-features-ko-heal-20260911 (RB-013 ko fix, FIXED_VERIFIED, d01d58561d). No campaigns currently active -- picking a fresh docs.aspose.org candidate next.",
   "cells_committed_total": 503,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "campaign_id": "wave-pdfnet-helpers-20260911",
+      "pid": null,
+      "manifest": "data/campaigns/manifests/wave-pdfnet-helpers-20260911.yaml",
+      "sources": [
+        "content/docs.aspose.org/en/pdf/net/developer-guide/helpers.md"
+      ],
+      "locales": 25,
+      "expected_output_count": 25,
+      "launched_at": null,
+      "launched_by": "hugo-translator-fc",
+      "notes": "Fresh Tier-1a page (0 existing translations, 25/25 missing). 0 heal_queue history for the whole pdf/net family. pid/launched_at filled in after Start-Process + confirmed real log progress per standing launch-race lesson."
+    }
+  ],
   "blocked_pending_clean_translator_repo": null,
   "wave_scale": {
     "value": 4,
