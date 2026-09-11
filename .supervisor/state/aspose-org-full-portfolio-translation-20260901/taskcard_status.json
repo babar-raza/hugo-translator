@@ -1458,17 +1458,17 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "campaign_id": "wave-cellsrust-quickstart-glueretrigger-20260911",
+      "campaign_id": "wave-cellsrust-quickstart-glueretrigger-20260911r2",
       "pid": null,
-      "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-glueretrigger-20260911.yaml",
+      "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-glueretrigger-20260911r2.yaml",
       "sources": [
         "content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md"
       ],
       "locales": 8,
       "expected_output_count": 8,
-      "launched_at": "2026-09-11T04:45:00+00:00",
+      "launched_at": "2026-09-11T05:00:00+00:00",
       "launched_by": "interactive-continue-20260911",
-      "notes": "RECURRENCE ESCALATION steps 2-3 for producer_frontmatter_description_placeholder_space_loss (TC-APT-110, fix commit 5c642cc1): retrigger the exact 8 quarantined locales (ar cs es fa hu nl pt uk) of cells/rust quickstart whose description field had glued placeholder boundaries. TM already purged for all 8 pairs. pid deliberately null (committed pre-launch); cross-reference logs/wave-cellsrust-quickstart-glueretrigger-20260911.log. No translator-repo git touches after Start-Process until the log shows sustained real activity."
+      "notes": "r2 of the TC-APT-110 retrigger. r1 (pid 49776) never translated: QU-02 file-level quarantine -- the 8 original OPEN space-loss tickets themselves quarantined the page (0 model calls, PARTIAL_WITH_TICKETS, 16 skip-artifact rows appended). Fixed by rewriting tickets in place (originals -> FIX_LANDED_PENDING_REVERIFY citing 5c642cc1; artifacts -> CLOSED_SUPERSEDED), quarantine release verified via is_source_path_quarantined()==False before relaunch. pid null pre-launch; see logs/wave-cellsrust-quickstart-glueretrigger-20260911r2-*.log."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
