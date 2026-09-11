@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-11T17:15:00+05:00",
+  "updated_at": "2026-09-11T17:35:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 46,
+  "wake_count": 47,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "Closed out wave-htmlcssompython-20260911: 23/25 accepted (zh exhausted retries, OPEN heal ticket, GluedIdentifierValidator class). Committed in 4 batches (3a0ff0857f, 346ab9d43f, 49a4aa1220, 52af0995e9, 36e28a677e). pdfgeneratedpython-retrigger-20260911 (PID 16024) still running -- 7/14 accepted so far (de/nl/pl/pt/ro/ru/sv), 3 committed batches so far, es OPEN-ticketed twice under fixed RB-011 config (watching for a 3rd distinct-locale recurrence before escalating further). Picking a fresh Tier-1a candidate next for the freed capacity.",
-  "cells_committed_total": 487,
+  "last_wake_summary": "pdfgeneratedpython-retrigger-20260911 (PID 16024) continues: found and fixed a SECOND real producer bug this page surfaced -- th's accepted description field (professionalize_llm, first attempt) also carried RB-012 markdown-bold hallucination (5 spans), confirming RB-005's recurrence diagnostic (2nd locale, same structural position -> producer-side, not variance). Root-caused to LLMModelBackend._build_batch_system_prompt(): the frontmatter_<field> context_hint was already wired end-to-end but had no prompt branch, so frontmatter translations fell through to the body-text prompt's 'preserve markdown' instruction. Added a dedicated plain-text branch (hugo-translator commit af2e29d3, 5 new regression tests, 11 pre-existing unrelated test_llm_waste_fixes.py failures confirmed via git-stash not caused by this change). This only closes the professionalize_llm path; nl's own RB-012 occurrence came from m2m100 (doesn't consume this prompt mechanism) and remains a separate open question. Committed ro/ru/sv/tr (c11875024b) and uk (e86c7e725e) clean. th held/ticketed like nl. 10/14 of this retrigger processed (8 accepted+committed-or-held, es/fa still the documented residual); vi/zh still pending. Peer closed wave-htmlcssompython-20260911 (23/25) and moved to a new page in parallel -- not touched here.",
+  "cells_committed_total": 492,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
