@@ -1457,6 +1457,23 @@
   "cells_committed_total": 536,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
+    {
+      "campaign_id": "wave-tier1b-batch1-retrigger-20260911",
+      "pid": 50572,
+      "manifest": "data/campaigns/manifests/wave-tier1b-batch1-retrigger-20260911.yaml",
+      "sources": [
+        "content/docs.aspose.org/en/email/net/developer-guide/compound-file-support.md",
+        "content/docs.aspose.org/en/email/python/developer-guide/compound-file-support.md",
+        "content/docs.aspose.org/en/pdf/go/getting-started/installation.md",
+        "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
+        "content/docs.aspose.org/en/slides/net/developer-guide/working-with-app-properties.md"
+      ],
+      "locales": 25,
+      "expected_output_count": 36,
+      "launched_at": "2026-09-11T18:12:00+00:00",
+      "launched_by": "hugo-translator-fc",
+      "notes": "Retrigger of wave-tier1b-batch1-20260911's 5 fully-blocked sources, now that the linktitle language_detection fix (hugo-translator commit 291c23f3) is live in a fresh process -- the original campaign had already loaded the pre-fix code before that commit landed, so it never benefited. 4 of the 5 sources (email/net+python compound-file-support.md, slides/cpp working-with-presentation-content.md, slides/net working-with-app-properties.md) should now pass cleanly if the fix works as the peer's own verification suggests; installation.md failed on a DIFFERENT, not-yet-diagnosed class (GATE18/GATE23/FrontmatterLanguageCheck) and is included as a fresh attempt, not a proven fix. On next wake: body-review every accepted cell (not just structural) given this session's repeated finding that peer verification misses real content defects; if the 4 linktitle-bug sources still fail the SAME way, that falsifies the fix's completeness and needs a fresh investigation, not a 3rd blind retry."
+    }
   ],
   "blocked_pending_clean_translator_repo": null,
   "wave_scale": {
