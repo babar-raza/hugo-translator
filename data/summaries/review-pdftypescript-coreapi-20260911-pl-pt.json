@@ -1,0 +1,119 @@
+{
+  "campaign_id": "wave-pdftypescript-coreapi-20260911",
+  "campaign_state_at_review": {
+    "accepted": 16,
+    "alive": true,
+    "failed": 1,
+    "locale_count": 25,
+    "pid": 52476
+  },
+  "commits_landed_this_iteration": {
+    "aspose.org": [],
+    "hugo-translator": [
+      "60c3999d review(TC-APT-059): extend RB-008 to non-slug link-text echo variant"
+    ]
+  },
+  "cross_locale_finding": {
+    "class": "RB-008:mixed-link-text-localization (mechanism variant)",
+    "conclusion": "extractor emits the unit (10/16 translate it); model echo, not _link_text_matches_url_slug; minority recurrence => RECORD_ONLY",
+    "link_target": "/pdf/typescript/introducing-pdf-foss-typescript/",
+    "source_link_text": "introductory post",
+    "ticket_id": "review-wave-pdftypescript-coreapi-20260911-rb008-linktext-pl",
+    "translated_in": [
+      "ar",
+      "cs",
+      "es",
+      "he",
+      "hi",
+      "hu",
+      "id",
+      "it",
+      "nl",
+      "pt"
+    ],
+    "untranslated_in": [
+      "de",
+      "el",
+      "fa",
+      "ja",
+      "ko",
+      "pl"
+    ]
+  },
+  "delivery_note": "pl/pt were committed by a concurrent peer session (371acb7b0a) before this review completed; this session did NOT commit content and stayed on trailing review per session-ledger scoping.",
+  "governed_term_check": {
+    "preserved_in": "16/16 locales",
+    "source": "config/terminology.yaml",
+    "term": "API Guide",
+    "verdict": "correct per RB-002/RB-006"
+  },
+  "kind": "trailing_review",
+  "loop_prompt_version_seen": "10.7 (2026-09-06)",
+  "mission": "aspose-org-full-portfolio-translation-20260901",
+  "rejected_cells": [
+    {
+      "attempts": 3,
+      "auto_ticket": "auto-wave-pdftypescript-coreapi-20260911-w0:blog.aspose.org:pdf:typescript:fr:1-index",
+      "models": [
+        "professionalize_llm",
+        "m2m100_418m"
+      ],
+      "target_lang": "fr",
+      "tm_purge": {
+        "applied": true,
+        "deleted": 32,
+        "scanned": 23120,
+        "tool": "scripts/tm/purge_page_lang_tm.py"
+      },
+      "validator": "RepetitionDetectorValidator"
+    }
+  ],
+  "reviewed_cells": [
+    {
+      "output_sha256_prefix": "fe0d3f2fc5c6e17e",
+      "recorded_defects": [
+        "RB-008 MECHANISM VARIANT: one body link text left in source language"
+      ],
+      "rule_ids": [
+        "RB-003",
+        "RB-006",
+        "RB-008"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "pl",
+      "verdict": "APPROVE_WITH_RECORD"
+    },
+    {
+      "output_sha256_prefix": "0a4223a0cf1b5524",
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003",
+        "RB-006"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "pt",
+      "verdict": "APPROVE"
+    }
+  ],
+  "rubric_change": {
+    "change": "MECHANISM VARIANT clause + evidence",
+    "commit": "60c3999d",
+    "file": "config/review_rubric.yaml",
+    "rule": "RB-008"
+  },
+  "run_id": "review-pdftypescript-coreapi-20260911-pl-pt",
+  "source_path": "content/blog.aspose.org/pdf/typescript/pdf-core-api-typescript/index.md",
+  "written_at": "2026-09-11T09:10:47.264198+00:00"
+}
