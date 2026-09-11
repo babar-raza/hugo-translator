@@ -1456,7 +1456,28 @@
   "last_wake_summary": "wave-pdfnet-helpers-20260911 CLOSED (PID 56568 exited, status PARTIAL_WITH_TICKETS): final 13/25 accepted and committed (ar,cs,de,el,fa,he,hu,id,it,ja,ko,nl,pl). 12/25 failed with auto-opened OPEN heal tickets: hi (auto:FrontmatterLanguageCheck, already investigated/exhausted), es/fr/pt (auto:RepetitionDetectorValidator), ro/ru/sv/th/tr/uk/vi/zh (auto:unclassified -- each has a duplicate ticket_id row, matching the known heal_queue append-vs-update-in-place bug documented in loop-prompt.md field notes). Per RECURRENCE ESCALATION practical reading, not root-causing this fresh multi-class backlog before moving on -- claim released, moving to a new Tier-1a candidate.",
   "cells_committed_total": 516,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "campaign_id": "wave-tier1b-batch1-20260911",
+      "pid": null,
+      "manifest": "data/campaigns/manifests/wave-tier1b-batch1-20260911.yaml",
+      "sources": [
+        "content/docs.aspose.org/en/email/net/developer-guide/compound-file-support.md",
+        "content/docs.aspose.org/en/email/python/developer-guide/compound-file-support.md",
+        "content/docs.aspose.org/en/font/python/developer-guide/type1.md",
+        "content/docs.aspose.org/en/pdf/go/docs-pdf-go-overview.md",
+        "content/docs.aspose.org/en/pdf/go/getting-started/installation.md",
+        "content/docs.aspose.org/en/pdf/java/developer-guide/cos.md",
+        "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
+        "content/docs.aspose.org/en/slides/net/developer-guide/working-with-app-properties.md"
+      ],
+      "locales": null,
+      "expected_output_count": 8,
+      "launched_at": null,
+      "launched_by": "hugo-translator-fc",
+      "notes": "First Tier-1b batch this mission: true Tier-1a (0-translation) supply on docs.aspose.org is now exhausted outside excluded families (confirmed via full-tree scan). Moving to Tier-1b per runbook strict tier order (plan section 17.1.0), fewest-missing-first: 8 pages across email/net, email/python, font/python, pdf/go, pdf/java, slides/cpp, slides/net, each missing exactly 1 of 25 locales, 0 heal_queue history on any. Built as ONE multi-source manifest via --source-list + --missing-only so it actually benefits from --max-parallel-jobs 4 (unlike the single-page Tier-1a manifests, which shard to 1 job each regardless of the setting). pid/launched_at to be filled in after Start-Process + confirmed real log/llm_calls.jsonl progress per standing launch-race lesson."
+    }
+  ],
   "blocked_pending_clean_translator_repo": null,
   "wave_scale": {
     "value": 4,
