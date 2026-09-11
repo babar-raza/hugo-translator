@@ -1459,14 +1459,14 @@
  "active_detached_runs": [
   {
    "campaign_id": "wave-cellsrust-quickstart-retrigger-20260911",
-   "pid": null,
+   "pid": 57940,
    "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-retrigger-20260911.yaml",
    "sources": [
     "content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md"
    ],
    "locales": 25,
    "expected_output_count": 25,
-   "launched_at": null,
+   "launched_at": "2026-09-11T01:21:37+00:00",
    "launched_by": "interactive-continue-20260911",
    "notes": "VA-07 reverification for the one page that originated the fix (leaf_inventory.classify_sole_leaf, commit 0328ef5b): all 25 locales still MISSING_TRANSLATION in work_ledger (never shipped -- ar/cs/de/el hit the pre-fix corruption and were left OPEN, es..zh were cascade-quarantined and never actually attempted). Provisionally closed the 4 OPEN tickets to unblock QU-01/QU-02 before building this manifest (--missing-only --include-known-broken). About to launch as a detached process; pid/launched_at will be filled in immediately after Start-Process, before any further git activity in this repo."
   }
