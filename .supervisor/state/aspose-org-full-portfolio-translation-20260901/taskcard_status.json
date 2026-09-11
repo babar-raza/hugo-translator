@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-11T22:55:00+05:00",
+  "updated_at": "2026-09-11T23:35:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 60,
+  "wake_count": 61,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "wave-tier1b-batch1-20260911 CLOSED (PID 50404 exited, status PARTIAL_WITH_TICKETS): final 20/56 accepted and committed across font/python/type1.md (6/6), pdf/go/docs-pdf-go-overview.md (8/8), pdf/java/developer-guide/cos.md (6/6). 36/56 failed with auto-opened OPEN heal tickets across 5 sources: email/net + email/python compound-file-support.md, slides/cpp working-with-presentation-content.md, slides/net working-with-app-properties.md (all 4 = the SAME already-fixed linktitle language_detection bug, commit 291c23f3 -- confirmed proven-retriggerable); pdf/go/getting-started/installation.md failed on a DIFFERENT, not-yet-investigated class (GATE18/GATE23/FrontmatterLanguageCheck) -- left as backlog, not chased this session per RECURRENCE ESCALATION practical reading. Claim released. Next: heal-retrigger campaign for the 4 linktitle-bug victims.",
-  "cells_committed_total": 536,
+  "last_wake_summary": "wave-tier1b-batch1-retrigger-20260911r2 (PID 52852, still running): the linktitle fix (291c23f3) CONFIRMED with direct evidence -- read all 10 accepted email/net+python compound-file-support.md cells' frontmatter, linktitle stays English in every one while title translates per-language. Committed 1f4d25f5d8 + da153c0c06 (10 cells). All 7 real heal tickets for this source now carry direct per-page proof, not just cross-page. Still waiting on slides/cpp working-with-presentation-content.md and slides/net working-with-app-properties.md (3 tickets each, cross-page-evidence-only pending direct confirmation). cells_committed_total 536 -> 546.",
+  "cells_committed_total": 546,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
