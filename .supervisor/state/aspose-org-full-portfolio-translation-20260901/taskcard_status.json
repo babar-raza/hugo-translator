@@ -1453,24 +1453,10 @@
       ]
     }
   },
-  "last_wake_summary": "Trailing review only -- a concurrent peer session owns this wave's commits (it shipped pl/pt as 371acb7b0a while this review ran; session_ledger refused adopt because the campaign holds the claim under AGENT_SESSION_ID hugo-translator-fc). Reviewed pl (APPROVE_WITH_RECORD) and pt (APPROVE): full structural parity, governed term 'API Guide' preserved 16/16. Cross-locale finding: body link text 'introductory post' untranslated in 6/16 locales (de/el/fa/ja/ko/pl) vs translated in 10 -> model echo, not the slug-exclusion path; extended RB-008 with a MECHANISM VARIANT clause (commit 60c3999d) and opened one representative, non-quarantining heal ticket. Purged 32 poisoned L2 TM entries for the rejected fr cell (RepetitionDetectorValidator, both models tried). Campaign pid 52476 alive, 16 accepted / 1 failed / 25 locales, ro in flight. Evidence: data/summaries/review-pdftypescript-coreapi-20260911-pl-pt.json",
+  "last_wake_summary": "wave-pdftypescript-coreapi-20260911 complete: 23/25 committed across 12 incremental commits (dc6e9fd4a4 through ffb70c0a72), landed as each locale finished rather than waiting for the full run -- addresses the users repeated concern about commit gaps during long serialized campaigns. fr (RepetitionDetectorValidator) and vi (pipeline error) exhausted retries, auto-ticketed, not shipped. Claim released; selecting next candidate.",
   "cells_committed_total": 481,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [
-    {
-      "campaign_id": "wave-pdftypescript-coreapi-20260911",
-      "pid": 52476,
-      "manifest": "data/campaigns/manifests/wave-pdftypescript-coreapi-20260911.yaml",
-      "sources": [
-        "content/blog.aspose.org/pdf/typescript/pdf-core-api-typescript/index.md"
-      ],
-      "locales": 25,
-      "expected_output_count": 25,
-      "launched_at": "2026-09-11T08:15:00+00:00",
-      "launched_by": "hugo-translator-fc",
-      "notes": "wave-barcodepython-index-20260911 (previous entry) failed instantly: work_ledger was stale for that page -- 20/21 requested locales were already committed weeks/days ago (0d98ffadd1), never reconciled in the ledger. Fixed 21 stale ledger rows to UP_TO_DATE, released the claim, verified this replacement candidate against actual git history/disk (0 existing locale files, not just ledger state) before claiming+launching. User asked for an ongoing watch mechanism over detached campaign processes (loop skill engaged). Committed partial batch (6/25: ar,cs,de,el,es,fa) as dc6e9fd4a4 while remaining 19 still in flight -- avoids accepted output sitting uncommitted during a long serialized run."
-    }
-  ],
+  "active_detached_runs": [],
   "blocked_pending_clean_translator_repo": null,
   "wave_scale": {
     "value": 4,
