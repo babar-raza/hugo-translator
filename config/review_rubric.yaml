@@ -319,3 +319,38 @@ rules:
       escalation attempt (professionalize_llm's own attempt for this cell
       failed on an unrelated FrontmatterLanguageCheck gate, so it was never
       compared against this specific defect).
+  - id: RB-014
+    name: meta-response-instead-of-translation
+    verdict: REJECT
+    scope: any
+    statement: >-
+      The model emitting a meta-commentary about the translation task
+      itself -- e.g. asking to be given the source text, refusing, or
+      describing what it would do -- instead of an actual translation of
+      the given source text is a total content-substitution failure, more
+      severe than RB-004's garbled-word or meaning-changing cases (there is
+      no translated content AT ALL, coherent or otherwise, in the target
+      language). Trivially detectable: the output describes or requests the
+      translation task rather than performing it. No RB-003 tolerance
+      applies -- this is not a meaning-preserving imperfection, it fails to
+      convey the source's meaning at all.
+      DIAGNOSTIC: recurrence at the same field/structural position across
+      locales or source pages is producer-side per RB-005 (fix producer,
+      retrigger, never hand-edit); a single-locale occurrence is model
+      variance and REJECTs only that cell -- retry on the other model
+      first, since a fresh regeneration attempt is often sufficient for
+      this class of stochastic confusion.
+    evidence: >-
+      docs.aspose.org/en/font/python/developer-guide/type1.md it,
+      wave-tier1b-batch1-20260911, 2026-09-11: frontmatter description
+      field (source: "How to load Type 1 fonts and inspect their glyph
+      outlines and encoding using FontLoader, GlyphAccessor, and
+      Type1Interpreter in Aspose.Font FOSS for Python.") came back as "Mi
+      serve la descrizione della classe API da tradurre; per favore
+      forniscila in modo che io possa tradurla in italiano." (= "I need the
+      API class description to translate; please provide it so I can
+      translate it into Italian.") -- coherent, fluent Italian, but a
+      request for input rather than a translation of the given input.
+      professionalize_llm, first attempt; all 44 automated gates passed
+      (none of them check whether the output is actually responsive to the
+      source, only structural/formatting properties).
