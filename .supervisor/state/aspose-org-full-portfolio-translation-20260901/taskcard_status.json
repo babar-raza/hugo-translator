@@ -1473,6 +1473,26 @@
       "launched_at": "2026-09-11T18:12:00+00:00",
       "launched_by": "hugo-translator-fc",
       "notes": "Retrigger of wave-tier1b-batch1-20260911's 5 fully-blocked sources, now that the linktitle language_detection fix (hugo-translator commit 291c23f3) is live in a fresh process -- the original campaign had already loaded the pre-fix code before that commit landed, so it never benefited. 4 of the 5 sources (email/net+python compound-file-support.md, slides/cpp working-with-presentation-content.md, slides/net working-with-app-properties.md) should now pass cleanly if the fix works as the peer's own verification suggests; installation.md failed on a DIFFERENT, not-yet-diagnosed class (GATE18/GATE23/FrontmatterLanguageCheck) and is included as a fresh attempt, not a proven fix. On next wake: body-review every accepted cell (not just structural) given this session's repeated finding that peer verification misses real content defects; if the 4 linktitle-bug sources still fail the SAME way, that falsifies the fix's completeness and needs a fresh investigation, not a 3rd blind retry."
+    },
+    {
+      "campaign_id": "wave-tier1b-batch2-20260911",
+      "pid": null,
+      "manifest": "data/campaigns/manifests/wave-tier1b-batch2-20260911.yaml",
+      "sources": [
+        "content/docs.aspose.org/en/slides/python/developer-guide/working-with-package-management.md",
+        "content/docs.aspose.org/en/slides/python/developer-guide/working-with-presentation-content.md",
+        "content/docs.aspose.org/en/words/python/developer-guide/docx-reader.md",
+        "content/docs.aspose.org/en/words/python/developer-guide/pdf-writer.md",
+        "content/docs.aspose.org/en/barcode/python/getting-started/license.md",
+        "content/docs.aspose.org/en/cells/cpp/getting-started/license.md",
+        "content/docs.aspose.org/en/tex/python/getting-started/installation.md",
+        "content/docs.aspose.org/en/email/cpp/developer-guide/eml-conversion.md"
+      ],
+      "locales": 25,
+      "expected_output_count": null,
+      "launched_at": null,
+      "launched_by": "hugo-translator-fc",
+      "notes": "Second Tier-1b batch this mission, launched IN PARALLEL with the peer's wave-tier1b-batch1-retrigger-20260911 (different sources, no overlap). 8 fresh fewest-missing-first pages, distinct families from everything touched so far (slides/python, words/python, barcode/python, cells/cpp, tex/python, email/cpp), 0 heal_queue history on any. Built via --source-list + --missing-only + --max-parallel-jobs 4. pid/launched_at to be filled in after Start-Process + confirmed real llm_calls.jsonl progress, with a fresh git-status-clean check immediately before Start-Process."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
