@@ -1453,22 +1453,22 @@
       ]
     }
   },
-  "last_wake_summary": "Routine monitoring wake: mission_supervisor decide=SKIP (queue empty), Track A slot occupied by in-flight wave-cellsrust-quickstart-fixretrigger-20260911 (pid 4632, alive) -- progress 18/25 accepted, 0 failed as of summary.json 08:14 (up from 7/25 at 07:54 checkpoint). No relaunch/kill per policy (do not disturb a running detached campaign). Content-repo dirty paths observed (products.aspose.org note/python _index.md x N, blog.aspose.org cells/go index.md) belong to other fleet sessions, not touched. No new Track-A/B action taken this wake; next wake checks fixretrigger completion and reviews once done.",
+  "last_wake_summary": "TC-APT-110 landed (commit 5c642cc1): PlaceholderManager.restore() now re-inserts model-dropped boundary spaces (glued-word defect, 8/25 locales on cells/rust quickstart description field); 7 new real-repro tests, extractor suite 329 passed, 8 heal tickets recorded in same commit. This wake: claim re-acquired, launching glueretrigger for the 8 quarantined locales per RECURRENCE ESCALATION steps 2-3. Old fixretrigger run (pid 4632) complete: 17/25 shipped in content commit ba68fdaeae.",
   "cells_committed_total": 481,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "campaign_id": "wave-cellsrust-quickstart-fixretrigger-20260911",
-      "pid": 4632,
-      "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-fixretrigger-20260911.yaml",
+      "campaign_id": "wave-cellsrust-quickstart-glueretrigger-20260911",
+      "pid": null,
+      "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-glueretrigger-20260911.yaml",
       "sources": [
         "content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md"
       ],
-      "locales": 25,
-      "expected_output_count": 25,
-      "launched_at": "2026-09-11T02:37:52+00:00",
+      "locales": 8,
+      "expected_output_count": 8,
+      "launched_at": "2026-09-11T04:45:00+00:00",
       "launched_by": "interactive-continue-20260911",
-      "notes": "Retrigger after fixing the two RB-005 producer bugs r3's review surfaced (see last_wake_summary + data/summaries/fp-wave-cellsrust-quickstart-fixretrigger-20260911-rootcause.json). --existing replace --include-known-broken, output_selection=all (regenerates all 25, including the 23 whose bad output already sits uncommitted on disk from r3). Manifest built last, dirty inventory diff discarded, zero translator-repo git touches until yaml_format_success confirmed -- this bookkeeping commit happens after that confirmation."
+      "notes": "RECURRENCE ESCALATION steps 2-3 for producer_frontmatter_description_placeholder_space_loss (TC-APT-110, fix commit 5c642cc1): retrigger the exact 8 quarantined locales (ar cs es fa hu nl pt uk) of cells/rust quickstart whose description field had glued placeholder boundaries. TM already purged for all 8 pairs. pid deliberately null (committed pre-launch); cross-reference logs/wave-cellsrust-quickstart-glueretrigger-20260911.log. No translator-repo git touches after Start-Process until the log shows sustained real activity."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
