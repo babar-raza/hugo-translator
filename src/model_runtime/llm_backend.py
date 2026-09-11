@@ -936,6 +936,40 @@ class LLMModelBackend:
                 f"- Preserve backtick spans and markdown formatting"
             )
 
+        if hint and hint.startswith("frontmatter_"):
+            # RB-012 (config/review_rubric.yaml, 2026-09-11): the generic prompt
+            # below tells the model to "preserve all formatting: markdown" --
+            # correct for body text, but frontmatter string fields (title,
+            # seoTitle, description, summary) are plain text consumed by HTML
+            # meta tags / RSS / search snippets, which do not render markdown.
+            # Reproduced on blog.aspose.org/pdf/python/pdf-generated-in-python:
+            # 2 of 8 accepted description-field translations (nl via
+            # m2m100_418m, th via professionalize_llm's first attempt) came
+            # back with technical terms wrapped in bold ("**aspose_pdf**") that
+            # were plain in the source -- the ambiguous "preserve formatting"
+            # instruction left room for the model to add emphasis it judged
+            # helpful. This hint was already wired end to end (segment_
+            # translator.py sets context_hint=f"frontmatter_{field_name}" and
+            # this method's own docstring names "frontmatter_description" as
+            # an example) but had no branch here, so it silently fell through
+            # to the generic (markdown-preserving) prompt every time.
+            return (
+                f"You are a professional translator. Translate each numbered "
+                f"segment from {src_name} to {tgt_name}.\n\n"
+                f"Input: {segment_count} numbered segments, each prefixed with <<<SEG_N>>>.\n"
+                f"Output: {segment_count} translated segments, each on its own line "
+                f"prefixed with the SAME tag <<<SEG_N>>>.\n\n"
+                f"Rules:\n"
+                f"- Output ONLY the translations with their numbers, nothing else\n"
+                f"- This is a PLAIN TEXT field (used in HTML meta tags, RSS feeds, "
+                f"search snippets) -- output plain text ONLY: no markdown formatting "
+                f"of any kind (no **bold**, no _italics_, no backticks, no headers), "
+                f"even to emphasize a technical term\n"
+                f"- Keep technical terms, brand names, and API identifiers unchanged, "
+                f"written exactly as they appear in the source, with no added markup\n"
+                f"- Maintain the same tone and register as the source"
+            )
+
         return (
             f"You are a professional translator. Translate each numbered segment "
             f"from {src_name} to {tgt_name}.\n\n"
