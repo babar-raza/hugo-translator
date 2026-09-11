@@ -17,6 +17,7 @@ from .base import ValidationResult, Validator
 from .completeness_validator import CompletenessValidator
 from .file_placement_validator import FilePlacementValidator
 from .frontmatter_protection_validator import FrontmatterProtectionValidator
+from .glued_identifier_validator import GluedIdentifierValidator
 from .language_consistency_validator import LanguageConsistencyValidator
 from .link_validator import LinkValidator
 from .metadata_markdown_contamination_validator import MetadataMarkdownContaminationValidator
@@ -304,6 +305,9 @@ class ValidationSuite:
 
         if validators_config.get("terminology_preservation", {}).get("enabled", True):
             validators.append(TerminologyPreservationValidator())
+
+        if validators_config.get("glued_identifier", {}).get("enabled", True):
+            validators.append(GluedIdentifierValidator())
 
         if validators_config.get("file_placement", {}).get("enabled", True):
             validators.append(FilePlacementValidator(config_service=config_service))

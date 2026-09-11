@@ -1,0 +1,33 @@
+{
+  "record_type": "first_principles",
+  "run_id": "wave-cellsrust-quickstart-glueretrigger-20260911r2",
+  "step": "TC-APT-110 reverification of the glued-word fix (RECURRENCE ESCALATION step 2)",
+  "written_at": "2026-09-11T05:20:00+00:00",
+  "goal": "Confirm the 5c642cc1 PlaceholderManager.restore() boundary-space fix eliminates the glued-word defect (e.g. 'pomocíWorkbook.save') on the exact original failing file, cells/rust/getting-started/quickstart.md description field, for all 8 ticketed locales.",
+  "observed": "r2 campaign: 8/8 accepted by the 44-gate battery, but reading the actual outputs found 3/8 (cs, hu, pt) STILL glued at the same description-field locations; 5/8 (ar, es, fa, nl, uk) clean. The pt shape that shipped glued passes its unit test against current code.",
+  "assumptions": [
+    {
+      "assumption": "The glue happens at the placeholder-restore boundary (model drops the space around an intact {PLACEHOLDER_N} token; naive restore glues the value onto prose).",
+      "status": "FALSIFIED for the surviving 3-locale defect",
+      "evidence": "In-session instrumented re-run of the cs cell (PlaceholderManager.restore traced, real professionalize_llm call): the description unit's placeholder_map is {'{PLACEHOLDER_0}': 'Aspose.Cells'} ONLY -- Workbook.save / Workbook.load_xlsx are NOT protected in that field under current extraction rules. The model emits them as literal inline text, so restore() never sees them; when the model glues them ('pomocíWorkbook.save' directly in generation), no restore-time code can fix it. The traced fresh generation happened to be clean ('ukládání pomocí Workbook.save'), confirming the defect is stochastic per generation, which explains 5/8 clean in r2 (clean generations, not necessarily the fix)."
+    },
+    {
+      "assumption": "The 44-gate zero-defect battery would catch a reader-facing garbled non-word in the description field.",
+      "status": "FALSIFIED",
+      "evidence": "r2 accepted all 8 cells including the 3 glued ones (model_outcomes: professionalize_llm accepted 8). Only the 5-agent rubric review has ever caught this class. Acceptance of this defect class is currently luck."
+    }
+  ],
+  "approaches": [
+    {
+      "approach": "A: Extend identifier protection so Workbook.save-style tokens in frontmatter description are always placeholder-protected, then rely on the (fixed) restore boundary logic.",
+      "assessment": "Rejected as primary: protection rules were deliberately narrowed one day earlier (c2145c3a, stop protecting snake-case-mentioning sentences) because over-protection causes its own defect class; re-widening risks regressing that. Also still leaves the generation-time glue path open for any OTHER unprotected identifier."
+    },
+    {
+      "approach": "B: Add a validation gate (error severity) that scans the candidate for non-inflectable code identifiers from the source unit (tokens containing '.' or '_' between alnum, e.g. Workbook.save, Aspose.Cells) glued directly against a Unicode letter, for space-delimited-script targets only. Retry machinery then converges on a clean generation (observed clean rate ~5/8 per attempt plus a clean traced re-run).",
+      "assessment": "CHOSEN. Producer-side, catches BOTH glue paths (generation-time and any residual restore-time), converts the class from review-caught to gate-caught, and is falsifiable: re-running the 3 failing cells through the campaign must yield outputs whose description contains the identifiers with legal boundaries, or rejection instead of acceptance. Restricted to dotted/underscored identifiers so Slavic inflection of plain words (cs 'v Rustu') cannot false-positive; hyphen-attached suffixes (hu 'Workbook.save-el') remain legal."
+    }
+  ],
+  "chosen_approach": "B, plus completing the 5c642cc1 hardening on the remaining naive restore passes (bare_replace, fuzzy_replace, _strip_wrapping_braces) which still glue when protection DOES fire and the model mangles the token shape.",
+  "expected_outcome": "Retrigger of cs/hu/pt on gated code either commits clean descriptions or gate-rejects; no glued identifier can reach acceptance. The 5 clean r2 locales pass full rubric review and commit.",
+  "regression_control": "New gate is scoped: only source-derived tokens matching the code-identifier pattern, only space-delimited-script targets, letter-glue only (punctuation/hyphen boundaries legal). Unit tests cover cs/hu/pt real defect shapes plus legal cases (hu hyphen suffix, cs 'v Rustu' inflection, zh no-space). Existing 329-test extractor suite must stay green."
+}

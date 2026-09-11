@@ -17,6 +17,7 @@ from .completeness_validator import CompletenessValidator
 from .decision_engine import ValidationDecisionEngine
 from .file_placement_validator import FilePlacementValidator
 from .frontmatter_protection_validator import FrontmatterProtectionValidator
+from .glued_identifier_validator import GluedIdentifierValidator
 from .language_consistency_validator import LanguageConsistencyValidator
 from .link_validator import LinkValidator
 from .placeholder_validator import PlaceholderValidator
@@ -59,4 +60,5 @@ __all__ = [
     "LanguageConsistencyValidator",
     "FilePlacementValidator",
     "FrontmatterProtectionValidator",
+    "GluedIdentifierValidator",
 ]

@@ -126,3 +126,59 @@ class TestGluedWordFixDoesNotRegressLegitimateNoSpace:
         restored = pm.restore(raw, placeholder_map)
 
         assert restored == "saving with Workbook.save correctly."
+
+
+class TestGluedWordOtherRestorePasses:
+    """TC-APT-110 follow-up (r2 reverification): the model can drop the
+    boundary space around ANY token shape the later fallback passes handle,
+    not just the intact braced form -- each pass needs the same boundary
+    logic."""
+
+    def test_bare_token_glued_gains_space(self):
+        pm = PlaceholderManager()
+        placeholder_map = {"{PLACEHOLDER_0}": "Workbook.save"}
+        raw = "uložení pomocíPLACEHOLDER_0 správně."
+
+        restored = pm.restore(raw, placeholder_map)
+
+        assert "pomocíWorkbook" not in restored
+        assert "pomocí Workbook.save" in restored
+
+    def test_bare_token_finnish_colon_suffix_still_unaffected(self):
+        pm = PlaceholderManager()
+        placeholder_map = {"{PLACEHOLDER_0}": "`.mtl`"}
+        raw = "OBJ (PLACEHOLDER_0):n kanssa)"
+
+        restored = pm.restore(raw, placeholder_map)
+
+        assert restored == "OBJ (`.mtl`):n kanssa)"
+
+    def test_fuzzy_token_glued_gains_space(self):
+        pm = PlaceholderManager()
+        placeholder_map = {"{PLACEHOLDER_1}": "Workbook.load_xlsx"}
+        raw = "načtení pomocí{ PLACHOLDER _1 }znovu."
+
+        restored = pm.restore(raw, placeholder_map)
+
+        assert "pomocíWorkbook" not in restored
+        assert "xlsxznovu" not in restored
+        assert "pomocí Workbook.load_xlsx znovu" in restored
+
+    def test_brace_wrapped_guessed_value_glued_gains_space(self):
+        pm = PlaceholderManager()
+        placeholder_map = {"{PLACEHOLDER_0}": "Workbook.save"}
+        raw = "uložení pomocí{Workbook.save}správně."
+
+        restored = pm.restore(raw, placeholder_map)
+
+        assert "pomocíWorkbook" not in restored
+        assert "pomocí Workbook.save správně" in restored
+
+    def test_brace_wrapped_guessed_value_spaced_unaffected(self):
+        pm = PlaceholderManager()
+        placeholder_map = {"{PLACEHOLDER_0}": "ColumnInfo"}
+        raw = "`{ColumnInfo}` clase principal."
+
+        restored = pm.restore(raw, placeholder_map)
+
+        assert restored == "`ColumnInfo` clase principal."

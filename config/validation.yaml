@@ -137,6 +137,10 @@ validators:
     validation_mode: "strict"
     description: "Validates terminology preservation (Aspose, .NET, etc.)"
 
+  glued_identifier:
+    enabled: true
+    description: "TC-APT-110: rejects source technical identifiers glued directly against prose letters (e.g. 'pomocíWorkbook.save'); no-space scripts and Latin inflection exempt"
+
   file_placement:
     enabled: true
     description: "Validates file placement and directory structure"

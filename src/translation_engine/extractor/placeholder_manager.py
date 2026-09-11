@@ -70,6 +70,22 @@ def _needs_space_boundary(context_char: str, value_char: str) -> bool:
     return True
 
 
+def _boundary_spaces(match: re.Match, value: str) -> tuple[str, str]:
+    """Prefix/suffix space to re-insert when substituting `value` over
+    `match`'s span, per `_needs_space_boundary` on the REAL surrounding
+    characters of the string being scanned (TC-APT-110). Shared by every
+    restore pass that substitutes a placeholder-shaped token -- the model
+    can drop the boundary space around any of the token shapes (braced,
+    bare, fuzzy, brace-wrapped-value), not just the intact braced one."""
+    if not value:
+        return "", ""
+    s = match.string
+    start, end = match.span()
+    prefix = " " if start > 0 and _needs_space_boundary(s[start - 1], value[0]) else ""
+    suffix = " " if end < len(s) and _needs_space_boundary(s[end], value[-1]) else ""
+    return prefix, suffix
+
+
 class PlaceholderManager:
     """Manages placeholder replacement and restoration for protected content."""
 
@@ -226,10 +242,7 @@ class PlaceholderManager:
         for placeholder, original in placeholder_map.items():
 
             def _restore_one(match: re.Match, _original: str = original) -> str:
-                s = match.string
-                start, end = match.span()
-                prefix = " " if start > 0 and _needs_space_boundary(s[start - 1], _original[0]) else ""
-                suffix = " " if end < len(s) and _needs_space_boundary(s[end], _original[-1]) else ""
+                prefix, suffix = _boundary_spaces(match, _original)
                 return f"{prefix}{_original}{suffix}"
 
             restored = re.sub(re.escape(placeholder), _restore_one, restored)
@@ -248,7 +261,11 @@ class PlaceholderManager:
         # leaked placeholder token is not.
         def bare_replace(match: re.Match) -> str:
             key = f"{{PLACEHOLDER_{match.group(1)}}}"
-            return placeholder_map.get(key, match.group(0))
+            value = placeholder_map.get(key)
+            if value is None:
+                return match.group(0)
+            prefix, suffix = _boundary_spaces(match, value)
+            return f"{prefix}{value}{suffix}"
 
         restored = re.sub(r"PLACEHOLDER_(\d+)", bare_replace, restored)
 
@@ -260,7 +277,11 @@ class PlaceholderManager:
             token = match.group(0)
             number = match.group(1)
             key = f"{{PLACEHOLDER_{number}}}"
-            return placeholder_map.get(key, token)
+            value = placeholder_map.get(key)
+            if value is None:
+                return token
+            prefix, suffix = _boundary_spaces(match, value)
+            return f"{prefix}{value}{suffix}"
 
         restored = re.sub(r"\{[^{}]*?(\d+)[^{}]*?\}", fuzzy_replace, restored)
 
@@ -287,7 +308,14 @@ class PlaceholderManager:
         # wrapping an already-correct placeholder value.
         def _strip_wrapping_braces(text: str) -> str:
             for original in placeholder_map.values():
-                text = re.sub(r"\{\s*" + re.escape(original) + r"\s*\}", original, text)
+
+                def _strip_one(match: re.Match, _original: str = original) -> str:
+                    prefix, suffix = _boundary_spaces(match, _original)
+                    return f"{prefix}{_original}{suffix}"
+
+                text = re.sub(
+                    r"\{\s*" + re.escape(original) + r"\s*\}", _strip_one, text
+                )
             return text
 
         restored = _strip_wrapping_braces(restored)
