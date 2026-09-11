@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-11T16:55:00+05:00",
+  "updated_at": "2026-09-11T17:15:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 45,
+  "wake_count": 46,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "pdfgeneratedpython-retrigger-20260911 (PID 16024) first results in: de now ACCEPTS cleanly under the preserve_patterns fix and passed a full body review (RB-011 heading-content-mismatch also gone) -- committed content repo f332c80c11, RB-011 and the 3 GluedIdentifierValidator tickets all FIXED_VERIFIED. es and fa BOTH exhausted both models again on the identical fingerprint, matching this record's own falsifiable prediction that the fix reduces but doesn't guarantee zero recurrence; next lead documented in the fp record is 'Aspose.PDF' (the only remaining unprotected dotted identifier in this field) -- deliberately not chased this iteration, it's a larger-blast-radius portfolio-wide change needing its own investigation. Only 2 distinct locales now have fresh OPEN tickets for this class on this page (below the QU-02 threshold of 3), so no re-quarantine; campaign continues on nl/pl/pt/ro/ru/sv/th/tr/uk/vi/zh. Not treating this as reopening the recurrence escalation -- a real fix was implemented and proven on de.",
-  "cells_committed_total": 485,
+  "last_wake_summary": "pdfgeneratedpython-retrigger-20260911 (PID 16024) continues: nl and pt also accepted; found a NEW defect class on nl's body review (not caught by any of the 44 gates) -- the accepted candidate (m2m100_418m 2nd escalation attempt, after both models failed the GluedIdentifierValidator battery once each) wraps 4 spans of the frontmatter description field in markdown bold ('**aspose_pdf.generated**' etc.), none present in source. Added RB-012 (markdown-syntax-in-plaintext-frontmatter-field) to config/review_rubric.yaml, TM-purged nl (59 entries), opened a heal ticket -- held back, not committed. pl and pt reviewed clean and committed (content repo 6fbdbe6ac6). de remains committed and clean (f332c80c11) from the prior wake. es/fa still exhausted (documented residual, see fp record). 4/14 of this retrigger accepted so far (de/nl/pl/pt, nl held); ro/ru/sv/th/tr/uk/vi/zh still pending.",
+  "cells_committed_total": 487,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
