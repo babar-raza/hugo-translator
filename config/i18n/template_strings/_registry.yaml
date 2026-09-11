@@ -505,3 +505,21 @@ entries:
   status: pending
   first_seen_incident: TC-APT-108-wave-cellsrust-go-t1a
   evidence_count: 0
+- id: heading.prerequisites
+  en: Prerequisites
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-014-wave-cellsrust-quickstart-retrigger-20260911
+  evidence_count: 23
+- id: table.header.requirement
+  en: Requirement
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-014-wave-cellsrust-quickstart-retrigger-20260911
+  evidence_count: 23
+- id: table.header.detail
+  en: Detail
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-014-wave-cellsrust-quickstart-retrigger-20260911
+  evidence_count: 23

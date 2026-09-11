@@ -2468,8 +2468,20 @@ class TextUnitExtractor:
         if re.match(r"^[A-Z][a-z]+(?:\.[A-Z][A-Za-z0-9]*)+$", text):
             return True
 
-        # snake_case (lowercase with underscores)
-        if "_" in text and text.islower():
+        # snake_case (lowercase with underscores) -- full match required.
+        # The prior check ("_" in text and text.islower()) matched ANY text
+        # containing an underscore anywhere with no uppercase letters at all,
+        # so a full lowercase prose sentence merely mentioning a snake_case
+        # identifier (e.g. a list item "`display_string_value` -- the cell's
+        # display text when reading values back.") was itself protected and
+        # left untranslated in every locale. Found via review of
+        # wave-cellsrust-quickstart-retrigger-20260911r3 (23/23 reviewed
+        # locales carried this exact sentence untranslated). Anchoring to the
+        # whole string, matching every other identifier-shape check in this
+        # method, still protects a standalone identifier unit
+        # ("aspose_slides_low_code") while letting prose that merely contains
+        # one through to normal translation.
+        if re.match(r"^[a-z][a-z0-9_]*$", text):
             return True
 
         # ALL_CAPS (2+ characters)
