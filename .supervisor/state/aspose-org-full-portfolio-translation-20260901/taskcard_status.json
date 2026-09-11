@@ -1453,23 +1453,10 @@
       ]
     }
   },
-  "last_wake_summary": "r2/r3 both shipped cs/hu glued in the frontmatter description field despite the new GluedIdentifierValidator gate (17073573) -- traced the gate itself is correct but structurally never runs against frontmatter text (fixed: b6218866). pt committed clean (b57a1586c1), ar/es/fa/nl/uk committed clean (f7ab0f5089), quickstart.md now 23/25. r4 (PID 12180) relaunched for cs/hu under the actually-wired gate, professionalize_llm only.",
+  "last_wake_summary": "r3 (mine) COMPLETE 3/3 gate-accepted but cs/hu STILL glued -- confirmed the gate was structurally blind to frontmatter (suite strips it); peer hugo-translator-fc committed the TC-APT-112 wiring (b6218866) + launched r4 (cs/hu, LLM-primary per user instruction). r4 failure_metadata now shows gate:GluedIdentifierValidator REJECTING glued candidates in production -- the class is closed at acceptance. r4 process exited without summary (peer's claim/lane to relaunch). Peer shipped ar/es/fa/nl/uk (f7ab0f5089) + pt (b57a1586c1): page 23/25 live. I purged cs/hu TM again (54 entries, r3's defective flush), launched 3 rubric-audit subagents over the 6 shipped locales, appended 2 SSL field notes (stash-pop trap; pre-existing router-wiring test failure, bisected to before 7eca6299). Ticket transitions to FIXED_VERIFIED await audit verdicts.",
   "cells_committed_total": 481,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
-    {
-      "campaign_id": "wave-cellsrust-quickstart-glueretrigger-20260911r3",
-      "pid": null,
-      "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-glueretrigger-20260911r3.yaml",
-      "sources": [
-        "content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md"
-      ],
-      "locales": 3,
-      "expected_output_count": 3,
-      "launched_at": "2026-09-11T05:55:00+00:00",
-      "launched_by": "interactive-continue-20260911",
-      "notes": "r3: cs/hu/pt only (r2's 3 failed-reverify locales), first run under the new GluedIdentifierValidator ERROR gate (commit 17073573) which makes glued generations gate-reject-and-retry instead of stochastically accepted. TM purged (54 entries). 5 clean r2 locales (ar es fa nl uk) NOT in this wave -- they await full rubric review then content commit. pid null pre-launch; logs/wave-cellsrust-quickstart-glueretrigger-20260911r3-*.log."
-    },
     {
       "campaign_id": "wave-cellsrust-quickstart-glueretrigger-20260911r4",
       "pid": 12180,
