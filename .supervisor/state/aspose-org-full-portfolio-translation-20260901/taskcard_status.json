@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T00:05:00+05:00",
+  "updated_at": "2026-09-12T00:20:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 62,
+  "wake_count": 63,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "wave-tier1b-batch1-retrigger-20260911r2 finished (SHARD_COMPLETE, 30/30 accepted, 0 failed). working-with-app-properties.md's full 8-locale retrigger (cs/de/hi/id/it/ja/nl/ru) now DIRECTLY body-reviewed clean by this session (not just structural) -- linktitle stays English, title translates, AppPropertiesPart preserved in all 8; peer committed hi/id/it/ja/nl/ru in 7136a8e2c7 with only structural verification (their commit message says so explicitly), this session independently confirmed body content after the fact. All 3 originally QU-02-blocked sources (compound-file-support.md, working-with-presentation-content.md, working-with-app-properties.md) now fully closed with direct per-locale evidence. Remaining open item: working-with-presentation-content.md hi has a separate NEW isolated defect (RB-013, 'Covers Presentation.' left untranslated) -- ticketed, TM purged, not yet retried; next wake should retrigger it. cells_committed_total 559 -> 565 (+6 peer-committed app-properties cells this session directly verified).",
-  "cells_committed_total": 565,
+  "last_wake_summary": "Reviewed batch2's eml-conversion.md (docs.aspose.org/email/cpp) 4 accepted cells: ja/nl/pl clean, committed (0db75f943c); ko REJECTed on RB-012 (backticks injected into frontmatter description, single-locale, ja/nl/pl clean at same position) -- ticketed, TM purged, not yet retried. Discovered and root-caused: my remembered git_plumb_commit.py path was wrong last iteration -- it lives in the CONTENT repo (D:/.../aspose.org/scripts/pipeline/commands/ops/), not hugo-translator; --no-push is mandatory. Launched single-cell replace retrigger for working-with-presentation-content.md hi (RB-013 fix, PID 40800) -- next wake must body-review its output before committing. cells_committed_total 565 -> 568 (+3 this iteration: eml-conversion ja/nl/pl).",
+  "cells_committed_total": 568,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1475,7 +1475,20 @@
       "expected_output_count": 60,
       "launched_at": "2026-09-11T18:29:14.492046+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Second Tier-1b batch this mission, launched IN PARALLEL with the peer's wave-tier1b-batch1-retrigger-20260911 (different sources, no overlap). 8 fresh fewest-missing-first pages, distinct families from everything touched so far (slides/python, words/python, barcode/python, cells/cpp, tex/python, email/cpp), 0 heal_queue history on any. Built via --source-list + --missing-only + --max-parallel-jobs 4. First TWO launch attempts (PID 59604, then 49636) died within seconds with 'translation memory fingerprint drift' -- root-caused: src/workers/campaign_manifest.py:543-544 re-hashes data/tm/l2.lmdb/data.mdb at runtime against the manifest's baked-in fingerprint, and the peer's actively-accepting concurrent campaign kept mutating that shared TM file faster than the build-to-launch window. NEW STANDING LESSON: launching a new campaign while a peer's campaign is mid-acceptance-burst against the SAME shared TM can race this way; minimize the rebuild-to-Start-Process gap, retry up to 3 times, stand down if it keeps failing. Third attempt (PID 66324) succeeded, confirmed alive with real progress via llm_calls.jsonl growth (425 bytes) ~18s after launch."
+      "notes": "Second Tier-1b batch this mission, launched IN PARALLEL with the peer's wave-tier1b-batch1-retrigger-20260911 (different sources, no overlap). 8 fresh fewest-missing-first pages, distinct families from everything touched so far (slides/python, words/python, barcode/python, cells/cpp, tex/python, email/cpp), 0 heal_queue history on any. Built via --source-list + --missing-only + --max-parallel-jobs 4. First TWO launch attempts (PID 59604, then 49636) died within seconds with 'translation memory fingerprint drift' -- root-caused: src/workers/campaign_manifest.py:543-544 re-hashes data/tm/l2.lmdb/data.mdb at runtime against the manifest's baked-in fingerprint, and the peer's actively-accepting concurrent campaign kept mutating that shared TM file faster than the build-to-launch window. NEW STANDING LESSON: launching a new campaign while a peer's campaign is mid-acceptance-burst against the SAME shared TM can race this way; minimize the rebuild-to-Start-Process gap, retry up to 3 times, stand down if it keeps failing. Third attempt (PID 66324) succeeded, confirmed alive with real progress via llm_calls.jsonl growth (425 bytes) ~18s after launch. Body-reviewed 4 accepted cells (ja/ko/nl/pl): ja/nl/pl clean, committed (0db75f943c); ko REJECTed -- RB-012, backticks injected into frontmatter description around method names with no markdown in source/siblings, single-locale variance -- ticketed, TM purged (31 entries)."
+    },
+    {
+      "campaign_id": "wwpc-hi-rb013-retrigger-20260912",
+      "pid": 40800,
+      "manifest": "data/campaigns/manifests/wwpc-hi-rb013-retrigger-20260912.yaml",
+      "sources": [
+        "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md"
+      ],
+      "locales": 1,
+      "expected_output_count": 1,
+      "launched_at": "2026-09-11T19:14:41+00:00",
+      "launched_by": "hugo-translator-fc",
+      "notes": "Single-cell heal retrigger for RB-013 (hi): frontmatter description trailing sentence 'Covers Presentation.' was left untranslated in the already-committed 7c3458e7da. --existing replace + --include-known-broken; TM already purged (23 entries) when the ticket was opened. On next wake: body-review the output for the same defect before committing (not just structural), then replace-commit over the existing hi file."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
