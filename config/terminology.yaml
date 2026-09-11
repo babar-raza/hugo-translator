@@ -343,9 +343,37 @@ global:
     # order): protected separately, SOV/postpositional languages (hi/ja/ko/zh)
     # interleave title text between the family name and FOSS, scrambling the
     # product name ("Aspose.PDF C++ 的 FOSS", TC-APT-040 title-template class).
-    - pattern: "Aspose\\.\\S+ FOSS\\b"
+    #
+    # TC-APT-042 (2026-09-11, fp-protected-span-blocks-head-noun-reordering-
+    # 20260905): the trailing platform qualifier ("for .NET", "for Java", ...)
+    # is folded into this SAME span rather than left as a bridge word plus a
+    # second, separately-protected ".NET"/"Java"/... placeholder. Root cause:
+    # inline link text like "[Aspose.Words FOSS for .NET repository]" needs
+    # the trailing head noun ("repository") to move in FRONT of the whole
+    # product name in every target language. With the name split across TWO
+    # opaque {TERM_N} placeholders bridged by literal "for", 0/15 locales
+    # reordered correctly (7 scrambled the noun INSIDE the name, 7 tacked it
+    # on in English order) -- the model cannot relocate a word relative to two
+    # discontinuous anchors it cannot see are one entity. A single-anchor
+    # construct (one opaque token + one natural trailing word) is exactly the
+    # SAME FILE's sibling "[GitHub Repository]" link, which is NOT protected
+    # at all and reorders correctly in all 15 locales ("Repositorio de
+    # GitHub", "Αποθετήριο GitHub", ...). Merging removes the second anchor
+    # without removing protection (rejected direction: unprotecting reopens
+    # the exact TC-APT-040 title-scrambling defect this pattern exists for).
+    # Consequence, by design: the English word "for" inside this specific
+    # compound is now frozen verbatim in every locale rather than localized
+    # (e.g. no longer "FOSS para .NET") -- this mirrors the upstream GitHub
+    # org/repo slug itself ("Aspose.Words-FOSS-for-.NET"), so the compound
+    # reads as one indivisible product/repo identifier in every language,
+    # consistent with how "Aspose.Words FOSS" alone was already frozen.
+    # Platform qualifier list is the observed, closed set across the FOSS
+    # portfolio (blog.aspose.org introducing-*-foss-* pages); an unlisted
+    # future platform simply falls back to the pre-existing (unmerged)
+    # behavior -- not a regression, just not yet covered by the merge.
+    - pattern: "Aspose\\.\\S+ FOSS\\b(?: for (?:\\.NET|TypeScript|Python|Java|Rust|Go|C\\+\\+))?"
       category: product_family
-      description: "FOSS edition compound product names (Aspose.PDF FOSS, etc.)"
+      description: "FOSS edition compound product names, with an optional trailing platform qualifier folded into the same protected span (Aspose.PDF FOSS, Aspose.Words FOSS for .NET, etc.)"
       preserve_mode: protect
       severity: error
 
