@@ -145,3 +145,43 @@ rules:
       independently as UNCOVERED by three separate reviewers (fa, nl, fr)
       before the rule existed.
       See data/summaries/review-words-doc-r3-fr-20260905.json
+  - id: RB-008
+    name: mixed-link-text-localization
+    verdict: RECORD_ONLY_PENDING_ADJUDICATION
+    scope: body
+    statement: >-
+      Non-brand link TEXT left in the source language while sibling links in
+      the same list/paragraph are translated is a deterministic producer-side
+      split, not model variance: single-word link texts equal to their URL
+      slug are deliberately excluded from translation by
+      _link_text_matches_url_slug (text_unit_extractor.py), while multi-word
+      link texts translate normally. Until the producer-level design question
+      (is slug-identical link text an identifier or prose?) is adjudicated
+      and either the exclusion is removed or the rubric blesses it, reviewers
+      RECORD occurrences with this rule id but do NOT charge the cell a
+      REJECT for this class alone. A REJECT verdict may still rest on other
+      rules in the same cell.
+    evidence: >-
+      cells-rust quickstart, glueretrigger-20260911r2 audit, 2026-09-11:
+      "[Installation]"/"[License]" English in ar/es/fa/nl/uk/pt while
+      sibling multi-word links translated; raised independently as UNCOVERED
+      by all three reviewers. Representative heal ticket opened (es);
+      Track-B design decision pending.
+  - id: RB-009
+    name: digit-script-consistency
+    verdict: REJECT
+    scope: body
+    statement: >-
+      Ordinal markers in sibling headings/list items of one document must use
+      one digit script: mixing localized digits with Latin digits across
+      parallel ordinals (e.g. Persian "### 3." rendered with Eastern-Arabic
+      numeral while "### 1."/"### 2." keep Latin digits) is a reader-visible
+      inconsistency. DIAGNOSTIC: recurrence at the same structural position
+      across locales is producer-side per RB-005's reasoning (fix producer,
+      retrigger, never hand-edit); an isolated single-locale occurrence is
+      model variance and REJECTs only the affected cell.
+    evidence: >-
+      cells-rust quickstart, glueretrigger-20260911r2 audit, 2026-09-11: fa
+      "### 3. اجرا کنید" with Eastern-Arabic numeral vs Latin "### 1." /
+      "### 2." siblings; raised as UNCOVERED by the fa reviewer with this
+      rule proposed.

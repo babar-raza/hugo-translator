@@ -523,3 +523,9 @@ entries:
   status: pending
   first_seen_incident: TC-APT-014-wave-cellsrust-quickstart-retrigger-20260911
   evidence_count: 23
+- id: heading.quickstart
+  en: Quickstart
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-114-wave-cellsrust-quickstart-glueretrigger-20260911r2-audit
+  evidence_count: 507
