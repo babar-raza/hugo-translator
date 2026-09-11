@@ -1453,7 +1453,7 @@
       ]
     }
   },
-  "last_wake_summary": "pdfgeneratedpython-retrigger-20260911 (PID 16024) continues: nl and pt also accepted; found a NEW defect class on nl's body review (not caught by any of the 44 gates) -- the accepted candidate (m2m100_418m 2nd escalation attempt, after both models failed the GluedIdentifierValidator battery once each) wraps 4 spans of the frontmatter description field in markdown bold ('**aspose_pdf.generated**' etc.), none present in source. Added RB-012 (markdown-syntax-in-plaintext-frontmatter-field) to config/review_rubric.yaml, TM-purged nl (59 entries), opened a heal ticket -- held back, not committed. pl and pt reviewed clean and committed (content repo 6fbdbe6ac6). de remains committed and clean (f332c80c11) from the prior wake. es/fa still exhausted (documented residual, see fp record). 4/14 of this retrigger accepted so far (de/nl/pl/pt, nl held); ro/ru/sv/th/tr/uk/vi/zh still pending.",
+  "last_wake_summary": "Closed out wave-htmlcssompython-20260911: 23/25 accepted (zh exhausted retries, OPEN heal ticket, GluedIdentifierValidator class). Committed in 4 batches (3a0ff0857f, 346ab9d43f, 49a4aa1220, 52af0995e9, 36e28a677e). pdfgeneratedpython-retrigger-20260911 (PID 16024) still running -- 7/14 accepted so far (de/nl/pl/pt/ro/ru/sv), 3 committed batches so far, es OPEN-ticketed twice under fixed RB-011 config (watching for a 3rd distinct-locale recurrence before escalating further). Picking a fresh Tier-1a candidate next for the freed capacity.",
   "cells_committed_total": 487,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
@@ -1469,19 +1469,6 @@
       "launched_at": "2026-09-11T11:38:00+00:00",
       "launched_by": "hugo-translator-fc",
       "notes": "de-retry-r2 (PID 62040) exhausted both models (m2m100_418m GATE36 warn/score=0.50; professionalize_llm x2 GluedIdentifierValidator field=description) -- root-caused: bare snake_case/dotted identifiers (aspose_pdf.generated, aspose_pdf) in the frontmatter description field had NO preserve_pattern coverage (neither backtick nor PascalCase). Fixed in commit 1fb13d20 (config/global.yaml third preserve_pattern, underscore-gated; regression tests; see data/summaries/fp-glued-identifier-recurrence-pdfgeneratedpython-20260911.json). That fix also revealed the main wave (55468, closed by peer at 12/25) never actually attempted nl/pl/pt/ro/ru/sv/th/tr/uk/vi/zh -- QU-02 file-level quarantine tripped once de's OPEN ticket became the 3rd distinct locale for auto:GluedIdentifierValidator on this source_path, cascading a skip-without-attempt to every remaining locale (mislabeled auto:unclassified, empty note). Resolved the 3 real tickets (FIXED_VERIFIED) + 22 cascade tickets (WAIVED_RUBRIC) to clear the quarantine. This retrigger covers es/fa/de (replace_existing, current on-disk sha declared) plus the 11 never-attempted locales, under the hardened config, primary_model=professionalize_llm. On next wake: check data/campaigns/pdfgeneratedpython-retrigger-20260911/{summary.json,acceptance_receipts.jsonl,failure_metadata.jsonl}; body-review de specifically for the RB-011 heading-content-mismatch class (structural gates don't catch it) before committing, in addition to the normal review pass."
-    },
-    {
-      "campaign_id": "wave-htmlcssompython-20260911",
-      "pid": 56788,
-      "manifest": "data/campaigns/manifests/wave-htmlcssompython-20260911.yaml",
-      "sources": [
-        "content/blog.aspose.org/html/python/html-cssom-in-python/index.md"
-      ],
-      "locales": 24,
-      "expected_output_count": 24,
-      "launched_at": "2026-09-11T11:08:00+00:00",
-      "launched_by": "hugo-translator-fc",
-      "notes": "New Tier-1a page after pdf-generated-in-python landed (12/25). 24/25 missing (es already shipped, verified against git log). 0 open tickets. Committing incrementally: >=5 files OR ~20min since last commit, always flush on process exit. First launch (PID 50836) died on SHA drift -- caused by committing bookkeeping with the real PID immediately after Start-Process, racing the process own verify_environment check. Relaunched, waited ~90s confirming real progress (no error dump) BEFORE touching git this time."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
