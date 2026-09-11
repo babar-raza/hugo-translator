@@ -1472,7 +1472,7 @@
     },
     {
       "campaign_id": "wave-htmlcssompython-20260911",
-      "pid": 50836,
+      "pid": 56788,
       "manifest": "data/campaigns/manifests/wave-htmlcssompython-20260911.yaml",
       "sources": [
         "content/blog.aspose.org/html/python/html-cssom-in-python/index.md"
@@ -1481,7 +1481,7 @@
       "expected_output_count": 24,
       "launched_at": "2026-09-11T11:08:00+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "New Tier-1a page after pdf-generated-in-python landed (12/25). 24/25 missing (es already shipped, verified against git log). 0 open tickets. Committing incrementally: >=5 files OR ~20min since last commit, always flush on process exit."
+      "notes": "New Tier-1a page after pdf-generated-in-python landed (12/25). 24/25 missing (es already shipped, verified against git log). 0 open tickets. Committing incrementally: >=5 files OR ~20min since last commit, always flush on process exit. First launch (PID 50836) died on SHA drift -- caused by committing bookkeeping with the real PID immediately after Start-Process, racing the process own verify_environment check. Relaunched, waited ~90s confirming real progress (no error dump) BEFORE touching git this time."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
