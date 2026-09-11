@@ -325,3 +325,107 @@ class TestTerminologyProtector:
 
         restored = protector.restore(protected)
         assert restored == ""
+
+
+class TestRestoreGluedWordRealRepros:
+    """TC-APT-111 (2026-09-11): professionalize_llm restores its own
+    {TERM_N} placeholders through TerminologyProtector, not
+    PlaceholderManager -- a sibling, previously-unpatched copy of the exact
+    TC-APT-110 glued-word defect (model drops the boundary space around the
+    placeholder token). Confirmed live: cs/hu/pt on cells/rust
+    getting-started/quickstart.md's frontmatter `description` field still
+    shipped this defect from wave-cellsrust-quickstart-glueretrigger-
+    20260911r2, generated entirely by professionalize_llm, AFTER TC-APT-110
+    (PlaceholderManager only) had already landed. Strings below are quoted
+    directly from that run's real committed-candidate files, not
+    paraphrased."""
+
+    @staticmethod
+    def _term(text: str) -> DetectedTerm:
+        rule = TermRule(
+            term=text,
+            category="api_identifier",
+            preserve_mode=PreserveMode.PROTECT,
+            severity=TermSeverity.ERROR,
+        )
+        return DetectedTerm(term_text=text, rule=rule, start_pos=0, end_pos=len(text), confidence=1.0)
+
+    def test_cs_single_sided_glue_both_identifiers(self):
+        from src.translation_engine.terminology.models import ProtectedSegment
+
+        protector = TerminologyProtector()
+        term_mapping = {0: self._term("Workbook.save"), 1: self._term("Workbook.load_xlsx")}
+        translated = ProtectedSegment(
+            original_text="",
+            protected_text="uložení pomocí{TERM_0} a načtení pomocí{TERM_1}.",
+            term_mapping=term_mapping,
+        )
+
+        restored = protector.restore(translated)
+
+        assert restored == "uložení pomocí Workbook.save a načtení pomocí Workbook.load_xlsx."
+
+    def test_pt_single_sided_glue_both_identifiers(self):
+        from src.translation_engine.terminology.models import ProtectedSegment
+
+        protector = TerminologyProtector()
+        term_mapping = {0: self._term("Workbook.save"), 1: self._term("Workbook.load_xlsx")}
+        translated = ProtectedSegment(
+            original_text="",
+            protected_text="salvando com{TERM_0} e recarregando com{TERM_1}.",
+            term_mapping=term_mapping,
+        )
+
+        restored = protector.restore(translated)
+
+        assert restored == "salvando com Workbook.save e recarregando com Workbook.load_xlsx."
+
+    def test_hu_prefix_glue(self):
+        """hu glued only on the prefix side this run (the trailing case
+        suffix was hyphen-attached, a legitimate Hungarian convention akin
+        to the documented Finnish colon-suffix case, not a defect)."""
+        from src.translation_engine.terminology.models import ProtectedSegment
+
+        protector = TerminologyProtector()
+        term_mapping = {0: self._term("Workbook.save")}
+        translated = ProtectedSegment(
+            original_text="",
+            protected_text="mentés a{TERM_0}-el",
+            term_mapping=term_mapping,
+        )
+
+        restored = protector.restore(translated)
+
+        assert restored == "mentés a Workbook.save-el"
+
+    def test_cjk_no_synthetic_space_inserted(self):
+        """Must not start breaking the no-space-convention scripts that were
+        already correct -- same regression bar as TC-APT-110's suite."""
+        from src.translation_engine.terminology.models import ProtectedSegment
+
+        protector = TerminologyProtector()
+        term_mapping = {0: self._term("Workbook.save")}
+        translated = ProtectedSegment(
+            original_text="",
+            protected_text="使用{TERM_0}保存",
+            term_mapping=term_mapping,
+        )
+
+        restored = protector.restore(translated)
+
+        assert restored == "使用Workbook.save保存"
+
+    def test_already_spaced_text_unaffected(self):
+        from src.translation_engine.terminology.models import ProtectedSegment
+
+        protector = TerminologyProtector()
+        term_mapping = {0: self._term("Workbook.save")}
+        translated = ProtectedSegment(
+            original_text="",
+            protected_text="saving with {TERM_0} correctly.",
+            term_mapping=term_mapping,
+        )
+
+        restored = protector.restore(translated)
+
+        assert restored == "saving with Workbook.save correctly."

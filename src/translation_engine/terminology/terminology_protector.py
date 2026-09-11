@@ -8,6 +8,7 @@ This module provides the TerminologyProtector class which:
 
 import re
 
+from src.translation_engine.boundary_spacing import needs_space_boundary
 from src.translation_engine.terminology.models import DetectedTerm, ProtectedSegment
 
 
@@ -86,6 +87,7 @@ class TerminologyProtector:
         - Underscores removed: {TERM_0} -> {TERM0}
         - Cyrillic translation: {TERM_0} -> {ТЕРМ_0}
         - Other script translations
+        - Lost boundary space: "with {TERM_0}" -> "with{TERM_0}" (TC-APT-111)
 
         Args:
             protected_segment: Protected segment with placeholders and term mapping
@@ -117,8 +119,29 @@ class TerminologyProtector:
 
             # Try each pattern until one matches
             for pattern in patterns:
-                if re.search(pattern, restored_text):
-                    restored_text = re.sub(pattern, term.term_text, restored_text)
+                match = re.search(pattern, restored_text)
+                if match:
+                    # TC-APT-111 (2026-09-11): the LLM backend (professionalize_llm)
+                    # restores its own {TERM_N} placeholders through THIS class, not
+                    # PlaceholderManager -- a sibling, previously-unpatched copy of the
+                    # exact TC-APT-110 glued-word defect (model drops the boundary
+                    # space around the placeholder token, e.g. "com{TERM_0}" ->
+                    # "comWorkbook.save"). Confirmed live: cs/hu/pt on cells/rust
+                    # quickstart.md still shipped this defect from professionalize_llm
+                    # AFTER TC-APT-110 landed, because that fix only touched
+                    # PlaceholderManager (the M2M100/AST path) -- professionalize_llm
+                    # produced 100% of the accepted output in that run and never
+                    # passes through it. Reuses the same boundary-space decision
+                    # (src/translation_engine/boundary_spacing.py) so the two restore
+                    # implementations can't drift on what counts as a lost space.
+                    value = term.term_text
+                    s = restored_text
+                    start, end = match.span()
+                    prefix = " " if start > 0 and needs_space_boundary(s[start - 1], value[0]) else ""
+                    suffix = (
+                        " " if end < len(s) and needs_space_boundary(s[end], value[-1]) else ""
+                    )
+                    restored_text = s[:start] + prefix + value + suffix + s[end:]
                     break
 
         return restored_text
