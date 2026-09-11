@@ -1458,17 +1458,17 @@
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "campaign_id": "wave-barcodepython-index-20260911",
-      "pid": 52432,
-      "manifest": "data/campaigns/manifests/wave-barcodepython-index-20260911.yaml",
+      "campaign_id": "wave-pdftypescript-coreapi-20260911",
+      "pid": 52476,
+      "manifest": "data/campaigns/manifests/wave-pdftypescript-coreapi-20260911.yaml",
       "sources": [
-        "content/blog.aspose.org/barcode/python/_index.md"
+        "content/blog.aspose.org/pdf/typescript/pdf-core-api-typescript/index.md"
       ],
-      "locales": 21,
-      "expected_output_count": 21,
-      "launched_at": "2026-09-11T08:00:00+00:00",
+      "locales": 25,
+      "expected_output_count": 25,
+      "launched_at": "2026-09-11T08:15:00+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "User flagged a ~2h gap with no new translated-content commits landing (last was c366c0b118, hu locale). Investigation: fleet is active (11+ peers), but recent commits in the window were all governance/quality-remediation, not content -- other sessions stuck on a different producer bug (words-foss-net FOSS+platform qualifier merge, TC-APT-042, actively claimed/being fixed, not touched here). Rather than just report the gap, launched a fresh, uncontested Tier-1a page (21/25 locales, excluding hi/ko/tr/ja which have an open unfixed title-postposition-inversion ticket) to land another real content commit."
+      "notes": "wave-barcodepython-index-20260911 (previous entry) failed instantly: work_ledger was stale for that page -- 20/21 requested locales were already committed weeks/days ago (0d98ffadd1), never reconciled in the ledger. Fixed 21 stale ledger rows to UP_TO_DATE, released the claim, verified this replacement candidate against actual git history/disk (0 existing locale files, not just ledger state) before claiming+launching. User asked for an ongoing watch mechanism over detached campaign processes (loop skill engaged)."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
