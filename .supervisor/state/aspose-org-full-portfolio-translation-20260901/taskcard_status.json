@@ -1456,7 +1456,21 @@
   "last_wake_summary": "wave-pdftypescript-coreapi-20260911 complete: 23/25 committed across 12 incremental commits (dc6e9fd4a4 through ffb70c0a72), landed as each locale finished rather than waiting for the full run -- addresses the users repeated concern about commit gaps during long serialized campaigns. fr (RepetitionDetectorValidator) and vi (pipeline error) exhausted retries, auto-ticketed, not shipped. Claim released; selecting next candidate.",
   "cells_committed_total": 481,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
-  "active_detached_runs": [],
+  "active_detached_runs": [
+    {
+      "campaign_id": "wave-pdfgeneratedpython-20260911",
+      "pid": 56272,
+      "manifest": "data/campaigns/manifests/wave-pdfgeneratedpython-20260911.yaml",
+      "sources": [
+        "content/blog.aspose.org/pdf/python/pdf-generated-in-python/index.md"
+      ],
+      "locales": 25,
+      "expected_output_count": 25,
+      "launched_at": "2026-09-11T09:47:00+00:00",
+      "launched_by": "hugo-translator-fc",
+      "notes": "New Tier-1a page after pdf-core-api-typescript landed (23/25). Verified 0 existing locale files on disk and 0 heal tickets before claiming (not just work_ledger, which has been found stale/incomplete before). Committing incrementally as locales complete, per the established pattern from the previous campaign, rather than waiting for full completion."
+    }
+  ],
   "blocked_pending_clean_translator_repo": null,
   "wave_scale": {
     "value": 4,
