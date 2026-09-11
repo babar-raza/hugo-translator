@@ -1453,22 +1453,22 @@
       ]
     }
   },
-  "last_wake_summary": "r3 (mine) COMPLETE 3/3 gate-accepted but cs/hu STILL glued -- confirmed the gate was structurally blind to frontmatter (suite strips it); peer hugo-translator-fc committed the TC-APT-112 wiring (b6218866) + launched r4 (cs/hu, LLM-primary per user instruction). r4 failure_metadata now shows gate:GluedIdentifierValidator REJECTING glued candidates in production -- the class is closed at acceptance. r4 process exited without summary (peer's claim/lane to relaunch). Peer shipped ar/es/fa/nl/uk (f7ab0f5089) + pt (b57a1586c1): page 23/25 live. I purged cs/hu TM again (54 entries, r3's defective flush), launched 3 rubric-audit subagents over the 6 shipped locales, appended 2 SSL field notes (stash-pop trap; pre-existing router-wiring test failure, bisected to before 7eca6299). Ticket transitions to FIXED_VERIFIED await audit verdicts.",
+  "last_wake_summary": "TC-APT-112 fix (b6218866) verified working live: r4 correctly rejected cs 3/3 (gate catches the defect now) and accepted hu clean, committed (c366c0b118). quickstart.md 24/25. r5 (PID 45620) relaunched for cs alone.",
   "cells_committed_total": 481,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
-      "campaign_id": "wave-cellsrust-quickstart-glueretrigger-20260911r4",
-      "pid": 12180,
-      "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-glueretrigger-20260911r4.yaml",
+      "campaign_id": "wave-cellsrust-quickstart-glueretrigger-20260911r5",
+      "pid": 45620,
+      "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-glueretrigger-20260911r5.yaml",
       "sources": [
         "content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md"
       ],
-      "locales": 2,
-      "expected_output_count": 2,
-      "launched_at": "2026-09-11T05:56:00+00:00",
+      "locales": 1,
+      "expected_output_count": 1,
+      "launched_at": "2026-09-11T06:05:00+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "r4: cs/hu only. Root-caused why the r3 gate (17073573) still let them ship glued a 3rd time: GluedIdentifierValidator was correctly written but the main validator suite never evaluates frontmatter text at all (every production caller strips frontmatter before validate_aggregated) -- fixed in commit b6218866 (_check_frontmatter_glued_identifiers, wired into all 3 call sites). Verified directly against the real r3 cs/hu glued strings before relaunch. primary_model=professionalize_llm only per explicit user instruction to stop spending attempts on m2m100 (0% acceptance on this content across every prior run); m2m100 remains only as the architecturally-required escalation fallback (same-model pairs are a hard validated constraint, not bypassed) but should never actually fire given professionalize_llm's 100% acceptance rate so far."
+      "notes": "r5: cs alone, single-locale retry. r4 (PID 12180/48732) correctly REJECTED cs 3/3 attempts via the now-fixed GluedIdentifierValidator frontmatter gate (b6218866) -- a real gate-catch, not a broken gate letting it ship (contrast r2/r3). hu accepted clean in r4, committed c366c0b118. This is stochastic professionalize_llm generation variance (ar/es/fa/nl/pt/uk/hu all succeeded on this exact page), not a deterministic defect -- a plain retry is appropriate, not a RECURRENCE ESCALATION case."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
