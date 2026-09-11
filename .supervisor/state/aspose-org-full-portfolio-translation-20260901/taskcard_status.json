@@ -1453,26 +1453,10 @@
       ]
     }
   },
-  "last_wake_summary": "wave-tier1b-batch1-retrigger-20260911r2 (PID 52852, still running): linktitle fix (291c23f3) now DIRECTLY confirmed on all 3 originally-blocked sources -- compound-file-support.md (net+python, 14 cells), working-with-presentation-content.md (7 of 8 locales so far; hi excluded), working-with-app-properties.md (2 of however many; still running). All real heal tickets for these 3 sources now carry direct per-page evidence, not cross-page inference. NEW separate defect found on working-with-presentation-content.md hi: frontmatter description's trailing sentence 'Covers Presentation.' left entirely untranslated while cs/de/id/it/ja/nl/ru (same wave) all translate it -- ticketed (RB-013), TM purged, not yet retried. cells_committed_total 546 -> 559 (this session's 5 + peer's 8 committed concurrently).",
-  "cells_committed_total": 559,
+  "last_wake_summary": "wave-tier1b-batch1-retrigger-20260911r2 finished (SHARD_COMPLETE, 30/30 accepted, 0 failed). working-with-app-properties.md's full 8-locale retrigger (cs/de/hi/id/it/ja/nl/ru) now DIRECTLY body-reviewed clean by this session (not just structural) -- linktitle stays English, title translates, AppPropertiesPart preserved in all 8; peer committed hi/id/it/ja/nl/ru in 7136a8e2c7 with only structural verification (their commit message says so explicitly), this session independently confirmed body content after the fact. All 3 originally QU-02-blocked sources (compound-file-support.md, working-with-presentation-content.md, working-with-app-properties.md) now fully closed with direct per-locale evidence. Remaining open item: working-with-presentation-content.md hi has a separate NEW isolated defect (RB-013, 'Covers Presentation.' left untranslated) -- ticketed, TM purged, not yet retried; next wake should retrigger it. cells_committed_total 559 -> 565 (+6 peer-committed app-properties cells this session directly verified).",
+  "cells_committed_total": 565,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
-    {
-      "campaign_id": "wave-tier1b-batch1-retrigger-20260911r2",
-      "pid": 52852,
-      "manifest": "data/campaigns/manifests/wave-tier1b-batch1-retrigger-20260911r2.yaml",
-      "sources": [
-        "content/docs.aspose.org/en/email/net/developer-guide/compound-file-support.md",
-        "content/docs.aspose.org/en/email/python/developer-guide/compound-file-support.md",
-        "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
-        "content/docs.aspose.org/en/slides/net/developer-guide/working-with-app-properties.md"
-      ],
-      "locales": 25,
-      "expected_output_count": 30,
-      "launched_at": "2026-09-11T18:20:00+00:00",
-      "launched_by": "hugo-translator-fc",
-      "notes": "r1 (PID 50572) produced 0/36 -- every cell blocked by QU-02, because dispositioning the real tickets FIXED_VERIFIED didn't clear the file-level quarantine on its own: is_source_path_quarantined() also counts the CASCADE artifacts (auto:unclassified, from cells never attempted) as a SEPARATE quarantine trigger once they hit >=3 distinct locales, which r1 itself then added to. Waived 100 cascade tickets across all 5 original sources (commit da3bd2cb), dropped installation.md from THIS retrigger (its real GATE23 tickets are genuinely unfixed, left OPEN/quarantined on purpose -- not a cascade artifact). r2 covers the 4 sources actually cleared. On next wake: body-review every accepted cell for real content (not just structural parity) -- the FIXED_VERIFIED disposition on the 12 real tickets was based on the peer's cross-page evidence, not a direct read of THESE pages' output yet; if r2 fails the SAME way (auto:verification:language_detection again), revert those 12 tickets to OPEN with that evidence, per the runbook's prose-does-not-count standard."
-    },
     {
       "campaign_id": "wave-tier1b-batch2-20260911",
       "pid": 66324,
