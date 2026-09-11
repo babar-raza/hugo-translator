@@ -1453,22 +1453,22 @@
    ]
   }
  },
- "last_wake_summary": "VA-07 fix (leaf_inventory.classify_sole_leaf, commit 0328ef5b) fully reverified: wave-va07-remediate-20260911r2 shipped installation.md 24/25 (zh blocked on unrelated TC-APT-040-class FrontmatterLanguageCheck failure across all 3 attempts, left un-replaced and still VA-07-corrupted -- separate open ticket auto-wave-va07-remediate-20260911r2-w0:docs.aspose.org:cells:rust:zh:1-installation) + license.md 25/25, 49 cells total, commit 26c8038b28. work_ledger updated UP_TO_DATE for all 49 cells; reverification_receipts.jsonl written (2 entries). No heal_queue tickets existed for these two files pre-fix (VA-07 corruption passed all 44 gates silently -- only found via the later portfolio-wide audit grep, not by quarantine), so none needed closing here. Session bookkeeping closed: skill_run_manager finalized run 20260911-010806-sht02, session_ledger session dbfc7da1-ff42-48e6-988a-c5c9f1a1c237 closed. Still open/deferred: rust/getting-started/quickstart.md (24 tickets, ar/cs/de/el still OPEN pending real-campaign retrigger -- code fix verified via isolated harness only, not yet reverified through campaign_runner.py); working-with-cells-foss-model.md (rust) still fully blocked on a distinct purity-check defect (fp-wave-followup-wcfm-20260910r3-purity-check.json); the 10,856-file portfolio-wide VA-07 backlog remains explicitly out of scope, cross-referenced to TC-APT-083 (manual-va07-portfolio-wide-nested-link-corruption-20260911).",
+ "last_wake_summary": "wave-cellsrust-quickstart-retrigger-20260911r3 completed (23/25 accepted, it+zh failed) but 4-agent parallel rubric review REJECTED all 23/23 on two RB-005 producer bugs recurring identically in every locale: (1) heading 'Prerequisites' + table headers 'Requirement'/'Detail' matched the legacy single-hump PascalCase heuristic with no i18n registry entry (same class as TC-APT-108/TC-APT-053); (2) two full list-item sentences merely mentioning a snake_case identifier were fully untranslated because the snake_case check matched any text containing '_' with no uppercase anywhere, not just a standalone identifier. Root-caused against the real source file (not assumed), fixed both (registry entries + anchored regex, commit c2145c3a), added regression test (775 tests pass, 0 failures), reverified the fix directly against the exact original file. TM purged for all 25 locales of this source (97 + 1664 entries). A THIRD, distinct defect (frontmatter missing-space glue before a protected identifier, e.g. 'pomocíWorkbook.save') was found in 8/23 locales but deferred -- it's LLM-generation-time whitespace loss around the placeholder token, not a deterministic extraction bug, and a blanket space-insertion repair would be wrong for non-space-delimited scripts in this same locale set; needs script-aware handling, filed as a new Track-B finding rather than guessed at. Retriggered wave-cellsrust-quickstart-fixretrigger-20260911 (all 25 locales, --existing replace) as an OS-detached process; passed verify_environment (yaml_format_success logged) before this bookkeeping commit. Full root-cause record: data/summaries/fp-wave-cellsrust-quickstart-fixretrigger-20260911-rootcause.json. Still open/deferred: working-with-cells-foss-model.md (rust) still fully blocked on a distinct purity-check defect; the 10,856-file portfolio-wide VA-07 backlog remains out of scope (TC-APT-083).",
  "cells_committed_total": 481,
  "loop_prompt_version_seen": "10.7 (2026-09-06)",
  "active_detached_runs": [
   {
-   "campaign_id": "wave-cellsrust-quickstart-retrigger-20260911r3",
-   "pid": 45588,
-   "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-retrigger-20260911r3.yaml",
+   "campaign_id": "wave-cellsrust-quickstart-fixretrigger-20260911",
+   "pid": 4632,
+   "manifest": "data/campaigns/manifests/wave-cellsrust-quickstart-fixretrigger-20260911.yaml",
    "sources": [
     "content/docs.aspose.org/en/cells/rust/getting-started/quickstart.md"
    ],
    "locales": 25,
    "expected_output_count": 25,
-   "launched_at": "2026-09-11T01:26:00+00:00",
+   "launched_at": "2026-09-11T02:37:52+00:00",
    "launched_by": "interactive-continue-20260911",
-   "notes": "r1 (pid 57940) and r2 both died on verify_environment before any real work: r1 on an uncommitted dirty path (post-launch edit), r2 on SHA drift (a bookkeeping commit landed AFTER the manifest was built but BEFORE launch, invalidating the baked translator_repo_sha). r3: manifest built LAST, immediately before Start-Process, zero commits in between; confirmed past the environment check -- yaml_format_success logged at 2026-09-11T06:29:04 local. This bookkeeping commit itself happens AFTER that real-progress confirmation, so it cannot repeat the same race."
+   "notes": "Retrigger after fixing the two RB-005 producer bugs r3's review surfaced (see last_wake_summary + data/summaries/fp-wave-cellsrust-quickstart-fixretrigger-20260911-rootcause.json). --existing replace --include-known-broken, output_selection=all (regenerates all 25, including the 23 whose bad output already sits uncommitted on disk from r3). Manifest built last, dirty inventory diff discarded, zero translator-repo git touches until yaml_format_success confirmed -- this bookkeeping commit happens after that confirmation."
   }
  ],
  "blocked_pending_clean_translator_repo": null,
