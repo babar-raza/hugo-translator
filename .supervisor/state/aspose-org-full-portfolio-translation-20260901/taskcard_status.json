@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T16:35:00+05:00",
+  "updated_at": "2026-09-12T16:50:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 85,
+  "wake_count": 86,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "batch3 (PID 6804) still running, 8/61 accepted so far. Reviewed 5 more cells (fa/hi/id/it for introducing-tex-foss-python, id for tex-engine-python) -- all clean and thorough, committed (1fbf678bc2). hi's Quick Start heading now confirms the heading.quickstart i18n fix working there too. cells_committed_total 597 -> 602 (+5). Campaign has ~53 outputs still to go -- continue reviewing incrementally across upcoming wakes.",
-  "cells_committed_total": 602,
+  "last_wake_summary": "batch3 (PID 6804) still running, 11/61 accepted, 1 failed (ja's blog _index.md hit a real gate failure this attempt, consistent with the RB-004 garbled-word defect already ticketed there). Reviewed 2 more cells: it's tex-engine-python article (clean, committed) and ja's introducing-tex-foss-python article (REJECT -- an internal heading inconsistency: the first heading correctly translates 'via' as a Japanese particle, but the identical construction is left in bare English in the next 3 headings on the SAME page; cs/de/fa/hi/id/it all handle it consistently. Ticketed as a 2nd ja defect this wave -- worth watching whether ja becomes a recurring weak point). cells_committed_total 602 -> 603 (+1). Campaign has ~48 outputs still to go.",
+  "cells_committed_total": 603,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
