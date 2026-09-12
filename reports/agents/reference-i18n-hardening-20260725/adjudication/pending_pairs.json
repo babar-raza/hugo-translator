@@ -806,5 +806,113 @@
   {
     "locale": "zh",
     "id": "heading.installation"
+  },
+  {
+    "locale": "ar",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "bg",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "ca",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "da",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "el",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "es",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "fi",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "he",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "hr",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "hu",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "id",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "ko",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "lt",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "lv",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "ms",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "no",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "pt",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "ro",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "sk",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "sr",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "sv",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "th",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "tr",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "uk",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "vi",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "zh",
+    "id": "heading.quickstart"
   }
 ]

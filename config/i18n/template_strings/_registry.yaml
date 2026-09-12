@@ -550,6 +550,6 @@ entries:
 - id: heading.quickstart
   en: Quickstart
   category: section_heading
-  status: pending
+  status: approved
   first_seen_incident: TC-APT-114-wave-cellsrust-quickstart-glueretrigger-20260911r2-audit
   evidence_count: 507

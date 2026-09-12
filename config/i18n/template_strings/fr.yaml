@@ -13,6 +13,12 @@ translations:
     reviewed_at: '2026-09-12'
     evidence_count: 58
     corpus_agreement: agree
+  heading.quickstart:
+    value: Démarrage rapide
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 507
+    corpus_agreement: agree
     rejected_variants:
     - Vue de l'ensemble
   heading.see_also:

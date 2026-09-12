@@ -13,6 +13,12 @@ translations:
     reviewed_at: '2026-09-12'
     evidence_count: 58
     corpus_agreement: agree
+  heading.quickstart:
+    value: Rychlý start
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 507
+    corpus_agreement: agree
   heading.see_also:
     value: 'Viz také:'
     reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
