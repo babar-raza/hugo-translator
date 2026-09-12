@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T00:35:00+05:00",
+  "updated_at": "2026-09-12T00:50:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 64,
+  "wake_count": 65,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "wwpc-hi-rb013-retrigger-20260912 (PID 40800) died instantly with 'translation memory fingerprint drift' -- known race, batch2 (PID 66324) was still actively accepting cells against the shared TM. Rebuilding manifest as r2; a manually-&-backgrounded shell rebuild attempt was silently lost when the tool call's shell session ended (anti-pattern -- never hand-roll background with &, let the harness auto-background a slow call instead), redone correctly as bgsnf50r1. Meanwhile reviewed batch2's 2 more eml-conversion.md cells (th/uk): both clean, committed (1b0c84ba6a) -- required session_ledger.py adopt first (files were dirty-but-unledgered). cells_committed_total 568 -> 570 (+2: eml-conversion th/uk).",
-  "cells_committed_total": 570,
+  "last_wake_summary": "wwpc-hi-rb013-retrigger-20260912r2 (PID 22784) launched successfully -- SHA-patched to latest HEADs immediately before Start-Process, survived past the instant-death window this time. Also committed working-with-package-management.md cs (batch2, clean -- cs translation correctly avoided replicating the English source's own 'working with working with' doubled-phrase glitch). Next wake: confirm r2 finished, body-review its hi output for the RB-013 defect before committing (replace-commit over 7c3458e7da), and check batch2 (PID 66324) for further progress. cells_committed_total 570 -> 571 (+1: working-with-package-management cs).",
+  "cells_committed_total": 571,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1478,17 +1478,17 @@
       "notes": "Second Tier-1b batch this mission, launched IN PARALLEL with the peer's wave-tier1b-batch1-retrigger-20260911 (different sources, no overlap). 8 fresh fewest-missing-first pages, distinct families from everything touched so far (slides/python, words/python, barcode/python, cells/cpp, tex/python, email/cpp), 0 heal_queue history on any. Built via --source-list + --missing-only + --max-parallel-jobs 4. First TWO launch attempts (PID 59604, then 49636) died within seconds with 'translation memory fingerprint drift' -- root-caused: src/workers/campaign_manifest.py:543-544 re-hashes data/tm/l2.lmdb/data.mdb at runtime against the manifest's baked-in fingerprint, and the peer's actively-accepting concurrent campaign kept mutating that shared TM file faster than the build-to-launch window. NEW STANDING LESSON: launching a new campaign while a peer's campaign is mid-acceptance-burst against the SAME shared TM can race this way; minimize the rebuild-to-Start-Process gap, retry up to 3 times, stand down if it keeps failing. Third attempt (PID 66324) succeeded, confirmed alive with real progress via llm_calls.jsonl growth (425 bytes) ~18s after launch. Body-reviewed 4 accepted cells (ja/ko/nl/pl): ja/nl/pl clean, committed (0db75f943c); ko REJECTed -- RB-012, backticks injected into frontmatter description around method names with no markdown in source/siblings, single-locale variance -- ticketed, TM purged (31 entries)."
     },
     {
-      "campaign_id": "wwpc-hi-rb013-retrigger-20260912",
-      "pid": null,
+      "campaign_id": "wwpc-hi-rb013-retrigger-20260912r2",
+      "pid": 22784,
       "manifest": "data/campaigns/manifests/wwpc-hi-rb013-retrigger-20260912r2.yaml",
       "sources": [
         "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md"
       ],
       "locales": 1,
       "expected_output_count": 1,
-      "launched_at": "2026-09-11T19:14:41+00:00",
+      "launched_at": "2026-09-12T05:49:23+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Single-cell heal retrigger for RB-013 (hi): frontmatter description trailing sentence 'Covers Presentation.' was left untranslated in the already-committed 7c3458e7da. --existing replace + --include-known-broken; TM already purged (23 entries) when the ticket was opened. r1 (PID 40800) died instantly with TM fingerprint drift -- batch2 (PID 66324) was still mid-acceptance-burst against the shared TM, same race documented on batch2's own launch. Rebuilding fresh as r2 (build in flight); launch it with minimal rebuild-to-Start-Process gap once the manifest lands, patching translator_repo_sha/content_repo_sha to current HEADs first. On next wake: confirm r2 launched and alive, then body-review its output for the same defect before committing (not just structural), then replace-commit over the existing hi file."
+      "notes": "Single-cell heal retrigger for RB-013 (hi): frontmatter description trailing sentence 'Covers Presentation.' was left untranslated in the already-committed 7c3458e7da. --existing replace + --include-known-broken; TM already purged (23 entries). r1 (PID 40800) died instantly with TM fingerprint drift -- batch2 (PID 66324) was still mid-acceptance-burst against the shared TM. r2 rebuilt fresh, SHA-patched to current HEADs immediately before launch, confirmed alive 5s post-launch (past the instant-death window). On next wake: confirm r2 finished, body-review its hi output for the same defect before committing (not just structural), then replace-commit over the existing hi file."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
