@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T15:10:00+05:00",
+  "updated_at": "2026-09-12T15:25:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 80,
+  "wake_count": 81,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,7 +1453,7 @@
       ]
     }
   },
-  "last_wake_summary": "Applied the now-proven pending-registry fix pattern a SECOND time: promoted heading.quickstart (evidence_count=507, the single largest of the 38 remaining pending entries) to approved for the same 9 locales (commit fca130c8). Sourced translations directly from live content rather than guessing -- the same 9 locales already correctly render 'Quick Start' as ordinary link text in their own installation.md files (Gate 11 doesn't touch link text, only title/linkTitle), giving high-confidence evidence for free. Verified via classify() smoke test (all 9 should_protect=False) and 498 regression tests (413 classification/extractor/terminology + 85 write_gate), zero failures. Noted but did not chase a separate, unrelated defect spotted in fr's already-shipped installation.md (stripped markdown link syntax, 'TX' instead of 'TeX') while gathering evidence. 37 pending entries remain (heading.options at 310 is now largest) -- documented this as a repeatable ~20-minute-per-term playbook in the fp record for whoever continues the backlog. No new content cells this wake (pure i18n-registry work); cells_committed_total unchanged at 592.",
+  "last_wake_summary": "Rebalancing back toward primary mission throughput (cells_committed_total) after several wakes of pure infra/i18n-registry work. Attempted a fresh Track-A batch: an unscoped --missing-only --max-sources 8 selected zero sources (wave-ascending sort truncated to already-fully-covered early-wave pages before the missing_only filter could find anything real) -- rebuilding scoped to --family words --platform python instead, build in flight. Standing lesson for future wakes: unscoped auto-discovery via --max-sources alone is unreliable this deep into the mission; always pair --missing-only with an explicit --family/--platform (or --source-list) scope.",
   "cells_committed_total": 592,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
