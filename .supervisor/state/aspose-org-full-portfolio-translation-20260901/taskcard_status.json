@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T15:50:00+05:00",
+  "updated_at": "2026-09-12T16:20:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 83,
+  "wake_count": 84,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "Launched wave-tier1b-batch3-20260912 (PID 6804) -- 7 sources / 61 outputs across tex/python (blog + docs), after 2 earlier scoping attempts came up nearly empty (words/python had only 1 missing cell). Claimed all 7 source pages. Confirmed alive past 8s. This is the mission's primary throughput work resuming after several wakes of infra/i18n-registry fixes. No new cells committed yet this wake (campaign just launched); cells_committed_total unchanged at 592.",
-  "cells_committed_total": 592,
+  "last_wake_summary": "batch3 (PID 6804) actively producing; body-reviewed its first 6 accepted cells. Committed 5 clean (hu's blog _index.md + cs/de's 2 full articles, ae70f29d) -- all thorough, correct translations that also confirm this session's heading.installation/heading.quickstart i18n fixes working live in production (cs 'Rychlý start', de 'Schnellstart' headings, de's table.header.role 'Rolle'). Rejected ja's _index.md: 'tutorials' renders as a garbled/non-standard transliteration (トゥトリエル) instead of the established Japanese loanword (チュートリアル) -- ticketed under RB-004. Campaign still running (61 total outputs expected, ~6 done so far) -- will take several more wakes to complete; keep reviewing as cells land rather than waiting for full completion. cells_committed_total 592 -> 597 (+5).",
+  "cells_committed_total": 597,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
