@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "Reviewed batch2's eml-conversion.md (docs.aspose.org/email/cpp) 4 accepted cells: ja/nl/pl clean, committed (0db75f943c); ko REJECTed on RB-012 (backticks injected into frontmatter description, single-locale, ja/nl/pl clean at same position) -- ticketed, TM purged, not yet retried. Discovered and root-caused: my remembered git_plumb_commit.py path was wrong last iteration -- it lives in the CONTENT repo (D:/.../aspose.org/scripts/pipeline/commands/ops/), not hugo-translator; --no-push is mandatory. Launched single-cell replace retrigger for working-with-presentation-content.md hi (RB-013 fix, PID 40800) -- next wake must body-review its output before committing. cells_committed_total 565 -> 568 (+3 this iteration: eml-conversion ja/nl/pl).",
-  "cells_committed_total": 568,
+  "last_wake_summary": "wwpc-hi-rb013-retrigger-20260912 (PID 40800) died instantly with 'translation memory fingerprint drift' -- known race, batch2 (PID 66324) was still actively accepting cells against the shared TM. Rebuilding manifest as r2; a manually-&-backgrounded shell rebuild attempt was silently lost when the tool call's shell session ended (anti-pattern -- never hand-roll background with &, let the harness auto-background a slow call instead), redone correctly as bgsnf50r1. Meanwhile reviewed batch2's 2 more eml-conversion.md cells (th/uk): both clean, committed (1b0c84ba6a) -- required session_ledger.py adopt first (files were dirty-but-unledgered). cells_committed_total 568 -> 570 (+2: eml-conversion th/uk).",
+  "cells_committed_total": 570,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1480,7 +1480,7 @@
     {
       "campaign_id": "wwpc-hi-rb013-retrigger-20260912",
       "pid": null,
-      "manifest": "data/campaigns/manifests/wwpc-hi-rb013-retrigger-20260912.yaml",
+      "manifest": "data/campaigns/manifests/wwpc-hi-rb013-retrigger-20260912r2.yaml",
       "sources": [
         "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md"
       ],
@@ -1488,7 +1488,7 @@
       "expected_output_count": 1,
       "launched_at": "2026-09-11T19:14:41+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Single-cell heal retrigger for RB-013 (hi): frontmatter description trailing sentence 'Covers Presentation.' was left untranslated in the already-committed 7c3458e7da. --existing replace + --include-known-broken; TM already purged (23 entries) when the ticket was opened. On next wake: body-review the output for the same defect before committing (not just structural), then replace-commit over the existing hi file."
+      "notes": "Single-cell heal retrigger for RB-013 (hi): frontmatter description trailing sentence 'Covers Presentation.' was left untranslated in the already-committed 7c3458e7da. --existing replace + --include-known-broken; TM already purged (23 entries) when the ticket was opened. r1 (PID 40800) died instantly with TM fingerprint drift -- batch2 (PID 66324) was still mid-acceptance-burst against the shared TM, same race documented on batch2's own launch. Rebuilding fresh as r2 (build in flight); launch it with minimal rebuild-to-Start-Process gap once the manifest lands, patching translator_repo_sha/content_repo_sha to current HEADs first. On next wake: confirm r2 launched and alive, then body-review its output for the same defect before committing (not just structural), then replace-commit over the existing hi file."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
