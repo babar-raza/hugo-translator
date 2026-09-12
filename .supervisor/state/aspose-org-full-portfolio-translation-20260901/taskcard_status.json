@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T15:25:00+05:00",
+  "updated_at": "2026-09-12T15:40:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 81,
+  "wake_count": 82,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,7 +1453,7 @@
       ]
     }
   },
-  "last_wake_summary": "Rebalancing back toward primary mission throughput (cells_committed_total) after several wakes of pure infra/i18n-registry work. Attempted a fresh Track-A batch: an unscoped --missing-only --max-sources 8 selected zero sources (wave-ascending sort truncated to already-fully-covered early-wave pages before the missing_only filter could find anything real) -- rebuilding scoped to --family words --platform python instead, build in flight. Standing lesson for future wakes: unscoped auto-discovery via --max-sources alone is unreliable this deep into the mission; always pair --missing-only with an explicit --family/--platform (or --source-list) scope.",
+  "last_wake_summary": "Continuing the Track-A rebalance. words/python (scoped attempt) turned out nearly saturated -- only 1 source/1 cell missing (converters.md). Trying tex/python next for a larger batch; build in flight (bafniw529). Standing lesson reinforced: this deep into the mission, most family/platform combos are heavily covered already -- expect to try 2-3 scopes before finding one with real remaining volume, rather than assuming the first scoped attempt will yield a full batch.",
   "cells_committed_total": 592,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
