@@ -233,6 +233,34 @@ def test_sibling_campaign_ledger_churn_in_translator_repo_does_not_block_under_c
         _env_ok_real_translator(frozen, translator, monkeypatch)
 
 
+def test_sibling_session_supervisor_state_churn_does_not_block_under_campaign_paths(
+    tmp_path, monkeypatch
+):
+    """Same race as the data/campaigns/ companion above, one directory over:
+    every session in this mission's multi-session fleet writes its own
+    mission-loop bookkeeping (taskcard_status.json etc.) to .supervisor/state/
+    continuously, independently of any campaign's own translation work. Found
+    live (2026-09-12): a single-cell heal retrigger died repeatedly on
+    "translator repository is dirty (1 paths)" purely because a sibling
+    session's concurrent edit to taskcard_status.json landed in the narrow
+    window between manifest build and launch.
+    """
+    content_repo = _repo(tmp_path)
+    translator = _real_translator_repo(tmp_path)
+    state_dir = translator / ".supervisor/state/some-mission-id"
+    state_dir.mkdir(parents=True)
+    (state_dir / "taskcard_status.json").write_text(
+        '{"wake_count": 1}\n', encoding="utf-8"
+    )  # untracked -- a sibling session's live, uncommitted mission-state write
+
+    manifest = _load(tmp_path, _payload(content_repo, dirty_scope="campaign_paths"))
+    _env_ok_real_translator(manifest, translator, monkeypatch)  # must NOT raise
+
+    frozen = _load(tmp_path, _payload(content_repo, dirty_scope="frozen_baseline"))
+    with pytest.raises(CampaignManifestError, match="translator repository is dirty"):
+        _env_ok_real_translator(frozen, translator, monkeypatch)
+
+
 def test_translator_code_dirtiness_outside_data_campaigns_still_blocks_under_campaign_paths(
     tmp_path, monkeypatch
 ):

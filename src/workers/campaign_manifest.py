@@ -521,8 +521,23 @@ class CampaignManifest:
                 # repository is dirty (1 paths)" solely because a SIBLING campaign had an
                 # in-flight, uncommitted append to data/campaigns/heal_queue.jsonl. Code/config
                 # dirtiness elsewhere in the tree still fails the check, as before.
+                #
+                # .supervisor/state/ extension (2026-09-12): the exact same race, one directory
+                # over. Every session in this fleet writes its own mission-loop bookkeeping
+                # (taskcard_status.json, active_detached_runs, etc.) to .supervisor/state/
+                # continuously and independently of any campaign's own translation work --
+                # confirmed live: a single-cell heal retrigger died 3x in a row on "translator
+                # repository is dirty (1 paths)" purely because a sibling session's concurrent
+                # edit to taskcard_status.json landed in the narrow window between manifest
+                # build and launch, well after the batch campaign whose ledger churn this
+                # exemption was originally written for had already exited. Same rationale as
+                # data/campaigns/ above: generated runtime state, never a translation-safety
+                # hazard, never staged or committed by this check.
+                _exempt_prefixes = ("data/campaigns/", ".supervisor/state/")
                 dirty = [
-                    item for item in dirty if not Path(item).as_posix().startswith("data/campaigns/")
+                    item
+                    for item in dirty
+                    if not Path(item).as_posix().startswith(_exempt_prefixes)
                 ]
             if dirty:
                 errors.append(f"translator repository is dirty ({len(dirty)} paths)")
