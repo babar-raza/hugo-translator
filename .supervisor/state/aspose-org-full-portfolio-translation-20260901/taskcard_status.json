@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T12:35:00+05:00",
+  "updated_at": "2026-09-12T12:45:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 71,
+  "wake_count": 72,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,7 +1453,7 @@
       ]
     }
   },
-  "last_wake_summary": "SECOND real code fix landed this wake (commit 01756e5d). The hi RB-013 combined retrigger died a 4th time on 'translator repository is dirty' even AFTER batch2 r2 (the presumed racing culprit) had already exited -- investigated instead of blindly retrying again, and found the real cause in src/workers/campaign_manifest.py: TC-APT-032's campaign_paths dirty-check exemption only covers data/campaigns/, but every session in this fleet also writes taskcard_status.json to .supervisor/state/ continuously, and that path was never exempted. Extended the exemption, added a regression test mirroring the existing data/campaigns/ companion test; 14/14 dirty-scope tests and 85/85 broader campaign_manifest tests pass. This is a second, independent producer-side/infra bug found and fixed this session (after the RB-015 i18n table-header fix earlier this wake) -- both were found by refusing to just re-ticket-and-retry a recurring failure and instead reading the actual check that was rejecting the launch. Rebuilt the hi RB-013 manifest as r3 (TM had drifted since r2 was built) -- build in flight. No new cells committed this wake; cells_committed_total unchanged at 584.",
+  "last_wake_summary": "SECOND real code fix landed this wake (commit 01756e5d): the hi RB-013 combined retrigger died a 4th time on 'translator repository is dirty' even AFTER batch2 r2 (the presumed racing culprit) had already exited -- investigated instead of blindly retrying again, and found src/workers/campaign_manifest.py's TC-APT-032 campaign_paths exemption only covers data/campaigns/, never .supervisor/state/ (where every session's taskcard_status.json bookkeeping lands). Extended the exemption + added a regression test; 14/14 dirty-scope + 85/85 broader campaign_manifest tests pass. Two independent producer-side/infra bugs found and fixed in one wake (the other: RB-015's i18n table-header gap, commit 7dceae31) by refusing to just re-ticket-and-retry a recurring failure and instead reading the actual check code. r3 (PID 16796, TM re-drifted since r2's manifest so rebuilt fresh) launched and survived past 8s with no instant-death error in its log this time -- first launch of this fix to get past the point where the previous 3 always died. No new cells committed this wake; cells_committed_total unchanged at 584. Next wake: confirm r3 actually completed (not just survived launch), body-review both hi outputs, commit if clean.",
   "cells_committed_total": 584,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
@@ -1476,7 +1476,7 @@
     },
     {
       "campaign_id": "wwpc-hi-rb013-combined-20260912r3",
-      "pid": null,
+      "pid": 16796,
       "manifest": "data/campaigns/manifests/wwpc-hi-rb013-combined-20260912r3.yaml",
       "sources": [
         "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
