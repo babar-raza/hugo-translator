@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T13:05:00+05:00",
+  "updated_at": "2026-09-12T13:10:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 73,
+  "wake_count": 74,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1476,7 +1476,7 @@
     },
     {
       "campaign_id": "wwpc-hi-rb013-m2m-diag-20260912",
-      "pid": null,
+      "pid": 24628,
       "manifest": "data/campaigns/manifests/wwpc-hi-rb013-m2m-diag-20260912r3.yaml",
       "sources": [
         "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
