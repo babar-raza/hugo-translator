@@ -29,7 +29,7 @@ param(
     [switch]$DryRun
 )
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 
 $RepoRoot  = "c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator"
 $LogDir    = Join-Path $RepoRoot "logs"
