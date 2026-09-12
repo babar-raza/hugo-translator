@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T12:45:00+05:00",
+  "updated_at": "2026-09-12T13:05:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 72,
+  "wake_count": 73,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,7 +1453,7 @@
       ]
     }
   },
-  "last_wake_summary": "SECOND real code fix landed this wake (commit 01756e5d): the hi RB-013 combined retrigger died a 4th time on 'translator repository is dirty' even AFTER batch2 r2 (the presumed racing culprit) had already exited -- investigated instead of blindly retrying again, and found src/workers/campaign_manifest.py's TC-APT-032 campaign_paths exemption only covers data/campaigns/, never .supervisor/state/ (where every session's taskcard_status.json bookkeeping lands). Extended the exemption + added a regression test; 14/14 dirty-scope + 85/85 broader campaign_manifest tests pass. Two independent producer-side/infra bugs found and fixed in one wake (the other: RB-015's i18n table-header gap, commit 7dceae31) by refusing to just re-ticket-and-retry a recurring failure and instead reading the actual check code. r3 (PID 16796, TM re-drifted since r2's manifest so rebuilt fresh) launched and survived past 8s with no instant-death error in its log this time -- first launch of this fix to get past the point where the previous 3 always died. No new cells committed this wake; cells_committed_total unchanged at 584. Next wake: confirm r3 actually completed (not just survived launch), body-review both hi outputs, commit if clean.",
+  "last_wake_summary": "hi RB-013 r3 (dirty-scope fix from last wake) DID complete successfully (COMPLETE, 2/2 accepted) -- but both hi outputs STILL had 'Covers Presentation.' left in English. Investigated rather than assuming model failure: computed sha256 of the actual on-disk files and confirmed they exactly match the receipts' output_sha256 (no post-write overwrite), then queried L2 TM directly for the SAME campaign_id/attempt and found it holds a CORRECT full Hindi translation. This means the accepted attempt's TM-flushed text and its own final written document DIVERGE -- a reconstruction-layer bug, not a translation-quality issue. This DISPROVES this session's own earlier hypothesis (stale TM needing a replace retrigger). Wrote a thorough first-principles record (data/summaries/fp-tm-vs-file-divergence-hi-coverspresentation-20260912.json) with the full evidence chain, ruled-out causes, and a leading (unconfirmed) hypothesis pointing at campaign_runner.py's multi-attempt retry reconciliation (~line 2251-2305) -- flagged as high severity since it could affect ANY historically-accepted cell that needed >1 attempt, silently, past all 44 structural gates. Time-boxed the investigation (did not complete a fix) to keep this wake bounded after 2 other code fixes already landed. Launched an m2m100 diagnostic (deterministic, single-attempt, no internal retry) to test whether the bug is specific to the multi-attempt path -- result not yet known, still building/racing TM drift from concurrent peer campaigns as of this write. No new cells committed; cells_committed_total unchanged at 584.",
   "cells_committed_total": 584,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
@@ -1475,9 +1475,9 @@
       "notes": "Relaunched (r2) after a planned machine restart killed the original PID 66324 mid-flight (21/60 accepted at that point, all already committed or ticketed -- see heal_queue RB-012 for the one rejected ko cell). Rebuilt via --source-list + --missing-only, which now correctly narrows to 5 remaining sources / 37 outputs (barcode/python and cells/cpp license.md are fully covered, dropped from this manifest). First relaunch attempt (PID 37812) died instantly with 'translator repository is dirty (1 paths)' -- a peer session was concurrently mid-edit on this same taskcard_status.json file (RB-013 r2 work); waited briefly, rebuilt again against the peer's new HEAD, relaunched as PID 16280 -- confirmed alive with real llm_calls.jsonl growth (363KB) ~20s after launch. Per explicit user instruction: do not monitor further, do not poll -- left running unattended."
     },
     {
-      "campaign_id": "wwpc-hi-rb013-combined-20260912r3",
-      "pid": 16796,
-      "manifest": "data/campaigns/manifests/wwpc-hi-rb013-combined-20260912r3.yaml",
+      "campaign_id": "wwpc-hi-rb013-m2m-diag-20260912",
+      "pid": null,
+      "manifest": "data/campaigns/manifests/wwpc-hi-rb013-m2m-diag-20260912r3.yaml",
       "sources": [
         "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
         "content/docs.aspose.org/en/slides/python/developer-guide/working-with-presentation-content.md"
@@ -1486,7 +1486,7 @@
       "expected_output_count": 2,
       "launched_at": null,
       "launched_by": "hugo-translator-fc",
-      "notes": "RECURRENCE ESCALATION (plan SS3): RB-013 'Covers Presentation.' left-in-English on 2 distinct source pages, both hi. L2 TM already holds a CORRECT full hi translation for both -- NOT purging on retry. r2 (PID 43264) STILL died on 'translator repository is dirty' even after batch2 r2 exited -- root-caused (not just retried blindly): the .supervisor/state/ dirty-check exemption gap fixed in 01756e5d. That fix is now committed, so this SHOULD succeed on the next launch. Rebuilding as r3 because TM fingerprint drifted since r2's manifest was built (confirmed via direct hash comparison, not assumed) -- reusing a stale manifest risks a fresh TM-drift failure layered on top. Build in flight (b9iv80k0t). On next wake: SHA-patch to current HEADs immediately before Start-Process, confirm survival past 5s, body-review both hi outputs before committing, then replace-commit. If this STILL fails with 'dirty', read the exact path(s) named in the error -- do not assume it's the same root cause a 4th time."
+      "notes": "wwpc-hi-rb013-combined-20260912r3 (dirty-scope fix) DID complete (COMPLETE, 2/2 accepted) -- but the RB-013 defect turned out to be a TM-vs-file divergence bug, not infra or model quality (see data/summaries/fp-tm-vs-file-divergence-hi-coverspresentation-20260912.json). This is now a DIAGNOSTIC run, not a fix attempt: m2m100_418m is deterministic (primary_retry_budget=0, exactly one real invocation per campaign_runner.py's _primary_backend_is_deterministic), so it can't hit the same multi-attempt-reconciliation path professionalize_llm's 3-attempt retry loop might be hitting. TM purged for both cells (55 entries) before this run so it's a genuinely fresh generation, not a cache replay. Manifest rebuilt 3x chasing TM drift from concurrent peer campaigns -- normal fleet friction, not a new bug. On next wake: launch with minimal SHA-patch gap, then compare the output against the SAME test used before (sha256 of file vs body-read for 'Covers Presentation.' in English) -- if m2m100 gets it right, that confirms the bug is retry-path-specific (strengthens the leading hypothesis in the fp record); if m2m100 ALSO gets it wrong despite a correct TM entry, the bug is broader than retry reconciliation. Either way this only narrows the search space -- do not attempt to fix campaign_runner.py's retry logic without first reading it end to end, that code path was explicitly NOT read this session (time-boxed)."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
