@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T13:25:00+05:00",
+  "updated_at": "2026-09-12T14:05:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 75,
+  "wake_count": 76,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,7 +1453,7 @@
       ]
     }
   },
-  "last_wake_summary": "MAJOR: a resumed peer instance corroborated the TM-vs-file divergence bug independently on batch2 output (tex/python/installation.md title field, 8/8 pending locales, PLUS one instance -- fr -- confirmed ALREADY LIVE/SHIPPED) -- this is now confirmed portfolio-wide across >=2 fields, >=8 locales, >=2 campaigns, not RB-013/hi-specific. The peer correctly held back all 22 pending batch2 cells rather than ship more instances; documented as an addendum in the shared fp record. Meanwhile my own m2m100 diagnostic completed: m2m100 was rejected and escalated back to professionalize_llm (attempt 4), which this time did NOT reproduce the original Covers Presentation. bug (both hi cells now correctly translated, verified by direct read) -- IMPORTANT CORRECTION to my own earlier fp-record claim that it 'reproduces on every fresh run': it does not, the bug is intermittent/attempt-path-dependent, not deterministic. Committed the now-clean python-page hi cell (efe679677a); the cpp-page cell surfaced a SEPARATE, ordinary RB-013 defect (document objects left in English, unrelated to the divergence bug) and was correctly NOT committed -- ticketed without purging (purging risks losing the now-correct translation and reintroducing the worse bug). Updated the fp record with all of this rather than letting it go stale. cells_committed_total 584 -> 585 (+1: presentation-content python hi).",
+  "last_wake_summary": "ROOT-CAUSED AND FIXED the batch2/title-field bug the peer corroborated last wake (commit 17a24369). Traced the actual mechanism instead of continuing to speculate: config/i18n/template_strings/_registry.yaml has 39 of 85 entries stuck at status=pending (evidence gathered, adjudication never run) -- including heading.installation (58 occurrences). TemplateStringRegistry.lookup() (classification.py) gates on status=='approved' BEFORE checking any per-locale translation, so a pending entry ALWAYS misses the table, falls through to the PascalCase-shape heuristic, and should_protect_as_identifier() defaults it to protect=True. write_gate.py's Gate 11 then ACTIVELY REVERTS an already-correctly-translated title/linkTitle back to the English source whenever this fires -- not a translation failure, a post-hoc reversion of correct output. This is a DIFFERENT, more precise mechanism than the earlier RB-015 extraction-time gap (though same underlying registry). Promoted heading.installation to approved with verified translations for the 9 locales with direct evidence (cs/de/fr/hi/it/ja/nl/pl/ru); verified via classify() smoke test (all 9 now should_protect=False) and 498 total regression tests (413 classification/extractor/terminology + 85 write_gate/Gate-11-specific), zero failures. 38 more pending entries remain unfixed (heading.quickstart alone has 507 evidence occurrences) -- documented as a very-high-severity systemic gap in a new fp record rather than rushed. This should unblock the peer's 22 held-back batch2 cells for the installation.md title field specifically (not the other cells' unrelated issues) once someone retriggers them. cells_committed_total unchanged at 585 (no new content cells this wake -- pure root-cause work).",
   "cells_committed_total": 585,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
