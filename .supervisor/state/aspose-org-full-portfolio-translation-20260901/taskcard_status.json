@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T14:05:00+05:00",
+  "updated_at": "2026-09-12T14:20:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 76,
+  "wake_count": 77,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,7 +1453,7 @@
       ]
     }
   },
-  "last_wake_summary": "ROOT-CAUSED AND FIXED the batch2/title-field bug the peer corroborated last wake (commit 17a24369). Traced the actual mechanism instead of continuing to speculate: config/i18n/template_strings/_registry.yaml has 39 of 85 entries stuck at status=pending (evidence gathered, adjudication never run) -- including heading.installation (58 occurrences). TemplateStringRegistry.lookup() (classification.py) gates on status=='approved' BEFORE checking any per-locale translation, so a pending entry ALWAYS misses the table, falls through to the PascalCase-shape heuristic, and should_protect_as_identifier() defaults it to protect=True. write_gate.py's Gate 11 then ACTIVELY REVERTS an already-correctly-translated title/linkTitle back to the English source whenever this fires -- not a translation failure, a post-hoc reversion of correct output. This is a DIFFERENT, more precise mechanism than the earlier RB-015 extraction-time gap (though same underlying registry). Promoted heading.installation to approved with verified translations for the 9 locales with direct evidence (cs/de/fr/hi/it/ja/nl/pl/ru); verified via classify() smoke test (all 9 now should_protect=False) and 498 total regression tests (413 classification/extractor/terminology + 85 write_gate/Gate-11-specific), zero failures. 38 more pending entries remain unfixed (heading.quickstart alone has 507 evidence occurrences) -- documented as a very-high-severity systemic gap in a new fp record rather than rushed. This should unblock the peer's 22 held-back batch2 cells for the installation.md title field specifically (not the other cells' unrelated issues) once someone retriggers them. cells_committed_total unchanged at 585 (no new content cells this wake -- pure root-cause work).",
+  "last_wake_summary": "Verifying the heading.installation fix (17a24369) with a real retrigger, not just the unit-level classify() smoke test. The 8 peer-held-back installation.md candidates (cs/de/hi/it/ja/nl/pl/ru) all have title: Installation baked in from BEFORE the fix -- confirmed by direct read, my fix can't retroactively repair already-written files, only prevent the defect on fresh generation. Claimed the page, building a replace manifest for all 8 locales -- hit 2 CLI usage errors along the way (--locale takes ONE value per flag, action='append', not a comma-joined string) before getting it right; build in flight as of this write. On next wake: launch with minimal SHA-patch gap, body-review the title field specifically (does it now read a real translated word, not English 'Installation'?) across all 8, commit whichever are clean, and update the fp record with the real-world verification result (not just the unit-test confirmation already recorded).",
   "cells_committed_total": 585,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
