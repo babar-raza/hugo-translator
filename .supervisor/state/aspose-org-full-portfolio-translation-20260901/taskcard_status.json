@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T13:10:00+05:00",
+  "updated_at": "2026-09-12T13:25:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 74,
+  "wake_count": 75,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "hi RB-013 r3 (dirty-scope fix from last wake) DID complete successfully (COMPLETE, 2/2 accepted) -- but both hi outputs STILL had 'Covers Presentation.' left in English. Investigated rather than assuming model failure: computed sha256 of the actual on-disk files and confirmed they exactly match the receipts' output_sha256 (no post-write overwrite), then queried L2 TM directly for the SAME campaign_id/attempt and found it holds a CORRECT full Hindi translation. This means the accepted attempt's TM-flushed text and its own final written document DIVERGE -- a reconstruction-layer bug, not a translation-quality issue. This DISPROVES this session's own earlier hypothesis (stale TM needing a replace retrigger). Wrote a thorough first-principles record (data/summaries/fp-tm-vs-file-divergence-hi-coverspresentation-20260912.json) with the full evidence chain, ruled-out causes, and a leading (unconfirmed) hypothesis pointing at campaign_runner.py's multi-attempt retry reconciliation (~line 2251-2305) -- flagged as high severity since it could affect ANY historically-accepted cell that needed >1 attempt, silently, past all 44 structural gates. Time-boxed the investigation (did not complete a fix) to keep this wake bounded after 2 other code fixes already landed. Launched an m2m100 diagnostic (deterministic, single-attempt, no internal retry) to test whether the bug is specific to the multi-attempt path -- result not yet known, still building/racing TM drift from concurrent peer campaigns as of this write. No new cells committed; cells_committed_total unchanged at 584.",
-  "cells_committed_total": 584,
+  "last_wake_summary": "MAJOR: a resumed peer instance corroborated the TM-vs-file divergence bug independently on batch2 output (tex/python/installation.md title field, 8/8 pending locales, PLUS one instance -- fr -- confirmed ALREADY LIVE/SHIPPED) -- this is now confirmed portfolio-wide across >=2 fields, >=8 locales, >=2 campaigns, not RB-013/hi-specific. The peer correctly held back all 22 pending batch2 cells rather than ship more instances; documented as an addendum in the shared fp record. Meanwhile my own m2m100 diagnostic completed: m2m100 was rejected and escalated back to professionalize_llm (attempt 4), which this time did NOT reproduce the original Covers Presentation. bug (both hi cells now correctly translated, verified by direct read) -- IMPORTANT CORRECTION to my own earlier fp-record claim that it 'reproduces on every fresh run': it does not, the bug is intermittent/attempt-path-dependent, not deterministic. Committed the now-clean python-page hi cell (efe679677a); the cpp-page cell surfaced a SEPARATE, ordinary RB-013 defect (document objects left in English, unrelated to the divergence bug) and was correctly NOT committed -- ticketed without purging (purging risks losing the now-correct translation and reintroducing the worse bug). Updated the fp record with all of this rather than letting it go stale. cells_committed_total 584 -> 585 (+1: presentation-content python hi).",
+  "cells_committed_total": 585,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1472,21 +1472,7 @@
       "expected_output_count": 37,
       "launched_at": "2026-09-12T00:31:00+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Relaunched (r2) after a planned machine restart killed the original PID 66324 mid-flight (21/60 accepted at that point, all already committed or ticketed -- see heal_queue RB-012 for the one rejected ko cell). Rebuilt via --source-list + --missing-only, which now correctly narrows to 5 remaining sources / 37 outputs (barcode/python and cells/cpp license.md are fully covered, dropped from this manifest). First relaunch attempt (PID 37812) died instantly with 'translator repository is dirty (1 paths)' -- a peer session was concurrently mid-edit on this same taskcard_status.json file (RB-013 r2 work); waited briefly, rebuilt again against the peer's new HEAD, relaunched as PID 16280 -- confirmed alive with real llm_calls.jsonl growth (363KB) ~20s after launch. Per explicit user instruction: do not monitor further, do not poll -- left running unattended."
-    },
-    {
-      "campaign_id": "wwpc-hi-rb013-m2m-diag-20260912",
-      "pid": 24628,
-      "manifest": "data/campaigns/manifests/wwpc-hi-rb013-m2m-diag-20260912r3.yaml",
-      "sources": [
-        "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
-        "content/docs.aspose.org/en/slides/python/developer-guide/working-with-presentation-content.md"
-      ],
-      "locales": 1,
-      "expected_output_count": 2,
-      "launched_at": null,
-      "launched_by": "hugo-translator-fc",
-      "notes": "wwpc-hi-rb013-combined-20260912r3 (dirty-scope fix) DID complete (COMPLETE, 2/2 accepted) -- but the RB-013 defect turned out to be a TM-vs-file divergence bug, not infra or model quality (see data/summaries/fp-tm-vs-file-divergence-hi-coverspresentation-20260912.json). This is now a DIAGNOSTIC run, not a fix attempt: m2m100_418m is deterministic (primary_retry_budget=0, exactly one real invocation per campaign_runner.py's _primary_backend_is_deterministic), so it can't hit the same multi-attempt-reconciliation path professionalize_llm's 3-attempt retry loop might be hitting. TM purged for both cells (55 entries) before this run so it's a genuinely fresh generation, not a cache replay. Manifest rebuilt 3x chasing TM drift from concurrent peer campaigns -- normal fleet friction, not a new bug. On next wake: launch with minimal SHA-patch gap, then compare the output against the SAME test used before (sha256 of file vs body-read for 'Covers Presentation.' in English) -- if m2m100 gets it right, that confirms the bug is retry-path-specific (strengthens the leading hypothesis in the fp record); if m2m100 ALSO gets it wrong despite a correct TM entry, the bug is broader than retry reconciliation. Either way this only narrows the search space -- do not attempt to fix campaign_runner.py's retry logic without first reading it end to end, that code path was explicitly NOT read this session (time-boxed)."
+      "notes": "Relaunched (r2) after a planned machine restart killed the original PID 66324 mid-flight (21/60 accepted at that point, all already committed or ticketed -- see heal_queue RB-012 for the one rejected ko cell). Rebuilt via --source-list + --missing-only, which now correctly narrows to 5 remaining sources / 37 outputs (barcode/python and cells/cpp license.md are fully covered, dropped from this manifest). First relaunch attempt (PID 37812) died instantly with 'translator repository is dirty (1 paths)' -- a peer session was concurrently mid-edit on this same taskcard_status.json file (RB-013 r2 work); waited briefly, rebuilt again against the peer's new HEAD, relaunched as PID 16280 -- confirmed alive with real llm_calls.jsonl growth (363KB) ~20s after launch. Per explicit user instruction: do not monitor further, do not poll -- left running unattended. NOTE: a later check this session found PID 16280 no longer running (exited); a resumed peer instance has since taken over driving this campaign's aftermath (see the RB-013/batch2 corroboration in data/summaries/fp-tm-vs-file-divergence-hi-coverspresentation-20260912.json) and deliberately held back 22 pending cells pending the portfolio-wide divergence-bug investigation -- do not commit those cells until that peer's own investigation resolves, and do not re-poll this PID per the standing instruction."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
