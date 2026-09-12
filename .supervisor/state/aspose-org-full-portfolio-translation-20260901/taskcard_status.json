@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T00:50:00+05:00",
+  "updated_at": "2026-09-12T11:05:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 65,
+  "wake_count": 66,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "wwpc-hi-rb013-retrigger-20260912r2 (PID 22784) launched successfully -- SHA-patched to latest HEADs immediately before Start-Process, survived past the instant-death window this time. Also committed working-with-package-management.md cs (batch2, clean -- cs translation correctly avoided replicating the English source's own 'working with working with' doubled-phrase glitch). Next wake: confirm r2 finished, body-review its hi output for the RB-013 defect before committing (replace-commit over 7c3458e7da), and check batch2 (PID 66324) for further progress. cells_committed_total 570 -> 571 (+1: working-with-package-management cs).",
-  "cells_committed_total": 571,
+  "last_wake_summary": "Machine restart during prior iteration killed all PIDs (batch2 PID 66324, hi-rb013-r2 PID 22784); a peer already relaunched batch2 as r2 (PID 16280, 5 sources/37 outputs remaining) per explicit user instruction to leave it unmonitored -- respected, not polled. My own hi-rb013 retry (r2) also died to a 'translator repository is dirty' race from the peer's concurrent taskcard_status.json edits during restart recovery. Body-reviewed batch2 r2's 14 accepted cells across working-with-presentation-content.md (python) and working-with-package-management.md (python): 12 clean, committed. FOUND A RECURRENCE (plan SS3): presentation-content.md hi has the SAME 'Covers Presentation.' left-in-English defect as the sibling slides/cpp page's still-open RB-013 ticket -- 2nd distinct source page, same root_cause_class, same locale. Investigated root cause directly: L2 TM already holds a CORRECT full hi translation for both pages' description strings (verified byte-for-byte, not assumed) -- the committed files diverged from what TM cached, this is NOT a fresh model failure needing a purge-and-retry. Built a combined replace-manifest for both hi cells WITHOUT purging (TM value is correct, purging would just force regeneration risking the same bug again) -- build in flight as b4qic840v. Also found and ticketed a 3rd, structurally-different hi defect (package-management.md, 'document objects' left in English mid-sentence) -- single-locale variance, separate from the recurrence. cells_committed_total 571 -> 583 (+12: presentation-content cs/de/id/it/ja/nl, package-management de/id/it/ja/nl/ru).",
+  "cells_committed_total": 583,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1475,17 +1475,18 @@
       "notes": "Relaunched (r2) after a planned machine restart killed the original PID 66324 mid-flight (21/60 accepted at that point, all already committed or ticketed -- see heal_queue RB-012 for the one rejected ko cell). Rebuilt via --source-list + --missing-only, which now correctly narrows to 5 remaining sources / 37 outputs (barcode/python and cells/cpp license.md are fully covered, dropped from this manifest). First relaunch attempt (PID 37812) died instantly with 'translator repository is dirty (1 paths)' -- a peer session was concurrently mid-edit on this same taskcard_status.json file (RB-013 r2 work); waited briefly, rebuilt again against the peer's new HEAD, relaunched as PID 16280 -- confirmed alive with real llm_calls.jsonl growth (363KB) ~20s after launch. Per explicit user instruction: do not monitor further, do not poll -- left running unattended."
     },
     {
-      "campaign_id": "wwpc-hi-rb013-retrigger-20260912r2",
-      "pid": 22784,
-      "manifest": "data/campaigns/manifests/wwpc-hi-rb013-retrigger-20260912r2.yaml",
+      "campaign_id": "wwpc-hi-rb013-combined-20260912",
+      "pid": null,
+      "manifest": "data/campaigns/manifests/wwpc-hi-rb013-combined-20260912.yaml",
       "sources": [
-        "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md"
+        "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md",
+        "content/docs.aspose.org/en/slides/python/developer-guide/working-with-presentation-content.md"
       ],
       "locales": 1,
-      "expected_output_count": 1,
-      "launched_at": "2026-09-12T05:49:23+00:00",
+      "expected_output_count": 2,
+      "launched_at": null,
       "launched_by": "hugo-translator-fc",
-      "notes": "Single-cell heal retrigger for RB-013 (hi): frontmatter description trailing sentence 'Covers Presentation.' was left untranslated in the already-committed 7c3458e7da. --existing replace + --include-known-broken; TM already purged (23 entries). r1 (PID 40800) died instantly with TM fingerprint drift -- batch2 (PID 66324) was still mid-acceptance-burst against the shared TM. r2 rebuilt fresh, SHA-patched to current HEADs immediately before launch, confirmed alive 5s post-launch (past the instant-death window). On next wake: confirm r2 finished, body-review its hi output for the same defect before committing (not just structural), then replace-commit over the existing hi file."
+      "notes": "RECURRENCE ESCALATION (plan SS3): RB-013 'Covers Presentation.' left-in-English defect confirmed on 2 distinct source pages (slides/cpp and slides/python versions of working-with-presentation-content.md), both hi, same structural position. r1 (PID 40800, TM fingerprint drift) and r2 (PID 22784, dirty-repo race from peer's concurrent taskcard_status.json edits during machine-restart recovery) both died before producing output -- neither is a content defect, both are launch-infra races. ROOT CAUSE INVESTIGATED DIRECTLY (not assumed): queried L2 TM by hand for both pages' hi description entries -- both already hold a CORRECT, fully-translated Hindi value (verified the actual decoded string, both sentences translated). The committed files' bad content diverged from what TM has cached; this is not a fresh-translation failure needing a purge. Combined both cells into ONE manifest, deliberately NOT purging TM (the cached value is correct; purging would force regeneration and risk reproducing the same bug). Manifest build in flight (b4qic840v) as of this write. On next wake: launch immediately after SHA-patching to current HEADs (minimize the dirty-repo race window), confirm survival past the instant-death window, body-review both hi outputs, then replace-commit over 7c3458e7da (cpp) and the current python-page hi file."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
