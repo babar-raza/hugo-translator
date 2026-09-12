@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T15:40:00+05:00",
+  "updated_at": "2026-09-12T15:50:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 82,
+  "wake_count": 83,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,7 +1453,7 @@
       ]
     }
   },
-  "last_wake_summary": "Continuing the Track-A rebalance. words/python (scoped attempt) turned out nearly saturated -- only 1 source/1 cell missing (converters.md). Trying tex/python next for a larger batch; build in flight (bafniw529). Standing lesson reinforced: this deep into the mission, most family/platform combos are heavily covered already -- expect to try 2-3 scopes before finding one with real remaining volume, rather than assuming the first scoped attempt will yield a full batch.",
+  "last_wake_summary": "Launched wave-tier1b-batch3-20260912 (PID 6804) -- 7 sources / 61 outputs across tex/python (blog + docs), after 2 earlier scoping attempts came up nearly empty (words/python had only 1 missing cell). Claimed all 7 source pages. Confirmed alive past 8s. This is the mission's primary throughput work resuming after several wakes of infra/i18n-registry fixes. No new cells committed yet this wake (campaign just launched); cells_committed_total unchanged at 592.",
   "cells_committed_total": 592,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
@@ -1473,6 +1473,25 @@
       "launched_at": "2026-09-12T00:31:00+00:00",
       "launched_by": "hugo-translator-fc",
       "notes": "Relaunched (r2) after a planned machine restart killed the original PID 66324 mid-flight (21/60 accepted at that point, all already committed or ticketed -- see heal_queue RB-012 for the one rejected ko cell). Rebuilt via --source-list + --missing-only, which now correctly narrows to 5 remaining sources / 37 outputs (barcode/python and cells/cpp license.md are fully covered, dropped from this manifest). First relaunch attempt (PID 37812) died instantly with 'translator repository is dirty (1 paths)' -- a peer session was concurrently mid-edit on this same taskcard_status.json file (RB-013 r2 work); waited briefly, rebuilt again against the peer's new HEAD, relaunched as PID 16280 -- confirmed alive with real llm_calls.jsonl growth (363KB) ~20s after launch. Per explicit user instruction: do not monitor further, do not poll -- left running unattended. NOTE: a later check this session found PID 16280 no longer running (exited); a resumed peer instance has since taken over driving this campaign's aftermath (see the RB-013/batch2 corroboration in data/summaries/fp-tm-vs-file-divergence-hi-coverspresentation-20260912.json) and deliberately held back 22 pending cells pending the portfolio-wide divergence-bug investigation -- do not commit those cells until that peer's own investigation resolves, and do not re-poll this PID per the standing instruction."
+    },
+    {
+      "campaign_id": "wave-tier1b-batch3-20260912",
+      "pid": 6804,
+      "manifest": "data/campaigns/manifests/wave-tier1b-batch3-20260912r2.yaml",
+      "sources": [
+        "content/blog.aspose.org/en/tex/python/introducing-tex-foss-python/index.md",
+        "content/blog.aspose.org/en/tex/python/tex-engine-python/index.md",
+        "content/docs.aspose.org/en/tex/python/_index.md",
+        "content/docs.aspose.org/en/tex/python/developer-guide/_index.md",
+        "content/docs.aspose.org/en/tex/python/developer-guide/engine.md",
+        "content/docs.aspose.org/en/tex/python/developer-guide/features.md",
+        "content/docs.aspose.org/en/tex/python/developer-guide/input.md"
+      ],
+      "locales": 25,
+      "expected_output_count": 61,
+      "launched_at": "2026-09-12T10:00:44+00:00",
+      "launched_by": "hugo-translator-fc",
+      "notes": "Rebalancing back to Track-A after several wakes of pure i18n-registry infra work. Two prior source-selection attempts before this one found real work: unscoped --missing-only --max-sources 8 selected ZERO sources (wave-ascending sort exhausts on already-fully-covered early-wave pages before the missing filter finds anything); --family words --platform python found only 1 cell (converters.md, nearly saturated family). --family tex --platform python finally found real volume (7 sources, 61 outputs). Standing lesson: this deep into the mission, expect to try 2-3 family/platform scopes before finding meaningful remaining coverage gaps. --resume flag used per plan SS4 guidance for detached campaigns. Confirmed alive past 8s. Claimed all 7 source pages. On next wake: check summary.json/failure_metadata.jsonl, body-review and commit page-complete batches as they land -- do not wait for full completion before reviewing, per the pipeline-overlap guidance (plan SS4 v10.4)."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
