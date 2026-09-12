@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T14:25:00+05:00",
+  "updated_at": "2026-09-12T14:45:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 78,
+  "wake_count": 79,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,8 +1453,8 @@
       ]
     }
   },
-  "last_wake_summary": "Launched a real-world verification retrigger (PID 41560, installation-i18nfix-verify-20260912) for the heading.installation fix, targeting the 8 peer-held-back installation.md locales specifically. Confirmed alive past 8s. This is a separate, narrower action than the peer's broader 22-cell hold -- only tests the ONE fixed term, doesn't resolve whatever else the peer's cells may need. Two CLI usage corrections needed along the way (--locale is action='append', repeat the flag per locale, not comma-joined). Next wake: body-review the title field specifically plus a full page review, commit clean cells, record the real end-to-end result in the fp record.",
-  "cells_committed_total": 585,
+  "last_wake_summary": "CONFIRMED END-TO-END: the heading.installation i18n fix (17a24369) works in a real campaign run, not just the unit-level smoke test. installation-i18nfix-verify-20260912 (PID 41560) completed 8/8 accepted; body-reviewed all 8 -- title now correctly translates in every locale (Instalace/Installation/Installazione/インストール/Installatie/Instalacja/Установка/स्थापना), Gate 11 no longer force-reverts. Notably hi's title reads 'स्थापना', a DIFFERENT word than what this session registered ('इंस्टॉलेशन') -- confirms the fix's real mechanism is 'stop Gate 11 from reverting', not 'force the registered value', the model's own natural translation ships once the gate stops blocking it. Committed 7 clean cells (cs/de/it/ja/nl/pl/ru, 89e63e194c); hi rejected for an UNRELATED defect (3 technical phrases left in bare English in the body, ticketed) -- not a regression from the fix. Also noted a minor RB-003-covered cosmetic pattern (missing space in 'Python X.XX+', 4/8 locales) without further investigation. Updated the fp record with this real-world confirmation. cells_committed_total 585 -> 592 (+7).",
+  "cells_committed_total": 592,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
     {
@@ -1473,19 +1473,6 @@
       "launched_at": "2026-09-12T00:31:00+00:00",
       "launched_by": "hugo-translator-fc",
       "notes": "Relaunched (r2) after a planned machine restart killed the original PID 66324 mid-flight (21/60 accepted at that point, all already committed or ticketed -- see heal_queue RB-012 for the one rejected ko cell). Rebuilt via --source-list + --missing-only, which now correctly narrows to 5 remaining sources / 37 outputs (barcode/python and cells/cpp license.md are fully covered, dropped from this manifest). First relaunch attempt (PID 37812) died instantly with 'translator repository is dirty (1 paths)' -- a peer session was concurrently mid-edit on this same taskcard_status.json file (RB-013 r2 work); waited briefly, rebuilt again against the peer's new HEAD, relaunched as PID 16280 -- confirmed alive with real llm_calls.jsonl growth (363KB) ~20s after launch. Per explicit user instruction: do not monitor further, do not poll -- left running unattended. NOTE: a later check this session found PID 16280 no longer running (exited); a resumed peer instance has since taken over driving this campaign's aftermath (see the RB-013/batch2 corroboration in data/summaries/fp-tm-vs-file-divergence-hi-coverspresentation-20260912.json) and deliberately held back 22 pending cells pending the portfolio-wide divergence-bug investigation -- do not commit those cells until that peer's own investigation resolves, and do not re-poll this PID per the standing instruction."
-    },
-    {
-      "campaign_id": "installation-i18nfix-verify-20260912",
-      "pid": 41560,
-      "manifest": "data/campaigns/manifests/installation-i18nfix-verify-20260912.yaml",
-      "sources": [
-        "content/docs.aspose.org/en/tex/python/getting-started/installation.md"
-      ],
-      "locales": 8,
-      "expected_output_count": 8,
-      "launched_at": "2026-09-12T09:02:03+00:00",
-      "launched_by": "hugo-translator-fc",
-      "notes": "Real-world verification of the heading.installation i18n fix (17a24369), separate from the peer's 22 held-back batch2 cells (do not conflate -- this is a fresh, targeted retrigger of ONLY the installation.md title-field bug, not a general resolution of everything the peer held back). --existing replace across the 8 locales (cs/de/hi/it/ja/nl/pl/ru) whose candidates all have the pre-fix baked-in English title (confirmed by direct read -- the fix cannot retroactively repair already-written files). Two CLI usage corrections needed before this built: --locale takes exactly one value per flag (action='append' in argparse), not a comma-joined string -- repeat the flag once per locale. Launched, confirmed alive past 8s. On next wake: body-review the title field specifically across all 8 outputs (real translated word, not English 'Installation'?) plus a normal full-page review, commit clean ones, and record the real-world result in the fp record (data/summaries/fp-i18n-pending-registry-entries-never-approved-20260912.json) -- the unit-test-level classify() smoke test already passed, this is the missing end-to-end confirmation."
     }
   ],
   "blocked_pending_clean_translator_repo": null,
