@@ -133,6 +133,18 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 715
     corpus_agreement: override
+  table.header.component:
+    value: مؤلفه
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 7
+    corpus_agreement: agree
+  table.header.role:
+    value: نقش
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
     rejected_variants:
     - Example
   table.header.enumeration:

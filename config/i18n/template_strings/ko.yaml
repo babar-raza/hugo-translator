@@ -176,6 +176,30 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 715
     corpus_agreement: no_corpus_evidence
+  table.header.component:
+    value: 구성 요소
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 7
+    corpus_agreement: agree
+  table.header.role:
+    value: 역할
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
+  table.header.renderer:
+    value: 렌더러
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 11
+    corpus_agreement: agree
+  table.header.handles:
+    value: 처리 내용
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 11
+    corpus_agreement: agree
   table.header.enumeration:
     value: 열거형
     reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow

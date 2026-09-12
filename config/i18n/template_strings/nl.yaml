@@ -180,6 +180,30 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 715
     corpus_agreement: override
+  table.header.component:
+    value: Component
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 7
+    corpus_agreement: agree
+  table.header.role:
+    value: Rol
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
+  table.header.renderer:
+    value: Renderer
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 11
+    corpus_agreement: agree
+  table.header.handles:
+    value: Verwerkt
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 11
+    corpus_agreement: agree
     rejected_variants:
     - Example
     - ImageRenderOptions

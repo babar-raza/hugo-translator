@@ -344,6 +344,30 @@ entries:
   status: approved
   first_seen_incident: reference-i18n-hardening-20260725
   evidence_count: 273
+- id: table.header.component
+  en: Component
+  category: table_header
+  status: approved
+  first_seen_incident: aspose-org-full-portfolio-translation-20260901
+  evidence_count: 7
+- id: table.header.role
+  en: Role
+  category: table_header
+  status: approved
+  first_seen_incident: aspose-org-full-portfolio-translation-20260901
+  evidence_count: 58
+- id: table.header.renderer
+  en: Renderer
+  category: table_header
+  status: approved
+  first_seen_incident: aspose-org-full-portfolio-translation-20260901
+  evidence_count: 11
+- id: table.header.handles
+  en: Handles
+  category: table_header
+  status: approved
+  first_seen_incident: aspose-org-full-portfolio-translation-20260901
+  evidence_count: 11
 - id: heading.interfaces
   en: Interfaces
   category: section_heading
