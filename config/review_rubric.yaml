@@ -354,3 +354,35 @@ rules:
       professionalize_llm, first attempt; all 44 automated gates passed
       (none of them check whether the output is actually responsive to the
       source, only structural/formatting properties).
+  - id: RB-015
+    name: isolated-untranslated-table-header
+    verdict: REJECT
+    scope: body_table
+    statement: >-
+      A table's header row (column labels) left in English while the same
+      table's data cells and every OTHER table on the same page have their
+      headers translated is RB-013's principle applied to a table instead of
+      a list: the test is the same -- did this locale translate the
+      equivalent header elsewhere on this page -- not whether the header
+      words look technical. "Component"/"Role"/"Description" etc. are
+      ordinary English words, not protected identifiers (RB-003 does not
+      apply) and not a brand-navigation label (RB-002 does not apply); a
+      reader who does not read English gets no information from an
+      untranslated header cell, only from the row values.
+      DIAGNOSTIC: recurrence at the same table/column position across
+      locales on first attempt (not a retry) is producer-side per RB-005 --
+      likely a segmentation bug specific to that table (e.g. a preserve
+      pattern or heading-adjacent heuristic misclassifying the header cells
+      as protected); a single-locale occurrence is model variance and
+      REJECTs only that cell.
+    evidence: >-
+      docs.aspose.org/en/words/python/developer-guide/docx-reader.md fa and
+      hi, wave-tier1b-batch2-20260911, 2026-09-12: the "DocumentReader
+      Architecture" section's 2-column table ("Component | Role") kept both
+      English header words verbatim in BOTH locales on their first
+      translation attempt, while the SAME page's "API Reference Summary"
+      table ("Class / Method | Description") was correctly translated to
+      "کلاس / متد | توضیح" (fa) and "क्लास / मेथड | विवरण" (hi) in the same
+      two cells. Row values in the defective table (e.g. "تحلیل‌گر اصلی
+      DOCX...", "मुख्य DOCX पार्सर...") were fully translated -- only the
+      header row was left in English, in both independently-run locales.
