@@ -1459,7 +1459,7 @@
   "active_detached_runs": [
     {
       "campaign_id": "wave-tier1b-batch2-20260911",
-      "pid": 66324,
+      "pid": null,
       "manifest": "data/campaigns/manifests/wave-tier1b-batch2-20260911.yaml",
       "sources": [
         "content/docs.aspose.org/en/slides/python/developer-guide/working-with-package-management.md",
@@ -1479,7 +1479,7 @@
     },
     {
       "campaign_id": "wwpc-hi-rb013-retrigger-20260912",
-      "pid": 40800,
+      "pid": null,
       "manifest": "data/campaigns/manifests/wwpc-hi-rb013-retrigger-20260912.yaml",
       "sources": [
         "content/docs.aspose.org/en/slides/cpp/developer-guide/working-with-presentation-content.md"
