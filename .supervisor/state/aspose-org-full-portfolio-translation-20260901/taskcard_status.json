@@ -4,7 +4,7 @@
   "plan_revision": 18,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-12T14:45:00+05:00",
+  "updated_at": "2026-09-12T15:10:00+05:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -19,7 +19,7 @@
     2,
     3
   ],
-  "wake_count": 79,
+  "wake_count": 80,
   "wakes_without_state_change": 0,
   "taskcards": {
     "TC-APT-001": {
@@ -1453,7 +1453,7 @@
       ]
     }
   },
-  "last_wake_summary": "CONFIRMED END-TO-END: the heading.installation i18n fix (17a24369) works in a real campaign run, not just the unit-level smoke test. installation-i18nfix-verify-20260912 (PID 41560) completed 8/8 accepted; body-reviewed all 8 -- title now correctly translates in every locale (Instalace/Installation/Installazione/インストール/Installatie/Instalacja/Установка/स्थापना), Gate 11 no longer force-reverts. Notably hi's title reads 'स्थापना', a DIFFERENT word than what this session registered ('इंस्टॉलेशन') -- confirms the fix's real mechanism is 'stop Gate 11 from reverting', not 'force the registered value', the model's own natural translation ships once the gate stops blocking it. Committed 7 clean cells (cs/de/it/ja/nl/pl/ru, 89e63e194c); hi rejected for an UNRELATED defect (3 technical phrases left in bare English in the body, ticketed) -- not a regression from the fix. Also noted a minor RB-003-covered cosmetic pattern (missing space in 'Python X.XX+', 4/8 locales) without further investigation. Updated the fp record with this real-world confirmation. cells_committed_total 585 -> 592 (+7).",
+  "last_wake_summary": "Applied the now-proven pending-registry fix pattern a SECOND time: promoted heading.quickstart (evidence_count=507, the single largest of the 38 remaining pending entries) to approved for the same 9 locales (commit fca130c8). Sourced translations directly from live content rather than guessing -- the same 9 locales already correctly render 'Quick Start' as ordinary link text in their own installation.md files (Gate 11 doesn't touch link text, only title/linkTitle), giving high-confidence evidence for free. Verified via classify() smoke test (all 9 should_protect=False) and 498 regression tests (413 classification/extractor/terminology + 85 write_gate), zero failures. Noted but did not chase a separate, unrelated defect spotted in fr's already-shipped installation.md (stripped markdown link syntax, 'TX' instead of 'TeX') while gathering evidence. 37 pending entries remain (heading.options at 310 is now largest) -- documented this as a repeatable ~20-minute-per-term playbook in the fp record for whoever continues the backlog. No new content cells this wake (pure i18n-registry work); cells_committed_total unchanged at 592.",
   "cells_committed_total": 592,
   "loop_prompt_version_seen": "10.7 (2026-09-06)",
   "active_detached_runs": [
