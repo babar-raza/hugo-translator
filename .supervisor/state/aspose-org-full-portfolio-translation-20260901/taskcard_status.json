@@ -1459,23 +1459,20 @@
   "active_detached_runs": [
     {
       "campaign_id": "wave-tier1b-batch2-20260911",
-      "pid": null,
+      "pid": 16280,
       "manifest": "data/campaigns/manifests/wave-tier1b-batch2-20260911.yaml",
       "sources": [
         "content/docs.aspose.org/en/slides/python/developer-guide/working-with-package-management.md",
         "content/docs.aspose.org/en/slides/python/developer-guide/working-with-presentation-content.md",
         "content/docs.aspose.org/en/words/python/developer-guide/docx-reader.md",
         "content/docs.aspose.org/en/words/python/developer-guide/pdf-writer.md",
-        "content/docs.aspose.org/en/barcode/python/getting-started/license.md",
-        "content/docs.aspose.org/en/cells/cpp/getting-started/license.md",
-        "content/docs.aspose.org/en/tex/python/getting-started/installation.md",
         "content/docs.aspose.org/en/email/cpp/developer-guide/eml-conversion.md"
       ],
       "locales": 25,
-      "expected_output_count": 60,
-      "launched_at": "2026-09-11T18:29:14.492046+00:00",
+      "expected_output_count": 37,
+      "launched_at": "2026-09-12T00:31:00+00:00",
       "launched_by": "hugo-translator-fc",
-      "notes": "Second Tier-1b batch this mission, launched IN PARALLEL with the peer's wave-tier1b-batch1-retrigger-20260911 (different sources, no overlap). 8 fresh fewest-missing-first pages, distinct families from everything touched so far (slides/python, words/python, barcode/python, cells/cpp, tex/python, email/cpp), 0 heal_queue history on any. Built via --source-list + --missing-only + --max-parallel-jobs 4. First TWO launch attempts (PID 59604, then 49636) died within seconds with 'translation memory fingerprint drift' -- root-caused: src/workers/campaign_manifest.py:543-544 re-hashes data/tm/l2.lmdb/data.mdb at runtime against the manifest's baked-in fingerprint, and the peer's actively-accepting concurrent campaign kept mutating that shared TM file faster than the build-to-launch window. NEW STANDING LESSON: launching a new campaign while a peer's campaign is mid-acceptance-burst against the SAME shared TM can race this way; minimize the rebuild-to-Start-Process gap, retry up to 3 times, stand down if it keeps failing. Third attempt (PID 66324) succeeded, confirmed alive with real progress via llm_calls.jsonl growth (425 bytes) ~18s after launch. Body-reviewed 4 accepted cells (ja/ko/nl/pl): ja/nl/pl clean, committed (0db75f943c); ko REJECTed -- RB-012, backticks injected into frontmatter description around method names with no markdown in source/siblings, single-locale variance -- ticketed, TM purged (31 entries)."
+      "notes": "Relaunched (r2) after a planned machine restart killed the original PID 66324 mid-flight (21/60 accepted at that point, all already committed or ticketed -- see heal_queue RB-012 for the one rejected ko cell). Rebuilt via --source-list + --missing-only, which now correctly narrows to 5 remaining sources / 37 outputs (barcode/python and cells/cpp license.md are fully covered, dropped from this manifest). First relaunch attempt (PID 37812) died instantly with 'translator repository is dirty (1 paths)' -- a peer session was concurrently mid-edit on this same taskcard_status.json file (RB-013 r2 work); waited briefly, rebuilt again against the peer's new HEAD, relaunched as PID 16280 -- confirmed alive with real llm_calls.jsonl growth (363KB) ~20s after launch. Per explicit user instruction: do not monitor further, do not poll -- left running unattended."
     },
     {
       "campaign_id": "wwpc-hi-rb013-retrigger-20260912r2",
