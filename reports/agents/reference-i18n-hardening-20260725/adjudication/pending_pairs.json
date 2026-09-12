@@ -698,5 +698,113 @@
   {
     "locale": "zh",
     "id": "table.header.renderer"
+  },
+  {
+    "locale": "ar",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "bg",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "ca",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "da",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "el",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "es",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "fi",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "he",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "hr",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "hu",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "id",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "ko",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "lt",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "lv",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "ms",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "no",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "pt",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "ro",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "sk",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "sr",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "sv",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "th",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "tr",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "uk",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "vi",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "zh",
+    "id": "heading.installation"
   }
 ]

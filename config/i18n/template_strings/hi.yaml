@@ -7,6 +7,12 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 13622
     corpus_agreement: agree
+  heading.installation:
+    value: इंस्टॉलेशन
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
     rejected_variants:
     - समीक्षा
     - विधियाँ

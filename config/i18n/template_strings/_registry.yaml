@@ -63,7 +63,7 @@ entries:
 - id: heading.installation
   en: Installation
   category: section_heading
-  status: pending
+  status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 58
 - id: heading.examples
