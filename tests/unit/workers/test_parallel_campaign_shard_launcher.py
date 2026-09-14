@@ -18,6 +18,7 @@ from scripts.campaign.launch_parallel_campaign_shards import (
     _child_command,
     assign_shard_groups,
     duplicate_receipts,
+    group_status_line,
     main,
     partition_by_device,
     select_pending_shards,
@@ -272,6 +273,17 @@ def test_all_gpu_shards_land_in_one_group(tmp_path):
     assert sorted(s["locale"] for s in carrying_gpu[0] if s["locale"] in GPU_PRIMARY_LOCALES) == [
         "hu", "ja", "ro",
     ]
+
+
+def test_group_status_line_is_bounded_for_portfolio_scale(tmp_path):
+    manifest = _load(tmp_path)
+    shard = next(iter(manifest.shards(resume_receipts=set(), max_outputs=250)))
+    group = [dict(shard, shard_id=f"s{index}") for index in range(10_000)]
+
+    line = group_status_line(2, group)
+
+    assert line == "child 2: shard_count=10000 preview=s0, s1, s2, ..."
+    assert len(line) < 100
 
 
 def test_gpu_group_is_not_also_given_the_largest_api_share(tmp_path):

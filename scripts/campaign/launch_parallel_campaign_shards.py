@@ -238,6 +238,21 @@ def assign_shard_groups(
     return [group for group in groups if group]
 
 
+def group_status_line(index: int, group: list[dict[str, Any]]) -> str:
+    """Return bounded launcher telemetry for one child group.
+
+    A full-portfolio group can contain tens of thousands of shards. Rendering
+    every id into stdout can fill a supervised launcher's pipe before it calls
+    ``Popen``, leaving a live but childless coordinator. Count plus a short
+    deterministic preview is sufficient for operator correlation; the full
+    assignment remains recoverable from the manifest and child log.
+    """
+    shard_ids = [str(shard["shard_id"]) for shard in group]
+    preview = ", ".join(shard_ids[:3])
+    suffix = ", ..." if len(shard_ids) > 3 else ""
+    return f"child {index}: shard_count={len(shard_ids)} preview={preview}{suffix}"
+
+
 def incomplete_shards(
     manifest: CampaignManifest,
     ledger_root: Path,
@@ -595,7 +610,7 @@ def main(argv: list[str] | None = None) -> int:
                     break
                 groups = assign_shard_groups(pending, args.max_workers, gpu_locales)
                 for index, group in enumerate(groups):
-                    print(f"child {index}: {', '.join(str(s['shard_id']) for s in group)}")
+                    print(group_status_line(index, group))
                 if args.dry_run:
                     return 0
                 launched_any = True
