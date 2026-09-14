@@ -261,6 +261,22 @@ def test_sibling_session_supervisor_state_churn_does_not_block_under_campaign_pa
         _env_ok_real_translator(frozen, translator, monkeypatch)
 
 
+def test_generated_inventory_churn_does_not_block_under_campaign_paths(tmp_path, monkeypatch):
+    """The portfolio inventory is a generated discovery report, not runtime config."""
+    content_repo = _repo(tmp_path)
+    translator = _real_translator_repo(tmp_path)
+    inventory = translator / "config/inventory/aspose_org_profile_inventory.json"
+    inventory.parent.mkdir(parents=True)
+    inventory.write_text('{"generated": true}\n', encoding="utf-8")
+
+    manifest = _load(tmp_path, _payload(content_repo, dirty_scope="campaign_paths"))
+    _env_ok_real_translator(manifest, translator, monkeypatch)
+
+    frozen = _load(tmp_path, _payload(content_repo, dirty_scope="frozen_baseline"))
+    with pytest.raises(CampaignManifestError, match="translator repository is dirty"):
+        _env_ok_real_translator(frozen, translator, monkeypatch)
+
+
 def test_translator_code_dirtiness_outside_data_campaigns_still_blocks_under_campaign_paths(
     tmp_path, monkeypatch
 ):

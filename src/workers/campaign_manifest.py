@@ -540,7 +540,16 @@ class CampaignManifest:
                 # exemption was originally written for had already exited. Same rationale as
                 # data/campaigns/ above: generated runtime state, never a translation-safety
                 # hazard, never staged or committed by this check.
-                _exempt_prefixes = ("data/campaigns/", ".supervisor/state/")
+                # `build_campaign_manifest.py` regenerates this inventory as a
+                # report-only discovery artifact. It is deliberately absent
+                # from CONFIG_FINGERPRINT_SHARED and no runtime component reads
+                # it, so a sibling inventory refresh cannot invalidate an
+                # already-bound campaign execution revision.
+                _exempt_prefixes = (
+                    "data/campaigns/",
+                    ".supervisor/state/",
+                    "config/inventory/",
+                )
                 dirty = [
                     item
                     for item in dirty
