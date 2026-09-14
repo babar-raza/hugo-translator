@@ -1292,11 +1292,18 @@ class ModelLoader:
         # breakers are NOT rerouted: the next call is the probe that may close them.
         self.last_reroute = None
         if getattr(model_info, "backend", None) == "llm":
+            from .campaign_llm_policy import professionalize_only_active
             from .circuit_breaker import breaker_for, fallback_model_for, health_log
+            from .llm_errors import LLMCircuitOpenError
 
             breaker = breaker_for(model_id)
             fallback = fallback_model_for(model_id)
             if breaker is not None and fallback and breaker.is_open():
+                if professionalize_only_active():
+                    health_log(model_id, event="refused", ok=False, reason="campaign_professionalize_only")
+                    raise LLMCircuitOpenError(
+                        f"circuit breaker open for {model_id!r}; Professionalize-only campaign refuses fallback"
+                    )
                 logger.warning(
                     "Circuit breaker OPEN for %s -> automatically rerouting to fallback %s",
                     model_id,

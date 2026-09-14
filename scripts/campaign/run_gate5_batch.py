@@ -28,10 +28,15 @@ import sys
 from pathlib import Path
 
 
-def build_real_engine(translator_repo: Path, max_gpu_memory_percent: int | None = None):
+def build_real_engine(
+    translator_repo: Path,
+    max_gpu_memory_percent: int | None = None,
+    tm_intent_spool_path: Path | None = None,
+):
     from src.model_runtime.loader import ModelLoader
     from src.model_runtime.registry import ModelRegistry
     from src.tm import TranslationMemory
+    from src.tm.intent_spool import TMIntentSpool
     from src.tm.l1_cache import L1Cache
     from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
     from src.translation_engine.engine import TranslationEngine
@@ -70,12 +75,17 @@ def build_real_engine(translator_repo: Path, max_gpu_memory_percent: int | None 
     )
     tm_data_dir = Path(raw.get("paths", {}).get("tm_data_dir", "data/tm"))
     l2_max_size_mb = raw.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
+    # Parallel campaign children must never write canonical LMDB directly.
+    # A campaign-scoped durable spool leaves read lookup behaviour unchanged,
+    # while exactly one separately supervised writer owns L2 mutation.
+    intent_spool = TMIntentSpool(tm_intent_spool_path) if tm_intent_spool_path else None
     tm = TranslationMemory(
         l1_cache=L1Cache(max_size=10000),
         l2_persistent=L2PersistentTM(
             db_path=tm_data_dir / L2_DB_NAME, max_size_mb=l2_max_size_mb
         ),
         l3_semantic=None,  # L3 FAISS index absent on this host (verified, plan section 0)
+        intent_spool=intent_spool,
     )
     engine = TranslationEngine(
         config_service=config_service,
@@ -121,6 +131,15 @@ def main(argv: list[str] | None = None) -> int:
         "rollback for THIS process, without flipping the shipped config for every other "
         "session sharing this working tree",
     )
+    parser.add_argument(
+        "--tm-intent-spool-path",
+        type=Path,
+        default=None,
+        help=(
+            "Campaign-scoped SQLite intent spool. When supplied, this process only enqueues "
+            "TM writes; a separately supervised single writer applies them to canonical LMDB."
+        ),
+    )
     args = parser.parse_args(argv)
 
     translator_repo = Path.cwd().resolve()
@@ -135,7 +154,13 @@ def main(argv: list[str] | None = None) -> int:
         f"primary={manifest.retry_policy['primary_model']}"
     )
 
-    engine = build_real_engine(translator_repo, args.max_gpu_memory_percent)
+    engine = build_real_engine(
+        translator_repo,
+        args.max_gpu_memory_percent,
+        args.tm_intent_spool_path,
+    )
+    if args.tm_intent_spool_path:
+        print(f"[{manifest.campaign_id}] TM writes spool to {args.tm_intent_spool_path}")
     runner = CampaignRunner(
         manifest=manifest,
         translation_engine=engine,

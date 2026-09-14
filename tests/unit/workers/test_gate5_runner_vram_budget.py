@@ -32,6 +32,13 @@ class _Stub:
         pass
 
 
+class _RecordingTM(_Stub):
+    last_kwargs: dict = {}
+
+    def __init__(self, *args, **kwargs):
+        type(self).last_kwargs = kwargs
+
+
 @pytest.fixture
 def recording_loader(monkeypatch):
     _RecordingLoader.last_kwargs = {}
@@ -39,7 +46,7 @@ def recording_loader(monkeypatch):
     monkeypatch.setattr("src.model_runtime.registry.ModelRegistry", _Stub)
     monkeypatch.setattr("src.tm.l1_cache.L1Cache", _Stub)
     monkeypatch.setattr("src.tm.l2_persistent.L2PersistentTM", _Stub)
-    monkeypatch.setattr("src.tm.TranslationMemory", _Stub)
+    monkeypatch.setattr("src.tm.TranslationMemory", _RecordingTM)
     monkeypatch.setattr("src.translation_engine.engine.TranslationEngine", _Stub)
     return _RecordingLoader
 
@@ -86,3 +93,13 @@ def test_vram_enforcer_lives_where_the_runner_imports_it_from():
     from src.hardware.vram_enforcer import VRAMEnforcer
 
     assert hasattr(VRAMEnforcer(), "enforce_from_config")
+
+
+def test_campaign_spool_prevents_direct_tm_writes(recording_loader, monkeypatch, tmp_path):
+    _force_cuda(monkeypatch, False)
+    spool_path = tmp_path / "campaign-intents.sqlite3"
+
+    runner.build_real_engine(REPO_ROOT, tm_intent_spool_path=spool_path)
+
+    assert _RecordingTM.last_kwargs["intent_spool"].path == spool_path
+    assert spool_path.is_file()

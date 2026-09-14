@@ -289,6 +289,8 @@ def _child_command(
     max_gpu_memory_percent: int,
     gpu_shard_memory_percent: int,
     gpu_locales: tuple[str, ...],
+    tm_intent_spool_path: Path | None = None,
+    no_force_serialize: bool = False,
     child: str = "gate5",
 ) -> list[str]:
     """Build one child's argv for a whole GROUP of shards, VRAM-budgeted if it holds GPU work.
@@ -320,6 +322,10 @@ def _child_command(
         ]
         for shard_id in shard_ids:
             command += ["--shard-id", shard_id]
+        if tm_intent_spool_path:
+            command += ["--tm-intent-spool-path", str(tm_intent_spool_path)]
+        if no_force_serialize:
+            command.append("--no-force-serialize")
         return command
     if len(shard_ids) > 1:
         # The legacy worker takes a single --campaign-shard, so it cannot amortise
@@ -383,6 +389,8 @@ def _run_wave(
             max_gpu_memory_percent=args.max_gpu_memory_percent,
             gpu_shard_memory_percent=args.gpu_shard_memory_percent,
             gpu_locales=gpu_locales,
+            tm_intent_spool_path=args.tm_intent_spool_path,
+            no_force_serialize=args.no_force_serialize,
             child=args.child,
         )
         log_path = log_dir / f"{manifest.campaign_id}_child{index}.log"
@@ -452,6 +460,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
     parser.add_argument(
+        "--tm-intent-spool-path",
+        type=Path,
+        default=None,
+        help="Campaign-scoped TM intent spool required for parallel gate5 children.",
+    )
+    parser.add_argument(
+        "--no-force-serialize",
+        action="store_true",
+        help="Disable process-local serialization for governed API-only canaries only.",
+    )
+    parser.add_argument(
         "--child",
         choices=("gate5", "worker"),
         default="gate5",
@@ -496,6 +515,15 @@ def main(argv: list[str] | None = None) -> int:
     gpu_locales = tuple(str(locale) for locale in args.gpu_locales)
 
     manifest = CampaignManifest.load(args.campaign_manifest)
+    professionalize_only = bool(manifest.retry_policy.get("professionalize_only", False))
+    if args.no_force_serialize and not professionalize_only:
+        raise SystemExit("--no-force-serialize requires retry_policy.professionalize_only=true")
+    if args.max_workers > 1 and args.child == "gate5" and not args.tm_intent_spool_path:
+        raise SystemExit("parallel gate5 launches require --tm-intent-spool-path")
+    if professionalize_only:
+        # There is no local-model work in this campaign; treating hu/ja/ro as
+        # GPU-bound would serialize API calls for no safety benefit.
+        gpu_locales = ()
     translator_repo = Path(__file__).resolve().parents[2]
     config_root = translator_repo / "config"
     # TC-APT-047/094 follow-up: read once, not per-wave -- config/global.yaml's

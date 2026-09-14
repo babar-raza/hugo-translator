@@ -554,6 +554,7 @@ class CampaignRunner:
         if hasattr(self.engine, "campaign_context"):
             self.engine.campaign_context["defer_llm_fallbacks"] = (
                 self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+                or bool(self.manifest.retry_policy.get("professionalize_only", False))
             )
 
     def _llm_event(self, event):
@@ -2327,12 +2328,20 @@ class CampaignRunner:
                     "retry_budget_override": retry_budget,
                     "model_id": phase_model_id,
                 }
+                policy_mode = (
+                    "deferred"
+                    if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+                    else "immediate"
+                )
                 with (
                     self._rollback_serialization(),
                     campaign_llm_scope(
-                        self.manifest.retry_policy.get("llm_escalation_mode", "immediate"),
+                        policy_mode,
                         "retry" if use_llm else "primary",
                         self._llm_event,
+                        professionalize_only=bool(
+                            self.manifest.retry_policy.get("professionalize_only", False)
+                        ),
                         campaign_id=self.manifest.campaign_id,
                         source_path=source.source_path,
                         output_path=expected_output,
@@ -2519,10 +2528,18 @@ class CampaignRunner:
             return summary
 
         # TC-APT-021: model-identity canary before new LLM work (cadence-gated).
+        identity_policy_mode = (
+            "deferred"
+            if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+            else "immediate"
+        )
         with campaign_llm_scope(
-            self.manifest.retry_policy.get("llm_escalation_mode", "immediate"),
+            identity_policy_mode,
             "identity",
             self._llm_event,
+            professionalize_only=bool(
+                self.manifest.retry_policy.get("professionalize_only", False)
+            ),
             campaign_id=self.manifest.campaign_id,
         ):
             self._llm_identity_check = self._llm_identity_gate()

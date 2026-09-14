@@ -172,6 +172,22 @@ def test_gate5_child_receives_the_ledger_root_the_parent_verifies(tmp_path):
     assert "--resume" in command
 
 
+def test_gate5_child_carries_campaign_tm_spool_and_api_concurrency_switch(tmp_path):
+    manifest = _load(tmp_path)
+    shard = next(iter(manifest.shards(resume_receipts=set(), max_outputs=250)))
+    spool = tmp_path / "campaign-intents.sqlite3"
+
+    command = _child_command(
+        shards=[shard],
+        tm_intent_spool_path=spool,
+        no_force_serialize=True,
+        **_kwargs(tmp_path, "gate5"),
+    )
+
+    assert Path(command[command.index("--tm-intent-spool-path") + 1]) == spool
+    assert "--no-force-serialize" in command
+
+
 def test_worker_child_refuses_a_ledger_root_it_cannot_receive(tmp_path):
     manifest_path = tmp_path / "manifest.yaml"
     manifest_path.write_text(yaml.safe_dump(_manifest_dict(tmp_path)), encoding="utf-8")

@@ -13,6 +13,12 @@ class DeferredLLMCall(RuntimeError):
     """The candidate must reach the durable retry queue instead of a provider."""
 
 
+def professionalize_only_active() -> bool:
+    """Whether the current campaign scope forbids non-Professionalize fallback."""
+    policy = _policy.get()
+    return bool(policy and policy.get("professionalize_only"))
+
+
 @contextmanager
 def campaign_llm_scope(mode, category, sink, **identity):
     if mode not in {"immediate", "deferred"}:

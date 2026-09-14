@@ -89,6 +89,36 @@ def test_manifest_accepts_professionalize_llm_as_primary(tmp_path):
     assert manifest.retry_policy["llm_model"] == "m2m100_418m"
 
 
+def test_manifest_accepts_professionalize_only_policy(tmp_path):
+    raw = _manifest(tmp_path)
+    raw["retry_policy"].update(
+        primary_model="professionalize_llm",
+        llm_model="professionalize_llm",
+        llm_escalation_mode="professionalize_only",
+        llm_escalation_attempts=0,
+        professionalize_only=True,
+    )
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    manifest = CampaignManifest.load(path)
+    assert manifest.retry_policy["professionalize_only"] is True
+
+
+def test_professionalize_only_rejects_m2m_fallback(tmp_path):
+    raw = _manifest(tmp_path)
+    raw["retry_policy"].update(
+        primary_model="professionalize_llm",
+        llm_model="m2m100_418m",
+        llm_escalation_mode="professionalize_only",
+        llm_escalation_attempts=0,
+        professionalize_only=True,
+    )
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(CampaignManifestError, match="professionalize_only"):
+        CampaignManifest.load(path)
+
+
 def test_manifest_accepts_deferred_professionalize_queue(tmp_path):
     raw = _manifest(tmp_path)
     raw["retry_policy"]["llm_escalation_mode"] = "deferred"

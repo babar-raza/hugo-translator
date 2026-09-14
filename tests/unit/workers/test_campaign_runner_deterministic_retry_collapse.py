@@ -55,7 +55,14 @@ def _repo(tmp_path: Path) -> Path:
     return repo
 
 
-def _manifest(repo: Path, *, primary_model: str, llm_model: str) -> SimpleNamespace:
+def _manifest(
+    repo: Path,
+    *,
+    primary_model: str,
+    llm_model: str,
+    professionalize_only: bool = False,
+    llm_attempts: int = 2,
+) -> SimpleNamespace:
     """A bare stand-in for CampaignManifest exposing only what
     CampaignRunner.__init__ and _run_campaign_job read: .content_repo,
     .campaign_id, .retry_policy. Building a fully validated CampaignManifest
@@ -69,9 +76,10 @@ def _manifest(repo: Path, *, primary_model: str, llm_model: str) -> SimpleNamesp
         retry_policy={
             "primary_model": primary_model,
             "primary_attempts": 3,
-            "llm_escalation_attempts": 2,
+            "llm_escalation_attempts": llm_attempts,
             "llm_model": llm_model,
-            "llm_escalation_mode": "immediate",
+            "llm_escalation_mode": "professionalize_only" if professionalize_only else "immediate",
+            "professionalize_only": professionalize_only,
         },
     )
 
@@ -167,10 +175,24 @@ class _FakeEngine:
         )
 
 
-def _run(tmp_path: Path, *, primary_model: str, llm_model: str, backend_by_model: dict[str, str]):
+def _run(
+    tmp_path: Path,
+    *,
+    primary_model: str,
+    llm_model: str,
+    backend_by_model: dict[str, str],
+    professionalize_only: bool = False,
+    llm_attempts: int = 2,
+):
     repo = _repo(tmp_path)
     out = repo / OUT_REL
-    manifest = _manifest(repo, primary_model=primary_model, llm_model=llm_model)
+    manifest = _manifest(
+        repo,
+        primary_model=primary_model,
+        llm_model=llm_model,
+        professionalize_only=professionalize_only,
+        llm_attempts=llm_attempts,
+    )
     engine = _FakeEngine(
         out=out,
         src=repo / SRC_REL,
@@ -231,6 +253,19 @@ class TestDeterministicPrimaryRetryCollapse:
         assert accepted is True
         assert engine.backend_calls["primary"] == 3
         assert engine.backend_calls["escalation"] == 1
+
+    def test_professionalize_only_never_enters_a_non_llm_escalation_phase(self, tmp_path):
+        accepted, _output, engine = _run(
+            tmp_path,
+            primary_model=PROFESSIONALIZE_LLM,
+            llm_model=PROFESSIONALIZE_LLM,
+            backend_by_model={PROFESSIONALIZE_LLM: "llm"},
+            professionalize_only=True,
+            llm_attempts=0,
+        )
+
+        assert accepted is False
+        assert engine.backend_calls == {"primary": 3, "escalation": 0}
 
     def test_unresolvable_primary_model_preserves_the_full_retry_budget(self, tmp_path):
         """A model_id the registry can't resolve (e.g. a manifest referencing

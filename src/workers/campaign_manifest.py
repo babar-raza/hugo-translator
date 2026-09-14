@@ -277,7 +277,11 @@ class CampaignManifest:
             ("m2m100_1.2b", "professionalize_llm"),
             ("professionalize_llm", "m2m100_418m"),
         }
-        if (_primary, _escalation) not in _valid_pairs:
+        _professionalize_only = bool(self.retry_policy.get("professionalize_only", False))
+        if _professionalize_only:
+            if _primary != "professionalize_llm" or _escalation != "professionalize_llm":
+                errors.append("professionalize_only requires Professionalize as both primary and retry target")
+        elif (_primary, _escalation) not in _valid_pairs:
             errors.append(
                 "zero-defect campaign model pair must be M2M100 primary with "
                 "professionalize_llm escalation (or the approved inverse pair), got "
@@ -287,7 +291,10 @@ class CampaignManifest:
             errors.append("zero-defect campaign requires exactly 3 primary attempts")
         _escalation_mode = self.retry_policy.get("llm_escalation_mode", "immediate")
         _llm_attempts = self.retry_policy.get("llm_escalation_attempts")
-        if _escalation_mode == "immediate" and _llm_attempts != 2:
+        if _professionalize_only:
+            if _escalation_mode != "professionalize_only" or _llm_attempts != 0:
+                errors.append("professionalize_only requires professionalize_only mode and zero escalation attempts")
+        elif _escalation_mode == "immediate" and _llm_attempts != 2:
             errors.append("immediate LLM escalation requires exactly 2 LLM attempts")
         elif _escalation_mode == "deferred":
             if _llm_attempts != 0:

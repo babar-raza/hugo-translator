@@ -426,6 +426,7 @@ def build_manifest(
     missing_only: bool = False,
     primary_model: str = "m2m100_418m",
     llm_escalation_mode: str = "immediate",
+    professionalize_only: bool = False,
     include_known_broken: bool = False,
     heal_queue_path: Path | None = None,
 ) -> dict[str, Any]:
@@ -452,19 +453,26 @@ def build_manifest(
     prior campaign already ticketed. Pass True to deliberately re-include such sources
     (e.g. retriggering after a fix has landed).
     """
+    if professionalize_only:
+        primary_model = "professionalize_llm"
+        llm_escalation_mode = "professionalize_only"
     if primary_model not in ("m2m100_418m", "m2m100_1.2b", "professionalize_llm"):
         raise DiscoveryError(
             "primary_model must be m2m100_418m, m2m100_1.2b, or professionalize_llm, "
             f"got {primary_model!r}"
         )
-    if llm_escalation_mode not in ("immediate", "deferred"):
+    if llm_escalation_mode not in ("immediate", "deferred", "professionalize_only"):
         raise DiscoveryError(
             "llm_escalation_mode must be immediate or deferred, "
             f"got {llm_escalation_mode!r}"
         )
     if llm_escalation_mode == "deferred" and primary_model not in ("m2m100_418m", "m2m100_1.2b"):
         raise DiscoveryError("deferred LLM escalation requires an M2M100 primary model")
-    escalation_model = "professionalize_llm" if primary_model != "professionalize_llm" else "m2m100_418m"
+    escalation_model = (
+        "professionalize_llm"
+        if professionalize_only or primary_model != "professionalize_llm"
+        else "m2m100_418m"
+    )
     locales_final = tuple(sorted(locales)) if locales else tuple(sorted(target_locales))
     portfolio = set(target_locales)
     unknown = set(locales_final) - portfolio
@@ -540,6 +548,7 @@ def build_manifest(
             "llm_escalation_attempts": 2 if llm_escalation_mode == "immediate" else 0,
             "llm_model": escalation_model,
             "llm_escalation_mode": llm_escalation_mode,
+            "professionalize_only": professionalize_only,
         },
         # hugo-translator never commits into the content repo; the loop does (plan 19.2).
         "commit_policy": {
@@ -669,6 +678,11 @@ def main(argv: list[str] | None = None) -> int:
         default="immediate",
         help="immediate: retry failed M2M cells through LLM; deferred: queue them for a later LLM pass",
     )
+    parser.add_argument(
+        "--professionalize-only",
+        action="store_true",
+        help="use Professionalize for all generation attempts and fail closed instead of M2M fallback",
+    )
     args = parser.parse_args(argv)
 
     sites = tuple(args.sites) if args.sites else IN_SCOPE_SITES
@@ -744,6 +758,7 @@ def main(argv: list[str] | None = None) -> int:
             missing_only=args.missing_only,
             primary_model=args.primary_model,
             llm_escalation_mode=args.llm_escalation_mode,
+            professionalize_only=args.professionalize_only,
             include_known_broken=args.include_known_broken,
         )
         atomic_write(
