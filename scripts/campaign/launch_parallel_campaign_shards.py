@@ -555,6 +555,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Locales treated as GPU-bound; at most one such shard runs at a time",
     )
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
+    parser.add_argument("--shard-list", type=Path, help="Restrict this pass to explicit shard IDs.")
     parser.add_argument(
         "--tm-intent-spool-path",
         type=Path,
@@ -697,6 +698,9 @@ def main(argv: list[str] | None = None) -> int:
             )
 
             pending_all = pending_shards(manifest, args.ledger_root)
+            if args.shard_list:
+                allowed = {line.strip() for line in args.shard_list.read_text(encoding="utf-8").splitlines() if line.strip()}
+                pending_all = [s for s in pending_all if str(s["shard_id"]) in allowed]
             gpu_bound, _api_bound = partition_by_device(pending_all, gpu_locales)
             if gpu_admission_on and gpu_bound:
                 # VR-01 path: real-telemetry admission instead of the single
