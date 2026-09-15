@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Run', 'Drain', 'Status')]
+    [ValidateSet('Run', 'Drain', 'Status', 'Watch')]
     [string]$Action = 'Run',
     [int]$MaxWorkers = 4
 )
@@ -54,15 +54,26 @@ function Show-Status {
     $failurePath = Join-Path $ledger "$campaign\failure_metadata.jsonl"
     $callsPath = Join-Path $ledger "$campaign\llm_calls.jsonl"
     $count = { param($p) if (Test-Path -LiteralPath $p) { (Get-Content -LiteralPath $p | Measure-Object -Line).Lines } else { 0 } }
+    $commitLedger = Join-Path $ledger "$campaign\commit_batches.jsonl"
+    $committed = 0
+    if (Test-Path -LiteralPath $commitLedger) {
+        $committed = @((Get-Content -LiteralPath $commitLedger | Where-Object { $_ -match '"status"\s*:\s*"COMMITTED"' } | ForEach-Object { ($_ | ConvertFrom-Json).outputs.Count } | Measure-Object -Sum).Sum)[0]
+        if ($null -eq $committed) { $committed = 0 }
+    }
+    $accepted = & $count $receiptPath
     [pscustomobject]@{
         live_processes = (Get-CampaignProcesses | ForEach-Object ProcessId) -join ', '
-        accepted       = & $count $receiptPath
+        accepted       = $accepted
         failures       = & $count $failurePath
         llm_events     = & $count $callsPath
+        committed      = $committed
+        pending_commit = $accepted - $committed
+        remaining      = 114636 - $accepted
     } | Format-List
 }
 
 if ($Action -eq 'Status') { Show-Status; exit 0 }
+if ($Action -eq 'Watch') { while ($true) { Clear-Host; Get-Date; Show-Status; Start-Sleep -Seconds 15 } }
 
 Assert-NoCampaignProcess
 

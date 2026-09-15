@@ -48,6 +48,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -421,8 +422,44 @@ def _run_wave(
                 stderr=subprocess.STDOUT,
             )
         )
+    receipt_path = args.ledger_root / manifest.campaign_id / "acceptance_receipts.jsonl"
+    failure_path = args.ledger_root / manifest.campaign_id / "failure_metadata.jsonl"
+
+    def line_count(path: Path) -> int:
+        try:
+            with path.open("rb") as handle:
+                return sum(1 for _ in handle)
+        except FileNotFoundError:
+            return 0
+
+    accepted_at_start = line_count(receipt_path)
+    started = time.monotonic()
+    last_report = 0.0
+    exit_codes: list[int] = []
     try:
-        exit_codes = [child.wait() for child in children]
+        # A silent wait made a healthy Professionalize batch look hung.  Emit
+        # bounded, receipt-backed progress on the launcher's own console.
+        while True:
+            now = time.monotonic()
+            if now - last_report >= args.progress_interval_seconds:
+                accepted = line_count(receipt_path)
+                failed = line_count(failure_path)
+                elapsed = max(now - started, 0.001)
+                rate = (accepted - accepted_at_start) * 60.0 / elapsed
+                remaining = max(manifest.expected_output_count - accepted, 0)
+                eta = "n/a" if rate <= 0 else f"{remaining / rate / 60.0:.1f}h"
+                live = sum(child.poll() is None for child in children)
+                print(
+                    f"progress accepted={accepted}/{manifest.expected_output_count} "
+                    f"failed={failed} rate={rate:.2f}/min remaining={remaining} "
+                    f"eta={eta} live_children={live}/{len(children)}",
+                    flush=True,
+                )
+                last_report = now
+            if all(child.poll() is not None for child in children):
+                exit_codes = [child.wait() for child in children]
+                break
+            time.sleep(0.5)
     finally:
         for handle in handles:
             handle.close()
@@ -456,6 +493,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--campaign-manifest", required=True, type=Path)
     parser.add_argument("--max-workers", type=int, default=4)
+    parser.add_argument("--progress-interval-seconds", type=int, default=30)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--max-gpu-memory-percent", type=int, default=90)
     parser.add_argument(
@@ -516,6 +554,8 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     args = parser.parse_args(argv)
+    if args.progress_interval_seconds < 5:
+        raise SystemExit("--progress-interval-seconds must be at least 5")
     if not 1 <= args.max_workers <= 4:
         raise SystemExit("--max-workers must be 1..4")
     if not args.wait:
