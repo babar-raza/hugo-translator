@@ -13,6 +13,7 @@ and mutates the TranslationResult directly.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import time
 from copy import deepcopy
@@ -34,6 +35,47 @@ if TYPE_CHECKING:
     from .engine import TranslationEngine
 
 logger = logging.getLogger(__name__)
+
+
+def _quarantine_diagnostic_candidate(
+    engine: Any,
+    *,
+    source_content: str,
+    candidate: str | None,
+    output_path: Path,
+    target_lang: str,
+    retry_count: int,
+    error: str,
+    validation_result: Any = None,
+    retry_feedback: str | None = None,
+) -> None:
+    """Persist an explicitly enabled recovery candidate outside campaign state."""
+    root = getattr(engine, "diagnostic_quarantine_root", None)
+    if not isinstance(root, (str, Path)) or candidate is None:
+        return
+    root = Path(root).resolve()
+    if ".local/rating-cause-analysis-runs" not in root.as_posix():
+        raise RuntimeError("diagnostic quarantine must be under .local/rating-cause-analysis-runs")
+    candidate_hash = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
+    entry = root / "candidates" / candidate_hash
+    entry.mkdir(parents=True, exist_ok=True)
+    (entry / "candidate.md").write_text(candidate, encoding="utf-8")
+    issues = []
+    for issue in getattr(validation_result, "issues", []) or []:
+        details = getattr(issue, "details", {}) or {}
+        issues.append({"validator": str(getattr(issue, "validator", "unknown")),
+                       "severity": str(getattr(getattr(issue, "severity", None), "value", "")),
+                       "location": str(getattr(issue, "location", "")),
+                       "detail_keys": sorted(str(key) for key in details)})
+    metadata = {
+        "source_sha256": hashlib.sha256(source_content.encode("utf-8")).hexdigest(),
+        "candidate_sha256": candidate_hash, "output_path": str(output_path),
+        "target_lang": target_lang, "attempt": retry_count + 1,
+        "error_sha256": hashlib.sha256(str(error).encode("utf-8")).hexdigest(),
+        "retry_feedback_sha256": hashlib.sha256((retry_feedback or "").encode("utf-8")).hexdigest(),
+        "validator_details": issues,
+    }
+    (entry / "metadata.json").write_text(json.dumps(metadata, sort_keys=True, indent=2), encoding="utf-8")
 
 
 def verification_error_metadata(verification_result: Any) -> list[dict[str, str]]:
@@ -892,6 +934,18 @@ class FileTranslationPipeline:
                 # PHASE 2: WRITE (only if ALL validation passed)
                 if validation_passed:
                     try:
+                        if getattr(engine, "diagnostic_no_write", False) is True:
+                            # Exercise acceptance without creating content, receipts, or TM writes.
+                            _quarantine_diagnostic_candidate(
+                                engine, source_content=content, candidate=translated_content,
+                                output_path=output_path, target_lang=target_lang,
+                                retry_count=retry_count, error="diagnostic accepted candidate",
+                                validation_result=final_validation_result,
+                                retry_feedback=retry_feedback,
+                            )
+                            result.error = "DIAGNOSTIC_NO_WRITE_ACCEPTED"
+                            lang_result.error = result.error
+                            break
                         if getattr(engine, "validation_policy", "standard") == "zero-defect":
                             accepted = _accepted_candidate
                             engine._write_accepted_output(accepted, result.stats)
@@ -926,6 +980,13 @@ class FileTranslationPipeline:
                         lang_result.error = str(write_error)
                         break  # Exit retry loop
                 else:
+                    _quarantine_diagnostic_candidate(
+                        engine, source_content=content, candidate=translated_content,
+                        output_path=output_path, target_lang=target_lang,
+                        retry_count=retry_count, error=validation_error or "write blocked",
+                        validation_result=final_validation_result,
+                        retry_feedback=retry_feedback,
+                    )
                     logger.error(f"WRITE BLOCKED for {output_path.name}: {validation_error}")
                     result.success = False
                     result.error = validation_error
@@ -1094,6 +1155,12 @@ class FileTranslationPipeline:
                 result.stats.validation_failed = True
                 result.stats.validation_decision = "REJECT"
                 result.stats.quality_score = "FAIL"  # TC-H5
+                _quarantine_diagnostic_candidate(
+                    engine, source_content=content, candidate=translated_content,
+                    output_path=output_path, target_lang=target_lang,
+                    retry_count=retry_count, error=str(_rej_err),
+                    validation_result=_rej_err.validation_result, retry_feedback=retry_feedback,
+                )
                 try:
                     _rtq_add(output_path, target_lang)
                     logger.info(
@@ -1129,6 +1196,12 @@ class FileTranslationPipeline:
                     result.stats.validation_failed = True
                     result.stats.validation_decision = "REJECT"
                     result.stats.quality_score = "FAIL"
+                    _quarantine_diagnostic_candidate(
+                        engine, source_content=content, candidate=translated_content,
+                        output_path=output_paths_cache.get(target_lang, output_path), target_lang=target_lang,
+                        retry_count=retry_count, error=str(e), validation_result=e.validation_result,
+                        retry_feedback=retry_feedback,
+                    )
                     try:
                         _rtq_add(output_paths_cache.get(target_lang, output_path), target_lang)
                         logger.info(

@@ -160,10 +160,16 @@ def main(argv: list[str] | None = None) -> int:
         "--max-files", type=int, choices=(25, 100), default=25,
         help="Receipt checkpoint size: 25 for campaign checkpoints, 100 for legacy cleanup batches.",
     )
+    parser.add_argument(
+        "--qualification-five", action="store_true",
+        help="Permit the sole explicit five-file recovery qualification checkpoint.",
+    )
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--co-author", default="Codex <codex@openai.com>")
     parser.add_argument("--session-id", help="Explicit governed aspose.org S-76 session identity.")
     args = parser.parse_args(argv)
+    if args.qualification_five:
+        args.max_files = 5
     manifest = CampaignManifest.load(args.manifest)
     content_repo = args.content_repo.resolve()
     root = args.ledger_root / manifest.campaign_id

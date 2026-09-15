@@ -305,6 +305,7 @@ def _child_command(
     max_gpu_memory_percent: int,
     gpu_shard_memory_percent: int,
     gpu_locales: tuple[str, ...],
+    shard_list_path: Path | None = None,
     tm_intent_spool_path: Path | None = None,
     no_force_serialize: bool = False,
     child: str = "gate5",
@@ -336,8 +337,11 @@ def _child_command(
             "--max-gpu-memory-percent",
             str(memory_percent),
         ]
-        for shard_id in shard_ids:
-            command += ["--shard-id", shard_id]
+        if shard_list_path is not None:
+            command += ["--shard-list", str(shard_list_path)]
+        else:
+            for shard_id in shard_ids:
+                command += ["--shard-id", shard_id]
         if tm_intent_spool_path:
             command += ["--tm-intent-spool-path", str(tm_intent_spool_path)]
         if no_force_serialize:
@@ -396,6 +400,11 @@ def _run_wave(
     child_logs: list[Path] = []
     handles: list[Any] = []
     for index, group in enumerate(groups):
+        shard_list_path = log_dir / f"{manifest.campaign_id}_child{index}.shards.txt"
+        shard_list_path.write_text(
+            "\n".join(str(shard["shard_id"]) for shard in group) + "\n",
+            encoding="utf-8",
+        )
         command = _child_command(
             shards=group,
             config_root=config_root,
@@ -405,6 +414,7 @@ def _run_wave(
             max_gpu_memory_percent=args.max_gpu_memory_percent,
             gpu_shard_memory_percent=args.gpu_shard_memory_percent,
             gpu_locales=gpu_locales,
+            shard_list_path=shard_list_path,
             tm_intent_spool_path=args.tm_intent_spool_path,
             no_force_serialize=args.no_force_serialize,
             child=args.child,
@@ -433,6 +443,7 @@ def _run_wave(
             return 0
 
     accepted_at_start = line_count(receipt_path)
+    failed_at_start = line_count(failure_path)
     started = time.monotonic()
     last_report = 0.0
     exit_codes: list[int] = []
@@ -456,6 +467,34 @@ def _run_wave(
                     flush=True,
                 )
                 last_report = now
+            # TC-PS-04: evaluate only rows created by this wave, never stale history.
+            fresh_failures: list[dict[str, Any]] = []
+            try:
+                lines = failure_path.read_text(encoding="utf-8").splitlines()[failed_at_start:]
+                fresh_failures = [json.loads(line) for line in lines if line.strip()]
+            except FileNotFoundError:
+                pass
+            roots = [str(row.get("gate") or row.get("root_cause_class") or "pipeline") for row in fresh_failures]
+            provider_error = any("provider" in root.lower() or "rate" in root.lower() for root in roots)
+            identical = len(roots) >= 3 and len(set(roots[-3:])) == 1
+            zero_accepts = len(fresh_failures) >= 5 and line_count(receipt_path) == accepted_at_start
+            if provider_error or identical or zero_accepts:
+                reason = ("provider_or_rate_limit" if provider_error else
+                          "three_consecutive_identical_root_cause" if identical else
+                          "zero_accepted_after_five_terminal_jobs")
+                state = {"status": "PAUSED_VALIDATION_REGRESSION", "reason": reason,
+                         "accepted_current_run": line_count(receipt_path) - accepted_at_start,
+                         "rejected_current_run": len(fresh_failures), "root_causes": roots}
+                if getattr(args, "watchdog_state", None):
+                    args.watchdog_state.parent.mkdir(parents=True, exist_ok=True)
+                    args.watchdog_state.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+                print(f"WATCHDOG PAUSE: {reason}; terminating children", file=sys.stderr, flush=True)
+                for child in children:
+                    if child.poll() is None:
+                        child.terminate()
+                for child in children:
+                    child.wait(timeout=30)
+                return 2
             if all(child.poll() is not None for child in children):
                 exit_codes = [child.wait() for child in children]
                 break
@@ -552,6 +591,10 @@ def main(argv: list[str] | None = None) -> int:
             "Fleet session id for the family work claim (TC-APT-056/094). Defaults to "
             "$AGENT_SESSION_ID, then a pid-derived id."
         ),
+    )
+    parser.add_argument(
+        "--watchdog-state", type=Path,
+        help="Write PAUSED_VALIDATION_REGRESSION state before stopping a bad wave.",
     )
     args = parser.parse_args(argv)
     if args.progress_interval_seconds < 5:

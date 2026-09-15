@@ -118,6 +118,11 @@ def main(argv: list[str] | None = None) -> int:
         "others in the same manifest; see data/summaries/fp-gate4-canary-TC-APT-013.json",
     )
     parser.add_argument(
+        "--shard-list",
+        type=Path,
+        help="File containing one shard id per line; avoids Windows command-line limits for large waves.",
+    )
+    parser.add_argument(
         "--max-gpu-memory-percent",
         type=int,
         default=None,
@@ -140,6 +145,14 @@ def main(argv: list[str] | None = None) -> int:
             "TM writes; a separately supervised single writer applies them to canonical LMDB."
         ),
     )
+    parser.add_argument(
+        "--diagnostic-quarantine-root", type=Path,
+        help="Protected local recovery evidence root; candidate text never enters ledgers.",
+    )
+    parser.add_argument(
+        "--diagnostic-no-write", action="store_true",
+        help="Exercise translation/gates but refuse content, receipt, and TM writes.",
+    )
     args = parser.parse_args(argv)
 
     translator_repo = Path.cwd().resolve()
@@ -159,6 +172,14 @@ def main(argv: list[str] | None = None) -> int:
         args.max_gpu_memory_percent,
         args.tm_intent_spool_path,
     )
+    if args.diagnostic_no_write and not args.diagnostic_quarantine_root:
+        parser.error("--diagnostic-no-write requires --diagnostic-quarantine-root")
+    if args.diagnostic_quarantine_root:
+        root = args.diagnostic_quarantine_root.resolve()
+        if ".local/rating-cause-analysis-runs" not in root.as_posix():
+            parser.error("diagnostic quarantine must be below .local/rating-cause-analysis-runs")
+        engine.diagnostic_quarantine_root = root
+        engine.diagnostic_no_write = args.diagnostic_no_write
     if args.tm_intent_spool_path:
         print(f"[{manifest.campaign_id}] TM writes spool to {args.tm_intent_spool_path}")
     runner = CampaignRunner(
@@ -175,7 +196,16 @@ def main(argv: list[str] | None = None) -> int:
             f"[{manifest.campaign_id}] force_serialize_all_backends OFF for this process; "
             f"max_parallel_jobs={manifest.execution_policy.get('max_parallel_jobs', 1)}"
         )
-    shard_ids = set(args.shard_id) if args.shard_id else None
+    listed_shards: list[str] = []
+    if args.shard_list:
+        listed_shards = [
+            line.strip()
+            for line in args.shard_list.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        if not listed_shards:
+            parser.error("--shard-list contains no shard ids")
+    shard_ids = set((args.shard_id or []) + listed_shards) or None
     try:
         result = runner.run(resume=args.resume, shard_ids=shard_ids)
     except CampaignManifestError as exc:
