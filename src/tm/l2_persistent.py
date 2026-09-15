@@ -162,7 +162,7 @@ class L2PersistentTM:
     with fast lookups and batch operations.
     """
 
-    def __init__(self, db_path: Path | str, max_size_mb: int = 4096):
+    def __init__(self, db_path: Path | str, max_size_mb: int = 4096, read_only: bool = False):
         """
         Initialize L2 persistent TM.
 
@@ -174,6 +174,7 @@ class L2PersistentTM:
                 the fallback of last resort.
         """
         self.db_path = Path(db_path)
+        self.read_only = read_only
         self.db_path.mkdir(parents=True, exist_ok=True)
 
         # Hard enforcement: reject unapproved LMDB paths at runtime
@@ -193,7 +194,7 @@ class L2PersistentTM:
         # Open LMDB environment
         from src.tm.environment_lease import EnvironmentLease
 
-        self._environment_lease = EnvironmentLease(self.db_path)
+        self._environment_lease = None if read_only else EnvironmentLease(self.db_path)
         try:
             self.env = lmdb.open(
                 str(self.db_path),
@@ -201,9 +202,11 @@ class L2PersistentTM:
                 max_dbs=4,  # main + by_config_fingerprint lineage index
                 sync=True,
                 writemap=False,
+                readonly=read_only,
             )
         except BaseException:
-            self._environment_lease.close()
+            if self._environment_lease is not None:
+                self._environment_lease.close()
             raise
 
         self._lock = threading.RLock()

@@ -82,7 +82,9 @@ def build_real_engine(
     tm = TranslationMemory(
         l1_cache=L1Cache(max_size=10000),
         l2_persistent=L2PersistentTM(
-            db_path=tm_data_dir / L2_DB_NAME, max_size_mb=l2_max_size_mb
+            db_path=tm_data_dir / L2_DB_NAME,
+            max_size_mb=l2_max_size_mb,
+            read_only=tm_intent_spool_path is not None,
         ),
         l3_semantic=None,  # L3 FAISS index absent on this host (verified, plan section 0)
         intent_spool=intent_spool,
