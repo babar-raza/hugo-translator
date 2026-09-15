@@ -395,7 +395,12 @@ def _run_wave(
     failures on 2026-09-05 (an LMDB map-size mismatch, then a dirty unreceipted
     output) were each diagnosed that way, at one wake apiece.
     """
-    flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+    # Detach workers from the transient parent console.  Intel/Fortran-backed
+    # model runtimes abort on CTRL_CLOSE_EVENT when the supervising shell exits.
+    flags = (
+        (subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+        if sys.platform == "win32" else 0
+    )
     log_dir = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
 
