@@ -400,6 +400,7 @@ class CampaignManifest:
         allow_existing_accepted: set[str] | None = None,
         scope_sources: set[str] | None = None,
         scope_outputs: set[str] | None = None,
+        allow_campaign_tm_drift: bool = False,
     ) -> None:
         """Verify pinned SHAs, clean worktrees, hashes, and output absence.
 
@@ -599,7 +600,7 @@ class CampaignManifest:
         # The baseline TM is pinned before the first accepted job. Campaign
         # acceptance writes mutate the same physical stores; resumed lookups
         # remain isolated by the campaign/config/source namespace.
-        if not allow_existing_accepted:
+        if not allow_existing_accepted and not allow_campaign_tm_drift:
             tm_paths = list(self.tm_fingerprint_inputs)
             try:
                 if fingerprint_files(translator_repo, tm_paths) != self.tm_fingerprint:

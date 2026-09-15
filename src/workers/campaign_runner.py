@@ -2120,6 +2120,7 @@ class CampaignRunner:
             allow_existing_accepted=set(receipts),
             scope_sources=scope_sources,
             scope_outputs=scope_outputs,
+            allow_campaign_tm_drift=resume,
         )
         return {
             **self.manifest.to_summary(),

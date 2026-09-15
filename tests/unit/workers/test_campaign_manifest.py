@@ -103,6 +103,7 @@ def test_parallel_runner_verifies_only_its_assigned_shard_paths(tmp_path, monkey
     expected_outputs = {output for _source, _locale, output in shard["jobs"]}
     assert captured["scope_sources"] == expected_sources
     assert captured["scope_outputs"] == expected_outputs
+    assert captured["allow_campaign_tm_drift"] is True
 
 
 def test_parallel_runner_refuses_unknown_shard_before_environment_check(tmp_path, monkeypatch):
