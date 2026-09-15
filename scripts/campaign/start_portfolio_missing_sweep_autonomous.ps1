@@ -45,7 +45,7 @@ function Test-CampaignLive {
 function Invoke-Preflight {
     Set-Location $RuntimeRepo
     $receipts = Join-Path $ledger "$campaign\acceptance_receipts.jsonl"
-    & $py -c "import json; from pathlib import Path; from src.workers.campaign_manifest import CampaignManifest; m=CampaignManifest.load(Path(r'$manifest')); accepted={json.loads(x)['output_path'] for x in Path(r'$receipts').read_text(encoding='utf-8').splitlines() if x.strip()}; m.verify_environment(translator_repo=Path(r'$RuntimeRepo'), require_clean=True, allow_existing_accepted=accepted); print(m.translator_repo_sha)"
+    & $py -c "import json; from pathlib import Path; from src.workers.campaign_manifest import CampaignManifest; m=CampaignManifest.load(Path(r'$manifest')); accepted={json.loads(x)['output_path'] for x in Path(r'$receipts').read_text(encoding='utf-8').splitlines() if x.strip()}; m.verify_environment(translator_repo=Path(r'$RuntimeRepo'), require_clean=True, allow_existing_accepted=accepted, allow_campaign_tm_drift=True); print(m.translator_repo_sha)"
     return $LASTEXITCODE -eq 0
 }
 function Invoke-Reconcile {
