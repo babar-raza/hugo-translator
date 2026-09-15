@@ -157,9 +157,13 @@ def main(argv: list[str] | None = None) -> int:
         "--max-parallel-jobs", type=int,
         help="Narrow process-local cap; recovery diagnosis must use one worker.",
     )
+    parser.add_argument(
+        "--translator-repo", type=Path,
+        help="Pinned runtime code root; permits a separate read-only working directory for shared caches.",
+    )
     args = parser.parse_args(argv)
 
-    translator_repo = Path.cwd().resolve()
+    translator_repo = (args.translator_repo or Path.cwd()).resolve()
 
     from src.workers.campaign_manifest import CampaignManifest, CampaignManifestError
     from src.workers.campaign_runner import CampaignRunner

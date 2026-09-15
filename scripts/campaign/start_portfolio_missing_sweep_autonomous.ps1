@@ -22,14 +22,11 @@ $launcherErr = Join-Path $logRoot 'launcher.err.log'
 $controllerLog = Join-Path $logRoot 'controller.log'
 $env:PYTHONPATH = $RuntimeRepo
 
-# All parallel children need the same immutable FastText language detector.
-# Seed it once before fan-out so they never race on one shared .tmp download.
-$fastTextSource = Join-Path $ControlRepo 'data\models\fasttext\lid.176.bin'
-$fastTextTarget = Join-Path $RuntimeRepo 'data\models\fasttext\lid.176.bin'
-if (-not (Test-Path -LiteralPath $fastTextTarget)) {
-    if (-not (Test-Path -LiteralPath $fastTextSource)) { throw "FastText model missing: $fastTextSource" }
-    New-Item -ItemType Directory -Force -Path (Split-Path $fastTextTarget) | Out-Null
-    Copy-Item -LiteralPath $fastTextSource -Destination $fastTextTarget
+# The runtime clone is revision-pinned and may be ACL-restricted when launched
+# elevated.  Run children from ControlRepo so immutable FastText/HF caches are
+# readable, while --translator-repo preserves runtime SHA/config verification.
+if (-not (Test-Path (Join-Path $ControlRepo 'data\models\fasttext\lid.176.bin'))) {
+    throw 'FastText model missing from the control repository.'
 }
 
 function Write-Controller([string]$Message) {
@@ -91,7 +88,7 @@ $args = @(
 # runtime before child startup (forrtl error 200), leaving no child logs.
 # The controller is intentionally run in a dedicated foreground PowerShell
 # window; it may be minimized, but must remain open for unattended operation.
-$launcher = Start-Process -FilePath $py -WorkingDirectory $RuntimeRepo -ArgumentList $args -NoNewWindow -RedirectStandardOutput $launcherLog -RedirectStandardError $launcherErr -PassThru
+$launcher = Start-Process -FilePath $py -WorkingDirectory $ControlRepo -ArgumentList $args -NoNewWindow -RedirectStandardOutput $launcherLog -RedirectStandardError $launcherErr -PassThru
 try {
     while (-not $launcher.HasExited) {
         if (-not (Invoke-Reconcile)) {

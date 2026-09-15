@@ -309,6 +309,7 @@ def _child_command(
     tm_intent_spool_path: Path | None = None,
     no_force_serialize: bool = False,
     child: str = "gate5",
+    translator_repo: Path | None = None,
 ) -> list[str]:
     """Build one child's argv for a whole GROUP of shards, VRAM-budgeted if it holds GPU work.
 
@@ -337,6 +338,8 @@ def _child_command(
             "--max-gpu-memory-percent",
             str(memory_percent),
         ]
+        if translator_repo is not None:
+            command[2:2] = ["--translator-repo", str(translator_repo)]
         if shard_list_path is not None:
             command += ["--shard-list", str(shard_list_path)]
         else:
@@ -408,6 +411,7 @@ def _run_wave(
         command = _child_command(
             shards=group,
             config_root=config_root,
+            translator_repo=translator_repo,
             campaign_manifest=args.campaign_manifest,
             ledger_root=args.ledger_root,
             device=args.device,
