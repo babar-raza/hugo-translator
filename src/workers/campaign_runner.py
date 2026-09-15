@@ -2087,12 +2087,39 @@ class CampaignRunner:
             )
         return feedback
 
-    def verify(self, *, resume: bool = False) -> dict[str, Any]:
+    def verify(
+        self,
+        *,
+        resume: bool = False,
+        shard_ids: frozenset[str] | None = None,
+    ) -> dict[str, Any]:
         receipts = self._validated_resume_receipts() if resume else {}
+        scope_sources: set[str] | None = None
+        scope_outputs: set[str] | None = None
+        if shard_ids:
+            max_outputs = int(self.manifest.commit_policy.get("max_outputs_per_commit", 250))
+            available = {
+                str(shard["shard_id"]): shard
+                for shard in self.manifest.shards(
+                    resume_receipts=set(receipts),
+                    max_outputs=max_outputs,
+                )
+            }
+            unknown = sorted(shard_ids - set(available))
+            if unknown:
+                raise CampaignManifestError(
+                    f"campaign shard is unknown or already complete: {unknown}"
+                )
+            selected = (available[shard_id] for shard_id in shard_ids)
+            jobs = [job for shard in selected for job in shard["jobs"]]
+            scope_sources = {source.source_path for source, _locale, _output in jobs}
+            scope_outputs = {output for _source, _locale, output in jobs}
         self.manifest.verify_environment(
             translator_repo=self.translator_repo,
             require_clean=True,
             allow_existing_accepted=set(receipts),
+            scope_sources=scope_sources,
+            scope_outputs=scope_outputs,
         )
         return {
             **self.manifest.to_summary(),
@@ -2542,7 +2569,7 @@ class CampaignRunner:
         verify_only: bool = False,
         shard_ids: frozenset[str] | None = None,
     ) -> dict[str, Any]:
-        summary = self.verify(resume=resume)
+        summary = self.verify(resume=resume, shard_ids=shard_ids)
         if verify_only:
             self.ledger.write_summary({**summary, **self._summary_evidence(), "status": "VERIFIED"})
             return summary

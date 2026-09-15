@@ -76,6 +76,58 @@ def test_manifest_loads_and_enumerates_deterministic_jobs(tmp_path):
     assert [job[1] for job in jobs] == ["es", "fr"]
 
 
+def test_parallel_runner_verifies_only_its_assigned_shard_paths(tmp_path, monkeypatch):
+    raw = _manifest(tmp_path)
+    raw["commit_policy"]["max_outputs_per_commit"] = 1
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    manifest = CampaignManifest.load(path)
+    shard = list(manifest.shards(max_outputs=1))[0]
+    captured = {}
+
+    def capture_verify_environment(_manifest, **kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(CampaignManifest, "verify_environment", capture_verify_environment)
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=SimpleNamespace(campaign_context={}),
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(runner, "_validated_resume_receipts", lambda: {})
+
+    runner.verify(resume=True, shard_ids=frozenset({str(shard["shard_id"])}))
+
+    expected_sources = {source.source_path for source, _locale, _output in shard["jobs"]}
+    expected_outputs = {output for _source, _locale, output in shard["jobs"]}
+    assert captured["scope_sources"] == expected_sources
+    assert captured["scope_outputs"] == expected_outputs
+
+
+def test_parallel_runner_refuses_unknown_shard_before_environment_check(tmp_path, monkeypatch):
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(_manifest(tmp_path)), encoding="utf-8")
+    manifest = CampaignManifest.load(path)
+    monkeypatch.setattr(
+        CampaignManifest,
+        "verify_environment",
+        lambda _manifest, **_kwargs: pytest.fail(
+            "environment check must not run for an unknown shard"
+        ),
+    )
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=SimpleNamespace(campaign_context={}),
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(runner, "_validated_resume_receipts", lambda: {})
+
+    with pytest.raises(CampaignManifestError, match="unknown or already complete"):
+        runner.verify(resume=True, shard_ids=frozenset({"not-a-real-shard"}))
+
+
 def test_manifest_accepts_professionalize_llm_as_primary(tmp_path):
     """TC-APT-039 (plan revision 8, §6.1): the primary/escalation pair may run in
     either direction, chosen from TC-APT-006's per-language measurement."""

@@ -398,8 +398,17 @@ class CampaignManifest:
         translator_repo: Path,
         require_clean: bool = True,
         allow_existing_accepted: set[str] | None = None,
+        scope_sources: set[str] | None = None,
+        scope_outputs: set[str] | None = None,
     ) -> None:
-        """Verify pinned SHAs, clean worktrees, hashes, and output absence."""
+        """Verify pinned SHAs, clean worktrees, hashes, and output absence.
+
+        ``scope_sources``/``scope_outputs`` allow a governed parallel child to
+        verify only the immutable shard set assigned to that child. Repository
+        and configuration pins remain global. This prevents every child from
+        walking the entire portfolio while retaining source/output hash gates
+        for every path it can read or write.
+        """
         content_repo = Path(self.content_repo).resolve()
         errors: list[str] = []
         if not content_repo.is_dir():
@@ -407,9 +416,31 @@ class CampaignManifest:
         else:
             current_content_sha = git_sha(content_repo)
             campaign_scoped = self.dirty_scope == "campaign_paths"
-            all_outputs = {o for s in self.sources for o in s.outputs.values()}
-            all_sources = {s.source_path for s in self.sources}
-            declared = self.declared_replacements()
+            manifest_outputs = {o for s in self.sources for o in s.outputs.values()}
+            manifest_sources = {s.source_path for s in self.sources}
+            requested_outputs = (
+                {Path(item).as_posix() for item in scope_outputs}
+                if scope_outputs is not None
+                else manifest_outputs
+            )
+            requested_sources = (
+                {Path(item).as_posix() for item in scope_sources}
+                if scope_sources is not None
+                else manifest_sources
+            )
+            unknown_outputs = sorted(requested_outputs - manifest_outputs)
+            unknown_sources = sorted(requested_sources - manifest_sources)
+            if unknown_outputs:
+                errors.append(f"verification scope has unknown outputs: {unknown_outputs[:5]}")
+            if unknown_sources:
+                errors.append(f"verification scope has unknown sources: {unknown_sources[:5]}")
+            all_outputs = requested_outputs & manifest_outputs
+            all_sources = requested_sources & manifest_sources
+            declared = {
+                path: spec
+                for path, spec in self.declared_replacements().items()
+                if path in all_outputs
+            }
             if current_content_sha != self.content_repo_sha and campaign_scoped:
                 # TC-APT-032: other sessions commit continuously in a shared repo. HEAD may move
                 # as long as the pin is an ancestor and nothing the campaign reads/writes changed
@@ -584,6 +615,8 @@ class CampaignManifest:
             elif sha256_file(knowledge_path) != expected_hash:
                 errors.append(f"knowledge fingerprint drift: {relative}")
         for source in self.sources:
+            if source.source_path not in all_sources:
+                continue
             source_path = content_repo / source.source_path
             if not source_path.is_file():
                 errors.append(f"source missing: {source.source_path}")
@@ -591,6 +624,8 @@ class CampaignManifest:
             if sha256_file(source_path) != source.source_sha256:
                 errors.append(f"source hash drift: {source.source_path}")
             for locale, output in source.outputs.items():
+                if output not in all_outputs:
+                    continue
                 if output in accepted or not (content_repo / output).exists():
                     continue
                 spec = source.replacement_for(locale)
