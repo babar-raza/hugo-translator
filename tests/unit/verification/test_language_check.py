@@ -273,6 +273,29 @@ class TestLanguageDetectionCheck:
 
         assert issues == []
 
+    def test_aliases_are_structural_routes_and_are_skipped(self, check):
+        """Hugo aliases are preserved URL routing metadata, never prose."""
+        translated = {
+            "frontmatter": {
+                "title": "Das ist ein ausreichend langer deutscher Titel",
+                "aliases": ["/3d/python/scene-management-in-python/"],
+            }
+        }
+
+        assert check.run({}, translated, "de") == []
+
+    def test_alias_exemption_does_not_skip_translatable_frontmatter(self, check):
+        translated = {
+            "frontmatter": {
+                "aliases": ["/3d/python/scene-management-in-python/"],
+                "description": "This English description must still fail language detection",
+            }
+        }
+
+        assert [issue.location for issue in check.run({}, translated, "de")] == [
+            "frontmatter.description"
+        ]
+
     def test_keywords_short_technical_phrases_are_skipped(self, check):
         """TC-APT-004b (2026-09-03): a hand-written, unambiguously CORRECT German
         translation of a real kb.aspose.org keyword -- confirmed via direct

@@ -122,6 +122,12 @@ class LanguageDetectionCheck(VerificationCheck):
         "www.",
     ]
     PROTECTED_FRONTMATTER_TREES = {
+        # Hugo aliases are route identifiers (for example
+        # /3d/python/scene-management-in-python/), not localized prose.  The
+        # recovery write canary proved that language detection otherwise rejects
+        # correct output solely because this ASCII URL is preserved verbatim.
+        # Route integrity is checked independently by the frontmatter validator.
+        "aliases",
         "evidence",
         "grade_reasons",
         # TC-APT-004b: found via qualification on real content --
