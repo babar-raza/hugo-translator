@@ -403,7 +403,7 @@ def _run_wave(
     child_logs: list[Path] = []
     handles: list[Any] = []
     for index, group in enumerate(groups):
-        shard_list_path = log_dir / f"{manifest.campaign_id}_child{index}.shards.txt"
+        shard_list_path = (log_dir / f"{manifest.campaign_id}_child{index}.shards.txt").resolve()
         shard_list_path.write_text(
             "\n".join(str(shard["shard_id"]) for shard in group) + "\n",
             encoding="utf-8",
