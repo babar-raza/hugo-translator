@@ -2,7 +2,7 @@
 
 The default is a non-mutating snapshot/verification.  ``--execute`` is the
 only mode that creates local content commits, and it delegates each exact
-100-file group to aspose.org's governed S-76 isolated-index plumbing.  It never
+checkpoint group to aspose.org's governed S-76 isolated-index plumbing.  It never
 pushes and never stages the shared checkout's index.
 """
 from __future__ import annotations
@@ -106,15 +106,23 @@ def append_jsonl(path: Path, row: dict[str, Any]) -> None:
         handle.flush()
 
 
-def existing_completed_outputs(path: Path) -> set[str]:
-    completed: set[str] = set()
+def existing_completed_receipts(path: Path) -> set[tuple[str, str]]:
+    """Return output/receipt pairs already committed.
+
+    Output paths alone are not durable completion identities: a failed or
+    superseded acceptance may be regenerated at the same path with a new
+    receipt and must receive a corrective commit.
+    """
+    completed: set[tuple[str, str]] = set()
     for row in read_jsonl(path):
         if row.get("status") == "COMMITTED":
-            completed.update(str(item) for item in row.get("outputs", []))
+            outputs = [str(item) for item in row.get("outputs", [])]
+            hashes = [str(item) for item in row.get("receipt_hashes", [])]
+            completed.update(zip(outputs, hashes))
     return completed
 
 
-def commit_group(*, content_repo: Path, paths: list[str], base_sha: str, co_author: str) -> tuple[int, str]:
+def commit_group(*, content_repo: Path, paths: list[str], base_sha: str, co_author: str, session_id: str | None = None) -> tuple[int, str]:
     """Run the repository-owned S-76 command using an isolated temporary input set."""
     import tempfile
 
@@ -131,10 +139,13 @@ def commit_group(*, content_repo: Path, paths: list[str], base_sha: str, co_auth
             "Co-authored-by: Codex <codex@openai.com>\n",
             encoding="utf-8",
         )
-        result = subprocess.run(
-            [sys.executable, str(tool), "--files-from", str(files), "--message-file", str(message),
+        cmd = [sys.executable, str(tool), "--files-from", str(files), "--message-file", str(message),
              "--skills", "S-76", "S-HT-02", "--plan", "receipt-backed portfolio checkpoint",
-             "--branch", "main", "--base-sha", base_sha, "--co-author", co_author, "--no-push"],
+             "--branch", "main", "--base-sha", base_sha, "--co-author", co_author, "--no-push"]
+        if session_id:
+            cmd.extend(["--session-id", session_id])
+        result = subprocess.run(
+            cmd,
             cwd=content_repo, text=True, encoding="utf-8", errors="replace", capture_output=True,
         )
     return result.returncode, (result.stdout + "\n" + result.stderr)[-8000:]
@@ -145,19 +156,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--content-repo", type=Path, required=True)
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
-    parser.add_argument("--max-files", type=int, default=100)
+    parser.add_argument(
+        "--max-files", type=int, choices=(25, 100), default=25,
+        help="Receipt checkpoint size: 25 for campaign checkpoints, 100 for legacy cleanup batches.",
+    )
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--co-author", default="Codex <codex@openai.com>")
+    parser.add_argument("--session-id", help="Explicit governed aspose.org S-76 session identity.")
     args = parser.parse_args(argv)
-    if args.max_files != 100:
-        raise SystemExit("receipt checkpoint cadence is fixed at 100 files")
-
     manifest = CampaignManifest.load(args.manifest)
     content_repo = args.content_repo.resolve()
     root = args.ledger_root / manifest.campaign_id
     batches_path = root / "commit_batches.jsonl"
-    completed = existing_completed_outputs(batches_path)
-    receipts = [r for r in read_jsonl(root / "acceptance_receipts.jsonl") if r.get("output_path") not in completed]
+    completed = existing_completed_receipts(batches_path)
+    receipts = [
+        receipt
+        for receipt in read_jsonl(root / "acceptance_receipts.jsonl")
+        if (str(receipt.get("output_path") or ""), receipt_digest(receipt)) not in completed
+    ]
     index = manifest_output_index(manifest)
     verified = verified_receipts(receipts, content_repo=content_repo, output_index=index)
     grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -181,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
             }
             planned += len(paths)
             if args.execute:
-                code, output = commit_group(content_repo=content_repo, paths=paths, base_sha=base_sha, co_author=args.co_author)
+                code, output = commit_group(content_repo=content_repo, paths=paths, base_sha=base_sha, co_author=args.co_author, session_id=args.session_id)
                 if code:
                     record.update({"status": "FAILED", "error": output})
                     append_jsonl(batches_path, record)
