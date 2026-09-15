@@ -473,6 +473,8 @@ def _run_wave(
                 live = sum(child.poll() is None for child in children)
                 print(
                     f"progress accepted={accepted}/{manifest.expected_output_count} "
+                    f"accepted_current={accepted - accepted_at_start} "
+                    f"failed_current={max(failed - failed_at_start, 0)} "
                     f"failed={failed} rate={rate:.2f}/min remaining={remaining} "
                     f"eta={eta} live_children={live}/{len(children)}",
                     flush=True,
@@ -625,6 +627,12 @@ def main(argv: list[str] | None = None) -> int:
     gpu_locales = tuple(str(locale) for locale in args.gpu_locales)
 
     manifest = CampaignManifest.load(args.campaign_manifest)
+    # Persist watchdog state by default so unattended launches cannot lose the
+    # pause reason merely because a caller omitted the optional flag.
+    if args.watchdog_state is None:
+        args.watchdog_state = (
+            args.ledger_root / manifest.campaign_id / "watchdog_state.json"
+        )
     # Eight is permitted only after the bounded Professionalize probe has
     # demonstrated zero provider/rate-limit errors and p95 no worse than
     # 1.5x the four-worker baseline.  Keep 16 out of this launcher until its
