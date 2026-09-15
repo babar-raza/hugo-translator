@@ -2,7 +2,7 @@
 
 The default is a non-mutating snapshot/verification.  ``--execute`` is the
 only mode that creates local content commits, and it delegates each exact
-25-file group to aspose.org's governed S-76 isolated-index plumbing.  It never
+100-file group to aspose.org's governed S-76 isolated-index plumbing.  It never
 pushes and never stages the shared checkout's index.
 """
 from __future__ import annotations
@@ -144,12 +144,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--content-repo", type=Path, required=True)
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
-    parser.add_argument("--max-files", type=int, default=25)
+    parser.add_argument("--max-files", type=int, default=100)
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--co-author", default="Codex <codex@openai.com>")
     args = parser.parse_args(argv)
-    if args.max_files != 25:
-        raise SystemExit("receipt checkpoint cadence is fixed at 25 files")
+    if args.max_files != 100:
+        raise SystemExit("receipt checkpoint cadence is fixed at 100 files")
 
     manifest = CampaignManifest.load(args.manifest)
     content_repo = args.content_repo.resolve()
