@@ -127,7 +127,8 @@ def commit_group(*, content_repo: Path, paths: list[str], base_sha: str, co_auth
         message.write_text(
             "content(portfolio): receipt-backed translation checkpoint\n\n"
             "Professionalize-only zero-defect outputs, partitioned by subdomain/family/platform.\n"
-            "Skills invoked: [S-76, S-HT-02]\n",
+            "Skills invoked: [S-76, S-HT-02]\n"
+            "Co-authored-by: Codex <codex@openai.com>\n",
             encoding="utf-8",
         )
         result = subprocess.run(
