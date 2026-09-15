@@ -53,9 +53,18 @@ python scripts/tm/cleanup_orphaned_lmdb_temp.py --dry-run
 python scripts/tm/cleanup_orphaned_lmdb_temp.py --apply
 ```
 
-### Production migration
+### Production store and legacy compatibility directory
+
+The only active production L2 store is `data/tm/l2.lmdb`.  The sibling
+`data/tm/l2_lmdb` is inactive legacy/test-compatibility data: it is neither
+read nor written by normal campaign operation. Do not delete or migrate it as
+part of a campaign. Runtime split-write diagnostics intentionally ignore that
+one classified inactive directory, but still warn (or fail in strict mode) for
+any other unexpected `l2*` sibling.
+
+### Historical migration utility
 ```bash
-# Preview migration of legacy l2_lmdb → l2.lmdb
+# Historical utility only; do not run for the classified inactive l2_lmdb store
 python scripts/migrate_l2_lmdb.py --dry-run
 
 # Apply (requires workers stopped)

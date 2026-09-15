@@ -262,6 +262,13 @@ class L2PersistentTM:
             return True  # validation error → allow
         return True
 
+    # ``l2_lmdb`` is retained solely so old test fixtures and historical
+    # diagnostics can be opened.  It is not a production writer/reader and
+    # therefore is not evidence of live split writes beside ``l2.lmdb``.
+    # Keep this list intentionally narrow: a newly discovered l2* directory
+    # must still be surfaced by the operational safety check below.
+    _INACTIVE_LEGACY_SIBLING_DIRS = frozenset({"l2_lmdb"})
+
     def _warn_on_sibling_l2_dirs(self, *, strict: bool = False) -> None:
         """Emit a UserWarning if sibling l2*.lmdb directories exist alongside the canonical path.
 
@@ -283,8 +290,21 @@ class L2PersistentTM:
         canonical_name = self.db_path.name
         # Match both "l2.lmdb" (dot-style) and "l2_lmdb" (underscore-style) variants.
         siblings = [p for p in parent.glob("l2*") if p.is_dir() and p.name != canonical_name]
-        if siblings:
-            names = ", ".join(p.name for p in siblings)
+        active_siblings = [
+            p for p in siblings if p.name not in self._INACTIVE_LEGACY_SIBLING_DIRS
+        ]
+        inactive_siblings = [
+            p for p in siblings if p.name in self._INACTIVE_LEGACY_SIBLING_DIRS
+        ]
+        if inactive_siblings:
+            logger.info(
+                "L2PersistentTM: inactive legacy/test-compatibility store(s) ignored: %s; "
+                "canonical active store: %s",
+                ", ".join(p.name for p in inactive_siblings),
+                self.db_path,
+            )
+        if active_siblings:
+            names = ", ".join(p.name for p in active_siblings)
             message = (
                 f"L2PersistentTM: sibling LMDB director{'y' if len(siblings) == 1 else 'ies'} "
                 f"found alongside canonical '{canonical_name}': {names}. "

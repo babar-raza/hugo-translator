@@ -370,6 +370,25 @@ class CampaignLedger:
             for category, counts in sorted(outcomes.items())
         }
 
+    def acceleration_metrics(self) -> dict[str, int]:
+        """Aggregate receipt-bound fast-path facts without reading candidate text."""
+        fields = (
+            "i18n_hits", "tm_hits", "l1_hits", "l2_hits", "semantic_tm_hits",
+            "professionalize_calls", "ast_batches", "individual_fallback_batches",
+            "validation_retries",
+        )
+        totals = {field: 0 for field in fields}
+        for receipt in self.receipts().values():
+            metrics = receipt.get("translation_stats") or {}
+            for field in fields:
+                try:
+                    totals[field] += int(metrics.get(field, 0) or 0)
+                except (TypeError, ValueError):
+                    # A malformed historical receipt must remain visible but
+                    # cannot make status reporting fail during recovery.
+                    continue
+        return totals
+
 
 class CampaignRunner:
     """Execute only jobs enumerated by a pinned CampaignManifest."""
@@ -867,6 +886,7 @@ class CampaignRunner:
             "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
             "quality_stop_recommendations": self._quality_stop_recommendations(),
             "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+            "acceleration_metrics": self.ledger.acceleration_metrics(),
         }
 
     def _unreplaced_declaration(self, source: Any, locale: str, relative: str) -> bool:
@@ -2621,6 +2641,7 @@ class CampaignRunner:
                     "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
                     "quality_stop_recommendations": self._quality_stop_recommendations(),
                     "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+                    "acceleration_metrics": self.ledger.acceleration_metrics(),
                 }
             )
             if shard_failed:
@@ -2641,6 +2662,7 @@ class CampaignRunner:
                         "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
                         "quality_stop_recommendations": self._quality_stop_recommendations(),
                         "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+                        "acceleration_metrics": self.ledger.acceleration_metrics(),
                     }
                 )
 
@@ -2655,6 +2677,7 @@ class CampaignRunner:
             "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
             "quality_stop_recommendations": self._quality_stop_recommendations(),
             "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+            "acceleration_metrics": self.ledger.acceleration_metrics(),
             "status": (
                 "SHARD_SET_COMPLETE"
                 if partial and failed == 0

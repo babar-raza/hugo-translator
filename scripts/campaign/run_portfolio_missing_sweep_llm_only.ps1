@@ -30,6 +30,24 @@ function Assert-NoCampaignProcess {
     }
 }
 
+function Assert-TmSpoolDrained {
+    $state = & $py -c "from pathlib import Path; from src.tm.intent_spool import TMIntentSpool; import json; print(json.dumps(TMIntentSpool(Path(r'$spool')).stats()))"
+    if ($LASTEXITCODE -ne 0) { throw 'Could not inspect TM intent spool.' }
+    $parsed = $state | ConvertFrom-Json
+    if ([int]$parsed.PENDING -ne 0 -or [int]$parsed.CLAIMED -ne 0) {
+        throw "TM spool must be drained before a translation wave (PENDING=$($parsed.PENDING), CLAIMED=$($parsed.CLAIMED)). Run -Action Drain first."
+    }
+}
+
+function Drain-TmSpool {
+    do {
+        & $py -m src.workers.tm_intent_writer --repository-root $repo --spool-path $spool --no-l3 --limit 500 --owner "$campaign-manual-writer"
+        if ($LASTEXITCODE -ne 0) { throw 'TM writer failed; new wave remains paused.' }
+        $stats = & $py -c "from pathlib import Path; from src.tm.intent_spool import TMIntentSpool; print(TMIntentSpool(Path(r'$spool')).stats())"
+        $stats
+    } while ($stats -match "'PENDING': (?!0)")
+}
+
 function Release-StaleFamilyClaim {
     # This runs only after the OS-process check above. It releases the actual
     # current owner rather than relying on a stale pid-derived session id.
@@ -50,25 +68,14 @@ else:
 }
 
 function Show-Status {
-    $receiptPath = Join-Path $ledger "$campaign\acceptance_receipts.jsonl"
-    $failurePath = Join-Path $ledger "$campaign\failure_metadata.jsonl"
-    $callsPath = Join-Path $ledger "$campaign\llm_calls.jsonl"
-    $count = { param($p) if (Test-Path -LiteralPath $p) { (Get-Content -LiteralPath $p | Measure-Object -Line).Lines } else { 0 } }
-    $commitLedger = Join-Path $ledger "$campaign\commit_batches.jsonl"
-    $committed = 0
-    if (Test-Path -LiteralPath $commitLedger) {
-        $committed = @((Get-Content -LiteralPath $commitLedger | Where-Object { $_ -match '"status"\s*:\s*"COMMITTED"' } | ForEach-Object { ($_ | ConvertFrom-Json).outputs.Count } | Measure-Object -Sum).Sum)[0]
-        if ($null -eq $committed) { $committed = 0 }
-    }
-    $accepted = & $count $receiptPath
+    $payload = & $py scripts\campaign\campaign_progress.py --manifest $manifest --ledger-root $ledger --spool $spool | ConvertFrom-Json
     [pscustomobject]@{
         live_processes = (Get-CampaignProcesses | ForEach-Object ProcessId) -join ', '
-        accepted       = $accepted
-        failures       = & $count $failurePath
-        llm_events     = & $count $callsPath
-        committed      = $committed
-        pending_commit = $accepted - $committed
-        remaining      = 114636 - $accepted
+        accepted       = $payload.accepted; failures = $payload.failures; rate_per_minute = $payload.rate_per_minute
+        remaining      = $payload.remaining; eta_minutes = $payload.eta_minutes; committed = $payload.committed
+        pending_commit = $payload.pending_commit; tm_spool = ($payload.spool | ConvertTo-Json -Compress)
+        i18n_hits      = $payload.metrics.i18n_hits; tm_hits = $payload.metrics.tm_hits
+        ast_batches    = $payload.metrics.ast_batches; validation_retries = $payload.metrics.validation_retries
     } | Format-List
 }
 
@@ -78,17 +85,18 @@ if ($Action -eq 'Watch') { while ($true) { Clear-Host; Get-Date; Show-Status; St
 Assert-NoCampaignProcess
 
 if ($Action -eq 'Drain') {
-    do {
-        & $py -m src.workers.tm_intent_writer --repository-root $repo --spool-path $spool --no-l3 --limit 500 --owner "$campaign-manual-writer"
-        if ($LASTEXITCODE -ne 0) { throw 'TM writer failed.' }
-        $stats = & $py -c "from pathlib import Path; from src.tm.intent_spool import TMIntentSpool; print(TMIntentSpool(Path(r'$spool')).stats())"
-        $stats
-    } while ($stats -match "'PENDING': (?!0)")
+    Drain-TmSpool
     Show-Status
     exit 0
 }
 
-if ($MaxWorkers -lt 1 -or $MaxWorkers -gt 4) { throw 'MaxWorkers must be 1..4.' }
+if ($MaxWorkers -lt 1 -or $MaxWorkers -gt 8) { throw 'MaxWorkers must be 1..8.' }
+if ($MaxWorkers -gt 4) {
+    $calibration = "reports\campaigns\$campaign\evidence\professionalize-concurrency-calibration.json"
+    $allowed = & $py -c "import json; from pathlib import Path; p=Path(r'$calibration'); d=json.loads(p.read_text(encoding='utf-8')); r=d.get('calibration',{}).get('concurrency_ramp',[]); base=next((x for x in r if x.get('level')==4),None); target=next((x for x in r if x.get('level')==$MaxWorkers),None); ok=bool(base and target and target.get('errors',1)==0 and target.get('rate_limited',1)==0 and target.get('p95',float('inf')) <= 1.5*base.get('p95',0)); print('true' if ok else 'false')"
+    if ($allowed -ne 'true') { throw "MaxWorkers $MaxWorkers is not qualified by a clean calibration result. Use 1..4 until the 1,2,4,8,16 probe passes." }
+}
+Assert-TmSpoolDrained
 Release-StaleFamilyClaim
 
 & $py scripts\campaign\build_campaign_manifest.py --content-repo $contentRepo --translator-repo . --inventory-output "reports\campaigns\$campaign\baseline\inventory.json" --manifest-output $manifest --campaign-id $campaign --missing-only --professionalize-only --max-parallel-jobs $MaxWorkers
@@ -103,5 +111,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Manifest preflight failed.' }
 & $py scripts\campaign\launch_parallel_campaign_shards.py --campaign-manifest $manifest --ledger-root $ledger --child gate5 --max-workers $MaxWorkers --wait --tm-intent-spool-path $spool --no-force-serialize
 if ($LASTEXITCODE -ne 0) { throw 'Campaign launcher failed; inspect child logs before draining TM.' }
 
-Write-Host 'Campaign launcher completed. Run this script again with -Action Drain after confirming status.'
+Write-Host 'Campaign launcher completed. Draining the single-writer TM spool before any next wave.'
+Drain-TmSpool
 Show-Status

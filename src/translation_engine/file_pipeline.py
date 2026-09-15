@@ -895,7 +895,7 @@ class FileTranslationPipeline:
                         if getattr(engine, "validation_policy", "standard") == "zero-defect":
                             accepted = _accepted_candidate
                             engine._write_accepted_output(accepted, result.stats)
-                            result.acceptance_receipts[target_lang] = accepted.receipt()
+                            result.acceptance_receipts[target_lang] = accepted.receipt(result.stats)
                         else:
                             engine._write_output(
                                 translated_content, output_path, source_path, result.stats

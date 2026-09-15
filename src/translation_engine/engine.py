@@ -2016,7 +2016,7 @@ class TranslationEngine:
         receipt_sink = getattr(self, "campaign_context", {}).get("receipt_sink")
         if receipt_sink is not None:
             try:
-                receipt_sink(accepted.receipt())
+                receipt_sink(accepted.receipt(stats))
             except Exception:
                 accepted.output_path.unlink(missing_ok=True)
                 raise

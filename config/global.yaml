@@ -47,6 +47,8 @@ execution:
 
 # Default TM preferences (overridable per site)
 tm_defaults:
+  # Canonical active L2 storage is data/tm/l2.lmdb. data/tm/l2_lmdb is an
+  # inactive legacy/test-compatibility directory and is never a campaign store.
   use_semantic_tm: true
   semantic_threshold: 0.80
   fallback_exact_only: false

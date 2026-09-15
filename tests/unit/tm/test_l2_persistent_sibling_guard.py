@@ -8,8 +8,9 @@ This file covers both TM-01 acceptance checks:
 1. Each of the five fixed scripts' path-resolution logic now matches the
    canonical pattern (imported and asserted directly, not by executing the
    whole script).
-2. `_warn_on_sibling_l2_dirs(strict=True)` raises where the existing
-   default-`False` behavior only warns.
+2. `_warn_on_sibling_l2_dirs(strict=True)` raises for an unexpected active
+   sibling, while the classified inactive legacy/test-compatibility directory
+   `l2_lmdb` is deliberately ignored.
 """
 
 import importlib
@@ -102,17 +103,18 @@ class TestSiblingGuardStrictMode:
         # exercise _warn_on_sibling_l2_dirs() directly and deterministically.
         return L2PersistentTM(db_path=tmp_path / L2_DB_NAME)
 
-    def test_default_strict_false_only_warns(self, tmp_path):
+    def test_classified_legacy_l2_lmdb_is_ignored_even_in_strict_mode(self, tmp_path):
         tm = self._make_tm(tmp_path)
         (tmp_path / "l2_lmdb").mkdir()
+
+        tm._warn_on_sibling_l2_dirs(strict=True)
+
+    def test_unexpected_sibling_warns_by_default_and_raises_in_strict_mode(self, tmp_path):
+        tm = self._make_tm(tmp_path)
+        (tmp_path / "l2_shadow.lmdb").mkdir()
 
         with pytest.warns(UserWarning, match="sibling LMDB"):
             tm._warn_on_sibling_l2_dirs()
-
-    def test_strict_true_raises_instead_of_warning(self, tmp_path):
-        tm = self._make_tm(tmp_path)
-        (tmp_path / "l2_lmdb").mkdir()
-
         with pytest.raises(RuntimeError, match="sibling LMDB"):
             tm._warn_on_sibling_l2_dirs(strict=True)
 

@@ -288,9 +288,9 @@ class AcceptedTranslation:
         """Return the accepted UTF-8 payload as text."""
         return self.content.decode("utf-8")
 
-    def receipt(self) -> dict[str, Any]:
+    def receipt(self, stats: "TranslationStats | None" = None) -> dict[str, Any]:
         """Return a JSON-serializable acceptance receipt without content."""
-        return {
+        receipt = {
             "campaign_id": self.campaign_id,
             "source_path": str(self.source_path),
             "output_path": str(self.output_path),
@@ -302,6 +302,23 @@ class AcceptedTranslation:
             "model_fingerprint": self.model_fingerprint,
             "gate_results": self.gate_results,
         }
+        # Receipts are written before the campaign runner regains control, so
+        # bind fast-path and AST facts here rather than trying to reconstruct
+        # them later from mutable process counters.  Keep every field numeric
+        # so JSONL summaries can safely aggregate old and new receipts.
+        if stats is not None:
+            receipt["translation_stats"] = {
+                "i18n_hits": int(stats.i18n_hits),
+                "tm_hits": int(stats.tm_hits),
+                "l1_hits": int(stats.l1_hits),
+                "l2_hits": int(stats.l2_hits),
+                "semantic_tm_hits": int(stats.l3_hits),
+                "professionalize_calls": int(stats.ast_batch_calls),
+                "ast_batches": int(stats.ast_batch_calls),
+                "individual_fallback_batches": int(stats.ast_individual_fallbacks),
+                "validation_retries": int(stats.validation_retried),
+            }
+        return receipt
 
 
 @dataclass

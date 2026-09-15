@@ -553,7 +553,7 @@ def build_manifest(
         # hugo-translator never commits into the content repo; the loop does (plan 19.2).
         "commit_policy": {
             "branch": "main",
-            "max_outputs_per_commit": 250,
+            "max_outputs_per_commit": 25,
             "push": False,
             "enabled": False,
         },
