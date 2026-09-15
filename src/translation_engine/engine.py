@@ -1925,7 +1925,9 @@ class TranslationEngine:
         )
         if not pre_write_passed:
             raise ValueError(
-                f"candidate rejected by pre-write validation ({len(pre_write_errors)} finding(s))"
+                "candidate rejected by pre-write validation "
+                f"({len(pre_write_errors)} finding(s)): "
+                + " | ".join(pre_write_errors)
             )
 
         gate_receipt = {
