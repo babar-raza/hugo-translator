@@ -2544,13 +2544,20 @@ class CampaignRunner:
         from src.model_runtime.llm_providers import create_provider
 
         interval = float(cfg.get("interval_hours", 6))
-        if not model_identity.should_check(llm_model, interval_hours=interval):
-            last = model_identity.last_check(llm_model)
+        identity_dir = Path(
+            getattr(self.engine, "campaign_identity_dir", None)
+            or cfg.get("identity_dir", "data/runtime/llm_identity")
+        )
+        if not model_identity.should_check(
+            llm_model, interval_hours=interval, identity_dir=identity_dir
+        ):
+            last = model_identity.last_check(llm_model, identity_dir=identity_dir)
             return {**(last or {}), "cadence": "not_due"}
         provider = create_provider(LLMProviderConfig.from_model_info(info))
         check = model_identity.check_identity(
             provider,
             llm_model,
+            identity_dir=identity_dir,
             quarantine_on_drift=bool(cfg.get("quarantine_on_drift", True)),
             quarantine_seconds=float(cfg.get("quarantine_seconds", 6 * 3600)),
         )

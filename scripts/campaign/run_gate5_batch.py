@@ -184,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("diagnostic quarantine must be below .local/rating-cause-analysis-runs")
         engine.diagnostic_quarantine_root = root
         engine.diagnostic_no_write = args.diagnostic_no_write
+        engine.campaign_identity_dir = root / "identity"
     if args.tm_intent_spool_path:
         print(f"[{manifest.campaign_id}] TM writes spool to {args.tm_intent_spool_path}")
     runner = CampaignRunner(
