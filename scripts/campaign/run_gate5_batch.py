@@ -184,6 +184,12 @@ def main(argv: list[str] | None = None) -> int:
         args.max_gpu_memory_percent,
         args.tm_intent_spool_path,
     )
+    # Child processes may run from an ACL-restricted pinned clone; keep the
+    # small mutable identity log in the governed control workspace instead.
+    import os
+    identity_override = os.environ.get("CAMPAIGN_IDENTITY_DIR")
+    if identity_override:
+        engine.campaign_identity_dir = Path(identity_override).resolve()
     if args.diagnostic_no_write and not args.diagnostic_quarantine_root:
         parser.error("--diagnostic-no-write requires --diagnostic-quarantine-root")
     if args.diagnostic_quarantine_root:
