@@ -15,7 +15,7 @@ $manifest = Join-Path $ControlRepo "data\campaigns\manifests\$campaign.yaml"
 $ledger = Join-Path $ControlRepo 'data\campaigns'
 $spool = Join-Path $ControlRepo "data\tm\campaign-spools\$campaign.sqlite3"
 $contentRepo = 'D:\onedrive\Documents\GitHub\aspose.org'
-$env:ASPOSE_ORG_CONTENT = $contentRepo
+$env:ASPOSE_ORG_CONTENT = Join-Path $contentRepo 'content'
 $logRoot = Join-Path $ControlRepo "reports\campaigns\$campaign\runtime"
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 $launcherLog = Join-Path $logRoot 'launcher.log'
