@@ -556,8 +556,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.progress_interval_seconds < 5:
         raise SystemExit("--progress-interval-seconds must be at least 5")
-    if not 1 <= args.max_workers <= 4:
-        raise SystemExit("--max-workers must be 1..4")
+    if not 1 <= args.max_workers <= 8:
+        raise SystemExit("--max-workers must be 1..8")
     if not args.wait:
         raise SystemExit("--wait is required for governed campaign launches")
     if args.child == "worker" and args.ledger_root != DEFAULT_LEDGER_ROOT:
@@ -570,6 +570,32 @@ def main(argv: list[str] | None = None) -> int:
     gpu_locales = tuple(str(locale) for locale in args.gpu_locales)
 
     manifest = CampaignManifest.load(args.campaign_manifest)
+    # Eight is permitted only after the bounded Professionalize probe has
+    # demonstrated zero provider/rate-limit errors and p95 no worse than
+    # 1.5x the four-worker baseline.  Keep 16 out of this launcher until its
+    # separate qualification exists; this is a real ceiling, not a hint.
+    if args.max_workers > 4:
+        calibration_path = (
+            Path("reports/campaigns")
+            / manifest.campaign_id
+            / "evidence/professionalize-concurrency-calibration.json"
+        )
+        try:
+            evidence = json.loads(calibration_path.read_text(encoding="utf-8"))
+            ramp = (evidence.get("calibration") or {}).get("concurrency_ramp") or []
+            baseline = next(item for item in ramp if int(item.get("level", 0)) == 4)
+            target = next(item for item in ramp if int(item.get("level", 0)) == args.max_workers)
+            qualified = (
+                int(target.get("errors", 1)) == 0
+                and int(target.get("rate_limited", 1)) == 0
+                and float(target.get("p95", float("inf"))) <= 1.5 * float(baseline["p95"])
+            )
+        except (OSError, ValueError, KeyError, StopIteration, TypeError, json.JSONDecodeError):
+            qualified = False
+        if not qualified:
+            raise SystemExit(
+                f"--max-workers {args.max_workers} lacks qualified Professionalize concurrency evidence"
+            )
     professionalize_only = bool(manifest.retry_policy.get("professionalize_only", False))
     if args.no_force_serialize and not professionalize_only:
         raise SystemExit("--no-force-serialize requires retry_policy.professionalize_only=true")
