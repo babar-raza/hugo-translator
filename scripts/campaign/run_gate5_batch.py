@@ -153,6 +153,10 @@ def main(argv: list[str] | None = None) -> int:
         "--diagnostic-no-write", action="store_true",
         help="Exercise translation/gates but refuse content, receipt, and TM writes.",
     )
+    parser.add_argument(
+        "--max-parallel-jobs", type=int,
+        help="Narrow process-local cap; recovery diagnosis must use one worker.",
+    )
     args = parser.parse_args(argv)
 
     translator_repo = Path.cwd().resolve()
@@ -188,6 +192,12 @@ def main(argv: list[str] | None = None) -> int:
         translator_repo=translator_repo,
         ledger_root=args.ledger_root,
     )
+    if args.max_parallel_jobs is not None:
+        if args.max_parallel_jobs < 1:
+            parser.error("--max-parallel-jobs must be positive")
+        if not args.diagnostic_no_write:
+            parser.error("--max-parallel-jobs is reserved for diagnostic no-write runs")
+        runner.manifest.execution_policy["max_parallel_jobs"] = args.max_parallel_jobs
     if args.no_force_serialize:
         # Process-scoped, so a canary never changes what any concurrently running
         # session sees. The shipped default stays the safe one (TC-APT-046 step 1).
