@@ -161,6 +161,10 @@ def main(argv: list[str] | None = None) -> int:
         "--translator-repo", type=Path,
         help="Pinned runtime code root; permits a separate read-only working directory for shared caches.",
     )
+    parser.add_argument(
+        "--recovery-qualification", action="store_true",
+        help="Run an explicitly bounded recovery canary despite stale heal tickets; never use for portfolio waves.",
+    )
     args = parser.parse_args(argv)
 
     translator_repo = (args.translator_repo or Path.cwd()).resolve()
@@ -197,6 +201,10 @@ def main(argv: list[str] | None = None) -> int:
         translator_repo=translator_repo,
         ledger_root=args.ledger_root,
     )
+    if args.recovery_qualification:
+        if not args.shard_id and not args.shard_list:
+            parser.error("--recovery-qualification requires an explicit shard scope")
+        engine.campaign_context["recovery_qualification"] = True
     if args.max_parallel_jobs is not None:
         if args.max_parallel_jobs < 1:
             parser.error("--max-parallel-jobs must be positive")

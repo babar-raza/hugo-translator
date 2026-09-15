@@ -2232,10 +2232,13 @@ class CampaignRunner:
         # attempted, unlike the per-locale dimension below (the live case:
         # quickstart.md kept accumulating fresh single-locale LinkValidator
         # tickets across 7+ locales, never tripping the per-locale threshold).
+        recovery_qualification = bool(
+            getattr(self.engine, "campaign_context", {}).get("recovery_qualification", False)
+        )
         file_quarantined, _file_root_cause = is_source_path_quarantined(
             source.source_path, heal_queue_path=heal_queue_path
         )
-        if file_quarantined:
+        if file_quarantined and not recovery_qualification:
             self._append_heal_ticket(
                 shard=shard, source=source, locale=locale, expected_output=expected_output
             )
@@ -2249,7 +2252,7 @@ class CampaignRunner:
         # candidate always gets its first attempt (plan §3 item 4 -- never
         # quarantine an unseen candidate).
         prior_failure = self.ledger.latest_failure(output_path=expected_output, target_lang=locale)
-        if prior_failure is not None:
+        if prior_failure is not None and not recovery_qualification:
             prior_root_cause = f"auto:{prior_failure.get('gate')}"
             if is_quarantined(
                 locale,
