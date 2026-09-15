@@ -44,6 +44,23 @@ def test_title_cannot_inject_message_trailers():
         )
 
 
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        (
+            "content/blog.aspose.org/pdf/java/pdf-facades-in-java/index.de.md",
+            "content(pdf/java): translate",
+        ),
+        (
+            "content/reference.aspose.org/de/cells/go/Font.md",
+            "content(cells/go): translate",
+        ),
+    ],
+)
+def test_title_uses_family_platform_for_suffix_and_locale_directory_layouts(path, expected):
+    assert content_commit_title([path], "translate") == expected
+
+
 def test_autonomous_worker_commit_title_refuses_mixed_scope():
     first = type("File", (), {"outputs": {"de": "content/docs.aspose.org/de/3d/java/a.md"}})()
     second = type("File", (), {"outputs": {"fr": "content/docs.aspose.org/fr/pdf/python/b.md"}})()
