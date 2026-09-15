@@ -430,7 +430,9 @@ def _run_wave(
         children.append(
             subprocess.Popen(
                 command,
-                cwd=translator_repo,
+                # Keep mutable progress/model-cache state in the accessible
+                # control workspace; --translator-repo still pins code/config.
+                cwd=Path.cwd(),
                 creationflags=flags,
                 stdout=handle,
                 stderr=subprocess.STDOUT,
