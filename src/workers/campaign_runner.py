@@ -2092,6 +2092,7 @@ class CampaignRunner:
         *,
         resume: bool = False,
         shard_ids: frozenset[str] | None = None,
+        require_clean: bool = True,
     ) -> dict[str, Any]:
         receipts = self._validated_resume_receipts() if resume else {}
         scope_sources: set[str] | None = None
@@ -2116,7 +2117,7 @@ class CampaignRunner:
             scope_outputs = {output for _source, _locale, output in jobs}
         self.manifest.verify_environment(
             translator_repo=self.translator_repo,
-            require_clean=True,
+            require_clean=require_clean,
             allow_existing_accepted=set(receipts),
             scope_sources=scope_sources,
             scope_outputs=scope_outputs,
@@ -2570,7 +2571,15 @@ class CampaignRunner:
         verify_only: bool = False,
         shard_ids: frozenset[str] | None = None,
     ) -> dict[str, Any]:
-        summary = self.verify(resume=resume, shard_ids=shard_ids)
+        diagnostic_no_write = getattr(self.engine, "diagnostic_no_write", False) is True
+        summary = self.verify(
+            resume=resume,
+            shard_ids=shard_ids,
+            # Diagnostic mode cannot write content, receipts, TM, or commits;
+            # unrelated shared-worktree dirt is therefore not relevant to its
+            # read-only candidate classification.
+            require_clean=not diagnostic_no_write,
+        )
         if verify_only:
             self.ledger.write_summary({**summary, **self._summary_evidence(), "status": "VERIFIED"})
             return summary
