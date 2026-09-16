@@ -6,6 +6,7 @@ param(
     [string]$SessionId = ([guid]::NewGuid().ToString()),
     [string]$ShardList,
     [string]$WatchdogState,
+    [switch]$RecoveryQualification,
     [switch]$SkipStaleReceiptInvalidation
 )
 
@@ -148,6 +149,7 @@ if ($ShardList) {
     $resolvedShardList = (Resolve-Path $ShardList).Path
     $args += @('--shard-list', $resolvedShardList)
 }
+if ($RecoveryQualification) { $args += '--recovery-qualification' }
 # A prior terminal watchdog record must not masquerade as the state of this
 # controller run.  Preserve it as evidence, then publish the new run identity
 # before the launcher starts.  The launcher atomically replaces this state if

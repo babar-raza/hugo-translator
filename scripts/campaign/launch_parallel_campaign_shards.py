@@ -308,6 +308,7 @@ def _child_command(
     shard_list_path: Path | None = None,
     tm_intent_spool_path: Path | None = None,
     no_force_serialize: bool = False,
+    recovery_qualification: bool = False,
     child: str = "gate5",
     translator_repo: Path | None = None,
 ) -> list[str]:
@@ -349,6 +350,8 @@ def _child_command(
             command += ["--tm-intent-spool-path", str(tm_intent_spool_path)]
         if no_force_serialize:
             command.append("--no-force-serialize")
+        if recovery_qualification:
+            command.append("--recovery-qualification")
         return command
     if len(shard_ids) > 1:
         # The legacy worker takes a single --campaign-shard, so it cannot amortise
@@ -426,6 +429,7 @@ def _run_wave(
             shard_list_path=shard_list_path,
             tm_intent_spool_path=args.tm_intent_spool_path,
             no_force_serialize=args.no_force_serialize,
+            recovery_qualification=args.recovery_qualification,
             child=args.child,
         )
         log_path = log_dir / f"{manifest.campaign_id}_child{index}.log"
@@ -598,6 +602,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Disable process-local serialization for governed API-only canaries only.",
     )
     parser.add_argument(
+        "--recovery-qualification",
+        action="store_true",
+        help="Permit only an explicitly sharded recovery canary to retry known rejected cells.",
+    )
+    parser.add_argument(
         "--child",
         choices=("gate5", "worker"),
         default="gate5",
@@ -638,6 +647,8 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--max-workers must be 1..8")
     if not args.wait:
         raise SystemExit("--wait is required for governed campaign launches")
+    if args.recovery_qualification and (args.child != "gate5" or args.shard_list is None):
+        raise SystemExit("--recovery-qualification requires --child gate5 and an explicit --shard-list")
     if args.child == "worker" and args.ledger_root != DEFAULT_LEDGER_ROOT:
         # The legacy worker has no --ledger-root flag, so its CampaignRunner would
         # silently fall back to the default while this parent verified receipts
