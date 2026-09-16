@@ -395,12 +395,12 @@ def _run_wave(
     failures on 2026-09-05 (an LMDB map-size mismatch, then a dirty unreceipted
     output) were each diagnosed that way, at one wake apiece.
     """
-    # Detach workers from the transient parent console.  Intel/Fortran-backed
-    # model runtimes abort on CTRL_CLOSE_EVENT when the supervising shell exits.
-    flags = (
-        (subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
-        if sys.platform == "win32" else 0
-    )
+    # Keep children attached to the persistent controller host.  DETACHED_PROCESS
+    # caused Intel/Fortran-backed runtimes to receive a window-close event and
+    # abort (forrtl error 200) even while the controller itself remained live.
+    # The production controller owns the console lifetime and waits for every
+    # child, so inheriting it is the safe unattended behaviour.
+    flags = 0
     log_dir = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
 
