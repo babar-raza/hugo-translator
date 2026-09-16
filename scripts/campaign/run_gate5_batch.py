@@ -27,6 +27,53 @@ import json
 import sys
 from pathlib import Path
 
+# Keeps the ctypes callback objects alive for the life of the process --
+# ctypes.WINFUNCTYPE instances are garbage-collected like anything else, and a
+# collected callback becomes a dangling native pointer Windows would call into.
+_CONSOLE_CTRL_HANDLERS: list[object] = []
+
+
+def _install_console_control_handler() -> None:
+    """TC-PORT-LLM-012: this process hosts the Intel/Fortran-backed runtime
+    (torch/sentence-transformers/FastText, linked via MKL) that aborts with
+    "forrtl: error (200): program aborting due to window-CLOSE event" --
+    observed recurring across 13+ soak attempts under every console
+    configuration tried by the controller (start_portfolio_missing_sweep_
+    autonomous.ps1), including its SetConsoleCtrlHandler(NULL, TRUE) call.
+
+    That call does not protect this process: per documented Win32 semantics,
+    SetConsoleCtrlHandler(NULL, TRUE) only installs an ignore-default for
+    CTRL_C_EVENT/CTRL_BREAK_EVENT. It does NOT suppress CTRL_CLOSE_EVENT,
+    CTRL_LOGOFF_EVENT, or CTRL_SHUTDOWN_EVENT -- exactly the event class the
+    Fortran runtime's own abort message names. A real handler that returns
+    TRUE (handled) for all five event types is required so Windows never
+    invokes the default terminate action here, regardless of what console
+    configuration the parent launcher uses.
+
+    This makes the process immune to ANY console-control event, including a
+    direct Ctrl+C typed into a shared console -- intentionally. The only
+    sanctioned shutdown paths remain the launcher's own controlled
+    terminate()/wait()/kill() sequence (launch_parallel_campaign_shards.py's
+    KeyboardInterrupt handler) and genuine OS process teardown on reboot,
+    both of which are unaffected by this handler (TerminateProcess and a real
+    OS shutdown are not control events a handler can decline).
+    """
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    handler_routine = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_uint)
+
+    def _handle_ctrl_event(_event: int) -> int:
+        return 1  # TRUE: handled, suppress Windows' default terminate action
+
+    callback = handler_routine(_handle_ctrl_event)
+    _CONSOLE_CTRL_HANDLERS.append(callback)
+    if not ctypes.windll.kernel32.SetConsoleCtrlHandler(callback, 1):
+        raise OSError(
+            "SetConsoleCtrlHandler installation failed: " + str(ctypes.WinError())
+        )
+
 
 def build_real_engine(
     translator_repo: Path,
@@ -106,6 +153,7 @@ def build_real_engine(
 
 
 def main(argv: list[str] | None = None) -> int:
+    _install_console_control_handler()
     parser = argparse.ArgumentParser(description="TC-APT-013 Gate 4 canary run")
     parser.add_argument(
         "--manifest", type=Path, default=Path("data/campaigns/gate4-canary/manifest.yaml")

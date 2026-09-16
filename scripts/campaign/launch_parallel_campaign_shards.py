@@ -407,7 +407,23 @@ def _run_wave(
     # abort (forrtl error 200) even while the controller itself remained live.
     # The production controller owns the console lifetime and waits for every
     # child, so inheriting it is the safe unattended behaviour.
-    flags = 0
+    #
+    # TC-PORT-LLM-012: that comment's diagnosis was incomplete. The crash
+    # recurred under every console-creation configuration tried (shared,
+    # detached, and a separate minimized console -- see
+    # start_portfolio_missing_sweep_autonomous.ps1 and the taskcard evidence),
+    # because none of them addressed the real cause: SetConsoleCtrlHandler
+    # (NULL, TRUE) only suppresses CTRL_C_EVENT/CTRL_BREAK_EVENT, never
+    # CTRL_CLOSE_EVENT/CTRL_LOGOFF_EVENT/CTRL_SHUTDOWN_EVENT -- exactly the
+    # event class the Fortran runtime's own message names. run_gate5_batch.py
+    # now installs a real handler for all five event types at process start,
+    # so the worker itself is immune to this regardless of console
+    # configuration; that is the actual fix. CREATE_NEW_PROCESS_GROUP is kept
+    # here only as defense in depth (isolates the worker's signal group from
+    # the controller's own console without detaching it) -- it does not
+    # create a new console and does not reintroduce the DETACHED_PROCESS
+    # failure mode.
+    flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
     log_dir = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
 
