@@ -5,7 +5,8 @@ param(
     [ValidateRange(1, 4)] [int]$MaxWorkers = 4,
     [string]$SessionId = ([guid]::NewGuid().ToString()),
     [string]$ShardList,
-    [string]$WatchdogState
+    [string]$WatchdogState,
+    [switch]$SkipStaleReceiptInvalidation
 )
 
 $ErrorActionPreference = 'Stop'
@@ -68,8 +69,10 @@ if (Test-CampaignLive) { throw 'A campaign process is already live; refusing a s
 # metadata evidence, demote those receipts, and declare their current files as
 # exact-hash replacements so the zero-defect pipeline regenerates them.
 Set-Location $RuntimeRepo
-& $py "$ControlRepo\scripts\campaign\invalidate_stale_campaign_receipts.py" --manifest $manifest --ledger-root $ledger --execute
-if ($LASTEXITCODE -ne 0) { throw 'Stale receipt recovery failed.' }
+if (-not $SkipStaleReceiptInvalidation) {
+    & $py "$ControlRepo\scripts\campaign\invalidate_stale_campaign_receipts.py" --manifest $manifest --ledger-root $ledger --execute
+    if ($LASTEXITCODE -ne 0) { throw 'Stale receipt recovery failed.' }
+}
 
 # The manifest builder is allowed to run before this controller.  Wait for its
 # revision-bound output, but do not bypass its preflight if it fails.
