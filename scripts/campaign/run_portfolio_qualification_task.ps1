@@ -14,9 +14,10 @@ try {
     & (Join-Path $PSScriptRoot 'start_portfolio_missing_sweep_autonomous.ps1') `
         -RuntimeRepo $runtimeRepo `
         -ControlRepo $controlRepo `
-        -MaxWorkers 4 `
-        -ShardList (Join-Path $evidence 'soak10.shards.txt') `
-        -WatchdogState (Join-Path $evidence 'soak-task-watchdog.json') `
+        -MaxWorkers 1 `
+        -ShardList (Join-Path $evidence 'repaired-it-probe.shards.txt') `
+        -WatchdogState (Join-Path $evidence 'repaired-it-probe7-watchdog.json') `
+        -RecoveryQualification `
         -SkipStaleReceiptInvalidation
     $code = $LASTEXITCODE
     "$(Get-Date -Format o) qualification task host completed exit=$code" | Add-Content -LiteralPath $taskLog
