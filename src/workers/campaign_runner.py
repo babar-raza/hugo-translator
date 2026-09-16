@@ -218,13 +218,32 @@ class CampaignLedger:
             os.fsync(handle.fileno())
 
     def write_summary(self, payload: dict[str, Any]) -> None:
-        with self._lock, FileLock(self._process_lock_path, timeout=30):
-            atomic_write(
-                path=self.summary_path,
-                content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
-                encoding="utf-8",
-                fsync=True,
-                create_parents=True,
+        # TC-PORT-LLM-009: summary.json is a reporting/progress artifact --
+        # reconcile_receipted_commits.py and _validated_resume_receipts both
+        # read acceptance_receipts.jsonl/commit_batches.jsonl directly and
+        # never this file, so losing one write is recoverable (the next
+        # write_summary call, or the next run, produces a fresh one).
+        # Confirmed live under a real 4-worker soak: with 4 concurrent child
+        # processes all finishing near the same moment, this call (including
+        # the mid-run progress checkpoints, not just the final one) can hit
+        # the same lock contention _append_heal_ticket already guards
+        # against, and previously crashed the whole worker process over a
+        # non-critical reporting write.
+        try:
+            with self._lock, FileLock(self._process_lock_path, timeout=30):
+                atomic_write(
+                    path=self.summary_path,
+                    content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+                    encoding="utf-8",
+                    fsync=True,
+                    create_parents=True,
+                )
+        except LockError as exc:
+            logger.error(
+                "summary.json write timed out under lock contention (this "
+                "write dropped, not fatal -- the next write_summary call or "
+                "run produces a fresh one): %s",
+                exc,
             )
 
     def model_outcomes(self) -> dict[str, dict[str, int]]:

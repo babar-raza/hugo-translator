@@ -9,10 +9,11 @@ future, losing every other job still in flight on the other 3 threads, not
 just this one ticket write.
 """
 
+import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.utils.file_lock import LockError
+from src.utils.file_lock import FileLock, LockError
 from src.workers.campaign_runner import CampaignLedger, CampaignRunner
 
 
@@ -56,6 +57,35 @@ def test_a_lock_timeout_writing_an_advisory_hold_skip_does_not_crash_the_job(tmp
             hold={"reason": "investigating", "expiry": None, "created_at": None},
         )
     # No exception propagated -- that is the entire point of this test.
+
+
+def test_a_lock_timeout_writing_the_summary_does_not_crash_the_run(tmp_path):
+    """A third, distinct call site hitting the exact same pattern -- found
+    during a real 4-worker soak confirming run, after the heal-ticket and
+    advisory-hold-skip fixes above already landed. write_summary is called
+    repeatedly through _run_locked (progress checkpoints, not just the final
+    summary), so this path is hit far more often than the heal-ticket path
+    and crashed the whole worker process the same way."""
+    campaigns_root = tmp_path / "campaigns"
+    campaigns_root.mkdir()
+    ledger = CampaignLedger(campaigns_root / "gate5-stub", "gate5-stub")
+
+    with patch.object(
+        FileLock, "__enter__", side_effect=LockError("Failed to acquire lock after 30.0s: x")
+    ):
+        ledger.write_summary({"accepted": 1, "status": "PARTIAL_WITH_TICKETS"})
+    # No exception propagated -- that is the entire point of this test.
+
+
+def test_summary_is_still_written_when_the_lock_is_free(tmp_path):
+    campaigns_root = tmp_path / "campaigns"
+    campaigns_root.mkdir()
+    ledger = CampaignLedger(campaigns_root / "gate5-stub", "gate5-stub")
+
+    ledger.write_summary({"accepted": 1, "status": "PARTIAL_WITH_TICKETS"})
+
+    assert ledger.summary_path.is_file()
+    assert json.loads(ledger.summary_path.read_text(encoding="utf-8"))["accepted"] == 1
 
 
 def test_a_heal_ticket_is_still_written_when_the_lock_is_free(tmp_path):
