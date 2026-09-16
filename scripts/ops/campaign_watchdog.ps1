@@ -215,6 +215,38 @@ if ($meta.consecutive_no_progress_relaunches -ge $MaxConsecutiveNoProgressRelaun
     exit 0
 }
 
+# TC-PORT-LLM-015: confirmed live via a real hard-kill recovery test --
+# work_claims.acquire_claim only checks TTL expiry (default 45 minutes), not
+# whether the holding session's process is actually alive. A hard-killed
+# launcher (crash, reboot, forced Stop-Process) leaves its family claim
+# looking perfectly valid to any other reader, so the very next relaunch
+# attempt -- the one thing this watchdog exists to do -- was refused with
+# "Another session holds the family claim", for however much of the 45
+# minutes remained. This watchdog has ALREADY independently confirmed, via
+# real OS process enumeration (not the claims file), that nothing is
+# running for this campaign, so releasing a claim that says otherwise here
+# is correcting a proven-stale record, not overriding a genuinely active
+# session elsewhere in the fleet.
+$py = Join-Path $controlRepo '.venv\Scripts\python.exe'
+$familyKey = "family:$CampaignId"
+$claimJson = & $py -c @"
+import sys, json
+sys.path.insert(0, r'$controlRepo')
+from src.workers.work_claims import active_claim
+c = active_claim('$familyKey')
+print(json.dumps(c))
+"@
+if ($claimJson -and $claimJson.Trim() -ne 'null') {
+    $claim = $claimJson | ConvertFrom-Json
+    Write-Tick "state=STALE_CLAIM_DETECTED session_id=$($claim.session_id) expires_at=$($claim.expires_at) -- no live process exists; releasing before relaunch"
+    & $py -c @"
+import sys
+sys.path.insert(0, r'$controlRepo')
+from src.workers.work_claims import release_claim
+release_claim('$familyKey', '$($claim.session_id)')
+"@ | Out-Null
+}
+
 Write-Tick "state=RELAUNCHING attempt=$($meta.consecutive_no_progress_relaunches + 1) accepted=$acceptedNow max_workers=$MaxWorkers"
 $sweepScript = Join-Path $controlRepo 'scripts\campaign\run_portfolio_sweep_task.ps1'
 $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
