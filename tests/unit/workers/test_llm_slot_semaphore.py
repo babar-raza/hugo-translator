@@ -59,6 +59,23 @@ class TestAcquireSlot:
         )
         assert acquire_slot("holder-b", capacity=1, slots_path=slots) is not None
 
+    def test_dead_pid_slot_is_reaped_before_ttl_expires(self, tmp_path):
+        slots = tmp_path / "llm_slots.json"
+        now = datetime.now(timezone.utc)
+        _write_raw(
+            slots,
+            {
+                "slots": {
+                    "pid99999999-dead:stale": {
+                        "holder_id": "pid99999999-dead",
+                        "acquired_at": now.isoformat(),
+                        "expires_at": (now + timedelta(hours=1)).isoformat(),
+                    }
+                }
+            },
+        )
+        assert acquire_slot("holder-b", capacity=1, slots_path=slots) is not None
+
 
 class TestReleaseSlot:
     def test_release_frees_capacity_for_another_holder(self, tmp_path):

@@ -119,7 +119,19 @@ def _reap_expired(slots: dict[str, Any], now: datetime) -> dict[str, Any]:
     live = {}
     for slot_id, slot in slots.items():
         expires_at = _parse(slot.get("expires_at", ""))
-        if expires_at is not None and expires_at > now:
+        holder = str(slot.get("holder_id") or "")
+        # A hard-killed Windows worker cannot execute __exit__, so waiting for
+        # the full TTL needlessly stalls unattended recovery.  Holder IDs are
+        # intentionally pid-prefixed; reap only when that PID is definitively
+        # gone, preserving slots owned by non-process integrations.
+        pid_dead = False
+        if holder.startswith("pid"):
+            try:
+                pid = int(holder[3:].split("-", 1)[0])
+                os.kill(pid, 0)
+            except (ValueError, OSError, ProcessLookupError):
+                pid_dead = True
+        if expires_at is not None and expires_at > now and not pid_dead:
             live[slot_id] = slot
     return live
 
