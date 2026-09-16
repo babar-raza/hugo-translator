@@ -133,8 +133,10 @@ class TestSelectPendingShardsRespectsTheLane:
         assert sorted(s["locale"] for s in selected) == ["de", "es"]
 
 
-def _run_dry(tmp_path, campaign_id="shard-launcher", session_id=None):
+def _run_dry(tmp_path, campaign_id="shard-launcher", session_id=None, monkeypatch=None):
     _load(tmp_path, campaign_id)
+    if monkeypatch is not None:
+        monkeypatch.setattr(launcher, "is_gpu_admission_enabled", lambda _repo: False)
     argv = [
         "--campaign-manifest",
         str(tmp_path / "manifest.yaml"),
@@ -142,6 +144,8 @@ def _run_dry(tmp_path, campaign_id="shard-launcher", session_id=None):
         str(tmp_path / "campaigns"),
         "--wait",
         "--dry-run",
+        "--tm-intent-spool-path",
+        str(tmp_path / "campaign-intents.sqlite3"),
     ]
     if session_id is not None:
         argv += ["--session-id", session_id]
@@ -149,12 +153,12 @@ def _run_dry(tmp_path, campaign_id="shard-launcher", session_id=None):
 
 
 class TestMainDefersGpuWorkWhenTheLaneIsHeld:
-    def test_dry_run_excludes_gpu_bound_shards_and_reports_deferral(self, tmp_path, capsys):
+    def test_dry_run_excludes_gpu_bound_shards_and_reports_deferral(self, tmp_path, capsys, monkeypatch):
         ledger_root = tmp_path / "campaigns"
         external = FileLock(gpu_lane_lock_path(ledger_root), timeout=0)
         external.acquire()
         try:
-            status = _run_dry(tmp_path)
+            status = _run_dry(tmp_path, monkeypatch=monkeypatch)
         finally:
             external.release()
 

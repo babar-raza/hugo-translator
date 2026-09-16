@@ -330,6 +330,7 @@ def _child_command(
     if child == "gate5":
         command = [
             sys.executable,
+            "-u",
             "scripts/campaign/run_gate5_batch.py",
             "--manifest",
             str(campaign_manifest),

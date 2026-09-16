@@ -69,6 +69,10 @@ def _args(tmp_path: Path) -> SimpleNamespace:
         device="cuda",
         max_gpu_memory_percent=50,
         gpu_shard_memory_percent=50,
+        progress_interval_seconds=30,
+        tm_intent_spool_path=None,
+        no_force_serialize=False,
+        recovery_qualification=False,
         child="gate5",
     )
 
@@ -82,6 +86,9 @@ class _FailingChild:
         stream.flush()
 
     def wait(self):
+        return 1
+
+    def poll(self):
         return 1
 
 
