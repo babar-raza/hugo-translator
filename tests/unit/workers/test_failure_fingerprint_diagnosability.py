@@ -127,3 +127,111 @@ def test_string_detail_values_are_not_recorded_verbatim():
     )
 
     assert "candidate text" not in fingerprint
+
+
+def test_semantic_similarity_validator_records_the_measured_score():
+    """TC-PORT-LLM-011: this validator's rejects fingerprinted as
+    'SemanticSimilarityValidator:error:generic:...:numeric=none' -- issue_kind
+    fell through to "generic" (no branch recognized this validator) and the one
+    number that distinguishes a genuine semantic-drift reject from a false one,
+    the measured similarity, was missing from the numeric allowlist even though
+    "threshold" was already in it. ce7bcb69 fixed the same gap for the separate
+    manual/forensic quarantine dump; this is the actual heal-queue write path.
+    """
+    fingerprint = _fingerprint(
+        [_issue("SemanticSimilarityValidator", {"similarity": 0.31, "threshold": 0.4})]
+    )
+
+    assert fingerprint.startswith("SemanticSimilarityValidator:error:semantic_similarity:")
+    assert "similarity=0.31" in fingerprint
+    assert "threshold=0.4" in fingerprint
+    assert "numeric=none" not in fingerprint
+
+
+def test_semantic_similarity_validator_records_why_it_could_not_run():
+    """The encoder-unavailable / embedding-call-raised paths record
+    details={"exception_type": type(exc).__name__} instead of a score -- a
+    class name, not candidate text, so it's safe to record and tells a human
+    tool-failure apart from a genuine semantic-drift reject at a glance.
+    """
+    fingerprint = _fingerprint(
+        [_issue("SemanticSimilarityValidator", {"exception_type": "ConnectionError"})]
+    )
+
+    assert "exception_type=ConnectionError" in fingerprint
+
+
+def _rule_issue(rule: str, message: str, location: str | None):
+    """Mimics src/translation_engine/models.py::ValidationIssue exactly: it has
+    `severity`/`rule`/`message`/`location` and genuinely has no `validator` or
+    `details` attribute at all (unlike validation/base.py::ValidationIssue,
+    which segment_translator.py's own TranslationRetryableError raises never
+    use). SimpleNamespace only exposes what's set here, so getattr(..., default)
+    on a missing attribute is exercised for real, not simulated.
+    """
+    return SimpleNamespace(severity="error", rule=rule, message=message, location=location)
+
+
+def test_ast_translation_empty_unit_is_not_misclassified_as_unknown():
+    """TC-PORT-LLM-011: segment_translator.py's AST-empty-translation check
+    raises with a models.ValidationIssue(rule="ASTTranslation", ...) -- which
+    has no `validator` attribute. _failure_metadata's introspection used to
+    read only `validator`, defaulting to "unknown" for every issue of this
+    shape, so a real, reproducible defect (professionalize_llm returning an
+    empty string for one text-run unit) fingerprinted identically to a truly
+    unclassified failure and could never benefit from root-cause grouping.
+    """
+    fingerprint = _fingerprint(
+        [
+            _rule_issue(
+                "ASTTranslation",
+                "1 units with substantial source text returned empty translations",
+                "body.blockquote[0].paragraph[0].text[1]",
+            )
+        ]
+    )
+
+    assert fingerprint.startswith("ASTTranslation:error:empty_translation_unit:")
+    assert "generic" not in fingerprint
+
+
+def test_ast_translation_gate_is_the_rule_name_not_unknown():
+    result = SimpleNamespace(
+        validation_result=SimpleNamespace(
+            issues=[
+                _rule_issue(
+                    "ASTTranslation",
+                    "1 units with substantial source text returned empty translations",
+                    "body.blockquote[0].paragraph[0].text[1]",
+                )
+            ]
+        ),
+        error="translation_rejected",
+        errors=[1],
+        retry_attempts=3,
+        verification_result=None,
+    )
+    gate, _reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "ASTTranslation"
+
+
+def test_batch_language_purity_rule_based_issue_is_not_misclassified_as_unknown():
+    fingerprint = _fingerprint(
+        [_rule_issue("BatchLanguagePurity", "High batch purity failure rate: 20.0%", "doc.md")]
+    )
+
+    assert fingerprint.startswith("BatchLanguagePurity:error:batch_language_purity:")
+
+
+def test_exception_type_cannot_smuggle_arbitrary_text_into_the_ledger():
+    fingerprint = _fingerprint(
+        [
+            _issue(
+                "SemanticSimilarityValidator",
+                {"exception_type": "candidate text that must not persist"},
+            )
+        ]
+    )
+
+    assert "candidate text" not in fingerprint

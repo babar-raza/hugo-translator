@@ -1306,9 +1306,21 @@ class CampaignRunner:
             )
             if severity not in {"error", "warning"}:
                 continue
-            _issue_validator_severities.setdefault(
-                str(getattr(issue, "validator", "unknown")), set()
-            ).add(severity)
+            # TC-PORT-LLM-011: src/translation_engine/models.py::ValidationIssue
+            # (used by segment_translator.py's own TranslationRetryableError
+            # raises, e.g. ASTTranslation/BatchLanguagePurity) has a `rule`
+            # field, not `validator` -- src/translation_engine/validation/
+            # base.py::ValidationIssue (used by the real per-cell validators)
+            # has `validator`, not `rule`. Falling back silently collapsed
+            # every issue of the first kind to "unknown", so a genuine,
+            # reproducible defect (e.g. empty translations for a blockquote
+            # text-run unit) fingerprinted identically to a truly unclassified
+            # failure -- indistinguishable in heal_queue.jsonl and unable to
+            # benefit from RECURRENCE ESCALATION grouping by root cause.
+            _issue_name = str(
+                getattr(issue, "validator", None) or getattr(issue, "rule", None) or "unknown"
+            )
+            _issue_validator_severities.setdefault(_issue_name, set()).add(severity)
         validators = sorted(
             name for name, severities in _issue_validator_severities.items() if "error" in severities
         )
@@ -1380,7 +1392,14 @@ class CampaignRunner:
                 re.sub(
                     r"[^A-Za-z0-9_-]",
                     "",
-                    str(getattr(issue, "validator", "unknown")),
+                    # See the matching comment above: this issue may carry
+                    # `rule` (models.ValidationIssue) instead of `validator`
+                    # (validation/base.py::ValidationIssue).
+                    str(
+                        getattr(issue, "validator", None)
+                        or getattr(issue, "rule", None)
+                        or "unknown"
+                    ),
                 )
                 or "unknown"
             )
@@ -1395,6 +1414,12 @@ class CampaignRunner:
                 issue_kind = "heading_repetition"
             elif validator == "FrontmatterLanguageCheck":
                 issue_kind = "frontmatter_language"
+            elif validator == "SemanticSimilarityValidator":
+                issue_kind = "semantic_similarity"
+            elif validator == "ASTTranslation":
+                issue_kind = "empty_translation_unit"
+            elif validator == "BatchLanguagePurity":
+                issue_kind = "batch_language_purity"
             else:
                 issue_kind = "generic"
             location_hash = hashlib.sha256(
@@ -1424,6 +1449,13 @@ class CampaignRunner:
                 "translation_level",
                 "src_len",
                 "tgt_len",
+                # SemanticSimilarityValidator's measured score (TC-PORT-LLM-011).
+                # "threshold" was already here, but the one number that actually
+                # tells a genuine semantic-drift reject apart from a false one --
+                # the measured similarity itself -- was silently dropped, so
+                # every such reject fingerprinted as "generic:...:numeric=none"
+                # even when the validator had computed a real score.
+                "similarity",
             ):
                 value = details.get(key)
                 if isinstance(value, bool) or not isinstance(value, int | float):
@@ -1445,6 +1477,14 @@ class CampaignRunner:
                 value = str(details.get(key, "")).lower()
                 if re.fullmatch(r"[a-z][a-z0-9]{0,9}", value):
                     categorical_parts.append(f"{key}={value}")
+            # A validator that failed to run at all (e.g. SemanticSimilarityValidator
+            # with no sentence encoder available) records details={"exception_type":
+            # type(exc).__name__} instead of a numeric score. Class names are schema,
+            # not candidate text, so safe to record; mirrors _SAFE_DETAIL_KEYS in
+            # file_pipeline.py::_quarantine_diagnostic_candidate (ce7bcb69).
+            exception_type_value = str(details.get("exception_type", ""))
+            if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,60}", exception_type_value):
+                categorical_parts.append(f"exception_type={exception_type_value}")
             payload_value = None
             for key in ("ngram", "word", "sentence", "heading"):
                 value = details.get(key)

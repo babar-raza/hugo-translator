@@ -2597,15 +2597,32 @@ class SegmentTranslator:
                         f"for whitespace/short source text"
                     )
 
+                # TC-PORT-LLM-011: record WHICH unit(s) came back empty, not just
+                # that some did.  node_addr is a structural AST address (e.g.
+                # "body.blockquote[0].paragraph[0].text[1]"), not candidate text,
+                # so it's safe to record and lets a heal ticket be grouped/
+                # deduplicated per failing unit instead of colliding on the
+                # whole file's path for every empty-translation reject.
+                _empty_unit_addrs = sorted(
+                    {
+                        str(getattr(u, "node_addr", "") or getattr(u, "unit_id", ""))
+                        for u in empty_units
+                        if getattr(u, "node_addr", "") or getattr(u, "unit_id", "")
+                    }
+                )[:5]
                 issues = [
                     ValidationIssue(
                         severity="error",
                         rule="ASTTranslation",
                         message=f"{len(empty_units)} units with substantial source text returned empty translations",
                         location=(
-                            str(doc.source_path)
-                            if hasattr(doc, "source_path") and doc.source_path
-                            else None
+                            ",".join(_empty_unit_addrs)
+                            if _empty_unit_addrs
+                            else (
+                                str(doc.source_path)
+                                if hasattr(doc, "source_path") and doc.source_path
+                                else None
+                            )
                         ),
                     )
                 ]
