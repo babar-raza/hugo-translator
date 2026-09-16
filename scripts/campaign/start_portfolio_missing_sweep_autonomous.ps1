@@ -7,7 +7,11 @@ param(
     [string]$ShardList,
     [string]$WatchdogState,
     [switch]$RecoveryQualification,
-    [switch]$SkipStaleReceiptInvalidation
+    [switch]$SkipStaleReceiptInvalidation,
+    # TC-PORT-LLM-014: was a hardcoded literal, silently ignoring any caller's
+    # intent to target a different campaign. The default preserves every
+    # existing caller's behaviour unchanged.
+    [string]$CampaignId = 'portfolio-missing-sweep-llm-only-20260914'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,7 +37,7 @@ if ($env:OS -eq 'Windows_NT') {
 $RuntimeRepo = (Resolve-Path $RuntimeRepo).Path
 $ControlRepo = (Resolve-Path $ControlRepo).Path
 $py = Join-Path $ControlRepo '.venv\Scripts\python.exe'
-$campaign = 'portfolio-missing-sweep-llm-only-20260914'
+$campaign = $CampaignId
 $manifest = Join-Path $ControlRepo "data\campaigns\manifests\$campaign.yaml"
 $ledger = Join-Path $ControlRepo 'data\campaigns'
 $spool = Join-Path $ControlRepo "data\tm\campaign-spools\$campaign.sqlite3"
