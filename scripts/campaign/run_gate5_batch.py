@@ -186,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
         args.max_gpu_memory_percent,
         args.tm_intent_spool_path,
     )
+    print(f"[{manifest.campaign_id}] startup engine_ready", flush=True)
     # Child processes may run from an ACL-restricted pinned clone; keep the
     # small mutable identity log in the governed control workspace instead.
     import os
@@ -209,6 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         translator_repo=translator_repo,
         ledger_root=args.ledger_root,
     )
+    print(f"[{manifest.campaign_id}] startup runner_ready", flush=True)
     if args.recovery_qualification:
         if not args.shard_id and not args.shard_list:
             parser.error("--recovery-qualification requires an explicit shard scope")
@@ -237,6 +239,11 @@ def main(argv: list[str] | None = None) -> int:
         if not listed_shards:
             parser.error("--shard-list contains no shard ids")
     shard_ids = set((args.shard_id or []) + listed_shards) or None
+    print(
+        f"[{manifest.campaign_id}] startup runner_run_begin "
+        f"shards={len(shard_ids) if shard_ids is not None else 'all'}",
+        flush=True,
+    )
     try:
         result = runner.run(resume=args.resume, shard_ids=shard_ids)
     except CampaignManifestError as exc:
@@ -249,6 +256,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(json.dumps({"error": str(exc)}, indent=2, default=str))
         return 1
+    print(f"[{manifest.campaign_id}] startup runner_run_complete", flush=True)
     print(json.dumps(result, indent=2, default=str))
     return 0
 
