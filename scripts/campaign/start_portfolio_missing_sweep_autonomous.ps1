@@ -3,7 +3,9 @@ param(
     [Parameter(Mandatory)] [string]$RuntimeRepo,
     [string]$ControlRepo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
     [ValidateRange(1, 4)] [int]$MaxWorkers = 4,
-    [string]$SessionId = 'fc3ec89c-a06a-47e6-b846-9e37a8d37fac'
+    [string]$SessionId = ([guid]::NewGuid().ToString()),
+    [string]$ShardList,
+    [string]$WatchdogState
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,6 +24,7 @@ New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 $launcherLog = Join-Path $logRoot 'launcher.log'
 $launcherErr = Join-Path $logRoot 'launcher.err.log'
 $controllerLog = Join-Path $logRoot 'controller.log'
+$WatchdogState = if ($WatchdogState) { [IO.Path]::GetFullPath($WatchdogState) } else { Join-Path $ledger "$campaign\watchdog_state.json" }
 $env:PYTHONPATH = $RuntimeRepo
 
 # The runtime clone is revision-pinned and may be ACL-restricted when launched
@@ -83,8 +86,12 @@ $args = @(
     'scripts\campaign\launch_parallel_campaign_shards.py', '--campaign-manifest', $manifest,
     '--ledger-root', $ledger, '--child', 'gate5', '--max-workers', $MaxWorkers, '--wait',
     '--tm-intent-spool-path', $spool, '--no-force-serialize', '--progress-interval-seconds', '30',
-    '--session-id', $SessionId
+    '--session-id', $SessionId, '--watchdog-state', $WatchdogState
 )
+if ($ShardList) {
+    $resolvedShardList = (Resolve-Path $ShardList).Path
+    $args += @('--shard-list', $resolvedShardList)
+}
 # Keep the Python launcher attached to this persistent PowerShell host.  A
 # hidden detached console delivered CTRL_CLOSE_EVENT to the Intel/Fortran
 # runtime before child startup (forrtl error 200), leaving no child logs.
