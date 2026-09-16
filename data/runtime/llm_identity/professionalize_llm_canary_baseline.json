@@ -23,14 +23,6 @@
     "gpt-oss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "qwen3-next": "539e20d356f59cd7132bdd8ab90b8511128f5edab73d6e88df28aab413ffd17d"
   },
-  "calibration": {
-    "n": 20,
-    "successful": 20,
-    "errors": 0,
-    "distinct_outputs": 1,
-    "false_positive_rate_estimate": 0.0,
-    "false_negative_note": "unmeasurable until a real model swap is observed; mitigated by the alias-resolution second signal",
-    "calibrated_at": "2026-09-02T07:32:43.885027+00:00"
-  },
-  "recorded_at": "2026-09-02T07:32:49.545940+00:00"
+  "calibration": {},
+  "recorded_at": "2026-09-15T14:28:12.219892+00:00"
 }
