@@ -22,6 +22,64 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def wire_semantic_similarity_encoder(engine) -> None:
+    """Wire SemanticSimilarityValidator's shared encoder onto `engine`.
+
+    TC-PORT-LLM-011 follow-up: this used to run only as part of
+    EngineBuilder._init_tm_wiring, which every EngineBuilder-constructed
+    engine gets for free -- but scripts/campaign/run_gate5_batch.py, the
+    actual entrypoint every real campaign cell runs through, constructs
+    TranslationEngine directly and never calls it. Confirmed live: a real
+    canary run hit SemanticSimilarityValidator rejects with
+    issue_fingerprints=...:numeric=none on 3 different, unrelated files --
+    not a genuine content-quality signal, but every check silently hitting
+    the "no encoder available" branch because _shared_encoder was never set
+    in that process at all. Extracted so both callers share one
+    implementation instead of the campaign path silently diverging from the
+    interactive path again in the future.
+    """
+    try:
+        from src.translation_engine.validation.semantic_similarity_validator import (
+            SemanticSimilarityValidator,
+        )
+
+        _configured_model = (
+            engine.config.get_config()
+            .get("tm_defaults", {})
+            .get("l3_embedding_model", "all-MiniLM-L6-v2")
+        )
+        _l3 = getattr(engine.tm, "l3", None)
+        _l3_enc = getattr(_l3, "encoder", None)
+        _l3_model = getattr(_l3, "embedding_model_name", None)
+        if _l3_enc is not None and _l3_model == _configured_model:
+            SemanticSimilarityValidator.set_encoder(_l3_enc)
+        else:
+            # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 1): L3 lookups
+            # and semantic-similarity VALIDATION are unrelated
+            # capabilities that happened to share one model artifact --
+            # engine.tm.l3 being None (skip_l3=True, the documented
+            # production default for multi-shard GPU runs) used to mean
+            # the validator's encoder was NEVER set, silently, on every
+            # run. Load a standalone encoder instead of leaving it
+            # unset. Defaults to CPU specifically to avoid reintroducing
+            # the GPU memory pressure skip_l3=True exists to prevent --
+            # see load_standalone_sentence_encoder()'s docstring.
+            from src.tm.l3_semantic import load_standalone_sentence_encoder
+
+            _standalone_enc = load_standalone_sentence_encoder(_configured_model, use_gpu=False)
+            SemanticSimilarityValidator.set_encoder(_standalone_enc)
+            logger.info(
+                "SemanticSimilarityValidator: loaded standalone CPU encoder "
+                "(%s) because the active L3 encoder is absent or uses a "
+                "different, non-governed model",
+                _configured_model,
+            )
+    except Exception as _sem_wire_err:
+        logger.debug(
+            "SemanticSimilarityValidator encoder wiring failed (non-fatal): %s", _sem_wire_err
+        )
+
+
 class EngineBuilder:
     """Constructs and wires all TranslationEngine subsystems."""
 
@@ -634,46 +692,7 @@ class EngineBuilder:
             except Exception as _tm_wire_err:
                 logger.debug(f"TM detector wiring failed (non-fatal): {_tm_wire_err}")
 
-        try:
-            from src.translation_engine.validation.semantic_similarity_validator import (
-                SemanticSimilarityValidator,
-            )
-
-            _configured_model = (
-                engine.config.get_config()
-                .get("tm_defaults", {})
-                .get("l3_embedding_model", "all-MiniLM-L6-v2")
-            )
-            _l3 = getattr(engine.tm, "l3", None)
-            _l3_enc = getattr(_l3, "encoder", None)
-            _l3_model = getattr(_l3, "embedding_model_name", None)
-            if _l3_enc is not None and _l3_model == _configured_model:
-                SemanticSimilarityValidator.set_encoder(_l3_enc)
-            else:
-                # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 1): L3 lookups
-                # and semantic-similarity VALIDATION are unrelated
-                # capabilities that happened to share one model artifact --
-                # engine.tm.l3 being None (skip_l3=True, the documented
-                # production default for multi-shard GPU runs) used to mean
-                # the validator's encoder was NEVER set, silently, on every
-                # run. Load a standalone encoder instead of leaving it
-                # unset. Defaults to CPU specifically to avoid reintroducing
-                # the GPU memory pressure skip_l3=True exists to prevent --
-                # see load_standalone_sentence_encoder()'s docstring.
-                from src.tm.l3_semantic import load_standalone_sentence_encoder
-
-                _standalone_enc = load_standalone_sentence_encoder(_configured_model, use_gpu=False)
-                SemanticSimilarityValidator.set_encoder(_standalone_enc)
-                logger.info(
-                    "SemanticSimilarityValidator: loaded standalone CPU encoder "
-                    "(%s) because the active L3 encoder is absent or uses a "
-                    "different, non-governed model",
-                    _configured_model,
-                )
-        except Exception as _sem_wire_err:
-            logger.debug(
-                "SemanticSimilarityValidator encoder wiring failed (non-fatal): %s", _sem_wire_err
-            )
+        wire_semantic_similarity_encoder(engine)
 
     # ------------------------------------------------------------------
     # Phase 15: Extracted components

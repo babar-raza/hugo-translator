@@ -613,3 +613,57 @@ class TestLoadStandaloneSentenceEncoder:
             result = load_standalone_sentence_encoder("some-model-name")
 
         assert result == "encoder-instance"
+
+    def test_lifts_hf_hub_offline_for_the_load_and_restores_it(self):
+        """TC-PORT-LLM-011 follow-up: confirmed live that a real campaign run
+        (HF_HUB_OFFLINE=1, set to block hidden GENERATIVE downloads, never
+        meant to cover this local validation-only encoder) raised
+        OfflineModeIsEnabled on every load attempt EVEN THOUGH the model was
+        already fully cached -- transformers' tokenizer loading makes an
+        unconditional network call (_patch_mistral_regex -> is_base_mistral
+        -> model_info) that ignores local_files_only entirely. Reproduced
+        directly against the installed transformers version before fixing.
+        Patching os.environ at call time does nothing either: huggingface_hub
+        reads it once into a module constant at import time, long before this
+        function ever runs -- confirmed that variant still failed identically.
+        The only thing that actually works is flipping the cached constant
+        itself for the duration of the call.
+        """
+        from huggingface_hub import constants as hf_constants
+
+        hf_constants.HF_HUB_OFFLINE = True
+        seen_offline_during_call = []
+
+        def _capture_offline_state(*_args, **_kwargs):
+            seen_offline_during_call.append(hf_constants.HF_HUB_OFFLINE)
+            return "encoder-instance"
+
+        try:
+            with patch("src.tm.l3_semantic.SentenceTransformer", side_effect=_capture_offline_state):
+                result = load_standalone_sentence_encoder("some-model-name")
+
+            assert seen_offline_during_call == [False], (
+                "HF_HUB_OFFLINE must be lifted for the duration of the load"
+            )
+            assert result == "encoder-instance"
+            assert hf_constants.HF_HUB_OFFLINE is True, (
+                "must be restored to its prior value after the call"
+            )
+        finally:
+            hf_constants.HF_HUB_OFFLINE = False
+
+    def test_restores_hf_hub_offline_even_if_the_load_raises(self):
+        from huggingface_hub import constants as hf_constants
+
+        hf_constants.HF_HUB_OFFLINE = True
+        try:
+            with patch(
+                "src.tm.l3_semantic.SentenceTransformer",
+                side_effect=RuntimeError("network unavailable"),
+            ):
+                with pytest.raises(RuntimeError):
+                    load_standalone_sentence_encoder("some-model-name")
+
+            assert hf_constants.HF_HUB_OFFLINE is True
+        finally:
+            hf_constants.HF_HUB_OFFLINE = False
