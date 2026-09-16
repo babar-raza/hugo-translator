@@ -85,8 +85,9 @@ while (-not (Invoke-Preflight)) {
 
 Write-Controller "starting Professionalize-only launcher workers=$MaxWorkers"
 Set-Location $RuntimeRepo
+$launcherScript = Join-Path $RuntimeRepo 'scripts\campaign\launch_parallel_campaign_shards.py'
 $args = @(
-    'scripts\campaign\launch_parallel_campaign_shards.py', '--campaign-manifest', $manifest,
+    $launcherScript, '--campaign-manifest', $manifest,
     '--ledger-root', $ledger, '--child', 'gate5', '--max-workers', $MaxWorkers, '--wait',
     '--tm-intent-spool-path', $spool, '--no-force-serialize', '--progress-interval-seconds', '30',
     '--session-id', $SessionId, '--watchdog-state', $WatchdogState
