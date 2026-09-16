@@ -54,6 +54,9 @@ $env:PYTHONPATH = $RuntimeRepo
 # than consume an unbounded network wait before the first terminal job.
 $env:HF_HUB_OFFLINE = '1'
 $env:TRANSFORMERS_OFFLINE = '1'
+# Candidate-free phase markers for supervised recovery qualification.  They
+# expose startup stalls without placing source/candidate text in logs.
+$env:CAMPAIGN_STARTUP_DIAGNOSTICS = '1'
 
 # The runtime clone is revision-pinned and may be ACL-restricted when launched
 # elevated.  Run children from ControlRepo so immutable FastText/HF caches are

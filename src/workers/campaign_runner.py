@@ -579,6 +579,11 @@ class CampaignRunner:
     def _llm_event(self, event):
         self.ledger._append(self.ledger.root / "llm_calls.jsonl", event)
 
+    def _startup_checkpoint(self, phase: str) -> None:
+        """Emit opt-in, candidate-free startup progress for bounded recovery probes."""
+        if os.environ.get("CAMPAIGN_STARTUP_DIAGNOSTICS") == "1":
+            print(f"[{self.manifest.campaign_id}] runner {phase}", flush=True)
+
     # TC-APT-046: a deferred campaign's terminal heal ticket is also the
     # dedicated retry consumer's only feed. Built lazily so campaigns that
     # never open one (the immediate-mode majority) never create the file.
@@ -2165,7 +2170,9 @@ class CampaignRunner:
                 + hashlib.sha256("\n".join(sorted(normalized)).encode("utf-8")).hexdigest()[:16]
                 + ".lock"
             )
+        self._startup_checkpoint("lock_wait")
         with FileLock(self.ledger.root / lock_name, timeout=0):
+            self._startup_checkpoint("lock_acquired")
             return self._run_locked(
                 resume=resume,
                 verify_only=verify_only,
@@ -2597,6 +2604,7 @@ class CampaignRunner:
         shard_ids: frozenset[str] | None = None,
     ) -> dict[str, Any]:
         diagnostic_no_write = getattr(self.engine, "diagnostic_no_write", False) is True
+        self._startup_checkpoint("verify_begin")
         summary = self.verify(
             resume=resume,
             shard_ids=shard_ids,
@@ -2605,6 +2613,7 @@ class CampaignRunner:
             # read-only candidate classification.
             require_clean=not diagnostic_no_write,
         )
+        self._startup_checkpoint("verify_complete")
         if verify_only:
             self.ledger.write_summary({**summary, **self._summary_evidence(), "status": "VERIFIED"})
             return summary
@@ -2615,6 +2624,7 @@ class CampaignRunner:
             if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
             else "immediate"
         )
+        self._startup_checkpoint("identity_begin")
         with campaign_llm_scope(
             identity_policy_mode,
             "identity",
@@ -2625,8 +2635,11 @@ class CampaignRunner:
             campaign_id=self.manifest.campaign_id,
         ):
             self._llm_identity_check = self._llm_identity_gate()
+        self._startup_checkpoint("identity_complete")
 
+        self._startup_checkpoint("receipts_begin")
         receipts = self._validated_resume_receipts() if resume else {}
+        self._startup_checkpoint("receipts_complete")
         self.engine.campaign_context.update(
             {
                 "campaign_id": self.manifest.campaign_id,
@@ -2639,12 +2652,14 @@ class CampaignRunner:
         failed = 0
         max_outputs = int(self.manifest.commit_policy.get("max_outputs_per_commit", 250))
         max_parallel_jobs = int(self.manifest.execution_policy.get("max_parallel_jobs", 1))
+        self._startup_checkpoint("shards_begin")
         all_shards = list(
             self.manifest.shards(
                 resume_receipts=set(receipts),
                 max_outputs=max_outputs,
             )
         )
+        self._startup_checkpoint(f"shards_complete count={len(all_shards)}")
         available_shards = {str(shard["shard_id"]) for shard in all_shards}
         if shard_ids and not shard_ids.issubset(available_shards):
             unknown = sorted(shard_ids - available_shards)
@@ -2662,6 +2677,9 @@ class CampaignRunner:
                 continue
             shard_accepted = 0
             shard_failed = 0
+            self._startup_checkpoint(
+                f"dispatch_begin shard={shard['shard_id']} jobs={len(shard['jobs'])}"
+            )
             with ThreadPoolExecutor(
                 max_workers=min(max_parallel_jobs, len(shard["jobs"]))
             ) as executor:
