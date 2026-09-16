@@ -47,6 +47,13 @@ $launcherErr = Join-Path $logRoot 'launcher.err.log'
 $controllerLog = Join-Path $logRoot 'controller.log'
 $WatchdogState = if ($WatchdogState) { [IO.Path]::GetFullPath($WatchdogState) } else { Join-Path $ledger "$campaign\watchdog_state.json" }
 $env:PYTHONPATH = $RuntimeRepo
+# This campaign is explicitly Professionalize-only.  Do not permit a hidden
+# Hugging Face/Transformers download during engine startup: the FastText
+# detector is local and the only generative route is Professionalize.  A
+# newly introduced local-model dependency must fail fast and visibly rather
+# than consume an unbounded network wait before the first terminal job.
+$env:HF_HUB_OFFLINE = '1'
+$env:TRANSFORMERS_OFFLINE = '1'
 
 # The runtime clone is revision-pinned and may be ACL-restricted when launched
 # elevated.  Run children from ControlRepo so immutable FastText/HF caches are
