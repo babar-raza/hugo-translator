@@ -25,8 +25,30 @@ evidence, not a silent side effect.
 param(
     [string]$ControlRepo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
     [string]$RuntimeRepo = (Join-Path $ControlRepo '.local\portfolio-runtime-writable'),
-    [string]$Ref = (git -C $ControlRepo rev-parse --abbrev-ref HEAD)
+    [string]$Ref = (git -C $ControlRepo rev-parse --abbrev-ref HEAD),
+    # Optional: a campaign manifest whose translator_repo_sha must track the
+    # repinned clone. verify_environment() hard-refuses on SHA drift, so a
+    # repin without this update just trades one preflight failure for
+    # another -- learned the hard way running TC-PORT-LLM-008 for real.
+    [string]$ManifestPath
 )
+
+function Sync-ManifestTranslatorSha([string]$Sha) {
+    if (-not $ManifestPath) { return }
+    $py = Join-Path $ControlRepo '.venv\Scripts\python.exe'
+    & $py -c @"
+import yaml
+path = r'$ManifestPath'
+d = yaml.safe_load(open(path, encoding='utf-8'))
+if d.get('translator_repo_sha') != '$Sha':
+    d['translator_repo_sha'] = '$Sha'
+    with open(path, 'w', encoding='utf-8') as f:
+        yaml.safe_dump(d, f, sort_keys=False, allow_unicode=True)
+    print(f'updated translator_repo_sha -> $Sha in {path}')
+else:
+    print(f'{path} translator_repo_sha already $Sha')
+"@
+}
 
 $ErrorActionPreference = 'Stop'
 
@@ -44,6 +66,7 @@ $controlHead = git -C $ControlRepo rev-parse $Ref
 
 if ($before -eq $controlHead) {
     Write-Output "Already current: $RuntimeRepo is at $before (matches $ControlRepo`:$Ref). Nothing to do."
+    Sync-ManifestTranslatorSha $before
     exit 0
 }
 
@@ -66,6 +89,8 @@ $stillDirty = git -C $RuntimeRepo status --porcelain
 if ($stillDirty) {
     throw "Repin left the runtime clone dirty -- refusing to declare success: `n$stillDirty"
 }
+
+Sync-ManifestTranslatorSha $after
 
 [pscustomobject]@{
     RuntimeRepo = $RuntimeRepo
