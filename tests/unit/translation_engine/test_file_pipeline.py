@@ -4,6 +4,7 @@ Tests retry loop, feedback guard, MT retry guard (TC-BUGFIX-B),
 correction pass, and TM buffer lifecycle.
 """
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -18,6 +19,7 @@ from src.translation_engine.file_pipeline import (
     FileTranslationPipeline,
     LanguageResult,
     LanguageTranslationContext,
+    _quarantine_diagnostic_candidate,
     verification_error_metadata,
 )
 
@@ -46,6 +48,83 @@ def test_verification_error_metadata_excludes_candidate_text():
         }
     ]
     assert "SECRET" not in repr(metadata)
+
+
+def test_quarantine_diagnostic_candidate_preserves_safe_details_only(tmp_path):
+    """A recovery-qualification rejection must record the actual similarity
+    score/threshold/exception type (so it can be told apart from an
+    encoder-unavailable false rejection) while never leaking candidate text
+    or arbitrary/unvetted detail keys into the quarantine metadata."""
+    quarantine_root = tmp_path / ".local" / "rating-cause-analysis-runs" / "probe"
+    engine = SimpleNamespace(diagnostic_quarantine_root=str(quarantine_root))
+
+    issue = SimpleNamespace(
+        validator="SemanticSimilarityValidator",
+        severity=SimpleNamespace(value="error"),
+        location="",
+        message="Semantic similarity 0.180 < 0.25 — translation meaning diverges significantly from source",
+        details={"similarity": 0.180, "threshold": 0.25, "unexpected_key": "SECRET CANDIDATE TEXT"},
+    )
+    validation_result = SimpleNamespace(issues=[issue])
+
+    _quarantine_diagnostic_candidate(
+        engine,
+        source_content="Source body text.",
+        candidate="SECRET CANDIDATE TEXT",
+        output_path=Path("index.it.md"),
+        target_lang="it",
+        retry_count=0,
+        error="write blocked",
+        validation_result=validation_result,
+        retry_feedback=None,
+    )
+
+    metadata_files = list(quarantine_root.glob("candidates/*/metadata.json"))
+    assert len(metadata_files) == 1
+    metadata = json.loads(metadata_files[0].read_text(encoding="utf-8"))
+
+    assert metadata["source_body_chars"] == len("Source body text.")
+    assert metadata["candidate_body_chars"] == len("SECRET CANDIDATE TEXT")
+    [recorded] = metadata["validator_details"]
+    assert recorded["validator"] == "SemanticSimilarityValidator"
+    assert recorded["details"] == {"similarity": 0.180, "threshold": 0.25}
+    assert "unexpected_key" not in recorded["details"]
+    assert "SECRET" not in repr(metadata)
+
+
+def test_quarantine_diagnostic_candidate_records_encoder_unavailable_with_no_score(tmp_path):
+    """The 'no encoder' rejection path carries no similarity value at all --
+    the quarantine record must show an empty details dict (not a fabricated
+    score), so it reads as distinguishable from a real low-similarity reject."""
+    quarantine_root = tmp_path / ".local" / "rating-cause-analysis-runs" / "probe"
+    engine = SimpleNamespace(diagnostic_quarantine_root=str(quarantine_root))
+
+    issue = SimpleNamespace(
+        validator="SemanticSimilarityValidator",
+        severity=SimpleNamespace(value="error"),
+        location="",
+        message="Validator unavailable (no sentence encoder available)",
+        details={},
+    )
+    validation_result = SimpleNamespace(issues=[issue])
+
+    _quarantine_diagnostic_candidate(
+        engine,
+        source_content="Source body text.",
+        candidate="Candidate body text.",
+        output_path=Path("index.it.md"),
+        target_lang="it",
+        retry_count=0,
+        error="write blocked",
+        validation_result=validation_result,
+        retry_feedback=None,
+    )
+
+    metadata_files = list(quarantine_root.glob("candidates/*/metadata.json"))
+    metadata = json.loads(metadata_files[0].read_text(encoding="utf-8"))
+    [recorded] = metadata["validator_details"]
+    assert recorded["message"] == "Validator unavailable (no sentence encoder available)"
+    assert recorded["details"] == {}
 
 
 def test_zero_defect_warning_block_preserves_verification_result_in_memory():

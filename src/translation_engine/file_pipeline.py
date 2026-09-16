@@ -61,19 +61,28 @@ def _quarantine_diagnostic_candidate(
     entry = root / "candidates" / candidate_hash
     entry.mkdir(parents=True, exist_ok=True)
     (entry / "candidate.md").write_text(candidate, encoding="utf-8")
+    # Privacy-safe diagnostic fields only: numeric/typed values that cannot carry
+    # translated text (a fixed validator message, a float score, a threshold, an
+    # exception class name). Never widen this to arbitrary `details` values --
+    # some validators could in principle put source/candidate fragments there.
+    _SAFE_DETAIL_KEYS = {"similarity", "threshold", "exception_type"}
     issues = []
     for issue in getattr(validation_result, "issues", []) or []:
         details = getattr(issue, "details", {}) or {}
+        safe_details = {k: details[k] for k in _SAFE_DETAIL_KEYS if k in details}
         issues.append({"validator": str(getattr(issue, "validator", "unknown")),
                        "severity": str(getattr(getattr(issue, "severity", None), "value", "")),
                        "location": str(getattr(issue, "location", "")),
-                       "detail_keys": sorted(str(key) for key in details)})
+                       "message": str(getattr(issue, "message", "")),
+                       "details": safe_details})
     metadata = {
         "source_sha256": hashlib.sha256(source_content.encode("utf-8")).hexdigest(),
         "candidate_sha256": candidate_hash, "output_path": str(output_path),
         "target_lang": target_lang, "attempt": retry_count + 1,
         "error_sha256": hashlib.sha256(str(error).encode("utf-8")).hexdigest(),
         "retry_feedback_sha256": hashlib.sha256((retry_feedback or "").encode("utf-8")).hexdigest(),
+        "source_body_chars": len(source_content),
+        "candidate_body_chars": len(candidate),
         "validator_details": issues,
     }
     (entry / "metadata.json").write_text(json.dumps(metadata, sort_keys=True, indent=2), encoding="utf-8")
