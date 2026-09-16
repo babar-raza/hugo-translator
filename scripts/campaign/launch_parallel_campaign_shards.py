@@ -512,6 +512,27 @@ def _run_wave(
                 exit_codes = [child.wait() for child in children]
                 break
             time.sleep(0.5)
+    except KeyboardInterrupt:
+        state = {
+            "status": "PAUSED_INTERRUPTED",
+            "reason": "controller_interrupt",
+            "accepted_current_run": line_count(receipt_path) - accepted_at_start,
+            "rejected_current_run": max(line_count(failure_path) - failed_at_start, 0),
+        }
+        if getattr(args, "watchdog_state", None):
+            args.watchdog_state.parent.mkdir(parents=True, exist_ok=True)
+            args.watchdog_state.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+        print("INTERRUPTED: terminating child workers", file=sys.stderr, flush=True)
+        for child in children:
+            if child.poll() is None:
+                child.terminate()
+        for child in children:
+            try:
+                child.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.wait(timeout=30)
+        return 2
     finally:
         for handle in handles:
             handle.close()
