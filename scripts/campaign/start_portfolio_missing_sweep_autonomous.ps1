@@ -68,6 +68,7 @@ function Write-Controller([string]$Message) {
 }
 function Test-CampaignLive {
     @(Get-CimInstance Win32_Process | Where-Object {
+        $_.Name -match '^python(?:\.exe)?$' -and
         $_.CommandLine -match 'launch_parallel_campaign_shards.py|run_gate5_batch.py' -and
         $_.ProcessId -ne $PID
     })
