@@ -174,6 +174,19 @@ def test_gate5_child_receives_the_ledger_root_the_parent_verifies(tmp_path):
     assert "--resume" in command
 
 
+def test_gate5_child_keeps_translator_repo_after_the_script_when_unbuffered(tmp_path):
+    manifest = _load(tmp_path)
+    shard = next(iter(manifest.shards(resume_receipts=set(), max_outputs=250)))
+    runtime = tmp_path / "runtime"
+
+    command = _child_command(
+        shards=[shard], translator_repo=runtime, **_kwargs(tmp_path, "gate5")
+    )
+
+    assert command[:3] == [command[0], "-u", "scripts/campaign/run_gate5_batch.py"]
+    assert command[command.index("--translator-repo") + 1] == str(runtime)
+
+
 def test_gate5_child_carries_campaign_tm_spool_and_api_concurrency_switch(tmp_path):
     manifest = _load(tmp_path)
     shard = next(iter(manifest.shards(resume_receipts=set(), max_outputs=250)))

@@ -341,7 +341,10 @@ def _child_command(
             str(memory_percent),
         ]
         if translator_repo is not None:
-            command[2:2] = ["--translator-repo", str(translator_repo)]
+            # Interpreter switches must precede the script; script arguments
+            # must follow it.  Inserting at index 2 became invalid once ``-u``
+            # was added (``python -u --translator-repo ... script``).
+            command[3:3] = ["--translator-repo", str(translator_repo)]
         if shard_list_path is not None:
             command += ["--shard-list", str(shard_list_path)]
         else:
