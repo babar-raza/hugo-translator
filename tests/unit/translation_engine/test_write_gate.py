@@ -66,6 +66,8 @@ class TestGateLanguageMismatch:
         r = gate.evaluate(_md(), "", "de", Path("test.md"))
         assert not r.passed
         assert "mismatch" in r.error.lower()
+        assert r.gate_results[2]["passed"] is False
+        assert r.gate_results[2]["action"] == "early_return"
 
     def test_pass_when_confidence_below_threshold(self):
         gate = _make_evaluator(detector=_make_detector("en", 0.60))
@@ -204,6 +206,39 @@ class TestGateOverwriteProtection:
 
         assert not r.passed
         assert r.retranslate_queued
+
+
+# ---------------------------------------------------------------------------
+# Gate 5: Soft contamination (TC-MLD-01)
+# ---------------------------------------------------------------------------
+
+
+class TestGateSoftContamination:
+    def test_zero_defect_failure_records_typed_gate_five(self):
+        gate = WriteGateEvaluator(
+            detector=_make_detector("it", 0.99),
+            similarity_tracker=None,
+            config=MagicMock(),
+            validation_policy="zero-defect",
+        )
+        gate._verify_final_file_purity = MagicMock(
+            return_value={
+                "passed": True,
+                "reason": "fixture",
+                "wrong_lang_percentage": 0.042,
+                "detected_languages": {"it": 0.958, "en": 0.042},
+            }
+        )
+
+        r = gate.evaluate(_md("Testo tradotto."), _md("Source."), "it", Path("test.md"))
+
+        assert r.passed is False
+        assert r.error == "Gate 5 soft contamination: 4.2% wrong-language paragraphs"
+        assert r.gate_results[5] == {
+            "passed": False,
+            "action": "block",
+            "error": r.error,
+        }
 
 
 # ---------------------------------------------------------------------------

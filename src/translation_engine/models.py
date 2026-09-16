@@ -93,6 +93,11 @@ class TranslationStats:
     ast_units_protected: int = 0  # TextUnits marked as do_not_translate
     ast_batch_calls: int = 0  # Number of batch translation calls
     ast_individual_fallbacks: int = 0  # Number of fallbacks to individual translation
+    # Provider calls made through the governed Professionalize backend.  This
+    # is deliberately distinct from ast_batch_calls: AST can use a local MT
+    # backend, while a Professionalize attempt can include context-aware
+    # single-unit calls as well as native list batches.
+    professionalize_calls: int = 0
     ast_missing_nodes: int = (
         0  # TC-MLD-01: AST nodes with no matching TextUnit (source-text leakage risk)
     )
@@ -214,6 +219,10 @@ class TranslationResult:
     # Metadata-only gate outcomes for rejected candidates. Error strings are
     # intentionally excluded because they may contain candidate fragments.
     rejection_gate_results: dict[int, dict[str, Any]] = field(default_factory=dict)
+    # Safe, stable diagnostic code for a final-byte acceptance failure that is
+    # not attributable to a numbered write gate.  This never contains
+    # candidate-derived content.
+    rejection_diagnostic_code: str = ""
     # Candidate hashes are transient, metadata-only diagnostics for retry
     # deduplication.  Candidate bytes never leave the file pipeline on a
     # rejected run.
@@ -313,7 +322,7 @@ class AcceptedTranslation:
                 "l1_hits": int(stats.l1_hits),
                 "l2_hits": int(stats.l2_hits),
                 "semantic_tm_hits": int(stats.l3_hits),
-                "professionalize_calls": int(stats.ast_batch_calls),
+                "professionalize_calls": int(stats.professionalize_calls),
                 "ast_batches": int(stats.ast_batch_calls),
                 "individual_fallback_batches": int(stats.ast_individual_fallbacks),
                 "validation_retries": int(stats.validation_retried),
@@ -375,6 +384,7 @@ class DirectoryResult:
             agg.ast_units_protected += result.stats.ast_units_protected
             agg.ast_batch_calls += result.stats.ast_batch_calls
             agg.ast_individual_fallbacks += result.stats.ast_individual_fallbacks
+            agg.professionalize_calls += result.stats.professionalize_calls
             agg.ast_missing_nodes += result.stats.ast_missing_nodes
             agg.llm_units_translated += result.stats.llm_units_translated
 

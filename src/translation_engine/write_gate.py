@@ -719,6 +719,23 @@ class WriteGateEvaluator:
         result = WriteGateResult(passed=True)
         detector = self._detector
 
+        def _record_early_failure(gate_id: int) -> bool:
+            """Attach the typed gate verdict before an early return.
+
+            Gates 2-8 historically returned only ``result.error`` on failure;
+            the campaign runner consequently persisted ``gate=pipeline`` even
+            when the in-memory error named the exact gate. Keep candidate text
+            out of ledgers while preserving the safe numeric gate id.
+            """
+            if result.passed:
+                return False
+            result.gate_results[gate_id] = {
+                "passed": False,
+                "action": "block" if gate_id == 5 else "early_return",
+                "error": result.error,
+            }
+            return True
+
         if detector is None:
             if self._zero_defect:
                 result.passed = False
@@ -764,7 +781,7 @@ class WriteGateEvaluator:
 
         # Gate 2: Language detection mismatch (B-7.1)
         self._gate_language_mismatch(_detection_text, target_lang, output_path, detector, result)
-        if not result.passed:
+        if _record_early_failure(2):
             return result
 
         # Gate 3: Overwrite protection (B-7.4, 4 CASEs)
@@ -777,33 +794,35 @@ class WriteGateEvaluator:
             force_overwrite=force_overwrite,
             site_profile=site_profile,
         )
-        if not result.passed:
+        if _record_early_failure(3):
             return result
 
         # Gate 4: Final file purity (B-7.5)
         self._gate_file_purity(translated_content, target_lang, output_path, detector, result)
-        if not result.passed:
+        if _record_early_failure(4):
             return result
 
         # Gate 5: Soft contamination queue (TC-MLD-01) — does NOT block
         self._gate_soft_contamination(target_lang, output_path, result)
-        if not result.passed:
+        if _record_early_failure(5):
             return result
 
         # Gate 6: Code block count
         self._gate_code_block(source_content, translated_content, output_path, result)
-        if not result.passed:
+        if _record_early_failure(6):
             return result
 
         # Gate 7: Heading surplus / TITLE hallucination
         self._gate_heading_surplus(source_content, translated_content, output_path, result)
-        if not result.passed:
+        if _record_early_failure(7):
             return result
 
         # Gate 8: YAML frontmatter structural (RC-5/RC-6)
         self._gate_yaml_frontmatter(
             translated_content, output_path, target_lang, source_doc, result
         )
+        if _record_early_failure(8):
+            return result
 
         # ------------------------------------------------------------------
         # Gates 9+: Content quality gates — run UNCONDITIONALLY regardless

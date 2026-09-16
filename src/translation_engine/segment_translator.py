@@ -2253,6 +2253,8 @@ class SegmentTranslator:
                                         file_context=_file_ctx,
                                         retry_feedback=retry_feedback,
                                     )
+                                    if _llm_model_id == "professionalize_llm":
+                                        stats.professionalize_calls += 1
                                     if _llm_result and _llm_result[0]:
                                         _llm_unit.translated_text = _llm_result[0]
                                         # TC-HT-003: tag units the LLM backend
@@ -2340,6 +2342,8 @@ class SegmentTranslator:
                                 site_profile.default_source_lang,
                                 target_lang,
                             )
+                        if _field_model_id == "professionalize_llm":
+                            stats.professionalize_calls += 1
                         if _result and _result[0]:
                             _unit.translated_text = _restore_required_seo_separator(
                                 str(_field), str(_original), _result[0]
@@ -2364,8 +2368,11 @@ class SegmentTranslator:
                 f"AST Translation: Translating {len(units_needing_translation)} new units via MT (batch_size: {batch_size}, reused: {reused_count})"
             )
 
-            batch_calls_before = getattr(extractor, "_batch_calls", 0)
-            fallbacks_before = getattr(extractor, "_individual_fallbacks", 0)
+            # TextUnitExtractor records counters in batch_stats.  The former
+            # private attributes never existed, which made every receipt say
+            # ast_batches=0 even when the AST batch path was used.
+            batch_calls_before = int(extractor.batch_stats.get("total_outer_batches", 0))
+            fallbacks_before = int(extractor.batch_stats.get("individual_translations", 0))
 
             translated_units = extractor.batch_translate_units(
                 plan.units,
@@ -2614,11 +2621,16 @@ class SegmentTranslator:
                     retry_feedback="All translated segments with substantial source text must return non-empty output.",
                 )
 
-            stats.ast_batch_calls = batch_calls_before - batch_calls_before  # intentional reset
-            stats.ast_batch_calls = getattr(extractor, "_batch_calls", 0) - batch_calls_before
-            stats.ast_individual_fallbacks = (
-                getattr(extractor, "_individual_fallbacks", 0) - fallbacks_before
+            stats.ast_batch_calls = (
+                int(extractor.batch_stats.get("total_outer_batches", 0)) - batch_calls_before
             )
+            stats.ast_individual_fallbacks = (
+                int(extractor.batch_stats.get("individual_translations", 0)) - fallbacks_before
+            )
+            if model_id == "professionalize_llm":
+                # Native list batching maps one outer AST batch to one provider
+                # request.  Context-aware single-unit calls are counted above.
+                stats.professionalize_calls += stats.ast_batch_calls
 
             # Step 3: Apply translations to AST and frontmatter
             logger.info("AST Translation: Applying translations to AST and frontmatter")

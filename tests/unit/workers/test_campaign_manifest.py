@@ -2225,6 +2225,35 @@ def test_failure_metadata_promotes_rejected_write_gate_without_error_text():
     assert "SECRET" not in reason
 
 
+def test_gate_five_retry_feedback_requires_translated_markdown_labels():
+    result = SimpleNamespace(
+        validation_result=None,
+        verification_result=None,
+        error="GATE5: rejected candidate",
+    )
+
+    feedback = CampaignRunner._retry_feedback(result, "it")
+
+    assert "Markdown link labels" in feedback
+    assert "Italian (it)" in feedback
+    assert "Preserve URLs" in feedback
+
+
+def test_failure_metadata_preserves_final_acceptance_diagnostic_code():
+    result = SimpleNamespace(
+        validation_result=None,
+        verification_result=None,
+        rejection_gate_results={},
+        rejection_diagnostic_code="TC-ACCEPTANCE-RECEIPT",
+        error="candidate lacks an all-pass 43-gate write receipt",
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "TC-ACCEPTANCE-RECEIPT"
+    assert "codes=TC-ACCEPTANCE-RECEIPT" in reason
+
+
 def test_failure_metadata_preserves_only_safe_sas_unit_fingerprints():
     result = SimpleNamespace(
         errors=[],

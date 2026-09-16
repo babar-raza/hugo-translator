@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from copy import deepcopy
 from dataclasses import dataclass
@@ -928,6 +929,23 @@ class FileTranslationPipeline:
                     except Exception as acceptance_error:
                         validation_passed = False
                         validation_error = str(acceptance_error)
+                        # ``accept_candidate_bytes`` deliberately returns
+                        # payload-free errors.  Retain its safe classification
+                        # for the campaign watchdog; otherwise a final-byte
+                        # rejection is misreported as generic ``pipeline``.
+                        _failed_gates = re.search(
+                            r"\bfailed_gates=([0-9,]+)", validation_error
+                        )
+                        if _failed_gates:
+                            result.rejection_gate_results = {
+                                int(gate_id): {"passed": False, "action": "acceptance_block"}
+                                for gate_id in _failed_gates.group(1).split(",")
+                                if gate_id
+                            }
+                        elif "all-pass 43-gate write receipt" in validation_error:
+                            result.rejection_diagnostic_code = "TC-ACCEPTANCE-RECEIPT"
+                        else:
+                            result.rejection_diagnostic_code = "TC-ACCEPTANCE-ERROR"
                 else:
                     _accepted_candidate = None
 

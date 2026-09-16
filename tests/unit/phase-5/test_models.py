@@ -5,6 +5,7 @@ Unit tests for translation engine result models.
 from pathlib import Path
 
 from src.translation_engine.models import (
+    AcceptedTranslation,
     DirectoryResult,
     TranslationResult,
     TranslationStats,
@@ -58,6 +59,23 @@ class TestTranslationStats:
         assert stats.l1_hits == 50
         assert stats.l2_hits == 20
         assert stats.l3_hits == 10
+
+    def test_receipt_keeps_ast_and_professionalize_counters_distinct(self):
+        accepted = AcceptedTranslation(
+            source_path=Path("content/en/example.md"),
+            output_path=Path("content/fr/example.md"),
+            content=b"translated",
+            source_sha256="source",
+            output_sha256="output",
+            target_lang="fr",
+            validation_policy="zero-defect",
+            gate_results={"gate": {"passed": True}},
+        )
+        receipt = accepted.receipt(
+            TranslationStats(ast_batch_calls=3, professionalize_calls=5)
+        )
+        assert receipt["translation_stats"]["ast_batches"] == 3
+        assert receipt["translation_stats"]["professionalize_calls"] == 5
 
 
 class TestTranslationResult:

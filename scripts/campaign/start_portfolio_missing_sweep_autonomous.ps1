@@ -10,6 +10,25 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# The unattended Windows host must not be cancelled by synthetic CTRL+C events
+# emitted when a short-lived console/process shim closes. Passing a null
+# handler with Add=true enables the documented per-process ignore flag, which
+# is inherited by launcher/worker children. Watchdog pauses and taskkill /T /F
+# remain authoritative governed shutdown paths.
+if ($env:OS -eq 'Windows_NT') {
+    # Reuse the framework's existing P/Invoke rather than compiling Add-Type
+    # source at runtime (production temp-directory policy can block csc files).
+    $native = [string].Assembly.GetType('Microsoft.Win32.Win32Native')
+    $setHandler = $native.GetMethod(
+        'SetConsoleCtrlHandler',
+        [Reflection.BindingFlags]'Static,NonPublic'
+    )
+    if (-not $setHandler -or -not $setHandler.Invoke($null, @($null, $true))) {
+        throw 'Could not install the unattended Windows console-control guard.'
+    }
+}
+
 $RuntimeRepo = (Resolve-Path $RuntimeRepo).Path
 $ControlRepo = (Resolve-Path $ControlRepo).Path
 $py = Join-Path $ControlRepo '.venv\Scripts\python.exe'
@@ -61,9 +80,42 @@ function Show-Progress {
     $progress = & $py "$ControlRepo\scripts\campaign\campaign_progress.py" --manifest $manifest --ledger-root $ledger --spool $spool
     Write-Controller "progress $progress"
 }
+function Get-SpoolState {
+    Set-Location $RuntimeRepo
+    $json = & $py -c "from pathlib import Path; from src.tm.intent_spool import TMIntentSpool; import json; print(json.dumps(TMIntentSpool(Path(r'$spool')).stats()))"
+    if ($LASTEXITCODE -ne 0) { throw 'Could not inspect TM intent spool.' }
+    return ($json | ConvertFrom-Json)
+}
+function Invoke-PreWaveSpoolDrain {
+    $state = Get-SpoolState
+    Write-Controller "tm_spool_pre_wave_before $($state | ConvertTo-Json -Compress)"
+    if ([int]$state.CLAIMED -gt 0) {
+        throw "TM spool has $($state.CLAIMED) active claim(s); refusing to race another writer or wait indefinitely."
+    }
+    while ([int]$state.PENDING -gt 0) {
+        $pendingBefore = [int]$state.PENDING
+        Set-Location $RuntimeRepo
+        & $py -m src.workers.tm_intent_writer --repository-root $RuntimeRepo --spool-path $spool --no-l3 --limit 500 --owner "$campaign-autonomous-predrain"
+        if ($LASTEXITCODE -ne 0) { throw 'TM writer failed during mandatory pre-wave drain.' }
+        $state = Get-SpoolState
+        Write-Controller "tm_spool_pre_wave_progress $($state | ConvertTo-Json -Compress)"
+        if ([int]$state.CLAIMED -gt 0 -or [int]$state.PENDING -ge $pendingBefore) {
+            throw "TM pre-wave drain made no safe progress (PENDING=$($state.PENDING), CLAIMED=$($state.CLAIMED))."
+        }
+    }
+    if ([int]$state.PENDING -ne 0 -or [int]$state.CLAIMED -ne 0) {
+        throw "TM spool is not drained (PENDING=$($state.PENDING), CLAIMED=$($state.CLAIMED))."
+    }
+    Write-Controller "tm_spool_pre_wave_ready $($state | ConvertTo-Json -Compress)"
+}
 
 if (-not (Test-Path $py)) { throw "Python interpreter missing: $py" }
 if (Test-CampaignLive) { throw 'A campaign process is already live; refusing a second launcher.' }
+
+# Translation waves only read/enqueue TM intents.  Drain all prior intents
+# through the single writer before workers start so every wave sees the latest
+# exact TM state and a crashed writer cannot be hidden by fresh work.
+Invoke-PreWaveSpoolDrain
 
 # A config-policy advance invalidates old acceptance decisions. Preserve the
 # metadata evidence, demote those receipts, and declare their current files as
@@ -96,23 +148,49 @@ if ($ShardList) {
     $resolvedShardList = (Resolve-Path $ShardList).Path
     $args += @('--shard-list', $resolvedShardList)
 }
-# Keep the Python launcher attached to this persistent PowerShell host.  A
-# hidden detached console delivered CTRL_CLOSE_EVENT to the Intel/Fortran
-# runtime before child startup (forrtl error 200), leaving no child logs.
-# The controller is intentionally run in a dedicated foreground PowerShell
-# window; it may be minimized, but must remain open for unattended operation.
-$launcher = Start-Process -FilePath $py -WorkingDirectory $ControlRepo -ArgumentList $args -NoNewWindow -RedirectStandardOutput $launcherLog -RedirectStandardError $launcherErr -PassThru
+# A prior terminal watchdog record must not masquerade as the state of this
+# controller run.  Preserve it as evidence, then publish the new run identity
+# before the launcher starts.  The launcher atomically replaces this state if
+# its acceptance watchdog pauses the wave.
+if (Test-Path $WatchdogState) {
+    $archive = "$WatchdogState.previous-$(Get-Date -Format 'yyyyMMddTHHmmssfff').json"
+    Move-Item -LiteralPath $WatchdogState -Destination $archive
+}
+@{
+    status = 'RUNNING'
+    reason = $null
+    session_id = $SessionId
+    started_at = (Get-Date -Format o)
+    accepted_current_run = 0
+    rejected_current_run = 0
+} | ConvertTo-Json | Set-Content -LiteralPath $WatchdogState -Encoding UTF8
+# Give the launcher a separate, persistent console/process group. Sharing the
+# controller console via -NoNewWindow let short-lived progress probes deliver
+# a Windows control event to the launcher and all workers. A fully hidden,
+# detached process previously triggered the Intel/Fortran runtime, so use a
+# real minimized console owned by the persistent controller instead.
+$launcher = Start-Process -FilePath $py -WorkingDirectory $ControlRepo -ArgumentList $args -WindowStyle Minimized -RedirectStandardOutput $launcherLog -RedirectStandardError $launcherErr -PassThru
 try {
-    while (-not $launcher.HasExited) {
-        if (-not (Invoke-Reconcile)) {
-            & "$env:SystemRoot\System32\taskkill.exe" /PID $launcher.Id /T /F | Out-Null
-            throw 'Receipt-to-commit reconciliation failed; launcher stopped with receipts preserved.'
-        }
+    while ($true) {
+        $launcher.Refresh()
+        $liveFamily = @(Test-CampaignLive)
+        if ($launcher.HasExited -and $liveFamily.Count -eq 0) { break }
+        # Do not reconcile commits while worker children are writing campaign
+        # receipts/failures. Both operations serialize through the campaign
+        # ledger lock; racing them caused a reconciliation failure followed by
+        # an avoidable launcher-tree kill. The bounded wave is reconciled once,
+        # immediately after every child exits and its receipts are frozen.
         Show-Progress
         Start-Sleep -Seconds 30
-        $launcher.Refresh()
     }
-    if ($launcher.ExitCode -ne 0) { throw "Campaign launcher exited $($launcher.ExitCode). See $launcherErr" }
+    # The Windows venv executable can be a short-lived shim whose process exit
+    # precedes the real interpreter.  The family wait above is authoritative;
+    # the shim's exit code is useful only when non-zero.
+    if ($launcher.ExitCode -ne 0) { throw "Campaign launcher shim exited $($launcher.ExitCode). See $launcherErr" }
+    $watchdog = Get-Content -LiteralPath $WatchdogState -Raw | ConvertFrom-Json
+    if ($watchdog.status -ne 'RUNNING') {
+        throw "Campaign launcher stopped under watchdog state $($watchdog.status): $($watchdog.reason)"
+    }
     if (-not (Invoke-Reconcile)) { throw 'Final receipt-to-commit reconciliation failed.' }
     do {
         Set-Location $RuntimeRepo

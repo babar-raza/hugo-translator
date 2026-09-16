@@ -1342,6 +1342,9 @@ class CampaignRunner:
             if not bool(gate_result.get("passed", False))
         )
         safe_codes = sorted({*safe_codes, *(f"GATE{gate_id}" for gate_id in failed_gate_ids)})
+        diagnostic_code = str(getattr(result, "rejection_diagnostic_code", "") or "")
+        if diagnostic_code:
+            safe_codes = sorted({*safe_codes, diagnostic_code})
         exception_classes = sorted(
             set(
                 re.findall(
@@ -1921,6 +1924,18 @@ class CampaignRunner:
                 "Avoid adding repeated phrases or duplicate sentences beyond the source structure."
             )
         raw_error = str(getattr(result, "error", "") or "")
+        if "GATE5" in raw_error:
+            # Gate 5 is the file-level language-purity backstop. Its metadata
+            # intentionally contains no candidate prose, so retry feedback
+            # must be source/structure based: URLs and identifiers stay
+            # verbatim, while labels and ordinary prose must be regenerated.
+            instructions.append(
+                "Perform a final language-purity pass over every ordinary-prose segment, "
+                "especially Markdown link labels and headings. Preserve URLs, product names, "
+                "API identifiers, code, versions, and placeholders exactly, but translate every "
+                f"ordinary label/prose word into {locale_label}; do not leave or generate English "
+                "link-label prose."
+            )
         if "GATE36" in raw_error:
             instructions.append(
                 "Preserve every source claim and section with no omission, reversal, or invented fact."
