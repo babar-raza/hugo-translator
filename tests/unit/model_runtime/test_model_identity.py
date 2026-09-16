@@ -191,3 +191,40 @@ def test_false_positive_calibration_is_measured_not_assumed():
     assert stable["distinct_outputs"] == 1 and stable["false_positive_rate_estimate"] == 0.0
     noisy = mi.calibrate_false_positive_rate(FakeProvider(mi.CANARY_USER, vary=True), "m", n=9)
     assert noisy["distinct_outputs"] == 3 and noisy["false_positive_rate_estimate"] > 0.5
+
+
+def test_concurrent_drift_log_access_does_not_race(identity_dir):
+    """TC-PORT-LLM-013: a real 4-worker soak hit
+    "PermissionError: [Errno 13] Permission denied:
+    '...professionalize_llm_drift_log.jsonl'" -- should_check -> last_check
+    reading this shared file while another worker's check_identity ->
+    _append was writing it. Every worker calls should_check/check_identity
+    at startup, so this races for real under concurrency, not just in
+    theory. Threads share this test process's FileLock the same way
+    separate worker processes would share the OS-level lock, so this proves
+    the fix serializes access instead of racing it.
+    """
+    import concurrent.futures
+
+    model_id = "professionalize_llm"
+    provider = FakeProvider(mi.CANARY_USER)
+    mi.write_baseline(model_id, mi.probe(provider, model_id), identity_dir=identity_dir)
+
+    errors: list[BaseException] = []
+
+    def _worker(_n: int) -> None:
+        try:
+            if mi.should_check(model_id, interval_hours=0, identity_dir=identity_dir):
+                mi.check_identity(provider, model_id, identity_dir=identity_dir)
+            mi.last_check(model_id, identity_dir=identity_dir)
+        except BaseException as exc:  # noqa: BLE001 -- must see every failure, not just some
+            errors.append(exc)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(_worker, range(40)))
+
+    assert not errors, f"concurrent access raised: {errors}"
+    log_path = mi.drift_log_path(model_id, identity_dir)
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    for line in lines:
+        json.loads(line)  # every row is well-formed -- no interleaved partial writes

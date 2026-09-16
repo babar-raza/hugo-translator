@@ -30,6 +30,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from src.utils.file_lock import FileLock
+
 DEFAULT_IDENTITY_DIR = Path("data/runtime/llm_identity")
 #: Fixed canary (must never change: the baseline hash is only comparable to itself).
 CANARY_SYSTEM = (
@@ -82,10 +84,23 @@ def review_items_path(identity_dir: Path = DEFAULT_IDENTITY_DIR) -> Path:
     return identity_dir / "review_items.jsonl"
 
 
+def _lock_path(path: Path) -> Path:
+    return path.with_suffix(path.suffix + ".lock")
+
+
 def _append(path: Path, row: dict[str, Any]) -> None:
+    # TC-PORT-LLM-013: professionalize_llm_drift_log.jsonl is shared across every
+    # concurrent campaign worker (each calls should_check/check_identity at
+    # startup). Confirmed live: a real 4-worker soak hit
+    # "PermissionError: [Errno 13] Permission denied:
+    # 'data\\runtime\\llm_identity\\professionalize_llm_drift_log.jsonl'" on
+    # last_check's read, racing another worker's concurrent append. Same lock
+    # pattern already used for this exact class of problem elsewhere in this
+    # codebase (src/workers/work_claims.py, CampaignLedger).
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(row, default=str) + "\n")
+    with FileLock(_lock_path(path), timeout=10.0):
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(row, default=str) + "\n")
 
 
 # --------------------------------------------------------------------------- probing
@@ -293,7 +308,10 @@ def last_check(model_id: str, identity_dir: Path = DEFAULT_IDENTITY_DIR) -> dict
     path = drift_log_path(model_id, identity_dir)
     if not path.is_file():
         return None
-    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    # Same lock as _append (TC-PORT-LLM-013): a read racing a concurrent
+    # worker's append is exactly what produced the observed PermissionError.
+    with FileLock(_lock_path(path), timeout=10.0):
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     return json.loads(lines[-1]) if lines else None
 
 

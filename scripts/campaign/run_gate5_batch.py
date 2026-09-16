@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 # Keeps the ctypes callback objects alive for the life of the process --
@@ -73,6 +74,33 @@ def _install_console_control_handler() -> None:
         raise OSError(
             "SetConsoleCtrlHandler installation failed: " + str(ctypes.WinError())
         )
+
+
+def _read_text_with_retry(path: Path, *, attempts: int = 6, initial_delay: float = 0.2) -> str:
+    """TC-PORT-LLM-013: a real 4-worker soak hit
+    "PermissionError: [Errno 13] Permission denied:
+    'logs\\...campaign..._child0.shards.txt'" reading this process's OWN
+    just-written, single-owner shard-list file -- not a cross-worker race
+    (each child has a distinct path), so a FileLock would not help.  The
+    repo lives under OneDrive, whose sync client is documented to briefly
+    hold a sharing lock on a just-created/modified file; that transient
+    window is exactly what a short bounded retry absorbs.  Re-raises the
+    original error if it is still failing after all attempts, so a genuine,
+    persistent permission problem is never silently swallowed.
+    """
+    delay = initial_delay
+    last_error: OSError | None = None
+    for attempt in range(attempts):
+        try:
+            return path.read_text(encoding="utf-8")
+        except PermissionError as exc:
+            last_error = exc
+            if attempt == attempts - 1:
+                break
+            time.sleep(delay)
+            delay *= 2
+    assert last_error is not None
+    raise last_error
 
 
 def build_real_engine(
@@ -281,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.shard_list:
         listed_shards = [
             line.strip()
-            for line in args.shard_list.read_text(encoding="utf-8").splitlines()
+            for line in _read_text_with_retry(args.shard_list).splitlines()
             if line.strip()
         ]
         if not listed_shards:
