@@ -34,23 +34,40 @@ function Get-CampaignLiveProcesses {
     param(
         [string]$CampaignId
     )
+    # TC-PORT-LLM-014 follow-up: this originally matched only the terminal
+    # python.exe launcher/worker, blind to the run_portfolio_sweep_task.ps1
+    # -> start_portfolio_missing_sweep_autonomous.ps1 PowerShell wrapper
+    # chain that starts before any python process exists (preflight,
+    # TM-spool drain, up to a 30-minute preflight-retry loop). Confirmed
+    # live: the watchdog's own relaunch decision reads this function, saw
+    # zero matches while a wrapper was still legitimately starting up, and
+    # launched a SECOND, duplicate wrapper racing the first for the same
+    # family claim and parallel-launcher.lock -- exactly the double-launch
+    # class of bug this whole module exists to prevent. Both process
+    # families must count as "live."
+    $pattern = 'launch_parallel_campaign_shards\.py|run_gate5_batch\.py|run_portfolio_sweep_task\.ps1|start_portfolio_missing_sweep_autonomous\.ps1|run_portfolio_qualification_task\.ps1'
     $now = Get-Date
     $matches = @(Get-CimInstance Win32_Process | Where-Object {
-        $_.Name -match '^python(?:\.exe)?$' -and
-        $_.CommandLine -match 'launch_parallel_campaign_shards\.py|run_gate5_batch\.py' -and
+        $_.Name -match '^(python|powershell)(?:\.exe)?$' -and
+        $_.CommandLine -match $pattern -and
         $_.ProcessId -ne $PID -and
         (-not $CampaignId -or $_.CommandLine -match [regex]::Escape($CampaignId))
     })
     foreach ($proc in $matches) {
         $created = $proc.CreationDate
         $ageMinutes = if ($created) { [math]::Round((New-TimeSpan -Start $created -End $now).TotalMinutes, 1) } else { $null }
+        $role = switch -Regex ($proc.CommandLine) {
+            'launch_parallel_campaign_shards\.py' { 'launcher'; break }
+            'run_gate5_batch\.py'                 { 'worker'; break }
+            default                               { 'wrapper' }
+        }
         [pscustomobject]@{
             ProcessId       = $proc.ProcessId
             ParentProcessId = $proc.ParentProcessId
             CommandLine     = $proc.CommandLine
             CreationDate    = $created
             AgeMinutes      = $ageMinutes
-            Role            = if ($proc.CommandLine -match 'launch_parallel_campaign_shards\.py') { 'launcher' } else { 'worker' }
+            Role            = $role
         }
     }
 }
