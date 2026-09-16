@@ -1,0 +1,49 @@
+{
+  "run_id": "throughput-breach-strategy-20260916",
+  "step": "runbook-SS2-item-0",
+  "opened_ops_queue_row": "2026-09-14T15:03:33.4550782+05:00",
+  "goal": "Restore mission throughput (cells_24h floor 25; observed 0, below floor >=6.1h) by resolving why the automated portfolio-missing-sweep-llm-only-20260914 recovery loop has made zero forward progress since 2026-09-14 despite dozens of relaunches.",
+  "assumptions": [
+    {
+      "assumption": "The 3 quarantined blog.aspose.org/font/python Italian cells are being correctly rejected for genuine semantic-drift content quality.",
+      "status": "FALSE",
+      "evidence": "Offline reproduction of the exact production validation path (HugoParser -> ASTRenderer.render_to_markdown(doc.ast) for source, frontmatter-stripped candidate body, configured encoder sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2, configured thresholds warn=0.45/error=0.25 from config/validation.yaml) against the quarantined brotli-font-compression-python/index.it.md candidate (.local/rating-cause-analysis-runs/portfolio-missing-sweep-llm-only-20260914/20260916T1148-gate5-it) scored cosine similarity 0.9598 -- far above the accept threshold. heal_queue.jsonl's own fingerprints for every one of these tickets read verdict=unknown;score=unknown;...numeric=none, meaning no run has ever actually recorded a failing similarity number for this defect class -- consistent with a measurement/attribution gap, not a real low score."
+    },
+    {
+      "assumption": "The repeated relaunches (qualification-task.log, claims.jsonl 'K-launcher fan-out' churn since 2026-09-14T16:22, continuing through this session) are converging on a fix.",
+      "status": "FALSE",
+      "evidence": "reports/campaigns/portfolio-missing-sweep-llm-only-20260914/runtime/{qualification-task.log,launcher.err.log} show the harness's own internal watchdog correctly detecting 'three_consecutive_identical_root_cause' and terminating children (a working safety control), but the OUTER scheduler (HugoTranslator-PortfolioQualification, LastTaskResult=1, and/or peer agent sessions per claims.jsonl's distinct session_id GUIDs claiming+releasing family:portfolio-missing-sweep-llm-only-20260914 every few minutes) treats that deliberate pause as a bare failure and relaunches unconditionally, with no code change between attempts. This iteration reproduced the identical outcome in ~5 minutes (accepted/committed counters unchanged, +2 failures, same pause) -- confirming a pure retry loop, not convergence."
+    },
+    {
+      "assumption": "No content or commits are being written by the paused recovery probes.",
+      "status": "VERIFIED",
+      "evidence": "D:/onedrive/Documents/GitHub/aspose.org git log's newest commit (81f09e7c, 2026-09-15T19:49:12+05:00) predates this iteration's reproduction run (2026-09-16T19:49-19:54) by ~24h; no new commit or tracked write was produced by the run."
+    },
+    {
+      "assumption": "There is no real, narrow, fixable defect underlying these 3 files -- only a threshold-calibration question.",
+      "status": "FALSE",
+      "evidence": "logs/portfolio-missing-sweep-llm-only-20260914_child0.log (this iteration's run) shows a genuine content-generation defect: 'Empty translations detected for 1 units. Samples: [\"body.blockquote[0].paragraph[0].text[1]\"]' immediately followed by 'retranslate_queue: max retries (3) exceeded for index.it.md -- moving to quarantine'. professionalize_llm is returning an empty string for a specific blockquote text-run unit on at least one of these files -- a narrow, reproducible defect distinct from semantic-similarity threshold miscalibration, and distinct from the offline-scored candidate (which did not exhibit it on that particular attempt)."
+    }
+  ],
+  "approaches_considered": [
+    {
+      "approach": "Lower or bypass SemanticSimilarityValidator thresholds for it/blog.aspose.org/font-python.",
+      "chosen": false,
+      "reason_rejected": "Evidence shows the validator is not the actual root cause for the candidate tested (0.96, well above threshold); loosening it would not fix the empty-unit defect and would weaken a control that is otherwise working (per the 2026-09-06 comment history in config/global.yaml warning explicitly against substituting a non-cross-lingual encoder)."
+    },
+    {
+      "approach": "This step is unnecessary -- just keep relaunching / let the operator's scheduled task keep trying.",
+      "chosen": false,
+      "reason_rejected": "loop-prompt.md's WORK CLAIMS section: documenting/repeating a recurring, multiply-evidenced defect without ever fixing the producer-side cause is explicitly the failure pattern the RECURRENCE ESCALATION rule exists to close; 42+ hours and dozens of relaunches (evidence dirs recovery-qualification-20260915T1758 through T1945, prewrite-diagnostic1-5, this session's 20260916T1148-gate5-it, and this iteration's own run) have produced zero accepted cells."
+    },
+    {
+      "approach": "Fix the diagnostic blind spot (quarantine metadata was discarding the real similarity score/threshold/exception type, recording only key names) so the next rejection is self-diagnosing, then target the actual empty-translation-unit defect.",
+      "chosen": true,
+      "reason": "Directly closes the measurement gap that has caused every prior session (including this one, initially) to re-litigate the same 'is this a real semantic failure?' question from scratch. Implemented in src/translation_engine/file_pipeline.py::_quarantine_diagnostic_candidate (commit ce7bcb69) with two new regression tests (tests/unit/translation_engine/test_file_pipeline.py) proving both that real values are now captured AND that candidate text / unvetted detail keys still never leak."
+    }
+  ],
+  "falsifiable_expected_outcome": "The next live rejection of one of these 3 files (or any SemanticSimilarityValidator reject in this campaign) will produce a .local/rating-cause-analysis-runs candidate metadata.json whose validator_details[].details is either a real {similarity, threshold} pair or empty with a message reading 'Validator unavailable (...)' -- resolving the ambiguity from evidence instead of re-guessing. If a future capture still shows details:{} with no distinguishing message, the fix itself has a gap and must be re-examined.",
+  "regression_control": "tests/unit/translation_engine/test_file_pipeline.py::test_quarantine_diagnostic_candidate_preserves_safe_details_only and ::test_quarantine_diagnostic_candidate_records_encoder_unavailable_with_no_score (both passing, full file_pipeline suite 22/22 passing).",
+  "known_gap_not_fixed_this_iteration": "The qualification harness actually executes from .local/portfolio-runtime-writable (a separate git clone pinned to a specific SHA, tracking an intermediate repo at C:\\Windows\\Temp\\hugo-translator-portfolio-autonomous, not this working tree directly) and is still pinned at commit 939b002d -- it does not yet have this fix (ce7bcb69). Propagating it requires whatever governed sync/repin process manages that clone (manifest translator_repo_sha + require_clean=True gate); doing that ad hoc from this session risked breaking an in-flight qualification-harness invariant this iteration did not have full visibility into, so it is left for the next agent/operator rather than forced.",
+  "next_action_for_future_agent": "1) Repin/sync .local/portfolio-runtime-writable to >= ce7bcb69 through the established mechanism. 2) Re-run the 3-file no-write shard once. 3) Read the new candidate metadata.json's validator_details -- if it shows a real low similarity score, treat as genuine content defect and investigate the encoder/text further; if it shows 'Validator unavailable', root-cause the encoder wiring (src/translation_engine/engine_builder.py::_init_tm_wiring, currently a silently-swallowed except at DEBUG level) in that harness's process. 4) Separately: root-cause the professionalize_llm empty-output defect for blockquote text-run units (segment_translator.py / text_unit_extractor.py handling of body.blockquote[N].paragraph[N].text[N] addressing) -- this is real and independent of the validator question."
+}
