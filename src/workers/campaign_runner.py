@@ -24,7 +24,7 @@ from src.model_runtime.campaign_llm_policy import campaign_llm_scope
 from src.tm.rejected_task_queue import RejectedTaskQueue
 from src.tm.retry_records import RejectedTranslationTask
 from src.utils.atomic_write import atomic_write
-from src.utils.file_lock import FileLock
+from src.utils.file_lock import FileLock, LockError
 from src.workers.content_commit_title import content_commit_title
 from src.workers.git_provenance import (
     GovernedProvenanceError,
@@ -2866,7 +2866,26 @@ class CampaignRunner:
             "note": note,
         }
         heal_queue_path = self.ledger.root.parent / "heal_queue.jsonl"
-        self.ledger._append(heal_queue_path, ticket)
+        # TC-PORT-LLM-009: a heal ticket is best-effort observability, not a
+        # correctness-critical write -- confirmed live under a real 4-worker
+        # soak: enough jobs hit the QU-02/QU-38 quarantine-refresh branches in
+        # the same burst (heavily-contaminated candidate pool) that one
+        # thread's FileLock(ledger-process.lock, timeout=30) exceeded 30s,
+        # raised LockError, and (uncaught) crashed the ENTIRE worker process
+        # via the ThreadPoolExecutor future -- losing every other job still
+        # in flight on the other 3 threads, not just this one ticket write.
+        # Losing one ticket write is recoverable (the next attempt on this
+        # cell regenerates it); losing a whole worker's in-flight batch is
+        # not. Log loudly, never let this crash the process.
+        try:
+            self.ledger._append(heal_queue_path, ticket)
+        except LockError as exc:
+            logger.error(
+                "Heal ticket write timed out under lock contention (ticket %s dropped, "
+                "not fatal): %s",
+                ticket["ticket_id"],
+                exc,
+            )
         if ticket["status"] == "QUEUED":
             self._enqueue_rejected_retry(
                 source=source,
@@ -2902,4 +2921,15 @@ class CampaignRunner:
             "hold_created_at": hold.get("created_at"),
             "skipped_at": datetime.now(timezone.utc).isoformat(),
         }
-        self.ledger._append(self.ledger.root / "advisory_holds_skipped.jsonl", record)
+        # TC-PORT-LLM-009: same reasoning as _append_heal_ticket -- best-effort
+        # observability, must never crash the worker over lock contention.
+        try:
+            self.ledger._append(self.ledger.root / "advisory_holds_skipped.jsonl", record)
+        except LockError as exc:
+            logger.error(
+                "Advisory-hold-skip record write timed out under lock contention "
+                "(source=%s locale=%s dropped, not fatal): %s",
+                source.source_path,
+                locale,
+                exc,
+            )
