@@ -22,7 +22,16 @@ Test-CampaignLive guard refuses a second launch if one is already live.
 [CmdletBinding()]
 param(
     [ValidateRange(1, 4)] [int]$MaxWorkers = 1,
-    [string]$CampaignId = 'portfolio-missing-sweep-llm-only-20260914'
+    [string]$CampaignId = 'portfolio-missing-sweep-llm-only-20260914',
+    # Opt-in only: QU-02/TC-APT-038 runtime quarantine short-circuits any cell
+    # with prior open-ticket history straight to a no-op re-ticket (no engine
+    # call at all), regardless of --include-known-broken at manifest-build
+    # time -- that flag only controls manifest inclusion, not runtime retry
+    # eligibility. Default stays off so the unattended steady-state sweep
+    # keeps respecting quarantine (repeatedly re-attempting known-bad content
+    # forever would waste real API budget); pass this switch only for a
+    # deliberate, bounded re-validation pass after a real fix has landed.
+    [switch]$RecoveryQualification
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,12 +45,15 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent $taskLog) | Out-Nu
     Add-Content -LiteralPath $taskLog
 
 try {
-    & (Join-Path $PSScriptRoot 'start_portfolio_missing_sweep_autonomous.ps1') `
-        -RuntimeRepo $runtimeRepo `
-        -ControlRepo $controlRepo `
-        -MaxWorkers $MaxWorkers `
-        -WatchdogState $watchdogState `
-        -CampaignId $CampaignId
+    $sweepArgs = @{
+        RuntimeRepo   = $runtimeRepo
+        ControlRepo   = $controlRepo
+        MaxWorkers    = $MaxWorkers
+        WatchdogState = $watchdogState
+        CampaignId    = $CampaignId
+    }
+    if ($RecoveryQualification) { $sweepArgs['RecoveryQualification'] = $true }
+    & (Join-Path $PSScriptRoot 'start_portfolio_missing_sweep_autonomous.ps1') @sweepArgs
     $code = $LASTEXITCODE
     "$(Get-Date -Format o) sweep task host completed exit=$code" | Add-Content -LiteralPath $taskLog
     exit $code
