@@ -82,9 +82,17 @@ class CampaignLedger:
         if not path.is_file():
             return []
         rows: list[dict[str, Any]] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                rows.append(json.loads(line))
+        # Stream line-by-line rather than path.read_text().splitlines(): that
+        # held the whole file plus its split lines in memory at once, and
+        # heal_queue.jsonl (10k+ lines and growing) triggered a real
+        # MemoryError under 4-worker concurrent load (2026-09-17 full-portfolio
+        # sweep, PID contention over shared system RAM alongside per-worker
+        # model buffers).
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if line:
+                    rows.append(json.loads(line))
         return rows
 
     def receipts(self) -> dict[str, dict[str, Any]]:

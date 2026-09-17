@@ -1284,6 +1284,30 @@ def test_campaign_suppresses_second_paid_retry_for_duplicate_candidate(tmp_path)
     assert rows[-1]["candidate_sha256"] == "a" * 64
 
 
+def test_read_jsonl_streams_instead_of_loading_the_whole_file(tmp_path, monkeypatch):
+    """A large ticket/receipt file must not be read into memory in one string.
+
+    A real 4-worker run against the full-portfolio manifest hit a genuine
+    MemoryError inside model_outcomes() -> _read_jsonl(heal_queue.jsonl) once
+    that file grew past 10k lines (2026-09-17). path.read_text().splitlines()
+    held the whole file plus its split lines in memory at once; streaming
+    line-by-line avoids that peak.
+    """
+    path = tmp_path / "heal_queue.jsonl"
+    path.write_text(
+        "\n".join(json.dumps({"i": i}) for i in range(50)) + "\n",
+        encoding="utf-8",
+    )
+
+    def _forbidden_read_text(self, *args, **kwargs):
+        raise AssertionError("_read_jsonl must not load the whole file via read_text()")
+
+    monkeypatch.setattr(Path, "read_text", _forbidden_read_text)
+
+    rows = CampaignLedger._read_jsonl(path)
+    assert [row["i"] for row in rows] == list(range(50))
+
+
 def test_campaign_parallel_jobs_share_engine_without_cross_job_state(tmp_path, monkeypatch):
     """A bounded campaign shard overlaps jobs while receipts stay per-output."""
     source = tmp_path / "content/docs.aspose.org/en/words/net/page.md"
