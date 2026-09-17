@@ -19,10 +19,13 @@ from typing import Any
 import pytest
 import yaml
 
+from src.workers.campaign_manifest import CampaignManifest
+
 from scripts.campaign.reconcile_receipted_commits import (
     build_commit_message,
     committed_batch_counts_by_group,
     main,
+    manifest_output_index,
     summarize_batch,
     _page_label,
 )
@@ -77,6 +80,65 @@ def test_build_commit_message_has_the_required_subject_and_skills_line_and_no_co
     # --co-author -- baking one into the message here would give it two,
     # which that tool explicitly refuses (CommitProvenanceError).
     assert "co-authored" not in message.lower()
+
+
+def test_manifest_output_index_groups_by_the_sources_own_family_and_platform_fields(tmp_path):
+    """A real regression: family names that collide with the locale-prefix
+    shape ('words', 'cells', 'email' are all 5-letter alphabetic strings) used
+    to get silently mis-grouped by a heuristic that re-derived family/platform
+    from the output path. Found live 2026-09-17 on a real words/net receipt,
+    which partitioned itself as family="net", platform="introducing-words-
+    foss-net" instead of family="words", platform="net". The fix reads the
+    authoritative family/platform already on the manifest source instead.
+    """
+    manifest_dict = {
+        "schema_version": 1, "campaign_id": "x", "validation_policy": "zero-defect",
+        "content_repo": str(tmp_path), "content_repo_sha": "a" * 40, "translator_repo_sha": "b" * 40,
+        "config_fingerprint": "c" * 64, "model_fingerprints": {"model_registry": "e" * 64},
+        "tm_fingerprint": "f" * 64, "knowledge_fingerprints": {}, "target_locales": ["ja"],
+        "expected_source_count": 3, "expected_output_count": 3,
+        "execution_policy": {"output_selection": "missing_only"},
+        "retry_policy": {
+            "primary_model": "m2m100_418m", "primary_attempts": 3,
+            "llm_escalation_attempts": 2, "llm_model": "professionalize_llm",
+        },
+        "commit_policy": {"branch": "main", "max_outputs_per_commit": 250, "push": False},
+        "sources": [
+            {
+                "site_id": "blog.aspose.org", "family": "words", "platform": "net",
+                "source_path": "content/blog.aspose.org/words/net/introducing-words-foss-net/index.md",
+                "source_sha256": "a" * 64, "wave": 1,
+                "outputs": {"ja": "content/blog.aspose.org/words/net/introducing-words-foss-net/index.ja.md"},
+            },
+            {
+                "site_id": "blog.aspose.org", "family": "cells", "platform": "net",
+                "source_path": "content/blog.aspose.org/cells/net/spreadsheet-management-in-net/index.md",
+                "source_sha256": "b" * 64, "wave": 1,
+                "outputs": {"ja": "content/blog.aspose.org/cells/net/spreadsheet-management-in-net/index.ja.md"},
+            },
+            {
+                "site_id": "blog.aspose.org", "family": "email", "platform": "python",
+                "source_path": "content/blog.aspose.org/email/python/python-outlook-msg-create-read/index.md",
+                "source_sha256": "c" * 64, "wave": 1,
+                "outputs": {"ja": "content/blog.aspose.org/email/python/python-outlook-msg-create-read/index.ja.md"},
+            },
+        ],
+    }
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(manifest_dict), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+
+    index = manifest_output_index(manifest)
+
+    assert index["content/blog.aspose.org/words/net/introducing-words-foss-net/index.ja.md"] == (
+        "blog.aspose.org", "words", "net"
+    )
+    assert index["content/blog.aspose.org/cells/net/spreadsheet-management-in-net/index.ja.md"] == (
+        "blog.aspose.org", "cells", "net"
+    )
+    assert index["content/blog.aspose.org/email/python/python-outlook-msg-create-read/index.ja.md"] == (
+        "blog.aspose.org", "email", "python"
+    )
 
 
 def test_committed_batch_counts_by_group_only_counts_committed_rows(tmp_path):

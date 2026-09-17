@@ -67,6 +67,7 @@ $controlRepo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $PSScriptRoot 'campaign_process_lifecycle.ps1')
 $manifestPath = Join-Path $controlRepo "data\campaigns\manifests\$CampaignId.yaml"
 $contentRepoPath = 'D:\onedrive\Documents\GitHub\aspose.org'
+$py = Join-Path $controlRepo '.venv\Scripts\python.exe'
 
 $ledgerRoot = Join-Path $controlRepo "data\campaigns\$CampaignId"
 $evidenceRoot = Join-Path $controlRepo "reports\campaigns\$CampaignId\evidence"
@@ -182,10 +183,17 @@ if ($live.Count -gt 0) {
 # contention that ruled out reconciling from inside the launcher's own
 # per-tick progress loop.
 try {
+    # No --session-id: this tick's identity was never registered with
+    # session_ledger.py (unlike a launcher run's own $SessionId, which the
+    # run itself registers at startup), and passing an unregistered one
+    # explicitly is refused outright ("names a none manifest") rather than
+    # falling back -- found live 2026-09-17. Omitting the flag is the
+    # governed tool's own documented fallback: an unknown identity is
+    # covered by the commit's lookback window instead.
     & $py "$controlRepo\scripts\campaign\reconcile_receipted_commits.py" `
         --manifest $manifestPath --content-repo $contentRepoPath `
         --ledger-root (Join-Path $controlRepo 'data\campaigns') `
-        --min-batch-size 5 --execute --session-id ([guid]::NewGuid().ToString()) | Out-Null
+        --min-batch-size 5 --execute | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Write-Tick "state=RECONCILE_FAILED exit=$LASTEXITCODE -- continuing regardless"
     }
@@ -252,7 +260,6 @@ if ($meta.consecutive_no_progress_relaunches -ge $MaxConsecutiveNoProgressRelaun
 # running for this campaign, so releasing a claim that says otherwise here
 # is correcting a proven-stale record, not overriding a genuinely active
 # session elsewhere in the fleet.
-$py = Join-Path $controlRepo '.venv\Scripts\python.exe'
 $familyKey = "family:$CampaignId"
 $claimJson = & $py -c @"
 import sys, json

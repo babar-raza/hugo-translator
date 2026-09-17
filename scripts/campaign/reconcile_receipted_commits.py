@@ -47,32 +47,27 @@ def receipt_digest(receipt: dict[str, Any]) -> str:
     ).hexdigest())
 
 
-def group_for_output(site_id: str, output_path: str) -> tuple[str, str, str]:
-    """Return the required subdomain/family/platform ownership partition."""
-    parts = Path(output_path).as_posix().split("/")
-    try:
-        site_index = parts.index(site_id)
-    except ValueError as exc:
-        raise ValueError(f"output is outside declared site {site_id}: {output_path}") from exc
-    tail = parts[site_index + 1 :]
-    # Most roots are site/family/platform; localized roots insert a locale.
-    if len(tail) >= 3 and len(tail[0]) in {2, 5} and tail[0].split("-")[0].isalpha():
-        tail = tail[1:]
-    if not tail:
-        raise ValueError(f"cannot derive family from {output_path}")
-    # Product landing pages legitimately have no platform directory.  Keep
-    # them isolated from any real platform instead of guessing one.
-    platform = tail[1] if len(tail) >= 2 and not Path(tail[1]).suffix else "_root"
-    return site_id, tail[0], platform
-
-
 def manifest_output_index(manifest: CampaignManifest) -> dict[str, tuple[str, str, str]]:
+    """Map each manifest output to its (site, family, platform) ownership partition.
+
+    The manifest already carries `family`/`platform` on every source -- these
+    were previously re-derived from the output path string instead, via a
+    locale-prefix heuristic (`len(segment) in {2, 5} and alphabetic`) meant to
+    detect an inserted locale code (like `zh-Hans`). That heuristic collided
+    with several real family names of the same shape -- `words`, `cells`,
+    `email` are all 5-letter alphabetic strings -- and silently mis-grouped
+    every output under them (found live 2026-09-17: a `words/net` receipt
+    partitioned itself as family="net", platform="introducing-words-foss-net").
+    Reading the authoritative field on the source is both simpler and
+    correct by construction.
+    """
     index: dict[str, tuple[str, str, str]] = {}
     for source in manifest.sources:
+        group = (source.site_id, source.family, source.platform)
         for _locale, output in source.outputs.items():
             if output in index:
                 raise ValueError(f"manifest duplicate output ownership: {output}")
-            index[output] = group_for_output(source.site_id, output)
+            index[output] = group
     return index
 
 
