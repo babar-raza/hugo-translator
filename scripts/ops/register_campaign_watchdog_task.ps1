@@ -62,7 +62,14 @@ $action = New-ScheduledTaskAction `
     -Execute $powershell `
     -Argument ("-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$entrypoint`" -CampaignId `"$CampaignId`" -MaxWorkers $MaxWorkers") `
     -WorkingDirectory $repo
-$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes) -RepetitionDuration ([TimeSpan]::MaxValue)
+# [TimeSpan]::MaxValue serializes to an ISO-8601 duration (P99999999DT23H59M59S)
+# that exceeds what the Task Scheduler XML schema accepts -- Register-ScheduledTask
+# fails outright with "value ... incorrectly formatted or out of range" (found live
+# 2026-09-17). Task Scheduler's own convention for "repeat this trigger forever,
+# no end date" is an EMPTY Duration element, which New-ScheduledTaskTrigger has no
+# parameter for -- set it directly on the trigger object after creation instead.
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes)
+$trigger.Repetition.Duration = ''
 $taskPrincipal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
