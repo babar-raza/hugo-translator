@@ -967,6 +967,9 @@ class LLMModelBackend:
                 f"even to emphasize a technical term\n"
                 f"- Keep technical terms, brand names, and API identifiers unchanged, "
                 f"written exactly as they appear in the source, with no added markup\n"
+                f"- Translate every other word and phrase into {tgt_name}; do not copy "
+                f"English prose such as adjectives, prepositions, or explanatory text, "
+                f"even when it appears next to an API identifier\n"
                 f"- Maintain the same tone and register as the source"
             )
 
@@ -1047,6 +1050,8 @@ class LLMModelBackend:
                 f"Translate this API class description from {src_name} to {tgt_name}.\n\n"
                 "Rules:\n"
                 "- Keep class names, method names, and identifiers in English\n"
+                f"- Translate every other word and phrase into {tgt_name}; do not leave "
+                "ordinary English prose unchanged\n"
                 "- Output ONLY the translation, nothing else\n"
                 "- Keep the same concise register as the source"
             )
