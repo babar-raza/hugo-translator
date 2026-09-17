@@ -47,7 +47,7 @@ from src.translation_engine.write_gate import WriteGateEvaluator  # noqa: E402
 from src.utils.config_loader import ConfigService  # noqa: E402
 from src.utils.content_discovery import discover_source_files, resolve_translated_path  # noqa: E402
 
-UNVALIDATED_GATE_IDS = [31, 32, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44]
+UNVALIDATED_GATE_IDS = [31, 32, 33, 34, 35, 37, 38, 39, 40, 41, 42, 43, 44, 45]
 IN_SCOPE_SITES = [
     "blog.aspose.org",
     "docs.aspose.org",
@@ -468,9 +468,45 @@ def gate42_fixtures(evaluator: WriteGateEvaluator) -> list[dict[str, Any]]:
     return out
 
 
+def gate45_fixtures(evaluator: WriteGateEvaluator) -> list[dict[str, Any]]:
+    """Gate 45 needs a real SiteProfile (its whole check is 'does a
+    mode: ignore field from this profile leak into output') -- run_fixture()'s
+    generic path never passes one, so this mirrors gate42_fixtures()'s
+    special-case shape rather than widening run_fixture() for one gate."""
+    config = ConfigService(_PROJECT_ROOT / "config")
+    profile = config.get_site_profile("blog.aspose.org")
+    source = _page({"title": "Key Features", "aliases": ["/slides/cpp/slides-key-features-cpp/"]},
+                   "## Overview\n\nText.")
+    leaked = _page({"title": "Fonctionnalites Cles",
+                    "aliases": ["/slides/cpp/slides-key-features-cpp/"]},
+                   "## Aperçu\n\nTexte.")
+    clean = _page({"title": "Fonctionnalites Cles"}, "## Aperçu\n\nTexte.")
+    out = []
+    for name, translated in (("adversarial", leaked), ("known_good_stripped", clean)):
+        results, _ = evaluator.run_all_content_gates(
+            source, translated, "fr",
+            Path("content/blog.aspose.org/fr/fixture.md"),
+            site_profile=profile,
+        )
+        gate_result = results.get(45)
+        out.append(
+            {
+                "gate_id": 45,
+                "name": name,
+                "fired": bool(gate_result is not None and not gate_result.passed),
+                "error": gate_result.error if gate_result is not None else None,
+                "other_gates_fired": sorted(
+                    gid for gid, res in results.items() if gid != 45 and not res.passed
+                ),
+            }
+        )
+    return out
+
+
 def run_all_fixtures(evaluator: WriteGateEvaluator) -> list[dict[str, Any]]:
     results = [run_fixture(evaluator, f) for f in FIXTURES]
     results.extend(gate42_fixtures(evaluator))
+    results.extend(gate45_fixtures(evaluator))
     return results
 
 
@@ -525,13 +561,28 @@ def scan_known_good(
     per_gate: dict[int, dict[str, Any]] = {
         gid: {"fired": 0, "examples": []} for gid in UNVALIDATED_GATE_IDS
     }
+    # Gate 45 needs a real SiteProfile (its whole check is 'does a mode:
+    # ignore field leak into output') -- resolved once per site_id, not
+    # once per file, since a config-file read is comparatively expensive
+    # and IN_SCOPE_SITES is a handful of ids, not thousands.
+    config = ConfigService(_PROJECT_ROOT / "config")
+    profile_cache: dict[str, Any] = {}
     for pair in sample:
         try:
             en = pair["source_path"].read_text(encoding="utf-8")
             tr = pair["translated_path"].read_text(encoding="utf-8")
         except OSError as exc:
             continue
-        results, _ = evaluator.run_all_content_gates(en, tr, pair["locale"], pair["translated_path"])
+        site_id = pair["site_id"]
+        if site_id not in profile_cache:
+            try:
+                profile_cache[site_id] = config.get_site_profile(site_id)
+            except Exception:
+                profile_cache[site_id] = None
+        results, _ = evaluator.run_all_content_gates(
+            en, tr, pair["locale"], pair["translated_path"],
+            site_profile=profile_cache[site_id],
+        )
         for gid in UNVALIDATED_GATE_IDS:
             gres = results.get(gid)
             if gres is not None and not gres.passed:

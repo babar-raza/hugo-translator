@@ -24,6 +24,8 @@ import sys
 import time
 from pathlib import Path
 
+from src.utils.config_loader import ConfigService
+
 # Ensure project root on sys.path
 _HERE = Path(__file__).resolve()
 _PROJECT_ROOT = _HERE.parents[2]
@@ -230,6 +232,10 @@ def process_queue(
                     if gate_id_from_issue_name(iss["type"]) is not None
                 }
                 if gate_issue_types:
+                    try:
+                        _site_profile = ConfigService(Path("config")).get_site_profile(site_id) if site_id else None
+                    except Exception:
+                        _site_profile = None
                     outcome = _heal_via_gate_rerun(
                         en_content=en_content,
                         tr_content=tr_content,
@@ -238,6 +244,7 @@ def process_queue(
                         gate_issue_types=gate_issue_types,
                         dry_run=dry_run,
                         stats=stats,
+                        site_profile=_site_profile,
                     )
                     # "needs_retranslation" is deliberately NOT marked done:
                     # the file still has a real, current defect this
@@ -505,6 +512,7 @@ def _heal_via_gate_rerun(
     gate_issue_types: set[str],
     dry_run: bool,
     stats: dict,
+    site_profile=None,
 ) -> str:
     """HT-QUALITY-GATES-001 Phase 8 (F3): heal a queue entry whose issues
     are gate-registry-derived (not UnitQualityScorer-vocabulary) by
@@ -530,6 +538,12 @@ def _heal_via_gate_rerun(
     "block", or "warn" (gates 9+), never the "early_return"/"no_op" gates
     2-5 that force_accept actually gates. detector=None independently skips
     the language-detector-dependent behavior those early gates would need.
+
+    ``site_profile`` (ASPOSE-BLOG-DEPLOY-ALIAS-RECURRENCE-001, 2026-09-17):
+    optional; without it, a gate whose check depends on the site profile's
+    own frontmatter rules (e.g. Gate 45's mode: ignore leak detector)
+    silently no-ops here even when the caller's queue entry already names
+    a real ``site_id``.
     """
     from src.translation_engine.write_gate import WriteGateEvaluator, gate_id_from_issue_name
 
@@ -552,6 +566,7 @@ def _heal_via_gate_rerun(
         translated_content=tr_content,
         target_lang=locale,
         output_path=tr_file,
+        site_profile=site_profile,
     )
 
     still_failing = {

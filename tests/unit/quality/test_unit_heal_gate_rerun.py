@@ -206,3 +206,74 @@ Some prose about a sample class with enough words to be meaningful..
 
     assert outcome == "fixed"
     assert tr_file.read_text(encoding="utf-8") == original  # unchanged on disk
+
+
+def test_heal_via_gate_rerun_surfaces_gate45_when_site_profile_is_passed(tmp_path):
+    """ASPOSE-BLOG-DEPLOY-ALIAS-RECURRENCE-001 (2026-09-17): before this fix,
+    _heal_via_gate_rerun had no way to receive a site_profile, so Gate 45
+    (whose whole check is "does a mode: ignore field leak into output")
+    silently no-opped for every queue entry this healer ever re-scanned --
+    a queued file with a real leaked aliases: value would be marked
+    "skipped_clean" instead of "needs_retranslation"."""
+    from types import SimpleNamespace
+    from src.utils.models import FrontmatterMode
+
+    def _rule(mode):
+        return SimpleNamespace(mode=mode)
+
+    profile = SimpleNamespace(
+        frontmatter={
+            "title": _rule(FrontmatterMode.TRANSLATE),
+            "aliases": _rule(FrontmatterMode.IGNORE),
+        }
+    )
+    en_leak = """---
+title: "Sample"
+aliases: [/old-slug/]
+---
+
+Some prose about a sample class with enough words to be meaningful.
+"""
+    tr_leak = """---
+title: "Sample"
+aliases: [/old-slug/]
+---
+
+Algo de texto sobre una clase de muestra con suficientes palabras.
+"""
+    tr_file = tmp_path / "sample.md"
+    tr_file.write_text(tr_leak, encoding="utf-8")
+    original = tr_file.read_text(encoding="utf-8")
+
+    stats_without_profile = {}
+    outcome_without = _heal_via_gate_rerun(
+        en_content=en_leak,
+        tr_content=tr_leak,
+        tr_file=tr_file,
+        locale="fr",
+        gate_issue_types={"gate45_ignore_mode_field_leak"},
+        dry_run=False,
+        stats=stats_without_profile,
+    )
+    assert outcome_without == "clean", (
+        "Baseline: with no site_profile, Gate 45 silently no-ops -- this is "
+        "the exact pre-fix gap, asserted here so a future regression is caught."
+    )
+
+    stats_with_profile = {}
+    outcome_with = _heal_via_gate_rerun(
+        en_content=en_leak,
+        tr_content=tr_leak,
+        tr_file=tr_file,
+        locale="fr",
+        gate_issue_types={"gate45_ignore_mode_field_leak"},
+        dry_run=False,
+        stats=stats_with_profile,
+        site_profile=profile,
+    )
+    assert outcome_with == "needs_retranslation", (
+        "With a real site_profile, the still-present leaked aliases: value "
+        "must be reported, not silently marked clean."
+    )
+    assert stats_with_profile.get("gate_needs_retranslation", 0) == 1
+    assert tr_file.read_text(encoding="utf-8") == original
