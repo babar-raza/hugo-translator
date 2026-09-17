@@ -128,28 +128,12 @@ def existing_completed_receipts(path: Path) -> set[tuple[str, str]]:
     return completed
 
 
-def _page_label(source_path: str, group: tuple[str, str, str]) -> str:
-    """A short human name for the page a receipt's source belongs to.
-
-    Most sources are `.../<page-slug>/index.md`, so the parent directory name
-    is the useful label. A bare `_index.md` directly under the family or
-    platform directory has no distinctive slug of its own -- label it
-    `_index` rather than the family/platform name, which would be confusing.
-    """
-    parent_name = Path(source_path).parent.name
-    if parent_name in (group[1], group[2]):
-        return "_index"
-    return parent_name
-
-
 def summarize_batch(group: tuple[str, str, str], chunk: list[dict[str, Any]]) -> str:
-    """A concise `family/platform — pages (locales)` summary for a commit subject."""
-    _, family, platform = group
-    pages = sorted({_page_label(str(row["source_path"]), group) for row in chunk})
+    """A concise `subdomain/family/platform (locales)` summary for a commit subject."""
+    subdomain, family, platform = group
     locales = sorted({str(row["target_lang"]) for row in chunk})
-    page_part = ", ".join(pages) if len(pages) <= 4 else f"{len(pages)} pages"
     locale_part = ", ".join(locales) if len(locales) <= 12 else f"{len(locales)} locales"
-    return f"{family}/{platform} — {page_part} ({locale_part})"
+    return f"{subdomain}/{family}/{platform} ({locale_part})"
 
 
 def build_commit_message(group: tuple[str, str, str], chunk: list[dict[str, Any]]) -> str:

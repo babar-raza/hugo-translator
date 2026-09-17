@@ -2,7 +2,7 @@
 
 Covers the governance fixes requested for aspose.org translation commits:
 - exactly one Co-Authored-By trailer, defaulting to hugo-translator@aspose.org
-- a `content(translation): {summary}` subject naming the affected pages/locales
+- a `content(translation): {subdomain}/{family}/{platform} ({locales})` subject
 - a group is committed as ONE batch as soon as it holds >= --min-batch-size
   receipts (default 5) -- never split into fixed-size chunks, never held
   back waiting for a larger batch once the minimum is met
@@ -27,7 +27,6 @@ from scripts.campaign.reconcile_receipted_commits import (
     main,
     manifest_output_index,
     summarize_batch,
-    _page_label,
 )
 
 
@@ -38,43 +37,30 @@ def _row(source_path: str, target_lang: str) -> dict[str, Any]:
     return {"source_path": source_path, "target_lang": target_lang}
 
 
-def test_page_label_uses_parent_directory_for_a_normal_page():
-    assert _page_label("content/blog.aspose.org/pdf/go/go-pdf-create-merge-split/index.md", GROUP) == (
-        "go-pdf-create-merge-split"
-    )
-
-
-def test_page_label_falls_back_to_index_for_a_bare_family_or_platform_index():
-    assert _page_label("content/blog.aspose.org/pdf/go/_index.md", GROUP) == "_index"
-
-
-def test_summarize_batch_lists_pages_and_locales_when_few():
+def test_summarize_batch_lists_locales_under_subdomain_family_platform():
     chunk = [
         _row("content/blog.aspose.org/pdf/go/go-pdf-create-merge-split/index.md", "fa"),
         _row("content/blog.aspose.org/pdf/go/go-pdf-create-merge-split/index.md", "de"),
         _row("content/blog.aspose.org/pdf/go/blog-pdf-go-overview/index.md", "nl"),
     ]
     summary = summarize_batch(GROUP, chunk)
-    assert summary == "pdf/go — blog-pdf-go-overview, go-pdf-create-merge-split (de, fa, nl)"
+    assert summary == "blog.aspose.org/pdf/go (de, fa, nl)"
 
 
-def test_summarize_batch_truncates_to_counts_when_many():
-    pages = [f"page-{i}" for i in range(6)]
+def test_summarize_batch_truncates_to_a_count_when_many_locales():
     locales = [f"l{i}" for i in range(20)]
-    # 20 rows cycling through only 6 distinct pages, so page and locale
-    # cardinality can each cross their own truncation threshold independently.
     chunk = [
-        _row(f"content/blog.aspose.org/pdf/go/{pages[i % len(pages)]}/index.md", locale)
+        _row(f"content/blog.aspose.org/pdf/go/page-{i}/index.md", locale)
         for i, locale in enumerate(locales)
     ]
     summary = summarize_batch(GROUP, chunk)
-    assert summary == "pdf/go — 6 pages (20 locales)"
+    assert summary == "blog.aspose.org/pdf/go (20 locales)"
 
 
 def test_build_commit_message_has_the_required_subject_and_skills_line_and_no_coauthor():
     chunk = [_row("content/blog.aspose.org/pdf/go/go-pdf-create-merge-split/index.md", "fa")]
     message = build_commit_message(GROUP, chunk)
-    assert message.startswith("content(translation): pdf/go — go-pdf-create-merge-split (fa)\n\n")
+    assert message.startswith("content(translation): blog.aspose.org/pdf/go (fa)\n\n")
     assert "Skills invoked: [S-76, S-HT-02]" in message
     # The single Co-Authored-By trailer is added by git_plumb_commit.py from
     # --co-author -- baking one into the message here would give it two,
