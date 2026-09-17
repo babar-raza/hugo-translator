@@ -106,6 +106,17 @@ def append_jsonl(path: Path, row: dict[str, Any]) -> None:
         handle.flush()
 
 
+def committed_batch_counts_by_group(path: Path) -> dict[tuple[str, str, str], int]:
+    """How many COMMITTED batches already exist for each group, for numbering."""
+    counts: dict[tuple[str, str, str], int] = defaultdict(int)
+    for row in read_jsonl(path):
+        if row.get("status") == "COMMITTED":
+            group = row.get("group") or {}
+            key = (str(group.get("subdomain")), str(group.get("family")), str(group.get("platform")))
+            counts[key] += 1
+    return counts
+
+
 def existing_completed_receipts(path: Path) -> set[tuple[str, str]]:
     """Return output/receipt pairs already committed.
 
@@ -122,7 +133,43 @@ def existing_completed_receipts(path: Path) -> set[tuple[str, str]]:
     return completed
 
 
-def commit_group(*, content_repo: Path, paths: list[str], base_sha: str, co_author: str, session_id: str | None = None) -> tuple[int, str]:
+def _page_label(source_path: str, group: tuple[str, str, str]) -> str:
+    """A short human name for the page a receipt's source belongs to.
+
+    Most sources are `.../<page-slug>/index.md`, so the parent directory name
+    is the useful label. A bare `_index.md` directly under the family or
+    platform directory has no distinctive slug of its own -- label it
+    `_index` rather than the family/platform name, which would be confusing.
+    """
+    parent_name = Path(source_path).parent.name
+    if parent_name in (group[1], group[2]):
+        return "_index"
+    return parent_name
+
+
+def summarize_batch(group: tuple[str, str, str], chunk: list[dict[str, Any]]) -> str:
+    """A concise `family/platform — pages (locales)` summary for a commit subject."""
+    _, family, platform = group
+    pages = sorted({_page_label(str(row["source_path"]), group) for row in chunk})
+    locales = sorted({str(row["target_lang"]) for row in chunk})
+    page_part = ", ".join(pages) if len(pages) <= 4 else f"{len(pages)} pages"
+    locale_part = ", ".join(locales) if len(locales) <= 12 else f"{len(locales)} locales"
+    return f"{family}/{platform} — {page_part} ({locale_part})"
+
+
+def build_commit_message(group: tuple[str, str, str], chunk: list[dict[str, Any]]) -> str:
+    subject = f"content(translation): {summarize_batch(group, chunk)}"
+    return (
+        f"{subject}\n\n"
+        "Professionalize-only zero-defect outputs, partitioned by subdomain/family/platform.\n"
+        "Skills invoked: [S-76, S-HT-02]\n"
+    )
+
+
+def commit_group(
+    *, content_repo: Path, paths: list[str], message: str, base_sha: str, co_author: str,
+    session_id: str | None = None,
+) -> tuple[int, str]:
     """Run the repository-owned S-76 command using an isolated temporary input set."""
     import tempfile
 
@@ -130,16 +177,10 @@ def commit_group(*, content_repo: Path, paths: list[str], base_sha: str, co_auth
     with tempfile.TemporaryDirectory(prefix="portfolio-receipts-") as temp:
         root = Path(temp)
         files = root / "files.txt"
-        message = root / "message.txt"
+        message_path = root / "message.txt"
         files.write_text("\n".join(paths) + "\n", encoding="utf-8")
-        message.write_text(
-            "content(portfolio): receipt-backed translation checkpoint\n\n"
-            "Professionalize-only zero-defect outputs, partitioned by subdomain/family/platform.\n"
-            "Skills invoked: [S-76, S-HT-02]\n"
-            "Co-authored-by: Codex <codex@openai.com>\n",
-            encoding="utf-8",
-        )
-        cmd = [sys.executable, str(tool), "--files-from", str(files), "--message-file", str(message),
+        message_path.write_text(message, encoding="utf-8")
+        cmd = [sys.executable, str(tool), "--files-from", str(files), "--message-file", str(message_path),
              "--skills", "S-76", "S-HT-02", "--plan", "receipt-backed portfolio checkpoint",
              "--branch", "main", "--base-sha", base_sha, "--co-author", co_author, "--no-push"]
         if session_id:
@@ -157,24 +198,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--content-repo", type=Path, required=True)
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
     parser.add_argument(
-        "--max-files", type=int, choices=(25, 100), default=25,
-        help="Receipt checkpoint size: 25 for campaign checkpoints, 100 for legacy cleanup batches.",
-    )
-    parser.add_argument(
-        "--qualification-five", action="store_true",
-        help="Permit the sole explicit five-file recovery qualification checkpoint.",
+        "--min-batch-size", type=int, default=5,
+        help="Minimum receipts a (site,family,platform) group must hold before it is committed. "
+             "A qualifying group is committed in full as one batch -- never split into smaller "
+             "fixed-size chunks, and never held back once the minimum is met.",
     )
     parser.add_argument("--execute", action="store_true")
-    parser.add_argument("--co-author", default="Codex <codex@openai.com>")
+    parser.add_argument("--co-author", default="hugo-translator <hugo-translator@aspose.org>")
     parser.add_argument("--session-id", help="Explicit governed aspose.org S-76 session identity.")
     args = parser.parse_args(argv)
-    if args.qualification_five:
-        args.max_files = 5
+    if args.min_batch_size < 1:
+        parser.error("--min-batch-size must be >= 1")
     manifest = CampaignManifest.load(args.manifest)
     content_repo = args.content_repo.resolve()
     root = args.ledger_root / manifest.campaign_id
     batches_path = root / "commit_batches.jsonl"
     completed = existing_completed_receipts(batches_path)
+    batch_counts = committed_batch_counts_by_group(batches_path)
     receipts = [
         receipt
         for receipt in read_jsonl(root / "acceptance_receipts.jsonl")
@@ -189,36 +229,40 @@ def main(argv: list[str] | None = None) -> int:
     planned = 0
     for group in sorted(grouped):
         rows = sorted(grouped[group], key=lambda row: str(row["output_path"]))
-        for chunk_index in range(0, len(rows), args.max_files):
-            chunk = rows[chunk_index : chunk_index + args.max_files]
-            if len(chunk) < args.max_files:
-                continue  # never create an undersized checkpoint; leave a visible backlog.
-            paths = [str(row["output_path"]) for row in chunk]
-            record = {
-                "campaign_id": manifest.campaign_id, "recorded_at": datetime.now(timezone.utc).isoformat(),
-                "group": {"subdomain": group[0], "family": group[1], "platform": group[2]},
-                "batch_number": chunk_index // args.max_files + 1, "base_sha": base_sha,
-                "outputs": paths, "receipt_hashes": [receipt_digest(row) for row in chunk],
-                "status": "VERIFIED", "planned": len(paths), "verified": len(paths), "staged": 0,
-            }
-            planned += len(paths)
-            if args.execute:
-                code, output = commit_group(content_repo=content_repo, paths=paths, base_sha=base_sha, co_author=args.co_author, session_id=args.session_id)
-                if code:
-                    record.update({"status": "FAILED", "error": output})
-                    append_jsonl(batches_path, record)
-                    print(json.dumps(record, indent=2))
-                    return code
-                commit_sha = subprocess.check_output(["git", "rev-parse", "main"], cwd=content_repo, text=True).strip()
-                mismatches = [path for path, row in zip(paths, chunk) if sha256_file(content_repo / path) != row["output_sha256"]]
-                if mismatches:
-                    record.update({"status": "FAILED", "commit_sha": commit_sha, "error": f"post-commit hash mismatch: {mismatches}"})
-                    append_jsonl(batches_path, record)
-                    return 3
-                record.update({"status": "COMMITTED", "staged": len(paths), "commit_sha": commit_sha, "post_commit_hash_verified": True})
-                base_sha = commit_sha
-            append_jsonl(batches_path, record)
-            print(json.dumps(record, indent=2))
+        if len(rows) < args.min_batch_size:
+            continue  # never create an undersized checkpoint; leave a visible backlog.
+        chunk = rows  # commit everything currently available in this group as one batch
+        paths = [str(row["output_path"]) for row in chunk]
+        message = build_commit_message(group, chunk)
+        record = {
+            "campaign_id": manifest.campaign_id, "recorded_at": datetime.now(timezone.utc).isoformat(),
+            "group": {"subdomain": group[0], "family": group[1], "platform": group[2]},
+            "batch_number": batch_counts[group] + 1, "base_sha": base_sha,
+            "outputs": paths, "receipt_hashes": [receipt_digest(row) for row in chunk],
+            "status": "VERIFIED", "planned": len(paths), "verified": len(paths), "staged": 0,
+        }
+        planned += len(paths)
+        if args.execute:
+            code, output = commit_group(
+                content_repo=content_repo, paths=paths, message=message, base_sha=base_sha,
+                co_author=args.co_author, session_id=args.session_id,
+            )
+            if code:
+                record.update({"status": "FAILED", "error": output})
+                append_jsonl(batches_path, record)
+                print(json.dumps(record, indent=2))
+                return code
+            commit_sha = subprocess.check_output(["git", "rev-parse", "main"], cwd=content_repo, text=True).strip()
+            mismatches = [path for path, row in zip(paths, chunk) if sha256_file(content_repo / path) != row["output_sha256"]]
+            if mismatches:
+                record.update({"status": "FAILED", "commit_sha": commit_sha, "error": f"post-commit hash mismatch: {mismatches}"})
+                append_jsonl(batches_path, record)
+                return 3
+            record.update({"status": "COMMITTED", "staged": len(paths), "commit_sha": commit_sha, "post_commit_hash_verified": True})
+            base_sha = commit_sha
+            batch_counts[group] += 1
+        append_jsonl(batches_path, record)
+        print(json.dumps(record, indent=2))
     print(json.dumps({"verified_receipts": len(verified), "planned_checkpoint_outputs": planned, "pending_commit": len(verified) - planned}, indent=2))
     return 0
 
