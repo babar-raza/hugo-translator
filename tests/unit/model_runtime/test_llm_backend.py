@@ -413,6 +413,7 @@ class TestLLMModelBackend:
         prompt = mock_provider.generate.call_args.kwargs["system_prompt"]
         assert "technical documentation translator" in prompt
         assert "Translate description fully into hi." in prompt
+        assert "Translate every other word and phrase into Hindi" in prompt
 
     def test_packed_retry_feedback_does_not_modify_numbered_sources(self, ollama_model_info):
         backend = LLMModelBackend(ollama_model_info, device="api")
