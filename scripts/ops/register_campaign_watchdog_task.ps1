@@ -28,7 +28,13 @@ silently no-ops.
 param(
     [switch]$Start,
     [int]$IntervalMinutes = 5,
-    [string]$CampaignId = 'portfolio-missing-sweep-llm-only-20260914'
+    [string]$CampaignId = 'portfolio-missing-sweep-llm-only-20260914',
+    # Defaults to 4: the configuration TC-PORT-LLM-009's real soak runs
+    # proved clean (zero unhandled crashes, zero orphans) after the
+    # concurrency-safety fixes landed. Without this parameter the task was
+    # silently registered at campaign_watchdog.ps1's own default of 1 worker
+    # -- a real, needless throughput regression found live 2026-09-17.
+    [ValidateRange(1, 4)] [int]$MaxWorkers = 4
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,7 +60,7 @@ if (-not [System.Diagnostics.EventLog]::SourceExists($eventSource)) {
 
 $action = New-ScheduledTaskAction `
     -Execute $powershell `
-    -Argument ("-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$entrypoint`" -CampaignId `"$CampaignId`"") `
+    -Argument ("-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$entrypoint`" -CampaignId `"$CampaignId`" -MaxWorkers $MaxWorkers") `
     -WorkingDirectory $repo
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes) -RepetitionDuration ([TimeSpan]::MaxValue)
 $taskPrincipal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest
@@ -90,5 +96,6 @@ $info = Get-ScheduledTaskInfo -TaskName $taskName
     NextRunTime     = $info.NextRunTime
     LastTaskResult  = $info.LastTaskResult
     IntervalMinutes = $IntervalMinutes
+    MaxWorkers      = $MaxWorkers
     RunLevel        = [string]$task.Principal.RunLevel
 } | Format-List
