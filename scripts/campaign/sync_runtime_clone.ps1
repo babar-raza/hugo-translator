@@ -23,8 +23,8 @@ evidence, not a silent side effect.
 #>
 [CmdletBinding()]
 param(
-    [string]$ControlRepo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
-    [string]$RuntimeRepo = (Join-Path $ControlRepo '.local\portfolio-runtime-writable'),
+    [string]$ControlRepo,
+    [string]$RuntimeRepo,
     [string]$Ref = (git -C $ControlRepo rev-parse --abbrev-ref HEAD),
     # Optional: a campaign manifest whose translator_repo_sha must track the
     # repinned clone. verify_environment() hard-refuses on SHA drift, so a
@@ -51,6 +51,16 @@ else:
 }
 
 $ErrorActionPreference = 'Stop'
+
+# PowerShell 5.1 evaluates parameter defaults before reliably populating
+# $PSScriptRoot when invoked with -File. Resolve dependent defaults after the
+# parameter block so the governed repin works from any working directory.
+if ([string]::IsNullOrWhiteSpace($ControlRepo)) {
+    $ControlRepo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+}
+if ([string]::IsNullOrWhiteSpace($RuntimeRepo)) {
+    $RuntimeRepo = Join-Path $ControlRepo '.local\portfolio-runtime-writable'
+}
 
 if (-not (Test-Path (Join-Path $RuntimeRepo '.git'))) {
     throw "Not a git repository: $RuntimeRepo"
