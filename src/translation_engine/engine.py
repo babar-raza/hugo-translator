@@ -1903,7 +1903,11 @@ class TranslationEngine:
         if set(gate_result.gate_results) != expected_gate_ids or any(
             not item.get("passed", False) for item in gate_result.gate_results.values()
         ):
-            raise ValueError("candidate lacks an all-pass 43-gate write receipt")
+            actual_gate_ids = ",".join(str(gate_id) for gate_id in sorted(gate_result.gate_results))
+            raise ValueError(
+                "candidate lacks an all-pass 43-gate write receipt "
+                f"gate_ids={actual_gate_ids or 'none'}"
+            )
         final_content = (
             gate_result.cleaned_content
             if gate_result.cleaned_content is not None
