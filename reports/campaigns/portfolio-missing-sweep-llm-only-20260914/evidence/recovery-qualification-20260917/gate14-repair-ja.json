@@ -1,0 +1,8 @@
+{
+  "status": "PAUSED_VALIDATION_REGRESSION",
+  "reason": "GATE14 persisted for encode-options.md after targeted retry guidance",
+  "accepted_current_run": 1,
+  "rejected_current_run": 2,
+  "session_id": "post-repair-ja-20260917",
+  "receipts_preserved": true
+}
