@@ -57,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
 
     retained: list[dict[str, Any]] = []
     stale: list[dict[str, Any]] = []
+    orphaned: list[dict[str, Any]] = []
     for receipt in receipts:
         output = str(receipt.get("output_path") or "")
         if output not in ownership:
@@ -66,7 +67,21 @@ def main(argv: list[str] | None = None) -> int:
         if not claimed or receipt_fingerprint(unsigned) != claimed:
             raise ValueError(f"receipt fingerprint mismatch: {output}")
         target = content_repo / output
-        if not target.is_file() or sha256_file(target) != receipt.get("output_sha256"):
+        if not target.is_file():
+            # This is a real, shared, multi-session content repo -- another
+            # session's own governed deletion can legitimately remove a file
+            # this campaign committed (found live 2026-09-17: a peer session's
+            # approved Deletion Governance Record removed an entire stale
+            # shadow-candidate page this campaign had translated into it,
+            # including the file a receipt here still points at). That is not
+            # a config-policy question this script exists to answer, and a
+            # missing target must never hard-stop every future unattended
+            # startup. Drop the receipt; do not resurrect a file another
+            # governance process deliberately removed by queuing it as a
+            # replace_existing retranslation target.
+            orphaned.append(receipt)
+            continue
+        if sha256_file(target) != receipt.get("output_sha256"):
             raise ValueError(f"receipt/output hash mismatch: {output}")
         if str(receipt.get("config_fingerprint") or "") == current_config:
             retained.append(receipt)
@@ -84,9 +99,10 @@ def main(argv: list[str] | None = None) -> int:
         "receipts": len(receipts),
         "retained": len(retained),
         "invalidated": len(stale),
+        "orphaned": len(orphaned),
         "executed": bool(args.execute),
     }
-    if not stale or not args.execute:
+    if (not stale and not orphaned) or not args.execute:
         print(json.dumps(result, sort_keys=True))
         return 0
 
@@ -114,6 +130,33 @@ def main(argv: list[str] | None = None) -> int:
         fsync=True,
         create_parents=True,
     )
+
+    if orphaned:
+        orphaned_path = ledger_dir / "orphaned_receipts.jsonl"
+        orphaned_evidence = "".join(
+            json.dumps(
+                {
+                    "campaign_id": campaign_id,
+                    "dropped_at": invalidated_at,
+                    "reason": "receipted_output_missing_from_content_repo",
+                    "prior_receipt": receipt,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+            + "\n"
+            for receipt in orphaned
+        )
+        previous_orphaned = (
+            orphaned_path.read_text(encoding="utf-8") if orphaned_path.is_file() else ""
+        )
+        atomic_write(
+            path=orphaned_path,
+            content=previous_orphaned + orphaned_evidence,
+            encoding="utf-8",
+            fsync=True,
+            create_parents=True,
+        )
     atomic_write(
         path=receipts_path,
         content="".join(
