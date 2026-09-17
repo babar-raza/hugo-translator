@@ -503,6 +503,28 @@ def _run_wave(
                     f"eta={eta} live_children={live}/{len(children)}",
                     flush=True,
                 )
+                # Keep the authoritative watchdog state live during healthy
+                # execution as well as on pause/exit.  The controller creates
+                # the RUNNING marker, but without this refresh it cannot
+                # distinguish a live wave from a hung or abandoned process.
+                if getattr(args, "watchdog_state", None):
+                    args.watchdog_state.parent.mkdir(parents=True, exist_ok=True)
+                    args.watchdog_state.write_text(
+                        json.dumps(
+                            {
+                                "status": "RUNNING",
+                                "reason": None,
+                                "accepted_current_run": accepted - accepted_at_start,
+                                "rejected_current_run": max(failed - failed_at_start, 0),
+                                "accepted_total": accepted,
+                                "rejected_total": failed,
+                                "updated_at": time.time(),
+                            },
+                            indent=2,
+                            sort_keys=True,
+                        ),
+                        encoding="utf-8",
+                    )
                 last_report = now
             # TC-PS-04: evaluate only rows created by this wave, never stale history.
             fresh_failures: list[dict[str, Any]] = []
