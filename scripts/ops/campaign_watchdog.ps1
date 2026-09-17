@@ -170,6 +170,29 @@ if ($live.Count -gt 0) {
 }
 
 # NOT_RUNNING (either genuinely idle, or just cleaned up above as stale).
+#
+# Commit whatever qualifying batches are already sitting uncommitted BEFORE
+# any of the pause/relaunch decisions below -- a wave that ends in a
+# validation-regression pause or a no-progress stop can still hold perfectly
+# good, already-accepted receipts that deserve to land regardless of whether
+# the campaign itself keeps going. This also covers the crash/interrupt case
+# where a prior run accumulated receipts but never reached its own
+# end-of-run reconcile step. Safe here specifically because we've just
+# confirmed nothing is live: this never races the active-run ledger-lock
+# contention that ruled out reconciling from inside the launcher's own
+# per-tick progress loop.
+try {
+    & $py "$controlRepo\scripts\campaign\reconcile_receipted_commits.py" `
+        --manifest $manifestPath --content-repo $contentRepoPath `
+        --ledger-root (Join-Path $controlRepo 'data\campaigns') `
+        --min-batch-size 5 --execute --session-id ([guid]::NewGuid().ToString()) | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Tick "state=RECONCILE_FAILED exit=$LASTEXITCODE -- continuing regardless"
+    }
+} catch {
+    Write-Tick "state=RECONCILE_FAILED error=$($_.Exception.Message) -- continuing regardless"
+}
+
 $campaignState = $null
 if (Test-Path $campaignWatchdogState) {
     try { $campaignState = Get-Content -LiteralPath $campaignWatchdogState -Raw | ConvertFrom-Json } catch { }
@@ -247,24 +270,6 @@ sys.path.insert(0, r'$controlRepo')
 from src.workers.work_claims import release_claim
 release_claim('$familyKey', '$($claim.session_id)')
 "@ | Out-Null
-}
-
-# Commit whatever qualifying batches are already sitting uncommitted BEFORE
-# starting the next wave -- covers the crash/interrupt case where a prior
-# run accumulated receipts but never reached its own end-of-run reconcile
-# step. Safe here specifically because we've just confirmed nothing is
-# live: this never races the active-run ledger-lock contention that ruled
-# out reconciling from inside the launcher's own per-tick progress loop.
-try {
-    & $py "$controlRepo\scripts\campaign\reconcile_receipted_commits.py" `
-        --manifest $manifestPath --content-repo $contentRepoPath `
-        --ledger-root (Join-Path $controlRepo 'data\campaigns') `
-        --min-batch-size 5 --execute --session-id ([guid]::NewGuid().ToString()) | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Tick "state=RECONCILE_FAILED exit=$LASTEXITCODE -- continuing to relaunch regardless"
-    }
-} catch {
-    Write-Tick "state=RECONCILE_FAILED error=$($_.Exception.Message) -- continuing to relaunch regardless"
 }
 
 Write-Tick "state=RELAUNCHING attempt=$($meta.consecutive_no_progress_relaunches + 1) accepted=$acceptedNow max_workers=$MaxWorkers"
