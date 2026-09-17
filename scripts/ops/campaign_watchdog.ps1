@@ -82,6 +82,23 @@ function Write-Tick([string]$Message) {
     "$(Get-Date -Format o) $Message" | Add-Content -LiteralPath $tickLog
 }
 
+function Test-ManifestControllerRevision {
+    if (-not (Test-Path -LiteralPath $manifestPath)) {
+        return @{ Ok = $false; Reason = 'manifest_missing' }
+    }
+    $declared = Select-String -LiteralPath $manifestPath -Pattern '^translator_repo_sha:\s*([0-9a-fA-F]{40})\s*$' |
+        Select-Object -First 1
+    if (-not $declared) {
+        return @{ Ok = $false; Reason = 'manifest_revision_missing' }
+    }
+    $current = (& git -C $controlRepo rev-parse HEAD 2>$null).Trim()
+    $pinned = $declared.Matches[0].Groups[1].Value.ToLowerInvariant()
+    if (-not $current -or $current.ToLowerInvariant() -ne $pinned) {
+        return @{ Ok = $false; Reason = "manifest_revision_drift:pinned=$pinned current=$current" }
+    }
+    return @{ Ok = $true; Reason = 'revision_match' }
+}
+
 function Get-AcceptedCount {
     $receipts = Join-Path $ledgerRoot 'acceptance_receipts.jsonl'
     if (-not (Test-Path $receipts)) { return 0 }
@@ -256,6 +273,22 @@ if ($meta.consecutive_no_progress_relaunches -ge $MaxConsecutiveNoProgressRelaun
         "it stops and alerts instead of escalating to any agent. Investigate " +
         "$tickLog and the most recent child logs under logs\, then clear " +
         "$metaPath's stopped flag (or delete it) to resume."
+    ) -meta $meta
+    $meta.stopped = $true
+    Save-Meta $meta
+    exit 0
+}
+
+# Never launch a stale manifest.  A controller change after manifest creation
+# must be followed by a fresh pinned rebuild; otherwise the wrapper can spend
+# its entire retry window in preflight and the scheduler will relaunch it
+# forever.  This gate is independent of the campaign pause state above.
+$revisionCheck = Test-ManifestControllerRevision
+if (-not $revisionCheck.Ok) {
+    Write-Tick "state=STOPPED_STALE_MANIFEST reason=$($revisionCheck.Reason) accepted=$acceptedNow -- not relaunching"
+    Send-Alert -Signature "stale_manifest:$($revisionCheck.Reason)" -Message (
+        "Campaign '$CampaignId' manifest cannot be launched: $($revisionCheck.Reason). " +
+        'Rebuild and validate the manifest at the current controller revision before resuming.'
     ) -meta $meta
     $meta.stopped = $true
     Save-Meta $meta
