@@ -61,6 +61,29 @@ $env:TRANSFORMERS_OFFLINE = '1'
 # Candidate-free phase markers for supervised recovery qualification.  They
 # expose startup stalls without placing source/candidate text in logs.
 $env:CAMPAIGN_STARTUP_DIAGNOSTICS = '1'
+# Mitigation, not a confirmed root-cause fix, for a real crash found live
+# 2026-09-17: all 4 workers of a run died with the identical Windows
+# exception 0xC0000005 (STATUS_ACCESS_VIOLATION) inside torch_cpu.dll
+# (Application-log Event ID 1000 + the raw child exit code both confirm
+# the same code) -- the "forrtl: ... window-CLOSE event" text printed by
+# some of them is the Intel/MKL runtime's own generic abort message for an
+# unhandled exception, not literally a console-close signal; the TC-PORT-
+# LLM-012 Win32-console-handler diagnosis this crash text previously drove
+# was treating a misleading symptom as the cause. No OMP/MKL thread-count
+# constraint existed anywhere in this codebase, so each of the 4 worker
+# processes' PyTorch backend (loaded via the L3 semantic-similarity
+# encoder) defaults to claiming every CPU core for its own thread pool --
+# under 4 concurrent processes doing that at once, on a machine also
+# running several other unrelated heavy sessions, that is a well-known
+# real cause of native MKL/OpenMP instability under core oversubscription.
+# Bounding each worker to a small, fixed thread count is standard practice
+# for exactly this deployment shape and has no real cost here (the actual
+# workload is professionalize_llm network I/O, not local tensor math).
+# Not yet proven to be *the* cause -- flagged honestly as a reasoned
+# mitigation for a newly identified real crash class, pending a clean
+# re-run under load to see whether it recurs.
+$env:OMP_NUM_THREADS = '1'
+$env:MKL_NUM_THREADS = '1'
 
 # The runtime clone is revision-pinned and may be ACL-restricted when launched
 # elevated.  Run children from ControlRepo so immutable FastText/HF caches are
