@@ -648,6 +648,12 @@ class WriteGateEvaluator:
         # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 4/637 (0.6%)
         # known-good hits; adversarial/negative fixtures both correct.
         (44, "_gate_seo_length_sanity", "content", "block"),
+        # ASPOSE-BLOG-DEPLOY-ALIAS-RECURRENCE-001 (2026-09-17): closes the
+        # gap that let blog.aspose.org deploy 3 times on aliases:/url:
+        # contamination FrontmatterProtectionValidator already knew how to
+        # catch but was never wired into this registry. Ships "warn" pending
+        # a clean-sample false-positive check, same convention as 31-44.
+        (45, "_gate_ignore_mode_field_leak", "structural", "warn"),
     ]
 
     def __init__(
@@ -766,6 +772,7 @@ class WriteGateEvaluator:
                 source_doc,
                 result,
                 translation_stats=translation_stats,
+                site_profile=site_profile,
             )
             if working != translated_content:
                 result.cleaned_content = working
@@ -837,6 +844,7 @@ class WriteGateEvaluator:
             source_doc,
             result,
             translation_stats=translation_stats,
+            site_profile=site_profile,
         )
         if working != translated_content:
             result.cleaned_content = working
@@ -1361,6 +1369,7 @@ class WriteGateEvaluator:
         output_path: Path,
         source_doc: object,
         translation_stats: object = None,
+        site_profile: object = None,
     ) -> dict[str, object]:
         """Build the signature-normalizing dispatch table shared by
         ``_run_content_gates`` (production write path) and
@@ -1386,6 +1395,9 @@ class WriteGateEvaluator:
         None.
         """
         return {
+            "_gate_ignore_mode_field_leak": lambda src, w, path, res: self._gate_ignore_mode_field_leak(
+                w, path, res, site_profile
+            ),
             "_gate_heading_integrity": lambda src, w, path, res: self._gate_heading_integrity(
                 src, w, path, source_doc, res, target_lang
             ),
@@ -1517,6 +1529,7 @@ class WriteGateEvaluator:
         source_doc: object,
         result: WriteGateResult,
         translation_stats: object = None,
+        site_profile: object = None,
     ) -> str:
         """Run all content quality gates (GATE_REGISTRY entries with action
         'auto_clean', 'block', or 'warn') against the production write path's
@@ -1529,7 +1542,7 @@ class WriteGateEvaluator:
         every gate's independent verdict rather than the first failure.
         """
         dispatch = self._build_content_gate_dispatch(
-            target_lang, output_path, source_doc, translation_stats
+            target_lang, output_path, source_doc, translation_stats, site_profile
         )
         working = translated_content
 
@@ -1602,6 +1615,7 @@ class WriteGateEvaluator:
         output_path: Path,
         source_doc: object = None,
         translation_stats: object = None,
+        site_profile: object = None,
     ) -> tuple[dict[int, WriteGateResult], str]:
         """Run every GATE_REGISTRY content gate (action 'auto_clean',
         'block', or 'warn') against ``(source_content, translated_content)``
@@ -1647,7 +1661,7 @@ class WriteGateEvaluator:
         the audit sweep's coverage either.
         """
         dispatch = self._build_content_gate_dispatch(
-            target_lang, output_path, source_doc, translation_stats
+            target_lang, output_path, source_doc, translation_stats, site_profile
         )
         results: dict[int, WriteGateResult] = {}
         working = translated_content
@@ -3908,6 +3922,83 @@ class WriteGateEvaluator:
                     len(tgt_value),
                 )
                 return
+
+    # ------------------------------------------------------------------
+    # Gate 45: IGNORE-mode frontmatter field leak (aliases:/url: contamination)
+    # ASPOSE-BLOG-DEPLOY-ALIAS-RECURRENCE-001 (2026-09-17): this repo's own
+    # site profiles set `aliases` and `url` to `mode: ignore` for all 4
+    # aspose.org site profiles (2026-09-01, config/site_profiles/*.yaml)
+    # specifically because a byte-identical aliases:/url: value copied into
+    # every translated locale copy of a page collapses all of them onto the
+    # same Hugo output path (a leading-slash aliases:/explicit url: value
+    # bypasses Hugo's per-language URL prefixing) -- confirmed by a real
+    # Hugo build reproducing "Duplicate target paths" for the exact affected
+    # aspose.org content files. reconstruct_frontmatter() already drops
+    # IGNORE-mode fields correctly (markdown_reconstructor.py), and
+    # FrontmatterProtectionValidator already has a matching check
+    # (_check_ignore_fields) -- but neither validator class was ever wired
+    # into this file's production gate registry (confirmed: every reference
+    # to FrontmatterProtectionValidator outside its own module is either
+    # ValidationSuite.from_config(), itself documented above as "never run
+    # in production", or a construction call with no invocation of the
+    # ignore-fields check). That gap is why stale, pre-fix cached
+    # translation output could still be adopted wholesale into aspose.org
+    # content weeks after the site-profile fix landed, reintroducing the
+    # exact contamination TC-ALIAS-005 had already cleaned up once. This
+    # gate is process-agnostic like Gate 30: it blocks the shape regardless
+    # of which writer produced the candidate content, given a site_profile.
+    # Ships "warn" pending a clean-sample false-positive check against real
+    # content (same rollout convention as gates 31-44) before promotion to
+    # "block" in this registry.
+    # ------------------------------------------------------------------
+
+    def _gate_ignore_mode_field_leak(
+        self,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+        site_profile: Any = None,
+    ) -> None:
+        """Flag a frontmatter field the site profile marks `mode: ignore`
+        that is nonetheless present in the translated output.
+
+        ``reconstruct_frontmatter()`` (markdown_reconstructor.py) already
+        removes every ``mode: ignore`` field when content goes through the
+        normal reconstruction step. A leak here means this candidate content
+        never went through that step at all -- e.g. a stale cached
+        translation adopted wholesale, or a writer that bypasses this
+        pipeline entirely. No-ops if ``site_profile`` is not supplied (the
+        caller has no frontmatter rules to check against).
+        """
+        if site_profile is None or not getattr(site_profile, "frontmatter", None):
+            return
+
+        split = _fm_parser._split_frontmatter(translated_content)
+        if split is None:
+            return
+        fm_data = _fm_parser._parse_yaml_content(split[0])
+        if not isinstance(fm_data, dict):
+            return
+
+        leaked = sorted(
+            key
+            for key, rule in site_profile.frontmatter.items()
+            if getattr(rule, "mode", None) == FrontmatterMode.IGNORE and key in fm_data
+        )
+        if not leaked:
+            return
+
+        result.passed = False
+        result.error = (
+            f"GATE45 IGNORE-FIELD LEAK {output_path.name}: mode:ignore "
+            f"field(s) present in output (should have been removed by "
+            f"reconstruct_frontmatter): {leaked}"
+        )
+        logger.warning(
+            "GATE45 IGNORE-FIELD LEAK (warn-only, pending promotion) %s: %s",
+            output_path.name,
+            leaked,
+        )
 
     # ------------------------------------------------------------------
     # Gate 41: homoglyph substitution in code spans/identifiers
