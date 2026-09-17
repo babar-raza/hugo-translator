@@ -2012,6 +2012,30 @@ class CampaignRunner:
             instructions.append(
                 "Preserve every source claim and section with no omission, reversal, or invented fact."
             )
+        if "Gate 21 inline code translated" in raw_error:
+            # Found live 2026-09-17 investigating a self-healing retry gap: this
+            # exact defect (`Page.Annotations()` translated into the target
+            # language) reproduced identically across two different locales
+            # (ro, fa) with zero corrective guidance between attempts -- GATE5/
+            # GATE36/TC-SAS-01 already get a targeted retry instruction, GATE21
+            # never did, so every retry was a blind repeat of the same mistake.
+            gate21_match = re.search(
+                r"Gate 21 inline code translated: `(.*?)` → `(.*?)`", raw_error
+            )
+            if gate21_match:
+                original_span = gate21_match.group(1)
+                instructions.append(
+                    "Reproduce this inline code span exactly as it appears in the source, "
+                    f"character for character, without translating any part of it: `{original_span}`. "
+                    "It is a code or API reference (a method call, class member, or identifier) "
+                    "and must never be translated or transliterated, even partially."
+                )
+            else:
+                instructions.append(
+                    "Reproduce every inline code span (text inside backticks) exactly as it "
+                    "appears in the source, character for character. Inline code is never "
+                    "translated, even partially."
+                )
         if "TC-SAS-01" in raw_error:
             instructions.append(
                 "Translate every translatable source unit; identical output is allowed only for "

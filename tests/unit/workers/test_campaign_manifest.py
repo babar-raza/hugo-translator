@@ -2263,6 +2263,38 @@ def test_gate_five_retry_feedback_requires_translated_markdown_labels():
     assert "Preserve URLs" in feedback
 
 
+def test_gate_21_retry_feedback_names_the_exact_span_that_was_translated():
+    """A real, reproduced defect (2026-09-17): professionalize_llm translated
+    the protected API identifier `Page.Annotations()` into the target
+    language, identically across two different locales, with zero corrective
+    feedback between attempts because GATE21 (unlike GATE5/GATE36/TC-SAS-01)
+    never fed anything back into the retry prompt.
+    """
+    result = SimpleNamespace(
+        validation_result=None,
+        verification_result=None,
+        error="Gate 21 inline code translated: `Page.Annotations()` → `Page.Adnotări()`",
+    )
+
+    feedback = CampaignRunner._retry_feedback(result, "ro")
+
+    assert "Page.Annotations()" in feedback
+    assert "Adnotări" not in feedback  # never echo the wrong candidate text back
+    assert "must never be translated" in feedback
+
+
+def test_gate_21_retry_feedback_falls_back_when_span_cannot_be_parsed():
+    result = SimpleNamespace(
+        validation_result=None,
+        verification_result=None,
+        error="Gate 21 inline code translated: unparseable legacy format",
+    )
+
+    feedback = CampaignRunner._retry_feedback(result, "ro")
+
+    assert "Inline code is never translated" in feedback
+
+
 def test_failure_metadata_preserves_final_acceptance_diagnostic_code():
     result = SimpleNamespace(
         validation_result=None,
