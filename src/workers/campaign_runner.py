@@ -1995,7 +1995,11 @@ class CampaignRunner:
                 instructions.append(locale_retry_hint)
         if "RepetitionDetectorValidator" in validators:
             instructions.append(
-                "Avoid adding repeated phrases or duplicate sentences beyond the source structure."
+                "Avoid adding repeated phrases or duplicate sentences beyond the source structure. "
+                "Before returning the final translation, compare repeated 3-8 word sequences "
+                "with the source and rewrite any model-created duplicate sentence or table-cell "
+                "phrase; preserve repetition that is demonstrably present in the source, such "
+                "as recurring headings, labels, or API names."
             )
         raw_error = str(getattr(result, "error", "") or "")
         if "GATE5" in raw_error:
