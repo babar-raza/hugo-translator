@@ -2019,7 +2019,10 @@ class CampaignRunner:
                 "including explanatory sentences and link labels. Preserve only "
                 "code fences, inline code, API identifiers, product names, URLs, "
                 "versions, and placeholders exactly; do not leave English prose "
-                f"unchanged in {locale_label}."
+                f"unchanged in {locale_label}. This includes Markdown table-cell "
+                "descriptions, bullet/list text, frontmatter title/description, and "
+                "admonition labels; translate each such unit independently even when "
+                "the surrounding line contains an identifier."
             )
         if "GATE36" in raw_error:
             instructions.append(
