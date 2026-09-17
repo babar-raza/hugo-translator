@@ -242,6 +242,20 @@ try {
     Show-Progress
     Write-Controller 'campaign launcher and final TM drain completed'
 } catch {
+    # Never leave an unattended run looking healthy after the launcher shim,
+    # child wave, reconciliation, or TM drain fails.  Persist a terminal
+    # state that includes the run identity and a bounded reason; the next
+    # controller archives this file before creating a new RUNNING marker.
+    try {
+        @{
+            status = 'PAUSED_LAUNCHER_FAILURE'
+            reason = $_.Exception.Message
+            session_id = $SessionId
+            failed_at = (Get-Date -Format o)
+        } | ConvertTo-Json | Set-Content -LiteralPath $WatchdogState -Encoding UTF8
+    } catch {
+        Write-Controller "watchdog state write failed: $($_.Exception.Message)"
+    }
     Write-Controller "FAILED $($_.Exception.Message)"
     throw
 }
