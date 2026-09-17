@@ -12,6 +12,7 @@ Enhanced with:
 
 import json
 import logging
+import os
 import pickle
 import threading
 import time
@@ -50,6 +51,29 @@ class SemanticMatch:
         return asdict(self)
 
 
+def _cached_sentence_transformer_snapshot(model_name: str) -> Path | None:
+    """Resolve a cached Hugging Face snapshot without a network request."""
+    candidate = Path(model_name)
+    if candidate.is_dir():
+        return candidate.resolve()
+
+    from huggingface_hub import constants as hf_constants
+
+    cache_root = Path(os.environ.get("HF_HUB_CACHE", hf_constants.HF_HUB_CACHE))
+    repo_cache = cache_root / f"models--{model_name.replace('/', '--')}"
+    ref = repo_cache / "refs" / "main"
+    if ref.is_file():
+        snapshot = repo_cache / "snapshots" / ref.read_text(encoding="utf-8").strip()
+        if snapshot.is_dir():
+            return snapshot.resolve()
+    snapshots = repo_cache / "snapshots"
+    if snapshots.is_dir():
+        available = sorted(path for path in snapshots.iterdir() if path.is_dir())
+        if len(available) == 1:
+            return available[0].resolve()
+    return None
+
+
 def load_standalone_sentence_encoder(model_name: str, use_gpu: bool = False) -> SentenceTransformer:
     """Load a SentenceTransformer encoder without the rest of L3SemanticTM's
     setup (FAISS index, on-disk metadata, periodic-save machinery).
@@ -74,54 +98,19 @@ def load_standalone_sentence_encoder(model_name: str, use_gpu: bool = False) -> 
     call per translated document) versus the bulk-embedding workload L3's
     own GPU path is optimized for.
 
-    TC-PORT-LLM-011 follow-up: Professionalize-only campaigns set
-    HF_HUB_OFFLINE=1/TRANSFORMERS_OFFLINE=1 (start_portfolio_missing_sweep_
-    autonomous.ps1) specifically to fail fast on a hidden GENERATIVE model
-    download -- this encoder is a local validation tool, not a generative
-    route, and was never the intended target of that restriction. Passing
-    local_files_only=True is not enough to honor that restriction safely:
-    confirmed live (and reproduced directly against transformers'
-    installed version) that even with local_files_only=True, tokenizer
-    loading unconditionally calls transformers.tokenization_utils_base
-    ._patch_mistral_regex -> is_base_mistral -> huggingface_hub.model_info,
-    an unrelated Mistral-specific check that still hits the network and
-    raises OfflineModeIsEnabled outright under offline mode, for every
-    model, not just Mistral ones -- a transformers-side gap that ignores
-    local_files_only. That exception was silently swallowed by the caller's
-    broad except, leaving SemanticSimilarityValidator's encoder permanently
-    unset for the whole process even though this exact model was already
-    fully cached (~/.cache/huggingface/hub/models--sentence-transformers--
-    paraphrase-multilingual-MiniLM-L12-v2). Every cell then hit the "no
-    encoder available" branch and rejected unconditionally, regardless of
-    actual translation quality -- not a content-quality signal at all.
-
-    The fix: temporarily lift the offline restriction for just this one,
-    known-non-generative, already-cached load, restoring it immediately
-    after (even on failure) so nothing else in the process is affected. In
-    the common case (network reachable) this is a fast cached-metadata
-    check, not a real download; if network is genuinely unavailable it
-    fails the same way it did before -- silently, via the caller's existing
-    except -- not worse than today.
-
-    Toggling the HF_HUB_OFFLINE/TRANSFORMERS_OFFLINE environment variables
-    at this point does nothing: huggingface_hub reads them exactly once,
-    into a module-level constant, at import time (constants.py:
-    ``HF_HUB_OFFLINE = _is_true(os.environ.get(...))``), and by the time
-    this function runs, huggingface_hub/transformers/sentence_transformers
-    are already imported -- confirmed live, an os.environ-only version of
-    this fix still failed identically. The actual enforcement point
-    (huggingface_hub.utils._http's request Session.send) reads that cached
-    constant, so that constant is what must be patched, not the
-    environment.
+    Professionalize-only campaigns set HF_HUB_OFFLINE and
+    TRANSFORMERS_OFFLINE to prevent hidden model downloads.  Passing an
+    identifier to SentenceTransformer can still resolve tokenizer metadata
+    remotely in the installed transformers version.  Resolve the immutable
+    cached snapshot first and retain ``local_files_only``.  A cache miss must
+    fail closed rather than download or hang in an unattended run.
     """
-    from huggingface_hub import constants as _hf_constants
-
-    was_offline = _hf_constants.HF_HUB_OFFLINE
-    _hf_constants.HF_HUB_OFFLINE = False
-    try:
-        return SentenceTransformer(model_name, device="cuda" if use_gpu else "cpu")
-    finally:
-        _hf_constants.HF_HUB_OFFLINE = was_offline
+    cached_snapshot = _cached_sentence_transformer_snapshot(model_name)
+    return SentenceTransformer(
+        str(cached_snapshot) if cached_snapshot is not None else model_name,
+        device="cuda" if use_gpu else "cpu",
+        local_files_only=True,
+    )
 
 
 class L3SemanticTM:
