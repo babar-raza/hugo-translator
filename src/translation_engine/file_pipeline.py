@@ -951,7 +951,7 @@ class FileTranslationPipeline:
                                 for gate_id in _failed_gates.group(1).split(",")
                                 if gate_id
                             }
-                        elif "all-pass 43-gate write receipt" in validation_error:
+                        elif "write receipt" in validation_error and "gate_ids=" in validation_error:
                             result.rejection_diagnostic_code = "TC-ACCEPTANCE-RECEIPT"
                         else:
                             result.rejection_diagnostic_code = "TC-ACCEPTANCE-ERROR"

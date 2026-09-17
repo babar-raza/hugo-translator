@@ -314,7 +314,7 @@ def _candidate_acceptance_engine(*, validation_warnings: int = 0):
         passed=True,
         cleaned_content="---\ntitle: Destino\n---\nCuerpo.\n",
         gate_results={
-            gate_id: {"passed": True, "action": "test", "error": None} for gate_id in range(2, 45)
+            gate_id: {"passed": True, "action": "test", "error": None} for gate_id in range(2, 46)
         },
     )
     gates._fidelity_result = {
@@ -348,7 +348,7 @@ def test_candidate_byte_acceptance_reruns_all_gates_without_writing(tmp_path):
     )
 
     assert accepted.content == candidate
-    assert len(accepted.gate_results) == 44
+    assert len(accepted.gate_results) == 45
     assert all(item["passed"] for item in accepted.gate_results.values())
     assert accepted.model_fingerprint == ("receipt-recovery:fidelity=professionalize_llm")
     assert not output_path.exists()

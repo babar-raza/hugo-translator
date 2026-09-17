@@ -1899,13 +1899,21 @@ class TranslationEngine:
                 f"failed_gates={','.join(map(str, failed_gates)) or 'unknown'} "
                 f"reason_sha256={reason_hash}"
             )
-        expected_gate_ids = set(range(2, 45))
-        if set(gate_result.gate_results) != expected_gate_ids or any(
+        actual_gate_ids = set(gate_result.gate_results)
+        # Gate 45 is an independently registered zero-defect gate.  Keep the
+        # historical baseline (2..44) mandatory, but derive the upper bound
+        # from the registry so adding a governed gate cannot make every valid
+        # candidate fail at the receipt contract.
+        expected_gate_ids = set(range(2, max(actual_gate_ids, default=0) + 1))
+        # A newly accepted candidate must carry Gate 45 as well as the
+        # historical gates.  This prevents stale pre-Gate-45 receipts from
+        # authorizing new content writes while preserving old receipt reads.
+        if max(actual_gate_ids, default=0) < 45 or actual_gate_ids != expected_gate_ids or any(
             not item.get("passed", False) for item in gate_result.gate_results.values()
         ):
-            actual_gate_ids = ",".join(str(gate_id) for gate_id in sorted(gate_result.gate_results))
+            actual_gate_ids = ",".join(str(gate_id) for gate_id in sorted(actual_gate_ids))
             raise ValueError(
-                "candidate lacks an all-pass 43-gate write receipt "
+                "candidate lacks an all-pass registered-gate write receipt "
                 f"gate_ids={actual_gate_ids or 'none'}"
             )
         final_content = (
@@ -1984,7 +1992,12 @@ class TranslationEngine:
             raise TypeError("zero-defect writer requires AcceptedTranslation")
         if accepted.validation_policy != "zero-defect":
             raise ValueError("accepted translation has the wrong validation policy")
-        expected_gate_ids = set(range(1, 45))
+        # Receipts produced after Gate 45 was registered must include every
+        # registered gate (1..45).  Keep accepting historical 1..44 receipts
+        # during read-only recovery so previously committed outputs remain
+        # verifiable; new writes are guarded by accept_candidate_bytes below.
+        max_gate_id = max((int(gate_id) for gate_id in accepted.gate_results), default=0)
+        expected_gate_ids = set(range(1, max_gate_id + 1))
         invalid_gates = [
             gate_id
             for gate_id, item in accepted.gate_results.items()
@@ -1994,7 +2007,7 @@ class TranslationEngine:
             in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
             or item.get("error") is not None
         ]
-        if set(accepted.gate_results) != expected_gate_ids or invalid_gates:
+        if max_gate_id < 44 or set(accepted.gate_results) != expected_gate_ids or invalid_gates:
             raise ValueError("accepted translation contains a non-final gate receipt")
 
         file_existed = accepted.output_path.exists()
@@ -2033,7 +2046,8 @@ class TranslationEngine:
 
         if not isinstance(accepted, AcceptedTranslation):
             raise TypeError("TM flush requires AcceptedTranslation")
-        expected_gate_ids = set(range(1, 45))
+        max_gate_id = max((int(gate_id) for gate_id in accepted.gate_results), default=0)
+        expected_gate_ids = set(range(1, max_gate_id + 1))
         invalid_gates = [
             gate_id
             for gate_id, item in accepted.gate_results.items()
@@ -2043,7 +2057,7 @@ class TranslationEngine:
             in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
             or item.get("error") is not None
         ]
-        if set(accepted.gate_results) != expected_gate_ids or invalid_gates:
+        if max_gate_id < 44 or set(accepted.gate_results) != expected_gate_ids or invalid_gates:
             raise ValueError("TM flush requires an all-44-gates acceptance receipt")
         for entry in buffered_entries:
             self.tm.store(**entry)

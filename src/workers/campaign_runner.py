@@ -734,7 +734,8 @@ class CampaignRunner:
             if sha256_file(output_path) != receipt.get("output_sha256"):
                 raise CampaignManifestError(f"receipt/output hash mismatch: {output}")
             gates = receipt.get("gate_results") or {}
-            expected_gate_ids = {str(index) for index in range(1, 45)}
+            max_gate_id = max((int(gate_id) for gate_id in gates), default=0)
+            expected_gate_ids = {str(index) for index in range(1, max_gate_id + 1)}
             invalid_gates = [
                 gate_id
                 for gate_id, item in gates.items()
@@ -751,7 +752,7 @@ class CampaignRunner:
                 }
                 or item.get("error") is not None
             ]
-            if set(gates) != expected_gate_ids or invalid_gates:
+            if max_gate_id < 44 or set(gates) != expected_gate_ids or invalid_gates:
                 raise CampaignManifestError(f"receipt is not all-pass: {output}")
             valid[output] = receipt_migrations.get(output, receipt)
         if receipt_migrations:
@@ -835,7 +836,8 @@ class CampaignRunner:
             **gate_result.gate_results,
         }
         gate_results[36] = accepted_gate36
-        expected_gate_ids = set(range(1, 45))
+        max_gate_id = max((int(gate_id) for gate_id in gate_results), default=0)
+        expected_gate_ids = set(range(1, max_gate_id + 1))
         invalid = [
             gate_id
             for gate_id, item in gate_results.items()
@@ -845,7 +847,7 @@ class CampaignRunner:
             in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
             or item.get("error") is not None
         ]
-        if set(gate_results) != expected_gate_ids or invalid:
+        if max_gate_id < 44 or set(gate_results) != expected_gate_ids or invalid:
             raise CampaignManifestError(f"receipt revalidation not all-pass: {output_path}")
         migrated = {
             key: value
