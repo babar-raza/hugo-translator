@@ -67,22 +67,23 @@ def main(argv: list[str] | None = None) -> int:
         if not claimed or receipt_fingerprint(unsigned) != claimed:
             raise ValueError(f"receipt fingerprint mismatch: {output}")
         target = content_repo / output
-        if not target.is_file():
-            # This is a real, shared, multi-session content repo -- another
-            # session's own governed deletion can legitimately remove a file
-            # this campaign committed (found live 2026-09-17: a peer session's
-            # approved Deletion Governance Record removed an entire stale
-            # shadow-candidate page this campaign had translated into it,
-            # including the file a receipt here still points at). That is not
-            # a config-policy question this script exists to answer, and a
-            # missing target must never hard-stop every future unattended
-            # startup. Drop the receipt; do not resurrect a file another
-            # governance process deliberately removed by queuing it as a
-            # replace_existing retranslation target.
+        # This is a real, shared, multi-session content repo -- another
+        # session can legitimately remove or modify a file this campaign
+        # committed, entirely outside this campaign's own config-policy
+        # question. Found live 2026-09-17, twice, in the same session: (1) a
+        # peer session's approved Deletion Governance Record removed an
+        # entire stale shadow-candidate page this campaign had translated
+        # into, including a file a receipt here still pointed at; (2) a
+        # separate peer session fixed a deploy-breaking frontmatter field in
+        # a file this campaign had also translated, changing its hash. Both
+        # are real, legitimate, already-governed changes (auditable in the
+        # content repo's own git history) -- not corruption, and not this
+        # campaign's call to overwrite by queuing a replace_existing
+        # retranslation. Either case must never hard-stop every future
+        # unattended startup: drop the stale receipt and move on.
+        if not target.is_file() or sha256_file(target) != receipt.get("output_sha256"):
             orphaned.append(receipt)
             continue
-        if sha256_file(target) != receipt.get("output_sha256"):
-            raise ValueError(f"receipt/output hash mismatch: {output}")
         if str(receipt.get("config_fingerprint") or "") == current_config:
             retained.append(receipt)
             continue

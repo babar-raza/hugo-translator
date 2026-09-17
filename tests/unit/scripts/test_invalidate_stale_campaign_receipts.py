@@ -1,13 +1,15 @@
 """Unit tests for scripts/campaign/invalidate_stale_campaign_receipts.py.
 
 Covers a real defect found live 2026-09-17: a receipt whose committed output
-file was later removed by ANOTHER session's own governed deletion (this is a
-real, shared, multi-session content repo) made every future unattended
-startup crash with an unhandled ValueError -- "Stale receipt recovery
-failed." blocked the operator's real elevated run. A missing target must be
-dropped as orphaned, not treated as a config-policy question (that would wrongly
-queue it for retranslation, resurrecting a file another governance process
-deliberately removed) and never a hard stop.
+file was later removed OR modified by ANOTHER session's own governance (this
+is a real, shared, multi-session content repo -- both a Deletion Governance
+Record removing a stale shadow page, and a separate peer session's legitimate
+frontmatter fix, hit the same code path in one session) made every future
+unattended startup crash with an unhandled ValueError -- "Stale receipt
+recovery failed." blocked the operator's real elevated run. Neither case is a
+config-policy question this script exists to answer; both must be dropped as
+orphaned, never queued for retranslation (which would overwrite another
+session's already-governed change) and never a hard stop.
 """
 from __future__ import annotations
 
@@ -16,7 +18,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-import pytest
 import yaml
 
 from scripts.campaign.invalidate_stale_campaign_receipts import main
@@ -91,11 +92,17 @@ def test_a_receipt_whose_output_file_no_longer_exists_is_dropped_not_crashed(tmp
     assert "replace_existing" not in rewritten_manifest["sources"][0]
 
 
-def test_a_receipt_whose_output_exists_but_has_the_wrong_content_still_raises(tmp_path):
+def test_a_receipt_whose_output_exists_but_has_different_content_is_also_dropped(tmp_path):
+    """A real second case (2026-09-17, same investigation): a peer session's
+    own legitimate content fix (stripping a deploy-breaking frontmatter
+    field) changed a file this campaign had a receipt for. Not corruption,
+    not a config-policy question -- drop the stale receipt like a missing
+    file, never overwrite another session's already-governed change.
+    """
     content_repo = tmp_path / "content_repo"
     output_path = content_repo / "content/site/family/platform/page/index.fa.md"
     output_path.parent.mkdir(parents=True)
-    output_path.write_text("wrong content", encoding="utf-8", newline="")
+    output_path.write_text("a peer session's legitimate edit", encoding="utf-8", newline="")
 
     manifest_dict = _manifest(tmp_path, content_repo)
     manifest_path = tmp_path / "manifest.yaml"
@@ -108,12 +115,23 @@ def test_a_receipt_whose_output_exists_but_has_the_wrong_content_still_raises(tm
         json.dumps(receipt) + "\n", encoding="utf-8"
     )
 
-    with pytest.raises(ValueError, match="receipt/output hash mismatch"):
-        main([
-            "--manifest", str(manifest_path),
-            "--ledger-root", str(tmp_path / "ledger"),
-            "--execute",
-        ])
+    code = main([
+        "--manifest", str(manifest_path),
+        "--ledger-root", str(tmp_path / "ledger"),
+        "--execute",
+    ])
+    assert code == 0
+
+    remaining = (ledger_dir / "acceptance_receipts.jsonl").read_text(encoding="utf-8")
+    assert remaining.strip() == ""
+    orphaned = [
+        json.loads(line)
+        for line in (ledger_dir / "orphaned_receipts.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(orphaned) == 1
+    rewritten_manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    assert "replace_existing" not in rewritten_manifest["sources"][0]
 
 
 def test_a_receipt_under_an_old_config_fingerprint_is_still_queued_for_retranslation(tmp_path):
