@@ -2010,6 +2010,17 @@ class CampaignRunner:
                 f"ordinary label/prose word into {locale_label}; do not leave or generate English "
                 "link-label prose."
             )
+        if "GATE14" in raw_error or "Gate 14" in raw_error:
+            # Gate 14's non-Latin detector catches genuine untranslated prose,
+            # but Latin code/API spans remain intentional. Retry feedback must
+            # make that distinction explicit rather than repeating blindly.
+            instructions.append(
+                "Translate every ordinary prose line into the target locale, "
+                "including explanatory sentences and link labels. Preserve only "
+                "code fences, inline code, API identifiers, product names, URLs, "
+                "versions, and placeholders exactly; do not leave English prose "
+                f"unchanged in {locale_label}."
+            )
         if "GATE36" in raw_error:
             instructions.append(
                 "Preserve every source claim and section with no omission, reversal, or invented fact."

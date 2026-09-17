@@ -2263,6 +2263,18 @@ def test_gate_five_retry_feedback_requires_translated_markdown_labels():
     assert "Preserve URLs" in feedback
 
 
+def test_gate_fourteen_retry_feedback_translates_prose_preserving_code():
+    result = SimpleNamespace(
+        validation_result=None,
+        verification_result=None,
+        error="Gate 14 mixed language: 5 untranslated English lines",
+    )
+    feedback = CampaignRunner._retry_feedback(result, "ko")
+    assert "every ordinary prose line" in feedback
+    assert "code fences" in feedback
+    assert "English prose" in feedback
+
+
 def test_gate_21_retry_feedback_names_the_exact_span_that_was_translated():
     """A real, reproduced defect (2026-09-17): professionalize_llm translated
     the protected API identifier `Page.Annotations()` into the target
