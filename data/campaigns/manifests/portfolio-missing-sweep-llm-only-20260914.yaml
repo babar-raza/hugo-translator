@@ -3,7 +3,7 @@ campaign_id: portfolio-missing-sweep-llm-only-20260914
 validation_policy: zero-defect
 content_repo: D:/onedrive/Documents/GitHub/aspose.org
 content_repo_sha: a7c055c14ddea9612dd6a98eb2931ca3e626c010
-translator_repo_sha: 5724291f90564ade1f3db6e0e2851c4b050fa68d
+translator_repo_sha: 980ae0dd513b0034949d71ce2cc3d2ffb73769d7
 config_fingerprint: 7db2b5bee800759209e47c97f07e42a303606b1b0c481d6c8aeb593b3ee787f5
 model_fingerprints:
   model_registry: 632c4a146e97600632a888331225fc419b61f921261627e7ff40bc93a3adc25b
@@ -44,8 +44,8 @@ target_locales:
 - uk
 - vi
 - zh
-expected_source_count: 8217
-expected_output_count: 114323
+expected_source_count: 8216
+expected_output_count: 114322
 retry_policy:
   primary_model: professionalize_llm
   primary_attempts: 3
