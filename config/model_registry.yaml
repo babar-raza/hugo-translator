@@ -498,7 +498,9 @@ models:
     optimal_device: api
     temperature: 0.0
     max_tokens: 6000
-    timeout_seconds: 300
+    # Campaign qualification requires a bounded 120-second provider call;
+    # retries remain governed separately by the manifest attempt policy.
+    timeout_seconds: 120
     description: "Company Professionalize LLM via OpenAI-compatible API. Deterministic translation."
 
   # Ollama local — Qwen3 14B
