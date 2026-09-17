@@ -136,10 +136,24 @@ function Send-Alert([string]$Signature, [string]$Message, $meta) {
 $meta = Get-Meta
 
 if ($Resume) {
+    # A deliberate validation pause is authoritative during ordinary ticks,
+    # but an explicit post-investigation operator resume must clear it too.
+    # Preserve the original state as evidence before removing only the live
+    # control file; otherwise the following tick would immediately recreate
+    # the same stop condition despite reporting a successful resume.
+    if (Test-Path $campaignWatchdogState) {
+        $resumeArchive = Join-Path $evidenceRoot (
+            'resolved-watchdog-state-' + (Get-Date -Format 'yyyyMMddTHHmmssfffK').Replace(':', '') + '.json'
+        )
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resumeArchive) | Out-Null
+        Copy-Item -LiteralPath $campaignWatchdogState -Destination $resumeArchive -Force
+        Remove-Item -LiteralPath $campaignWatchdogState -Force
+        Write-Tick "state=RESUME_ARCHIVED_PAUSE archive=$resumeArchive"
+    }
     $meta.stopped = $false
     $meta.consecutive_no_progress_relaunches = 0
     Save-Meta $meta
-    Write-Tick 'state=RESUMED_BY_OPERATOR -- stopped flag and no-progress counter cleared; not relaunching this tick'
+    Write-Tick 'state=RESUMED_BY_OPERATOR -- stop and quality-pause state cleared; not relaunching this tick'
     Write-Output "Resumed. The next scheduled watchdog tick will supervise '$CampaignId' normally again."
     exit 0
 }
