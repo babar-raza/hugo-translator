@@ -487,10 +487,11 @@ def _run_wave(
         # bounded, receipt-backed progress on the launcher's own console.
         while True:
             now = time.monotonic()
-            if args.child_timeout_seconds > 0 and now - started >= args.child_timeout_seconds:
+            child_timeout_seconds = int(getattr(args, "child_timeout_seconds", 900))
+            if child_timeout_seconds > 0 and now - started >= child_timeout_seconds:
                 state = {
                     "status": "PAUSED_INFRASTRUCTURE_TIMEOUT",
-                    "reason": f"child_wave_timeout_seconds={args.child_timeout_seconds}",
+                    "reason": f"child_wave_timeout_seconds={child_timeout_seconds}",
                     "accepted_current_run": line_count(receipt_path) - accepted_at_start,
                     "rejected_current_run": max(line_count(failure_path) - failed_at_start, 0),
                 }
