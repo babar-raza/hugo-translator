@@ -219,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--content-repo", type=Path, required=True)
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
     parser.add_argument(
-        "--min-batch-size", type=int, default=25,
+        "--min-batch-size", type=int, default=5,
         help="Minimum receipts a (site,family,platform) group must hold before it is committed. "
              "A qualifying group is committed in full as one batch -- never split into smaller "
              "fixed-size chunks, and never held back once the minimum is met.",

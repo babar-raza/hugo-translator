@@ -123,7 +123,7 @@ function Invoke-Preflight {
 }
 function Invoke-Reconcile {
     Set-Location $RuntimeRepo
-    & $py "$ControlRepo\scripts\campaign\reconcile_receipted_commits.py" --manifest $manifest --content-repo $contentRepo --ledger-root $ledger --min-batch-size 25 --execute
+    & $py "$ControlRepo\scripts\campaign\reconcile_receipted_commits.py" --manifest $manifest --content-repo $contentRepo --ledger-root $ledger --min-batch-size 5 --execute
     return $LASTEXITCODE -eq 0
 }
 function Show-Progress {

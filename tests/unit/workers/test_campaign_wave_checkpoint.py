@@ -16,7 +16,7 @@ def test_empty_spool_commits_only_after_drain(tmp_path, monkeypatch):
                            checkpoint_wave_shards=4)
     assert checkpoint_wave(args, SimpleNamespace(campaign_id="test", content_repo=tmp_path), tmp_path)
     assert len(calls) == 1
-    assert calls[0][0][-3:] == ["--min-batch-size", "25", "--execute"]
+    assert calls[0][0][-3:] == ["--min-batch-size", "5", "--execute"]
     assert calls[0][1] == {"check": True, "timeout": 900}
 
 

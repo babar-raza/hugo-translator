@@ -153,7 +153,7 @@ def checkpoint_wave(args: argparse.Namespace, manifest: CampaignManifest, transl
         subprocess.run([
             sys.executable, str(translator_repo / "scripts/campaign/reconcile_receipted_commits.py"),
             "--manifest", str(args.campaign_manifest), "--content-repo", str(manifest.content_repo),
-            "--ledger-root", str(args.ledger_root), "--min-batch-size", "25", "--execute",
+            "--ledger-root", str(args.ledger_root), "--min-batch-size", "5", "--execute",
         ], check=True, timeout=900)
     except (subprocess.SubprocessError, OSError) as exc:
         checkpoint_path = args.ledger_root / manifest.campaign_id / "checkpoint_backlog.jsonl"
