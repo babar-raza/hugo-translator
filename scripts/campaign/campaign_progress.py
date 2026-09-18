@@ -5,10 +5,16 @@ import argparse
 import hashlib
 import json
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
 
 from src.workers.campaign_manifest import CampaignManifest
+
+try:  # Package execution (`python -m`) and direct script execution are both supported.
+    from scripts.campaign.throughput_slo import ThroughputPolicy, evaluate_throughput
+except ModuleNotFoundError:  # pragma: no cover - exercised by the CLI smoke command
+    from throughput_slo import ThroughputPolicy, evaluate_throughput
 
 
 def rows(path: Path):
@@ -26,11 +32,28 @@ def receipt_digest(receipt: dict) -> str:
     )
 
 
+def current_run_progress(state: dict, now: float, remaining: int) -> dict:
+    elapsed = float(state.get("elapsed_seconds") or 0)
+    accepted = int(state.get("accepted_current_run") or 0)
+    updated = float(state.get("updated_at") or 0)
+    fresh = state.get("status") == "RUNNING" and 0 <= now - updated <= 120
+    rate = accepted * 60 / elapsed if fresh and elapsed > 0 else None
+    return {"session_id": state.get("session_id"), "status": state.get("status", "UNKNOWN"),
+            "accepted": accepted, "rejected": int(state.get("rejected_current_run") or 0),
+            "fresh": fresh, "rate_per_minute": rate,
+            "eta_minutes": remaining / rate if rate else None,
+            "pause_reason": state.get("reason")}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
     parser.add_argument("--spool", type=Path)
+    parser.add_argument("--slo-target-per-hour", type=float, default=600.0)
+    parser.add_argument("--slo-max-eta-minutes", type=float, default=1440.0)
+    parser.add_argument("--slo-max-provider-calls-per-hour", type=float, default=3600.0)
+    parser.add_argument("--slo-min-rate-per-hour", type=float, default=60.0)
     args = parser.parse_args()
     manifest = CampaignManifest.load(args.manifest)
     root = args.ledger_root / manifest.campaign_id
@@ -64,11 +87,39 @@ def main() -> int:
             rate = accepted / minutes
     spool = {"PENDING": None, "CLAIMED": None, "APPLIED": None, "FAILED": None}
     if args.spool and args.spool.is_file():
+        spool = dict.fromkeys(spool, 0)
         with sqlite3.connect(args.spool) as conn:
             for state, count in conn.execute("select state, count(*) from tm_intents group by state"):
                 spool[str(state)] = count
     remaining = max(0, manifest.expected_output_count - accepted)
-    payload = {"campaign": manifest.campaign_id, "accepted": accepted, "failures": len(failures), "rate_per_minute": round(rate, 3), "remaining": remaining, "eta_minutes": round(remaining / rate, 1) if rate else None, "committed": committed, "pending_commit": max(0, accepted-committed), "spool": spool, "metrics": metrics}
+    elapsed_seconds = 0.0
+    if len(accepted_times) > 1:
+        elapsed_seconds = max((end - start).total_seconds(), 0.0)
+    throughput = evaluate_throughput(
+        accepted=accepted,
+        remaining=remaining,
+        elapsed_seconds=elapsed_seconds,
+        provider_calls=metrics["professionalize_calls"],
+        policy=ThroughputPolicy(
+            target_outputs_per_hour=args.slo_target_per_hour,
+            max_eta_minutes=args.slo_max_eta_minutes,
+            max_provider_calls_per_hour=args.slo_max_provider_calls_per_hour,
+            min_rate_per_hour=args.slo_min_rate_per_hour,
+        ),
+    )
+    payload = {"campaign": manifest.campaign_id, "accepted": accepted, "failures": len(failures), "rate_per_minute": round(rate, 3), "remaining": remaining, "eta_minutes": round(remaining / rate, 1) if rate else None, "committed": committed, "pending_commit": max(0, accepted-committed), "spool": spool, "metrics": metrics, "throughput": throughput}
+    state_path = root / "watchdog_state.json"
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        state = {}
+    current = current_run_progress(state, time.time(), remaining)
+    payload["schema_version"] = 2
+    payload["historical_rate_per_minute"] = payload["rate_per_minute"]
+    payload["rate_per_minute"] = current["rate_per_minute"]
+    payload["eta_minutes"] = current["eta_minutes"]
+    payload["current_run"] = current
+    throughput["measurement_scope"] = "historical_receipts_only_includes_downtime_excludes_rejected_calls"
     print(json.dumps(payload, sort_keys=True))
     return 0
 

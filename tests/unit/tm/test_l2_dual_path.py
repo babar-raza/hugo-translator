@@ -2,8 +2,9 @@
 TC-TM-02: L2 LMDB dual-path detection tests.
 
 Verifies:
-1. L2PersistentTM emits UserWarning when a sibling l2*.lmdb directory exists.
-2. No warning is emitted when only the canonical database is present.
+1. L2PersistentTM emits UserWarning for active sibling l2*.lmdb directories.
+2. The explicitly inactive legacy ``l2_lmdb`` directory is silent.
+3. No warning is emitted when only the canonical database is present.
 
 Gap: G-TM-02 — two live L2 LMDB directories (data/tm/l2.lmdb + data/tm/l2_lmdb).
 
@@ -72,8 +73,8 @@ class TestSiblingDetectionWarning:
             f"Unexpected sibling warning with only canonical present: {sibling_warns}"
         )
 
-    def test_warning_when_sibling_exists(self, tmp_path: Path):
-        """UserWarning is emitted when a sibling l2*.lmdb directory exists."""
+    def test_inactive_legacy_sibling_is_silent(self, tmp_path: Path):
+        """The documented legacy/test-compatibility directory is not an active store."""
         from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
 
         db_path = tmp_path / L2_DB_NAME
@@ -91,16 +92,7 @@ class TestSiblingDetectionWarning:
             for w in caught
             if issubclass(w.category, UserWarning) and "sibling" in str(w.message).lower()
         ]
-        assert len(sibling_warns) == 1, (
-            f"Expected exactly 1 sibling UserWarning, got {len(sibling_warns)}: "
-            f"{[str(w.message) for w in caught]}"
-        )
-        assert "l2_lmdb" in str(sibling_warns[0].message), (
-            "Warning should name the sibling directory."
-        )
-        assert "migrate_l2_lmdb.py" in str(sibling_warns[0].message), (
-            "Warning should reference the migration script."
-        )
+        assert not sibling_warns, [str(w.message) for w in caught]
 
     def test_warning_names_all_siblings(self, tmp_path: Path):
         """Warning message includes all sibling directory names."""

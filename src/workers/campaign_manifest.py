@@ -677,8 +677,6 @@ class CampaignManifest:
                 output = source.outputs.get(locale)
                 if output is None:
                     continue
-                if output in completed:
-                    continue
                 key = (
                     source.wave,
                     source.site_id,
@@ -691,6 +689,13 @@ class CampaignManifest:
             jobs = sorted(grouped[key], key=lambda item: item[0].source_path)
             for offset in range(0, len(jobs), max_outputs):
                 part = offset // max_outputs + 1
+                # Chunk immutable manifest jobs before removing completed cells.
+                # Otherwise accepting part 1 renumbers part 2 to part 1, and a
+                # durable wave cursor silently skips untranslated outputs.
+                pending_jobs = [job for job in jobs[offset : offset + max_outputs]
+                                if job[2] not in completed]
+                if not pending_jobs:
+                    continue
                 yield {
                     "shard_id": (f"w{key[0]}:{key[1]}:{key[2]}:{key[3]}:{key[4]}:{part}"),
                     "wave": key[0],
@@ -699,7 +704,7 @@ class CampaignManifest:
                     "platform": key[3],
                     "locale": key[4],
                     "part": part,
-                    "jobs": jobs[offset : offset + max_outputs],
+                    "jobs": pending_jobs,
                 }
 
     def to_summary(self) -> dict[str, Any]:

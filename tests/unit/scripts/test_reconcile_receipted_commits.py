@@ -26,11 +26,45 @@ from scripts.campaign.reconcile_receipted_commits import (
     committed_batch_counts_by_group,
     main,
     manifest_output_index,
+    recover_recorded_commits,
     summarize_batch,
 )
 
 
 GROUP = ("blog.aspose.org", "pdf", "go")
+
+
+def test_recovers_commit_before_ledger_append_without_a_second_commit(tmp_path):
+    _init_content_repo(tmp_path)
+    base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True).strip()
+    path, digest = _write_output(tmp_path, "content/page.md", "validated\n")
+    subprocess.run(["git", "add", path], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "checkpoint\n\nCampaign-Batch: unique"], cwd=tmp_path, check=True)
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True).strip()
+    ledger = tmp_path / "batches.jsonl"
+    record = {"batch_id": "unique", "status": "VERIFIED", "base_sha": base,
+              "outputs": [path], "output_hashes": {path: digest}}
+    ledger.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    recover_recorded_commits(tmp_path, ledger)
+    recover_recorded_commits(tmp_path, ledger)
+    rows = [json.loads(line) for line in ledger.read_text().splitlines()]
+    assert len(rows) == 2
+    assert rows[-1]["status"] == "COMMITTED"
+    assert rows[-1]["commit_sha"] == commit
+    assert rows[-1]["recovered"] is True
+
+
+def test_recovery_refuses_a_commit_with_wrong_output_hash(tmp_path):
+    _init_content_repo(tmp_path)
+    base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True).strip()
+    path, _ = _write_output(tmp_path, "content/page.md", "wrong\n")
+    subprocess.run(["git", "add", path], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "checkpoint\n\nCampaign-Batch: unique"], cwd=tmp_path, check=True)
+    ledger = tmp_path / "batches.jsonl"
+    ledger.write_text(json.dumps({"batch_id": "unique", "status": "VERIFIED", "base_sha": base,
+                                "outputs": [path], "output_hashes": {path: "0" * 64}}) + "\n")
+    with pytest.raises(ValueError, match="differs"):
+        recover_recorded_commits(tmp_path, ledger)
 
 
 def _row(source_path: str, target_lang: str) -> dict[str, Any]:
@@ -171,7 +205,7 @@ def _receipt(output_path: str, output_sha256: str, source_path: str, target_lang
     }
 
 
-def test_main_commits_a_group_of_six_as_one_batch_and_holds_back_an_undersized_group(tmp_path):
+def test_main_previews_a_group_of_six_without_mutating_the_ledger(tmp_path, capsys):
     content_repo = tmp_path / "content_repo"
     content_repo.mkdir()
     _init_content_repo(content_repo)
@@ -245,19 +279,17 @@ def test_main_commits_a_group_of_six_as_one_batch_and_holds_back_an_undersized_g
         "--manifest", str(manifest_path),
         "--content-repo", str(content_repo),
         "--ledger-root", str(ledger_root),
+        "--min-batch-size", "5",
     ])
     assert code == 0
 
-    batches = [
-        json.loads(line)
-        for line in (campaign_dir / "commit_batches.jsonl").read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    assert not (campaign_dir / "commit_batches.jsonl").exists()
+    decoder = json.JSONDecoder()
+    output = capsys.readouterr().out.lstrip()
+    record, _ = decoder.raw_decode(output)
     # Exactly one record: the six-receipt pdf/go group, committed whole (not
     # split into a 5-chunk plus a leftover 1). The three-receipt cells/net
     # group stays below --min-batch-size and produces no record at all.
-    assert len(batches) == 1
-    record = batches[0]
     assert record["group"] == {"subdomain": "blog.aspose.org", "family": "pdf", "platform": "go"}
     assert record["planned"] == 6
     assert record["status"] == "VERIFIED"  # --execute was not passed
@@ -312,6 +344,7 @@ def test_main_holds_back_a_group_at_exactly_min_batch_size_minus_one(tmp_path):
         "--manifest", str(manifest_path),
         "--content-repo", str(content_repo),
         "--ledger-root", str(ledger_root),
+        "--min-batch-size", "5",
     ])
     assert code == 0
     batches_path = campaign_dir / "commit_batches.jsonl"

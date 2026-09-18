@@ -224,12 +224,14 @@ try {
     & $py "$controlRepo\scripts\campaign\reconcile_receipted_commits.py" `
         --manifest $manifestPath --content-repo $contentRepoPath `
         --ledger-root (Join-Path $controlRepo 'data\campaigns') `
-        --min-batch-size 5 --execute | Out-Null
+        --min-batch-size 25 --execute | Out-Null
     if ($LASTEXITCODE -ne 0) {
-        Write-Tick "state=RECONCILE_FAILED exit=$LASTEXITCODE -- continuing regardless"
+        Write-Tick "state=RECONCILE_FAILED exit=$LASTEXITCODE -- new work paused"
+        exit 1
     }
 } catch {
-    Write-Tick "state=RECONCILE_FAILED error=$($_.Exception.Message) -- continuing regardless"
+    Write-Tick "state=RECONCILE_FAILED error=$($_.Exception.Message) -- new work paused"
+    exit 1
 }
 
 $campaignState = $null

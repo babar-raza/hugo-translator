@@ -44,6 +44,7 @@ is deliberately left to the orchestrating session.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -70,6 +71,96 @@ DEFAULT_LEDGER_ROOT = Path("data/campaigns")
 # per-campaign like `parallel-launcher.lock` -- so it actually serializes GPU
 # access across independent launcher processes running different manifests.
 GPU_LANE_LOCK_NAME = "gpu_lane.lock"
+
+
+class TerminalProgressDeadline:
+    """Expire only when no accepted/rejected job completes during the interval."""
+
+    def __init__(self, now: float, counts: tuple[int, int]):
+        self.last_progress = now
+        self.counts = counts
+
+    def expired(self, now: float, counts: tuple[int, int], seconds: int) -> bool:
+        if counts != self.counts:
+            self.last_progress = now
+            self.counts = counts
+        return seconds > 0 and now - self.last_progress >= seconds
+
+
+class TerminalLedgerTail:
+    """Read appended complete records only; never parse a writer's partial row."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.offset = 0
+        self.count = 0
+
+    def poll(self) -> list[dict[str, Any]]:
+        rows = []
+        try:
+            with self.path.open("rb") as stream:
+                if self.path.stat().st_size < self.offset:
+                    raise RuntimeError("terminal ledger truncated during active wave")
+                stream.seek(self.offset)
+                while True:
+                    line = stream.readline()
+                    if not line.endswith(b"\n"):
+                        break
+                    if line.strip():
+                        rows.append(json.loads(line))
+                        self.count += 1
+                    self.offset = stream.tell()
+        except FileNotFoundError:
+            if self.offset:
+                raise RuntimeError("terminal ledger removed during active wave")
+        return rows
+
+
+def checkpoint_wave(args: argparse.Namespace, manifest: CampaignManifest, translator_repo: Path) -> None:
+    """Only called after every child exits: one TM writer, then governed commits."""
+    from src.tm.intent_spool import TMIntentSpool
+
+    spool = TMIntentSpool(args.tm_intent_spool_path)
+    while True:
+        before = spool.stats()
+        if before.get("CLAIMED", 0):
+            raise RuntimeError("checkpoint refuses claimed TM intents")
+        if before.get("FAILED", 0):
+            raise RuntimeError("checkpoint refuses failed TM intents")
+        if not before.get("PENDING", 0):
+            break
+        subprocess.run([
+            sys.executable, "-m", "src.workers.tm_intent_writer",
+            "--repository-root", str(args.tm_repository_root),
+            "--spool-path", str(args.tm_intent_spool_path), "--no-l3", "--limit", "500",
+            "--owner", f"{manifest.campaign_id}-wave-writer",
+        ], check=True, timeout=600)
+        if spool.stats().get("PENDING", 0) >= before["PENDING"]:
+            raise RuntimeError("TM checkpoint writer made no progress")
+    subprocess.run([
+        sys.executable, str(translator_repo / "scripts/campaign/reconcile_receipted_commits.py"),
+        "--manifest", str(args.campaign_manifest), "--content-repo", str(manifest.content_repo),
+        "--ledger-root", str(args.ledger_root), "--min-batch-size", "25", "--execute",
+    ], check=True, timeout=900)
+
+
+def stop_children(children: list[subprocess.Popen]) -> None:
+    """Terminate owned process trees, including Windows venv redirector children."""
+    for child in children:
+        if child.poll() is not None:
+            continue
+        if sys.platform == "win32":
+            result = subprocess.run(["taskkill.exe", "/PID", str(child.pid), "/T", "/F"],
+                                    capture_output=True, timeout=30)
+            if result.returncode and child.poll() is None:
+                raise RuntimeError(f"cannot terminate owned child tree {child.pid}")
+        else:
+            child.terminate()
+        try:
+            child.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait(timeout=30)
 
 
 def pending_shards(manifest: CampaignManifest, ledger_root: Path) -> list[dict[str, Any]]:
@@ -430,6 +521,19 @@ def _run_wave(
     children: list[subprocess.Popen] = []
     child_logs: list[Path] = []
     handles: list[Any] = []
+    receipt_path = args.ledger_root / manifest.campaign_id / "acceptance_receipts.jsonl"
+    failure_path = args.ledger_root / manifest.campaign_id / "failure_metadata.jsonl"
+    receipt_tail = TerminalLedgerTail(receipt_path)
+    failure_tail = TerminalLedgerTail(failure_path)
+    receipt_tail.poll()
+    failure_tail.poll()
+    fresh_failures: list[dict[str, Any]] = []
+
+    def line_count(path: Path) -> int:
+        return receipt_tail.count if path == receipt_path else failure_tail.count
+
+    accepted_at_start = line_count(receipt_path)
+    failed_at_start = line_count(failure_path)
     for index, group in enumerate(groups):
         shard_list_path = (log_dir / f"{manifest.campaign_id}_child{index}.shards.txt").resolve()
         shard_list_path.write_text(
@@ -456,8 +560,8 @@ def _run_wave(
         handle = log_path.open("w", encoding="utf-8")
         handles.append(handle)
         child_logs.append(log_path)
-        children.append(
-            subprocess.Popen(
+        try:
+            child = subprocess.Popen(
                 command,
                 # Keep mutable progress/model-cache state in the accessible
                 # control workspace; --translator-repo still pins code/config.
@@ -466,32 +570,29 @@ def _run_wave(
                 stdout=handle,
                 stderr=subprocess.STDOUT,
             )
-        )
-    receipt_path = args.ledger_root / manifest.campaign_id / "acceptance_receipts.jsonl"
-    failure_path = args.ledger_root / manifest.campaign_id / "failure_metadata.jsonl"
-
-    def line_count(path: Path) -> int:
-        try:
-            with path.open("rb") as handle:
-                return sum(1 for _ in handle)
-        except FileNotFoundError:
-            return 0
-
-    accepted_at_start = line_count(receipt_path)
-    failed_at_start = line_count(failure_path)
+        except BaseException:
+            stop_children(children)
+            for opened in handles:
+                opened.close()
+            raise
+        children.append(child)
     started = time.monotonic()
+    started_at = time.time()
+    deadline = TerminalProgressDeadline(started, (accepted_at_start, failed_at_start))
     last_report = 0.0
     exit_codes: list[int] = []
     try:
         # A silent wait made a healthy Professionalize batch look hung.  Emit
         # bounded, receipt-backed progress on the launcher's own console.
         while True:
+            receipt_tail.poll()
+            fresh_failures.extend(failure_tail.poll())
             now = time.monotonic()
             child_timeout_seconds = int(getattr(args, "child_timeout_seconds", 900))
-            if child_timeout_seconds > 0 and now - started >= child_timeout_seconds:
+            if deadline.expired(now, (line_count(receipt_path), line_count(failure_path)), child_timeout_seconds):
                 state = {
                     "status": "PAUSED_INFRASTRUCTURE_TIMEOUT",
-                    "reason": f"child_wave_timeout_seconds={child_timeout_seconds}",
+                    "reason": f"no_terminal_progress_seconds={child_timeout_seconds}",
                     "accepted_current_run": line_count(receipt_path) - accepted_at_start,
                     "rejected_current_run": max(line_count(failure_path) - failed_at_start, 0),
                 }
@@ -499,17 +600,15 @@ def _run_wave(
                     args.watchdog_state.parent.mkdir(parents=True, exist_ok=True)
                     args.watchdog_state.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
                 print("INFRASTRUCTURE TIMEOUT: terminating child workers", file=sys.stderr, flush=True)
-                for child in children:
-                    if child.poll() is None:
-                        child.terminate()
-                for child in children:
-                    try:
-                        child.wait(timeout=30)
-                    except subprocess.TimeoutExpired:
-                        child.kill()
-                        child.wait(timeout=30)
+                stop_children(children)
                 return 2
             if now - last_report >= args.progress_interval_seconds:
+                if getattr(args, "session_id", None) and not work_claims.acquire_claim(
+                    f"family:{manifest.campaign_id}", args.session_id,
+                    purpose="active campaign wave heartbeat",
+                    claims_path=args.ledger_root / "claims.jsonl",
+                ):
+                    raise RuntimeError("campaign family claim lost during active wave")
                 accepted = line_count(receipt_path)
                 failed = line_count(failure_path)
                 elapsed = max(now - started, 0.001)
@@ -535,11 +634,15 @@ def _run_wave(
                         json.dumps(
                             {
                                 "status": "RUNNING",
+                                "session_id": getattr(args, "session_id", None),
+                                "started_at_epoch": started_at,
                                 "reason": None,
                                 "accepted_current_run": accepted - accepted_at_start,
                                 "rejected_current_run": max(failed - failed_at_start, 0),
                                 "accepted_total": accepted,
                                 "rejected_total": failed,
+                                "elapsed_seconds": elapsed,
+                                "rate_per_minute": rate,
                                 "updated_at": time.time(),
                             },
                             indent=2,
@@ -549,14 +652,8 @@ def _run_wave(
                     )
                 last_report = now
             # TC-PS-04: evaluate only rows created by this wave, never stale history.
-            fresh_failures: list[dict[str, Any]] = []
-            try:
-                lines = failure_path.read_text(encoding="utf-8").splitlines()[failed_at_start:]
-                fresh_failures = [json.loads(line) for line in lines if line.strip()]
-            except FileNotFoundError:
-                pass
             roots = [str(row.get("gate") or row.get("root_cause_class") or "pipeline") for row in fresh_failures]
-            provider_error = any("provider" in root.lower() or "rate" in root.lower() for root in roots)
+            provider_error = any("provider" in root.lower() or "rate_limit" in root.lower() or "ratelimit" in root.lower() for root in roots)
             # Typed zero-defect outcomes are expected data backlog, not
             # controller failures.  Only repeated unknown/infrastructure
             # roots may pause the wave; otherwise a bad source would stop a
@@ -586,11 +683,7 @@ def _run_wave(
                     args.watchdog_state.parent.mkdir(parents=True, exist_ok=True)
                     args.watchdog_state.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
                 print(f"WATCHDOG PAUSE: {reason}; terminating children", file=sys.stderr, flush=True)
-                for child in children:
-                    if child.poll() is None:
-                        child.terminate()
-                for child in children:
-                    child.wait(timeout=30)
+                stop_children(children)
                 return 2
             if all(child.poll() is not None for child in children):
                 exit_codes = [child.wait() for child in children]
@@ -607,17 +700,12 @@ def _run_wave(
             args.watchdog_state.parent.mkdir(parents=True, exist_ok=True)
             args.watchdog_state.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
         print("INTERRUPTED: terminating child workers", file=sys.stderr, flush=True)
-        for child in children:
-            if child.poll() is None:
-                child.terminate()
-        for child in children:
-            try:
-                child.wait(timeout=30)
-            except subprocess.TimeoutExpired:
-                child.kill()
-                child.wait(timeout=30)
+        stop_children(children)
         return 2
     finally:
+        # Parsing/I/O errors must not leave detached writers running after
+        # the coordinator releases its campaign claim.
+        stop_children(children)
         for handle in handles:
             handle.close()
 
@@ -656,12 +744,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--campaign-manifest", required=True, type=Path)
     parser.add_argument("--max-workers", type=int, default=4)
+    parser.add_argument("--checkpoint-wave-shards", type=int, default=0,
+                        help="Bound each wave to this many shards; drain TM and commit before continuing.")
+    parser.add_argument("--tm-repository-root", type=Path,
+                        help="Repository containing the canonical TM store used by workers.")
     parser.add_argument("--progress-interval-seconds", type=int, default=30)
     parser.add_argument(
         "--child-timeout-seconds",
         type=int,
         default=900,
-        help="Maximum wall time for one child wave; zero disables the infrastructure timeout.",
+            help="Maximum time without accepted/rejected job progress; zero disables the inactivity timeout.",
     )
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--max-gpu-memory-percent", type=int, default=90)
@@ -733,6 +825,10 @@ def main(argv: list[str] | None = None) -> int:
         help="Write PAUSED_VALIDATION_REGRESSION state before stopping a bad wave.",
     )
     args = parser.parse_args(argv)
+    if args.checkpoint_wave_shards < 0:
+        parser.error("--checkpoint-wave-shards must be nonnegative")
+    if args.checkpoint_wave_shards and (not args.tm_repository_root or not args.tm_intent_spool_path):
+        parser.error("checkpoint waves require --tm-repository-root and --tm-intent-spool-path")
     if args.progress_interval_seconds < 5:
         raise SystemExit("--progress-interval-seconds must be at least 5")
     if not 1 <= args.max_workers <= 8:
@@ -786,7 +882,7 @@ def main(argv: list[str] | None = None) -> int:
     professionalize_only = bool(manifest.retry_policy.get("professionalize_only", False))
     if args.no_force_serialize and not professionalize_only:
         raise SystemExit("--no-force-serialize requires retry_policy.professionalize_only=true")
-    if args.max_workers > 1 and args.child == "gate5" and not args.tm_intent_spool_path:
+    if args.max_workers > 1 and args.child == "gate5" and not args.tm_intent_spool_path and not args.dry_run:
         raise SystemExit("parallel gate5 launches require --tm-intent-spool-path")
     if professionalize_only:
         # There is no local-model work in this campaign; treating hu/ja/ro as
@@ -805,6 +901,7 @@ def main(argv: list[str] | None = None) -> int:
     # mutex no other session can see), claims.jsonl lets peer sessions across
     # the fleet know this campaign is already being worked before they try it.
     session_id = args.session_id or os.environ.get("AGENT_SESSION_ID") or f"launcher-pid{os.getpid()}"
+    args.session_id = session_id
     family_key = f"family:{manifest.campaign_id}"
     claims_path = args.ledger_root / "claims.jsonl"
     if not work_claims.acquire_claim(
@@ -826,6 +923,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         launched_any = False
+        completed_waves_path = args.ledger_root / manifest.campaign_id / "completed_wave_shards.json"
+        manifest_digest = hashlib.sha256(args.campaign_manifest.read_bytes()).hexdigest()
+        visited: set[str] = set()
+        if args.checkpoint_wave_shards and completed_waves_path.exists():
+            saved = json.loads(completed_waves_path.read_text(encoding="utf-8"))
+            if saved.get("manifest_sha256") == manifest_digest:
+                visited = set(saved["shards"])
         while True:
             # Renew every pass: a long --drain run must not let the 45-minute
             # claim TTL lapse mid-campaign and let another session start in.
@@ -837,9 +941,13 @@ def main(argv: list[str] | None = None) -> int:
             )
 
             pending_all = pending_shards(manifest, args.ledger_root)
+            if args.checkpoint_wave_shards:
+                pending_all = [s for s in pending_all if str(s["shard_id"]) not in visited]
             if args.shard_list:
                 allowed = {line.strip() for line in args.shard_list.read_text(encoding="utf-8").splitlines() if line.strip()}
                 pending_all = [s for s in pending_all if str(s["shard_id"]) in allowed]
+            if args.checkpoint_wave_shards:
+                pending_all = pending_all[:args.checkpoint_wave_shards]
             gpu_bound, _api_bound = partition_by_device(pending_all, gpu_locales)
             if gpu_admission_on and gpu_bound:
                 # VR-01 path: real-telemetry admission instead of the single
@@ -886,6 +994,21 @@ def main(argv: list[str] | None = None) -> int:
                         gpu_lane_lock.release()
             if wave_status != 0:
                 return wave_status
+            if args.checkpoint_wave_shards:
+                try:
+                    checkpoint_wave(args, manifest, translator_repo)
+                except (RuntimeError, subprocess.SubprocessError, OSError) as exc:
+                    args.watchdog_state.write_text(json.dumps({
+                        "status": "PAUSED_CHECKPOINT_FAILURE", "reason": str(exc),
+                        "session_id": session_id, "updated_at": time.time(),
+                    }, sort_keys=True), encoding="utf-8")
+                    return 2
+                visited.update(str(shard["shard_id"]) for group in groups for shard in group)
+                temporary = completed_waves_path.with_suffix(".tmp")
+                temporary.write_text(json.dumps({"schema_version": 1, "manifest_sha256": manifest_digest,
+                                                "shards": sorted(visited)}, sort_keys=True), encoding="utf-8")
+                temporary.replace(completed_waves_path)
+                continue
             if not args.drain:
                 break
 

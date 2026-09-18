@@ -111,7 +111,7 @@ function Invoke-Preflight {
 }
 function Invoke-Reconcile {
     Set-Location $RuntimeRepo
-    & $py "$ControlRepo\scripts\campaign\reconcile_receipted_commits.py" --manifest $manifest --content-repo $contentRepo --ledger-root $ledger --min-batch-size 5 --execute --session-id $SessionId
+    & $py "$ControlRepo\scripts\campaign\reconcile_receipted_commits.py" --manifest $manifest --content-repo $contentRepo --ledger-root $ledger --min-batch-size 25 --execute
     return $LASTEXITCODE -eq 0
 }
 function Show-Progress {
@@ -134,7 +134,7 @@ function Invoke-PreWaveSpoolDrain {
     while ([int]$state.PENDING -gt 0) {
         $pendingBefore = [int]$state.PENDING
         Set-Location $RuntimeRepo
-        & $py -m src.workers.tm_intent_writer --repository-root $RuntimeRepo --spool-path $spool --no-l3 --limit 500 --owner "$campaign-autonomous-predrain"
+        & $py -m src.workers.tm_intent_writer --repository-root $ControlRepo --spool-path $spool --no-l3 --limit 500 --owner "$campaign-autonomous-predrain"
         if ($LASTEXITCODE -ne 0) { throw 'TM writer failed during mandatory pre-wave drain.' }
         $state = Get-SpoolState
         Write-Controller "tm_spool_pre_wave_progress $($state | ConvertTo-Json -Compress)"
@@ -183,6 +183,9 @@ $args = @(
     '--tm-intent-spool-path', $spool, '--no-force-serialize', '--progress-interval-seconds', '30',
     '--session-id', $SessionId, '--watchdog-state', $WatchdogState
 )
+if (-not $RecoveryQualification) {
+    $args += @('--checkpoint-wave-shards', '4', '--tm-repository-root', $ControlRepo)
+}
 if ($ShardList) {
     $resolvedShardList = (Resolve-Path $ShardList).Path
     $args += @('--shard-list', $resolvedShardList)
@@ -209,7 +212,10 @@ if (Test-Path $WatchdogState) {
 # a Windows control event to the launcher and all workers. A fully hidden,
 # detached process previously triggered the Intel/Fortran runtime, so use a
 # real minimized console owned by the persistent controller instead.
-$launcher = Start-Process -FilePath $py -WorkingDirectory $ControlRepo -ArgumentList $args -WindowStyle Minimized -RedirectStandardOutput $launcherLog -RedirectStandardError $launcherErr -PassThru
+$launcher = Start-Process -FilePath $py -WorkingDirectory $ControlRepo -ArgumentList $args -WindowStyle Hidden -RedirectStandardOutput $launcherLog -RedirectStandardError $launcherErr -PassThru
+# Cache the process handle before it exits. Windows PowerShell can otherwise
+# return a null ExitCode for a short-lived venv redirector.
+$launcherHandle = $launcher.Handle
 try {
     while ($true) {
         $launcher.Refresh()
@@ -226,15 +232,17 @@ try {
     # The Windows venv executable can be a short-lived shim whose process exit
     # precedes the real interpreter.  The family wait above is authoritative;
     # the shim's exit code is useful only when non-zero.
-    if ($launcher.ExitCode -ne 0) { throw "Campaign launcher shim exited $($launcher.ExitCode). See $launcherErr" }
+    $launcher.WaitForExit()
+    $launcher.Refresh()
+    if ($null -ne $launcher.ExitCode -and $launcher.ExitCode -ne 0) { throw "Campaign launcher shim exited $($launcher.ExitCode). See $launcherErr" }
     $watchdog = Get-Content -LiteralPath $WatchdogState -Raw | ConvertFrom-Json
-    if ($watchdog.status -notin @('RUNNING', 'COMPLETED_WITH_BACKLOG')) {
+    if ($watchdog.status -ne 'COMPLETED_WITH_BACKLOG') {
         throw "Campaign launcher stopped under watchdog state $($watchdog.status): $($watchdog.reason)"
     }
     if (-not (Invoke-Reconcile)) { throw 'Final receipt-to-commit reconciliation failed.' }
     do {
         Set-Location $RuntimeRepo
-        & $py -m src.workers.tm_intent_writer --repository-root $RuntimeRepo --spool-path $spool --no-l3 --limit 500 --owner "$campaign-autonomous-writer"
+        & $py -m src.workers.tm_intent_writer --repository-root $ControlRepo --spool-path $spool --no-l3 --limit 500 --owner "$campaign-autonomous-writer"
         if ($LASTEXITCODE -ne 0) { throw 'TM writer failed after launcher completion.' }
         $state = & $py -c "from pathlib import Path; from src.tm.intent_spool import TMIntentSpool; import json; print(json.dumps(TMIntentSpool(Path(r'$spool')).stats()))"
         Write-Controller "tm_spool $state"
@@ -247,12 +255,21 @@ try {
     # state that includes the run identity and a bounded reason; the next
     # controller archives this file before creating a new RUNNING marker.
     try {
+        $priorState = if (Test-Path -LiteralPath $WatchdogState) {
+            Get-Content -LiteralPath $WatchdogState -Raw | ConvertFrom-Json
+        } else { $null }
+        # Preserve the launcher's specific diagnosis instead of replacing it
+        # with a generic shim failure.
+        if ($priorState -and $priorState.status -like 'PAUSED_*') {
+            Write-Controller "launcher pause preserved: $($priorState.status): $($priorState.reason)"
+        } else {
         @{
             status = 'PAUSED_LAUNCHER_FAILURE'
             reason = $_.Exception.Message
             session_id = $SessionId
             failed_at = (Get-Date -Format o)
         } | ConvertTo-Json | Set-Content -LiteralPath $WatchdogState -Encoding UTF8
+        }
     } catch {
         Write-Controller "watchdog state write failed: $($_.Exception.Message)"
     }
