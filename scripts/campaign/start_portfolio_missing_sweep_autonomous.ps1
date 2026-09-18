@@ -187,7 +187,7 @@ $launcherScript = Join-Path $RuntimeRepo 'scripts\campaign\launch_parallel_campa
 $args = @(
     $launcherScript, '--campaign-manifest', $manifest,
     '--ledger-root', $ledger, '--child', 'gate5', '--max-workers', $MaxWorkers, '--wait',
-    '--tm-intent-spool-path', $spool, '--no-force-serialize', '--progress-interval-seconds', '30',
+    '--tm-intent-spool-path', $spool, '--progress-interval-seconds', '30',
     '--session-id', $SessionId, '--watchdog-state', $WatchdogState
 )
 if (-not $RecoveryQualification) {
