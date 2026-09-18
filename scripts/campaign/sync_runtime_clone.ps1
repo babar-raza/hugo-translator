@@ -89,7 +89,7 @@ Write-Output "Repinning $RuntimeRepo from $before to $controlHead (control repo 
 # The active branch can be worktree-private and therefore invisible to a
 # local-path upload-pack. Export its verified SHA through a short-lived normal
 # ref, fetch it locally, then remove the export ref.
-$exportRef = 'refs/codex/runtime-repin-export'
+$exportRef = 'refs/heads/codex-runtime-repin-export'
 git -C $ControlRepo update-ref $exportRef $controlHead
 try {
     git -C $RuntimeRepo fetch $ControlRepo "${exportRef}:refs/repin/runtime" | Out-Null
