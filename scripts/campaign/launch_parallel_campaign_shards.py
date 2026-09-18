@@ -877,6 +877,24 @@ def main(argv: list[str] | None = None) -> int:
         if duplicates:
             print(f"Duplicate acceptance receipts: {sorted(duplicates)}", file=sys.stderr)
             return 1
+        if getattr(args, "watchdog_state", None):
+            receipt_path = args.ledger_root / manifest.campaign_id / "acceptance_receipts.jsonl"
+            failure_path = args.ledger_root / manifest.campaign_id / "failure_metadata.jsonl"
+            count_lines = lambda path: sum(1 for _ in path.open("rb")) if path.exists() else 0
+            args.watchdog_state.write_text(
+                json.dumps(
+                    {
+                        "status": "COMPLETED_WITH_BACKLOG",
+                        "reason": "validator_rejections_remain_in_backlog",
+                        "accepted_total": count_lines(receipt_path),
+                        "rejected_total": count_lines(failure_path),
+                        "updated_at": time.time(),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
         return 0
     finally:
         launcher_lock.release()

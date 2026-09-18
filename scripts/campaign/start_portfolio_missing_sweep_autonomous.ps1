@@ -228,7 +228,7 @@ try {
     # the shim's exit code is useful only when non-zero.
     if ($launcher.ExitCode -ne 0) { throw "Campaign launcher shim exited $($launcher.ExitCode). See $launcherErr" }
     $watchdog = Get-Content -LiteralPath $WatchdogState -Raw | ConvertFrom-Json
-    if ($watchdog.status -ne 'RUNNING') {
+    if ($watchdog.status -notin @('RUNNING', 'COMPLETED_WITH_BACKLOG')) {
         throw "Campaign launcher stopped under watchdog state $($watchdog.status): $($watchdog.reason)"
     }
     if (-not (Invoke-Reconcile)) { throw 'Final receipt-to-commit reconciliation failed.' }
