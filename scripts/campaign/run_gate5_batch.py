@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -320,6 +321,18 @@ def main(argv: list[str] | None = None) -> int:
         f"shards={len(shard_ids) if shard_ids is not None else 'all'}",
         flush=True,
     )
+    # A long Professionalize request may legitimately produce no terminal
+    # receipt for several minutes.  Emit candidate-free process heartbeats so
+    # the parent distinguishes that from a dead Python/Windows child and does
+    # not kill healthy overnight work merely because a page is large.
+    heartbeat_stop = threading.Event()
+
+    def _heartbeat() -> None:
+        while not heartbeat_stop.wait(30):
+            print(f"[{manifest.campaign_id}] worker_heartbeat", flush=True)
+
+    heartbeat = threading.Thread(target=_heartbeat, name="campaign-worker-heartbeat", daemon=True)
+    heartbeat.start()
     try:
         result = runner.run(resume=args.resume, shard_ids=shard_ids)
     except CampaignManifestError as exc:
@@ -340,6 +353,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(json.dumps({"error": str(exc)}, indent=2, default=str))
         return 1
+    finally:
+        heartbeat_stop.set()
+        heartbeat.join(timeout=1)
     print(f"[{manifest.campaign_id}] startup runner_run_complete", flush=True)
     print(json.dumps(result, indent=2, default=str))
     return 0

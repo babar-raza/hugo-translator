@@ -613,6 +613,19 @@ def _run_wave(
     started = time.monotonic()
     started_at = time.time()
     deadline = TerminalProgressDeadline(started, (accepted_at_start, failed_at_start))
+    # Terminal receipts alone are not a liveness signal for a large page: one
+    # bounded Professionalize call can be healthy for minutes before it
+    # produces an accept/reject row.  Gate5 emits an unbuffered, candidate-free
+    # heartbeat every 30 seconds; only declare infrastructure timeout when
+    # both terminal progress *and* every worker heartbeat have gone silent.
+    child_activity: dict[Path, tuple[int, int] | None] = {}
+    for log_path in child_logs:
+        try:
+            stat = log_path.stat()
+            child_activity[log_path] = (stat.st_mtime_ns, stat.st_size)
+        except OSError:
+            child_activity[log_path] = None
+    last_worker_activity = started
     last_report = 0.0
     exit_codes: list[int] = []
     try:
@@ -623,10 +636,26 @@ def _run_wave(
             fresh_failures.extend(failure_tail.poll())
             now = time.monotonic()
             child_timeout_seconds = int(getattr(args, "child_timeout_seconds", 900))
-            if deadline.expired(now, (line_count(receipt_path), line_count(failure_path)), child_timeout_seconds):
+            for log_path in child_logs:
+                try:
+                    stat = log_path.stat()
+                    snapshot: tuple[int, int] | None = (stat.st_mtime_ns, stat.st_size)
+                except OSError:
+                    snapshot = None
+                if snapshot is not None and snapshot != child_activity.get(log_path):
+                    child_activity[log_path] = snapshot
+                    last_worker_activity = now
+            terminal_stalled = deadline.expired(
+                now, (line_count(receipt_path), line_count(failure_path)), child_timeout_seconds
+            )
+            worker_stalled = now - last_worker_activity >= child_timeout_seconds
+            if terminal_stalled and worker_stalled:
                 state = {
                     "status": "PAUSED_INFRASTRUCTURE_TIMEOUT",
-                    "reason": f"no_terminal_progress_seconds={child_timeout_seconds}",
+                    "reason": (
+                        f"no_terminal_progress_or_worker_heartbeat_seconds="
+                        f"{child_timeout_seconds}"
+                    ),
                     "accepted_current_run": line_count(receipt_path) - accepted_at_start,
                     "rejected_current_run": max(line_count(failure_path) - failed_at_start, 0),
                 }
