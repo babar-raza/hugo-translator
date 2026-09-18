@@ -86,12 +86,13 @@ Write-Output "Repinning $RuntimeRepo from $before to $controlHead (control repo 
 # a terminating ErrorRecord under $ErrorActionPreference = 'Stop' even though
 # the fetch succeeds -- confirmed live (fetch created the ref correctly; only
 # the redirect made the script think it had failed).
-# A local-path remote does not resolve a short branch name as a fetch source
-# on every Git-for-Windows version.  Fetch the explicit branch ref; this is
-# still entirely local and does not contact or push to any external remote.
-git -C $RuntimeRepo fetch $ControlRepo "refs/heads/${Ref}:refs/repin/${Ref}" | Out-Null
-git -C $RuntimeRepo checkout --detach "refs/repin/${Ref}"
-git -C $RuntimeRepo update-ref -d "refs/repin/${Ref}"
+# The control worktree can be on a worktree-private branch ref, which is not
+# advertised by a local-path fetch.  The verified immutable object ID is
+# always addressable, so fetch that exact commit into a private runtime ref.
+git -C $RuntimeRepo fetch $ControlRepo "${controlHead}:refs/repin/runtime" | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'Local runtime fetch failed.' }
+git -C $RuntimeRepo checkout --detach 'refs/repin/runtime'
+git -C $RuntimeRepo update-ref -d 'refs/repin/runtime'
 
 $after = git -C $RuntimeRepo rev-parse HEAD
 if ($after -ne $controlHead) {
