@@ -289,11 +289,15 @@ def reconcile(args: argparse.Namespace, manifest: CampaignManifest) -> int:
                 append_jsonl(batches_path, record)
                 print(json.dumps(record, indent=2))
                 return code
-            # main may have advanced again in another governed writer. Verify
-            # OUR commit, not an unrelated branch tip observed afterwards.
-            matches = re.findall(r"(?m)^commit_sha=([0-9a-f]{40,64})\s*$", output)
+            # Resolve our immutable trailer from Git. Plumbing's diagnostic
+            # output is deliberately bounded and can omit its own first line.
+            marker = f"Campaign-Batch: {batch_id}"
+            matches = subprocess.check_output([
+                "git", "log", "main", f"{base_sha}..main", "--format=%H",
+                "--fixed-strings", f"--grep={marker}",
+            ], cwd=content_repo, text=True, timeout=30).splitlines()
             if len(matches) != 1:
-                record.update({"status": "FAILED", "error": "plumbing did not return one commit identity"})
+                record.update({"status": "FAILED", "error": "plumbing commit identity is ambiguous"})
                 append_jsonl(batches_path, record)
                 return 3
             commit_sha = matches[0]
