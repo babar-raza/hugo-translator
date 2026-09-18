@@ -36,6 +36,13 @@ if ($env:OS -eq 'Windows_NT') {
 
 $RuntimeRepo = (Resolve-Path $RuntimeRepo).Path
 $ControlRepo = (Resolve-Path $ControlRepo).Path
+$ResolvedShardList = $null
+if ($ShardList) {
+    # The documented command is executed from ControlRepo. Resolve relative
+    # scope files before subsequent Set-Location calls enter the runtime clone.
+    $candidate = if ([IO.Path]::IsPathRooted($ShardList)) { $ShardList } else { Join-Path $ControlRepo $ShardList }
+    $ResolvedShardList = (Resolve-Path $candidate).Path
+}
 $py = Join-Path $ControlRepo '.venv\Scripts\python.exe'
 $campaign = $CampaignId
 $manifest = Join-Path $ControlRepo "data\campaigns\manifests\$campaign.yaml"
@@ -187,8 +194,7 @@ if (-not $RecoveryQualification) {
     $args += @('--checkpoint-wave-shards', '4', '--tm-repository-root', $ControlRepo)
 }
 if ($ShardList) {
-    $resolvedShardList = (Resolve-Path $ShardList).Path
-    $args += @('--shard-list', $resolvedShardList)
+    $args += @('--shard-list', $ResolvedShardList)
 }
 if ($RecoveryQualification) { $args += '--recovery-qualification' }
 # A prior terminal watchdog record must not masquerade as the state of this
