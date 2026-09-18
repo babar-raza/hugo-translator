@@ -487,6 +487,27 @@ def _run_wave(
         # bounded, receipt-backed progress on the launcher's own console.
         while True:
             now = time.monotonic()
+            if args.child_timeout_seconds > 0 and now - started >= args.child_timeout_seconds:
+                state = {
+                    "status": "PAUSED_INFRASTRUCTURE_TIMEOUT",
+                    "reason": f"child_wave_timeout_seconds={args.child_timeout_seconds}",
+                    "accepted_current_run": line_count(receipt_path) - accepted_at_start,
+                    "rejected_current_run": max(line_count(failure_path) - failed_at_start, 0),
+                }
+                if getattr(args, "watchdog_state", None):
+                    args.watchdog_state.parent.mkdir(parents=True, exist_ok=True)
+                    args.watchdog_state.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+                print("INFRASTRUCTURE TIMEOUT: terminating child workers", file=sys.stderr, flush=True)
+                for child in children:
+                    if child.poll() is None:
+                        child.terminate()
+                for child in children:
+                    try:
+                        child.wait(timeout=30)
+                    except subprocess.TimeoutExpired:
+                        child.kill()
+                        child.wait(timeout=30)
+                return 2
             if now - last_report >= args.progress_interval_seconds:
                 accepted = line_count(receipt_path)
                 failed = line_count(failure_path)
@@ -619,6 +640,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--campaign-manifest", required=True, type=Path)
     parser.add_argument("--max-workers", type=int, default=4)
     parser.add_argument("--progress-interval-seconds", type=int, default=30)
+    parser.add_argument(
+        "--child-timeout-seconds",
+        type=int,
+        default=900,
+        help="Maximum wall time for one child wave; zero disables the infrastructure timeout.",
+    )
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--max-gpu-memory-percent", type=int, default=90)
     parser.add_argument(
