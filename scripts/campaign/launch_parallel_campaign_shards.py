@@ -605,7 +605,13 @@ def _run_wave(
         print(f"child logs: {', '.join(str(p) for p in child_logs)}", file=sys.stderr)
     if any(code != 0 for code in exit_codes):
         return 1
-    return 1 if incomplete else 0
+    # A zero exit from run_gate5 means the worker completed its assigned
+    # inputs safely.  A shard can still be incomplete because one or more
+    # candidates were rejected by a zero-defect validator; those cells are
+    # deliberately represented in failure_metadata/heal backlog and must not
+    # turn a healthy campaign controller into a launcher failure.  Only a
+    # non-zero child exit is an orchestration/infrastructure error.
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
