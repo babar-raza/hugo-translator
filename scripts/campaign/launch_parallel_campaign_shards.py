@@ -116,8 +116,20 @@ class TerminalLedgerTail:
         return rows
 
 
-def checkpoint_wave(args: argparse.Namespace, manifest: CampaignManifest, translator_repo: Path) -> None:
-    """Only called after every child exits: one TM writer, then governed commits."""
+def checkpoint_wave(args: argparse.Namespace, manifest: CampaignManifest, translator_repo: Path) -> bool:
+    """Drain TM, then attempt a governed checkpoint commit.
+
+    A TM drain is a correctness boundary: starting a new wave while its single
+    writer is unhealthy can lose or reorder learning, so its failures still
+    propagate to the controller.  A content commit is deliberately different:
+    every candidate is already receipt/hash backed and remains in the durable
+    pending-commit ledger.  A transient Git/governance failure must therefore
+    become a retryable commit backlog, never terminate a 100k-output
+    translation run.
+
+    Returns ``True`` when reconciliation completed, ``False`` when it was
+    safely deferred.  It never treats a failed commit as completed.
+    """
     from src.tm.intent_spool import TMIntentSpool
 
     spool = TMIntentSpool(args.tm_intent_spool_path)
@@ -137,11 +149,33 @@ def checkpoint_wave(args: argparse.Namespace, manifest: CampaignManifest, transl
         ], check=True, timeout=600)
         if spool.stats().get("PENDING", 0) >= before["PENDING"]:
             raise RuntimeError("TM checkpoint writer made no progress")
-    subprocess.run([
-        sys.executable, str(translator_repo / "scripts/campaign/reconcile_receipted_commits.py"),
-        "--manifest", str(args.campaign_manifest), "--content-repo", str(manifest.content_repo),
-        "--ledger-root", str(args.ledger_root), "--min-batch-size", "25", "--execute",
-    ], check=True, timeout=900)
+    try:
+        subprocess.run([
+            sys.executable, str(translator_repo / "scripts/campaign/reconcile_receipted_commits.py"),
+            "--manifest", str(args.campaign_manifest), "--content-repo", str(manifest.content_repo),
+            "--ledger-root", str(args.ledger_root), "--min-batch-size", "25", "--execute",
+        ], check=True, timeout=900)
+    except (subprocess.SubprocessError, OSError) as exc:
+        checkpoint_path = args.ledger_root / manifest.campaign_id / "checkpoint_backlog.jsonl"
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "at": time.time(),
+            "kind": "receipt_commit_deferred",
+            "reason": str(exc),
+            "wave_shards": int(args.checkpoint_wave_shards),
+        }
+        with checkpoint_path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        print(
+            "CHECKPOINT COMMIT DEFERRED: receipts remain hash-backed and will be retried "
+            "after the next wave; continuing translation.",
+            file=sys.stderr,
+            flush=True,
+        )
+        return False
+    return True
 
 
 def stop_children(children: list[subprocess.Popen]) -> None:
@@ -996,13 +1030,23 @@ def main(argv: list[str] | None = None) -> int:
                 return wave_status
             if args.checkpoint_wave_shards:
                 try:
-                    checkpoint_wave(args, manifest, translator_repo)
+                    checkpoint_committed = checkpoint_wave(args, manifest, translator_repo)
                 except (RuntimeError, subprocess.SubprocessError, OSError) as exc:
                     args.watchdog_state.write_text(json.dumps({
-                        "status": "PAUSED_CHECKPOINT_FAILURE", "reason": str(exc),
+                        # Only the TM drain reaches this path.  It is a
+                        # correctness boundary and must pause before another
+                        # wave is permitted.  Receipt-commit failures are
+                        # handled inside checkpoint_wave as durable backlog.
+                        "status": "PAUSED_TM_CHECKPOINT_FAILURE", "reason": str(exc),
                         "session_id": session_id, "updated_at": time.time(),
                     }, sort_keys=True), encoding="utf-8")
                     return 2
+                if not checkpoint_committed:
+                    print(
+                        "checkpoint commit deferred; advancing with receipt-backed commit backlog",
+                        file=sys.stderr,
+                        flush=True,
+                    )
                 visited.update(str(shard["shard_id"]) for group in groups for shard in group)
                 temporary = completed_waves_path.with_suffix(".tmp")
                 temporary.write_text(json.dumps({"schema_version": 1, "manifest_sha256": manifest_digest,

@@ -12,8 +12,9 @@ def test_empty_spool_commits_only_after_drain(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.campaign.launch_parallel_campaign_shards.subprocess.run",
                         lambda command, **kw: calls.append((command, kw)))
     args = SimpleNamespace(tm_intent_spool_path=spool, tm_repository_root=tmp_path,
-                           campaign_manifest=tmp_path / "manifest.yaml", ledger_root=tmp_path)
-    checkpoint_wave(args, SimpleNamespace(campaign_id="test", content_repo=tmp_path), tmp_path)
+                           campaign_manifest=tmp_path / "manifest.yaml", ledger_root=tmp_path,
+                           checkpoint_wave_shards=4)
+    assert checkpoint_wave(args, SimpleNamespace(campaign_id="test", content_repo=tmp_path), tmp_path)
     assert len(calls) == 1
     assert calls[0][0][-3:] == ["--min-batch-size", "25", "--execute"]
     assert calls[0][1] == {"check": True, "timeout": 900}
@@ -27,6 +28,27 @@ def test_unsafe_spool_never_commits(tmp_path, monkeypatch, state):
     with pytest.raises(RuntimeError):
         checkpoint_wave(SimpleNamespace(tm_intent_spool_path=tmp_path / "spool.sqlite3"),
                         SimpleNamespace(campaign_id="test"), tmp_path)
+
+
+def test_commit_failure_becomes_durable_backlog_after_safe_tm_drain(tmp_path, monkeypatch):
+    spool = tmp_path / "spool.sqlite3"
+    TMIntentSpool(spool)
+    error = __import__("subprocess").CalledProcessError(1, ["reconcile"])
+    monkeypatch.setattr(
+        "scripts.campaign.launch_parallel_campaign_shards.subprocess.run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(error),
+    )
+    args = SimpleNamespace(
+        tm_intent_spool_path=spool,
+        tm_repository_root=tmp_path,
+        campaign_manifest=tmp_path / "manifest.yaml",
+        ledger_root=tmp_path,
+        checkpoint_wave_shards=4,
+    )
+    assert not checkpoint_wave(args, SimpleNamespace(campaign_id="test", content_repo=tmp_path), tmp_path)
+    rows = (tmp_path / "test" / "checkpoint_backlog.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(rows) == 1
+    assert "receipt_commit_deferred" in rows[0]
 
 
 def test_rate_uses_current_wave_not_historical_downtime():
