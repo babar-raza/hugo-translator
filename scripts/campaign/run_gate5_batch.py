@@ -329,6 +329,14 @@ def main(argv: list[str] | None = None) -> int:
         summary = getattr(exc, "summary", None)
         if summary is not None:
             print(json.dumps(summary, indent=2, default=str))
+            # A CampaignRunner partial summary means the worker completed its
+            # assigned cells and placed validator rejects in the failure/heal
+            # backlog.  Those are expected data outcomes, not an orchestration
+            # failure.  Keep a non-zero exit for untyped/exceptional failures
+            # so locks, provider crashes, and manifest defects still stop the
+            # controller.
+            if str(summary.get("status", "")) == "PARTIAL_WITH_TICKETS":
+                return 0
         else:
             print(json.dumps({"error": str(exc)}, indent=2, default=str))
         return 1
