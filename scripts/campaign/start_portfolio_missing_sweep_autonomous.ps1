@@ -6,6 +6,11 @@ param(
     [string]$SessionId = ([guid]::NewGuid().ToString()),
     [string]$ShardList,
     [string]$WatchdogState,
+    # Four locale shards can yield fewer than the governed 25-file minimum
+    # after normal zero-defect rejections, leaving a healthy campaign with no
+    # checkpoint commit. Eight keeps one receipt group together long enough to
+    # cross that floor without lowering the no-commit-spam policy.
+    [ValidateRange(1, 64)] [int]$CheckpointWaveShards = 8,
     [switch]$RecoveryQualification,
     [switch]$SkipStaleReceiptInvalidation,
     # TC-PORT-LLM-014: was a hardcoded literal, silently ignoring any caller's
@@ -191,7 +196,7 @@ $args = @(
     '--session-id', $SessionId, '--watchdog-state', $WatchdogState
 )
 if (-not $RecoveryQualification) {
-    $args += @('--checkpoint-wave-shards', '4', '--tm-repository-root', $ControlRepo)
+    $args += @('--checkpoint-wave-shards', "$CheckpointWaveShards", '--tm-repository-root', $ControlRepo)
 }
 if ($ShardList) {
     $args += @('--shard-list', $ResolvedShardList)
