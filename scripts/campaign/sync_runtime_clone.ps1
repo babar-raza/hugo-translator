@@ -86,11 +86,17 @@ Write-Output "Repinning $RuntimeRepo from $before to $controlHead (control repo 
 # a terminating ErrorRecord under $ErrorActionPreference = 'Stop' even though
 # the fetch succeeds -- confirmed live (fetch created the ref correctly; only
 # the redirect made the script think it had failed).
-# The control worktree can be on a worktree-private branch ref, which is not
-# advertised by a local-path fetch.  The verified immutable object ID is
-# always addressable, so fetch that exact commit into a private runtime ref.
-git -C $RuntimeRepo fetch $ControlRepo "${controlHead}:refs/repin/runtime" | Out-Null
-if ($LASTEXITCODE -ne 0) { throw 'Local runtime fetch failed.' }
+# The active branch can be worktree-private and therefore invisible to a
+# local-path upload-pack. Export its verified SHA through a short-lived normal
+# ref, fetch it locally, then remove the export ref.
+$exportRef = 'refs/codex/runtime-repin-export'
+git -C $ControlRepo update-ref $exportRef $controlHead
+try {
+    git -C $RuntimeRepo fetch $ControlRepo "${exportRef}:refs/repin/runtime" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Local runtime fetch failed.' }
+} finally {
+    git -C $ControlRepo update-ref -d $exportRef
+}
 git -C $RuntimeRepo checkout --detach 'refs/repin/runtime'
 git -C $RuntimeRepo update-ref -d 'refs/repin/runtime'
 
