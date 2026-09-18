@@ -245,7 +245,18 @@ try {
     if ($watchdog.status -ne 'COMPLETED_WITH_BACKLOG') {
         throw "Campaign launcher stopped under watchdog state $($watchdog.status): $($watchdog.reason)"
     }
-    if (-not (Invoke-Reconcile)) { throw 'Final receipt-to-commit reconciliation failed.' }
+    # A final reconciliation is a retryable delivery operation.  Every
+    # candidate is already receipt/hash backed and the next bounded wave will
+    # retry it.  Do not turn a temporary isolated-index/governance failure
+    # into a failed overnight translation process; TM writer failures below
+    # remain fail-closed because they are a state-integrity boundary.
+    if (-not (Invoke-Reconcile)) {
+        $watchdog | Add-Member -NotePropertyName status -NotePropertyValue 'COMPLETED_WITH_COMMIT_BACKLOG' -Force
+        $watchdog | Add-Member -NotePropertyName reason -NotePropertyValue 'final_receipt_reconciliation_deferred' -Force
+        $watchdog | Add-Member -NotePropertyName updated_at -NotePropertyValue (Get-Date -Format o) -Force
+        $watchdog | ConvertTo-Json | Set-Content -LiteralPath $WatchdogState -Encoding UTF8
+        Write-Controller 'final receipt-to-commit reconciliation deferred; continuing with durable commit backlog'
+    }
     do {
         Set-Location $RuntimeRepo
         & $py -m src.workers.tm_intent_writer --repository-root $ControlRepo --spool-path $spool --no-l3 --limit 500 --owner "$campaign-autonomous-writer"
