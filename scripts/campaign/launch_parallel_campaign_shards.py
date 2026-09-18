@@ -557,8 +557,24 @@ def _run_wave(
                 pass
             roots = [str(row.get("gate") or row.get("root_cause_class") or "pipeline") for row in fresh_failures]
             provider_error = any("provider" in root.lower() or "rate" in root.lower() for root in roots)
-            identical = len(roots) >= 3 and len(set(roots[-3:])) == 1
-            zero_accepts = len(fresh_failures) >= 5 and line_count(receipt_path) == accepted_at_start
+            # Typed zero-defect outcomes are expected data backlog, not
+            # controller failures.  Only repeated unknown/infrastructure
+            # roots may pause the wave; otherwise a bad source would stop a
+            # 100K-page campaign indefinitely on the same validator ticket.
+            data_root_tokens = (
+                "gate", "validator", "language", "frontmatter", "repetition",
+                "fidelity", "translation_rejected", "placeholder", "markdown",
+            )
+            infrastructure_roots = [
+                root for root in roots
+                if not any(token in root.lower() for token in data_root_tokens)
+            ]
+            identical = len(infrastructure_roots) >= 3 and len(set(infrastructure_roots[-3:])) == 1
+            zero_accepts = (
+                len(fresh_failures) >= 5
+                and line_count(receipt_path) == accepted_at_start
+                and bool(infrastructure_roots)
+            )
             if provider_error or identical or zero_accepts:
                 reason = ("provider_or_rate_limit" if provider_error else
                           "three_consecutive_identical_root_cause" if identical else
