@@ -683,6 +683,10 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="use Professionalize for all generation attempts and fail closed instead of M2M fallback",
     )
+    parser.add_argument(
+        "--exclude-dirty-sources", action="store_true",
+        help="Exclude content-repo source paths currently modified in the shared checkout; record them as deferred.",
+    )
     args = parser.parse_args(argv)
 
     sites = tuple(args.sites) if args.sites else IN_SCOPE_SITES
@@ -736,6 +740,14 @@ def main(argv: list[str] | None = None) -> int:
             source_list=listed,
             max_sources=args.max_sources,
         )
+        deferred_dirty_sources: list[str] = []
+        if args.exclude_dirty_sources:
+            dirty = {Path(p).as_posix() for p in git_dirty_paths(content_repo)}
+            deferred_dirty_sources = [
+                str(item["source_path"]) for item in scoped if str(item["source_path"]) in dirty
+            ]
+            scoped = [item for item in scoped if str(item["source_path"]) not in dirty]
+            print(f"deferred dirty sources: {len(deferred_dirty_sources)}")
         declared = None
         if args.existing == "replace":
             declared = declarations_from_ledger(
@@ -761,6 +773,7 @@ def main(argv: list[str] | None = None) -> int:
             professionalize_only=args.professionalize_only,
             include_known_broken=args.include_known_broken,
         )
+        manifest["deferred_dirty_sources"] = sorted(deferred_dirty_sources)
         atomic_write(
             path=args.manifest_output,
             content=yaml.safe_dump(manifest, sort_keys=False, allow_unicode=True),
