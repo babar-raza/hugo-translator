@@ -63,12 +63,12 @@ def rolling_receipt_rate(receipts: list[dict], *, now: float, window_seconds: in
     return {"window_seconds": window_seconds, "accepted": len(recent), "rate_per_minute": round(rate, 3)}
 
 
-def live_llm_slots(path: Path) -> dict[str, int]:
+def live_llm_slots(path: Path, capacity: int = 0) -> dict[str, int]:
     """Read slot occupancy without mutating the shared semaphore file."""
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {"active": 0, "capacity": 0}
+        return {"active": 0, "capacity": capacity}
     now = datetime.now(timezone.utc).timestamp()
     slots = payload.get("slots", {}) or {}
     active = 0
@@ -79,7 +79,7 @@ def live_llm_slots(path: Path) -> dict[str, int]:
             continue
         if expires > now:
             active += 1
-    return {"active": active, "capacity": int(payload.get("capacity", 0) or 0)}
+    return {"active": active, "capacity": int(payload.get("capacity", 0) or capacity)}
 
 
 def main() -> int:
@@ -88,6 +88,7 @@ def main() -> int:
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
     parser.add_argument("--spool", type=Path)
     parser.add_argument("--llm-slots", type=Path, default=Path("data/campaigns/llm_slots.json"))
+    parser.add_argument("--llm-slot-capacity", type=int, default=0)
     parser.add_argument("--slo-target-per-hour", type=float, default=600.0)
     parser.add_argument("--slo-max-eta-minutes", type=float, default=1440.0)
     parser.add_argument("--slo-max-provider-calls-per-hour", type=float, default=3600.0)
@@ -147,7 +148,7 @@ def main() -> int:
     )
     payload = {"campaign": manifest.campaign_id, "accepted": accepted, "failures": len(failures), "rate_per_minute": round(rate, 3), "remaining": remaining, "eta_minutes": round(remaining / rate, 1) if rate else None, "committed": committed, "pending_commit": max(0, accepted-committed), "spool": spool, "metrics": metrics, "throughput": throughput}
     payload["rolling_15m"] = rolling_receipt_rate(receipts.values(), now=time.time())
-    payload["llm_slots"] = live_llm_slots(args.llm_slots)
+    payload["llm_slots"] = live_llm_slots(args.llm_slots, args.llm_slot_capacity)
     state_path = root / "watchdog_state.json"
     try:
         state = json.loads(state_path.read_text(encoding="utf-8-sig"))

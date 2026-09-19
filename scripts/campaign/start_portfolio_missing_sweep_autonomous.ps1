@@ -134,7 +134,7 @@ function Invoke-Reconcile {
 }
 function Show-Progress {
     Set-Location $RuntimeRepo
-    $progress = & $py "$ControlRepo\scripts\campaign\campaign_progress.py" --manifest $manifest --ledger-root $ledger --spool $spool --llm-slots (Join-Path $ControlRepo 'data\campaigns\llm_slots.json')
+    $progress = & $py "$ControlRepo\scripts\campaign\campaign_progress.py" --manifest $manifest --ledger-root $ledger --spool $spool --llm-slots (Join-Path $ControlRepo 'data\campaigns\llm_slots.json') --llm-slot-capacity ([int]$release.fleet_llm_slots)
     Write-Controller "progress $progress"
 }
 function Get-SpoolState {
