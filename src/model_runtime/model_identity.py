@@ -120,7 +120,12 @@ def probe(provider: Any, model_id: str, *, resolve_alias: bool = True) -> Identi
 
     t0 = time.perf_counter()
     try:
-        text, _, _ = provider.generate(CANARY_SYSTEM, CANARY_USER)
+        # Identity probes are real Professionalize calls and can run at the
+        # start of several campaign children. They must obey the same fleet
+        # limit as translation, rather than creating an unaccounted burst.
+        from src.workers.llm_slot_semaphore import slot_from_config
+        with slot_from_config():
+            text, _, _ = provider.generate(CANARY_SYSTEM, CANARY_USER)
     except Exception as exc:
         return IdentityProbe(
             model_id,
@@ -339,7 +344,9 @@ def calibrate_false_positive_rate(provider: Any, model_id: str, *, n: int = 20) 
     errors = 0
     for _ in range(n):
         try:
-            text, _, _ = provider.generate(CANARY_SYSTEM, CANARY_USER)
+            from src.workers.llm_slot_semaphore import slot_from_config
+            with slot_from_config():
+                text, _, _ = provider.generate(CANARY_SYSTEM, CANARY_USER)
             hashes.append(_sha(text))
         except Exception:
             errors += 1

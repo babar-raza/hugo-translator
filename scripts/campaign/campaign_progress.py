@@ -6,7 +6,7 @@ import hashlib
 import json
 import sqlite3
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.workers.campaign_manifest import CampaignManifest
@@ -45,11 +45,49 @@ def current_run_progress(state: dict, now: float, remaining: int) -> dict:
             "pause_reason": state.get("reason")}
 
 
+def rolling_receipt_rate(receipts: list[dict], *, now: float, window_seconds: int = 900) -> dict:
+    """Compute a current-window rate; never let historical downtime inflate ETA."""
+    cutoff = now - window_seconds
+    recent = []
+    for receipt in receipts:
+        value = receipt.get("accepted_at")
+        if not value:
+            continue
+        try:
+            stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            continue
+        if stamp >= cutoff:
+            recent.append(stamp)
+    rate = len(recent) * 60.0 / window_seconds
+    return {"window_seconds": window_seconds, "accepted": len(recent), "rate_per_minute": round(rate, 3)}
+
+
+def live_llm_slots(path: Path) -> dict[str, int]:
+    """Read slot occupancy without mutating the shared semaphore file."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"active": 0, "capacity": 0}
+    now = datetime.now(timezone.utc).timestamp()
+    slots = payload.get("slots", {}) or {}
+    active = 0
+    for slot in slots.values():
+        try:
+            expires = datetime.fromisoformat(str(slot.get("expires_at", "")).replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            continue
+        if expires > now:
+            active += 1
+    return {"active": active, "capacity": int(payload.get("capacity", 0) or 0)}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
     parser.add_argument("--spool", type=Path)
+    parser.add_argument("--llm-slots", type=Path, default=Path("data/campaigns/llm_slots.json"))
     parser.add_argument("--slo-target-per-hour", type=float, default=600.0)
     parser.add_argument("--slo-max-eta-minutes", type=float, default=1440.0)
     parser.add_argument("--slo-max-provider-calls-per-hour", type=float, default=3600.0)
@@ -108,6 +146,8 @@ def main() -> int:
         ),
     )
     payload = {"campaign": manifest.campaign_id, "accepted": accepted, "failures": len(failures), "rate_per_minute": round(rate, 3), "remaining": remaining, "eta_minutes": round(remaining / rate, 1) if rate else None, "committed": committed, "pending_commit": max(0, accepted-committed), "spool": spool, "metrics": metrics, "throughput": throughput}
+    payload["rolling_15m"] = rolling_receipt_rate(receipts.values(), now=time.time())
+    payload["llm_slots"] = live_llm_slots(args.llm_slots)
     state_path = root / "watchdog_state.json"
     try:
         state = json.loads(state_path.read_text(encoding="utf-8-sig"))

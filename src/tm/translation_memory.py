@@ -176,6 +176,7 @@ class TranslationMemory:
                 hit=False,
                 source="override_bypass",
                 confidence=0.0,
+                metadata={"miss_reason": "override_bypass"},
             )
 
         # Layer 1: Check cache
@@ -193,12 +194,13 @@ class TranslationMemory:
         entry = self.l2.exact_lookup(
             site_id, src_lang, tgt_lang, text, context, field_name=field_name
         )
+        miss_reason = "l2_absent"
         if entry:
             # TC-12: Validate that the cached translation is actually in the target language.
             # Rejects poisoned L2 entries (e.g., Bulgarian stored under a Malay key).
             if not self._validate_hit_language(entry.translation, tgt_lang):
                 # Poisoned entry — fall through to L3 / fresh translation
-                pass
+                miss_reason = "l2_invalid_language"
             else:
                 # Populate L1 cache
                 self.l1.put(site_id, src_lang, tgt_lang, text, entry.translation, field_name)
@@ -230,7 +232,7 @@ class TranslationMemory:
                 # translations in sibling languages (e.g., Bulgarian when targeting Malay).
                 if not self._validate_hit_language(best_match.translation, tgt_lang):
                     # Poisoned L3 entry — no hit, force fresh translation
-                    pass
+                    miss_reason = "l3_invalid_language"
                 else:
                     # Populate L1 cache with best match
                     self.l1.put(
@@ -247,11 +249,19 @@ class TranslationMemory:
                         metadata=best_match.metadata,
                     )
 
+            else:
+                miss_reason = "l3_absent"
+        elif use_semantic:
+            miss_reason = "l3_unavailable"
+        else:
+            miss_reason = "semantic_disabled"
+
         # No hit
         return LookupResult(
             hit=False,
             source="none",
             confidence=0.0,
+            metadata={"miss_reason": miss_reason},
         )
 
     def store(

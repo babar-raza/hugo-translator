@@ -237,6 +237,10 @@ def main(argv: list[str] | None = None) -> int:
         help="Narrow process-local cap; recovery diagnosis must use one worker.",
     )
     parser.add_argument(
+        "--throughput-release", type=Path,
+        help="Immutable release artifact authorizing production parallelism.",
+    )
+    parser.add_argument(
         "--translator-repo", type=Path,
         help="Pinned runtime code root; permits a separate read-only working directory for shared caches.",
     )
@@ -287,6 +291,19 @@ def main(argv: list[str] | None = None) -> int:
         translator_repo=translator_repo,
         ledger_root=args.ledger_root,
     )
+    release = None
+    if args.throughput_release:
+        import subprocess
+        from src.workers.throughput_release import verify_release
+        release = verify_release(
+            args.throughput_release,
+            campaign_id=manifest.campaign_id,
+            runtime_sha=subprocess.check_output(
+                ["git", "-C", str(translator_repo), "rev-parse", "HEAD"], text=True
+            ).strip(),
+            manifest_path=args.manifest,
+        )
+        runner.manifest.execution_policy["max_parallel_jobs"] = release.max_parallel_jobs
     print(f"[{manifest.campaign_id}] startup runner_ready", flush=True)
     if args.recovery_qualification:
         if not args.shard_id and not args.shard_list:
@@ -299,6 +316,8 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--max-parallel-jobs is reserved for diagnostic no-write runs")
         runner.manifest.execution_policy["max_parallel_jobs"] = args.max_parallel_jobs
     if args.no_force_serialize:
+        if release is not None and release.force_serialize:
+            parser.error("throughput release requires serialization")
         # Process-scoped, so a canary never changes what any concurrently running
         # session sees. The shipped default stays the safe one (TC-APT-046 step 1).
         runner._force_serialize = False
@@ -306,6 +325,8 @@ def main(argv: list[str] | None = None) -> int:
             f"[{manifest.campaign_id}] force_serialize_all_backends OFF for this process; "
             f"max_parallel_jobs={manifest.execution_policy.get('max_parallel_jobs', 1)}"
         )
+    elif release is not None and not release.force_serialize:
+        parser.error("throughput release requires --no-force-serialize")
     listed_shards: list[str] = []
     if args.shard_list:
         listed_shards = [

@@ -81,21 +81,17 @@ if ($before -eq $controlHead) {
 }
 
 Write-Output "Repinning $RuntimeRepo from $before to $controlHead (control repo $Ref)..."
-# Do not redirect git's stderr in PowerShell 5.1: git's normal progress output
-# (e.g. "From <path>") goes to stderr, and 2>&1 here turns each such line into
-# a terminating ErrorRecord under $ErrorActionPreference = 'Stop' even though
-# the fetch succeeds -- confirmed live (fetch created the ref correctly; only
-# the redirect made the script think it had failed).
-# The active branch can be worktree-private and therefore invisible to a
-# local-path upload-pack. Export its verified SHA through a short-lived normal
-# ref, fetch it locally, then remove the export ref.
-$exportRef = 'refs/heads/codex-runtime-repin-export'
-git -C $ControlRepo update-ref $exportRef $controlHead
+# A worktree-private branch is not reliably advertised by local-path
+# upload-pack. A self-contained bundle names the verified object directly and
+# avoids both an external push and a transient shared ref race.
+$bundle = Join-Path ([IO.Path]::GetTempPath()) ("hugo-runtime-" + [guid]::NewGuid().ToString() + '.bundle')
 try {
-    git -C $RuntimeRepo fetch $ControlRepo "${exportRef}:refs/repin/runtime" | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Local runtime fetch failed.' }
+    git -C $ControlRepo bundle create $bundle $controlHead
+    if ($LASTEXITCODE -ne 0) { throw 'Could not build local runtime bundle.' }
+    git -C $RuntimeRepo fetch $bundle "${controlHead}:refs/repin/runtime" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Local runtime bundle import failed.' }
 } finally {
-    git -C $ControlRepo update-ref -d $exportRef
+    Remove-Item -LiteralPath $bundle -Force -ErrorAction SilentlyContinue
 }
 git -C $RuntimeRepo checkout --detach 'refs/repin/runtime'
 git -C $RuntimeRepo update-ref -d 'refs/repin/runtime'

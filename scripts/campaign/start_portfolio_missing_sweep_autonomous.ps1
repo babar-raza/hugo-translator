@@ -13,6 +13,7 @@ param(
     [ValidateRange(1, 64)] [int]$CheckpointWaveShards = 8,
     [switch]$RecoveryQualification,
     [switch]$SkipStaleReceiptInvalidation,
+    [string]$ThroughputRelease,
     # TC-PORT-LLM-014: was a hardcoded literal, silently ignoring any caller's
     # intent to target a different campaign. The default preserves every
     # existing caller's behaviour unchanged.
@@ -41,6 +42,11 @@ if ($env:OS -eq 'Windows_NT') {
 
 $RuntimeRepo = (Resolve-Path $RuntimeRepo).Path
 $ControlRepo = (Resolve-Path $ControlRepo).Path
+if ([string]::IsNullOrWhiteSpace($ThroughputRelease)) {
+    $ThroughputRelease = Join-Path $ControlRepo "data\campaigns\throughput-releases\$CampaignId.json"
+}
+if (-not (Test-Path $ThroughputRelease)) { throw "Throughput release artifact missing: $ThroughputRelease" }
+$ThroughputRelease = (Resolve-Path $ThroughputRelease).Path
 $ResolvedShardList = $null
 if ($ShardList) {
     # The documented command is executed from ControlRepo. Resolve relative
@@ -128,7 +134,7 @@ function Invoke-Reconcile {
 }
 function Show-Progress {
     Set-Location $RuntimeRepo
-    $progress = & $py "$ControlRepo\scripts\campaign\campaign_progress.py" --manifest $manifest --ledger-root $ledger --spool $spool
+    $progress = & $py "$ControlRepo\scripts\campaign\campaign_progress.py" --manifest $manifest --ledger-root $ledger --spool $spool --llm-slots (Join-Path $ControlRepo 'data\campaigns\llm_slots.json')
     Write-Controller "progress $progress"
 }
 function Get-SpoolState {
@@ -163,6 +169,15 @@ function Invoke-PreWaveSpoolDrain {
 if (-not (Test-Path $py)) { throw "Python interpreter missing: $py" }
 if (Test-CampaignLive) { throw 'A campaign process is already live; refusing a second launcher.' }
 
+# A clean clone can still be stale. Bind every launch to an immutable release
+# artifact before it can mutate TM or content.
+$runtimeSha = (git -C $RuntimeRepo rev-parse HEAD).Trim()
+$releaseJson = & $py -c "from pathlib import Path; import json; from src.workers.throughput_release import verify_release; r=verify_release(Path(r'$ThroughputRelease'), campaign_id=r'$campaign', runtime_sha=r'$runtimeSha', manifest_path=Path(r'$manifest')); print(json.dumps(r.__dict__, sort_keys=True))"
+if ($LASTEXITCODE -ne 0) { throw 'Throughput release verification failed.' }
+$release = $releaseJson | ConvertFrom-Json
+if ([int]$release.processes -ne $MaxWorkers) { throw "Release requires $($release.processes) processes; requested MaxWorkers=$MaxWorkers." }
+Write-Controller "throughput_release $releaseJson"
+
 # Translation waves only read/enqueue TM intents.  Drain all prior intents
 # through the single writer before workers start so every wave sees the latest
 # exact TM state and a crashed writer cannot be hidden by fresh work.
@@ -193,11 +208,13 @@ $args = @(
     $launcherScript, '--campaign-manifest', $manifest,
     '--ledger-root', $ledger, '--child', 'gate5', '--max-workers', $MaxWorkers, '--wait',
     '--tm-intent-spool-path', $spool, '--progress-interval-seconds', '30',
-    '--session-id', $SessionId, '--watchdog-state', $WatchdogState
+    '--session-id', $SessionId, '--watchdog-state', $WatchdogState,
+    '--throughput-release', $ThroughputRelease
 )
 if (-not $RecoveryQualification) {
     $args += @('--checkpoint-wave-shards', "$CheckpointWaveShards", '--tm-repository-root', $ControlRepo)
 }
+if (-not [bool]$release.force_serialize) { $args += '--no-force-serialize' }
 if ($ShardList) {
     $args += @('--shard-list', $ResolvedShardList)
 }

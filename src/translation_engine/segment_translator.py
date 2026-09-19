@@ -1249,6 +1249,10 @@ class SegmentTranslator:
                         progress.segments_completed(1)
                 else:
                     segments_to_translate.append(segment)
+                    _miss_reason = (tm_result.metadata or {}).get("miss_reason", "unknown")
+                    stats.tm_miss_reasons[_miss_reason] = (
+                        stats.tm_miss_reasons.get(_miss_reason, 0) + 1
+                    )
                     progress = get_progress_tracker()
                     if progress:
                         progress.cache_miss()

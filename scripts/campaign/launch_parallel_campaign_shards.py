@@ -432,6 +432,7 @@ def _child_command(
     gpu_locales: tuple[str, ...],
     shard_list_path: Path | None = None,
     tm_intent_spool_path: Path | None = None,
+    throughput_release: Path | None = None,
     no_force_serialize: bool = False,
     recovery_qualification: bool = False,
     child: str = "gate5",
@@ -477,6 +478,8 @@ def _child_command(
                 command += ["--shard-id", shard_id]
         if tm_intent_spool_path:
             command += ["--tm-intent-spool-path", str(tm_intent_spool_path)]
+        if throughput_release:
+            command += ["--throughput-release", str(throughput_release)]
         if no_force_serialize:
             command.append("--no-force-serialize")
         if recovery_qualification:
@@ -518,6 +521,7 @@ def _run_wave(
     gpu_locales: tuple[str, ...],
     translator_repo: Path,
     config_root: Path,
+    throughput_release: Path | None = None,
 ) -> int:
     """Launch one child per shard group and wait for all of them.
 
@@ -586,6 +590,7 @@ def _run_wave(
             gpu_locales=gpu_locales,
             shard_list_path=shard_list_path,
             tm_intent_spool_path=args.tm_intent_spool_path,
+            throughput_release=throughput_release,
             no_force_serialize=args.no_force_serialize,
             recovery_qualification=args.recovery_qualification,
             child=args.child,
@@ -844,6 +849,10 @@ def main(argv: list[str] | None = None) -> int:
         help="Campaign-scoped TM intent spool required for parallel gate5 children.",
     )
     parser.add_argument(
+        "--throughput-release", type=Path,
+        help="Immutable evidence-backed concurrency release artifact.",
+    )
+    parser.add_argument(
         "--no-force-serialize",
         action="store_true",
         help="Disable process-local serialization for governed API-only canaries only.",
@@ -910,6 +919,20 @@ def main(argv: list[str] | None = None) -> int:
     gpu_locales = tuple(str(locale) for locale in args.gpu_locales)
 
     manifest = CampaignManifest.load(args.campaign_manifest)
+    if args.throughput_release:
+        from src.workers.throughput_release import verify_release
+        runtime_root = Path(__file__).resolve().parents[2]
+        runtime_sha = subprocess.check_output(
+            ["git", "-C", str(runtime_root), "rev-parse", "HEAD"], text=True
+        ).strip()
+        release = verify_release(
+            args.throughput_release, campaign_id=manifest.campaign_id,
+            runtime_sha=runtime_sha, manifest_path=args.campaign_manifest,
+        )
+        if args.max_workers != release.processes:
+            raise SystemExit("--max-workers does not match throughput release")
+        if args.no_force_serialize != (not release.force_serialize):
+            raise SystemExit("--no-force-serialize does not match throughput release")
     # Persist watchdog state by default so unattended launches cannot lose the
     # pause reason merely because a caller omitted the optional flag.
     if args.watchdog_state is None:
@@ -1048,6 +1071,7 @@ def main(argv: list[str] | None = None) -> int:
                     gpu_locales=gpu_locales,
                     translator_repo=translator_repo,
                     config_root=config_root,
+                    throughput_release=args.throughput_release,
                 )
             finally:
                 if gpu_lane_lock is not None:

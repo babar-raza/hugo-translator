@@ -44,6 +44,7 @@ class TranslationStats:
     l1_hits: int = 0  # L1 cache hits
     l2_hits: int = 0  # L2 persistent hits
     l3_hits: int = 0  # L3 semantic hits
+    tm_miss_reasons: dict[str, int] = field(default_factory=dict)
     translated_segments: int = 0  # New translations via model
     skipped_segments: int = 0  # Skipped (excluded by rules)
     duration_seconds: float = 0.0
@@ -326,6 +327,7 @@ class AcceptedTranslation:
                 "ast_batches": int(stats.ast_batch_calls),
                 "individual_fallback_batches": int(stats.ast_individual_fallbacks),
                 "validation_retries": int(stats.validation_retried),
+                "tm_miss_reasons": dict(stats.tm_miss_reasons),
             }
         return receipt
 
@@ -358,6 +360,8 @@ class DirectoryResult:
             agg.l1_hits += result.stats.l1_hits
             agg.l2_hits += result.stats.l2_hits
             agg.l3_hits += result.stats.l3_hits
+            for reason, count in result.stats.tm_miss_reasons.items():
+                agg.tm_miss_reasons[reason] = agg.tm_miss_reasons.get(reason, 0) + int(count)
             agg.translated_segments += result.stats.translated_segments
             agg.skipped_segments += result.stats.skipped_segments
             agg.words_translated += result.stats.words_translated
