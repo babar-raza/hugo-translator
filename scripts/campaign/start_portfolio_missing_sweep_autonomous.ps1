@@ -10,7 +10,7 @@ param(
     # after normal zero-defect rejections, leaving a healthy campaign with no
     # checkpoint commit. Eight keeps one receipt group together long enough to
     # cross that floor without lowering the no-commit-spam policy.
-    [ValidateRange(1, 64)] [int]$CheckpointWaveShards = 8,
+    [ValidateRange(1, 64)] [int]$CheckpointWaveShards = 64,
     [switch]$RecoveryQualification,
     [switch]$SkipStaleReceiptInvalidation,
     [string]$ThroughputRelease,
