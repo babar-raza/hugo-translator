@@ -86,10 +86,11 @@ Write-Output "Repinning $RuntimeRepo from $before to $controlHead (control repo 
 # avoids both an external push and a transient shared ref race.
 $bundle = Join-Path ([IO.Path]::GetTempPath()) ("hugo-runtime-" + [guid]::NewGuid().ToString() + '.bundle')
 try {
-    # Export the missing revision range explicitly. A bare endpoint revision
-    # is treated as an empty bundle when the source SHA lives only in a
-    # worktree-private ref; the old runtime SHA is the stable exclusion base.
-    git -C $ControlRepo bundle create $bundle "$before..$controlHead"
+    # Export all local refs. This repository uses worktree-private refs and
+    # Git's bundle reachability calculation can incorrectly report a revision
+    # range as empty even when rev-list sees the commit. The bundle remains
+    # local, is deleted in finally, and never pushes to a remote.
+    git -C $ControlRepo bundle create $bundle --all
     if ($LASTEXITCODE -ne 0) { throw 'Could not build local runtime bundle.' }
     git -C $RuntimeRepo fetch $bundle "${controlHead}:refs/repin/runtime" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Local runtime bundle import failed.' }
