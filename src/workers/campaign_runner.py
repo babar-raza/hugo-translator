@@ -2783,6 +2783,86 @@ class CampaignRunner:
         # swept into a commit); failed_shard_ids is surfaced in the final summary so
         # failures stay visible instead of silently disappearing.
         failed_shard_ids: list[str] = []
+        # When backend serialization is explicitly disabled by a governed
+        # throughput release, schedule across the selected shards as well as
+        # within each shard.  Many locale/platform shards contain only one
+        # cell; a per-shard executor therefore silently capped the real fleet
+        # at one provider call per process and made the 16/32-call release
+        # ineffective.  Receipt/ledger writes remain serialized by their
+        # existing locks and shard commits happen after all futures complete.
+        if not self._force_serialize and max_parallel_jobs > 1:
+            selected_shards = [
+                shard for shard in all_shards
+                if not shard_ids or shard["shard_id"] in shard_ids
+            ]
+            future_to_job: dict[Any, tuple[dict[str, Any], Any, str, str]] = {}
+            with ThreadPoolExecutor(max_workers=max_parallel_jobs) as executor:
+                for shard in selected_shards:
+                    self._startup_checkpoint(
+                        f"dispatch_begin shard={shard['shard_id']} jobs={len(shard['jobs'])}"
+                    )
+                    for source, locale, expected_output in shard["jobs"]:
+                        future = executor.submit(
+                            self._run_campaign_job,
+                            shard=shard,
+                            source=source,
+                            locale=locale,
+                            expected_output=expected_output,
+                        )
+                        future_to_job[future] = (shard, source, locale, expected_output)
+                shard_results: dict[str, list[int]] = {
+                    str(shard["shard_id"]): [0, 0] for shard in selected_shards
+                }
+                for future in as_completed(future_to_job):
+                    shard, source, locale, expected_output = future_to_job[future]
+                    job_accepted, _output = future.result()
+                    result = shard_results[str(shard["shard_id"])]
+                    if job_accepted:
+                        accepted += 1
+                        result[0] += 1
+                    else:
+                        failed += 1
+                        result[1] += 1
+                        self._append_heal_ticket(
+                            shard=shard,
+                            source=source,
+                            locale=locale,
+                            expected_output=expected_output,
+                        )
+            for shard in selected_shards:
+                shard_accepted, shard_failed = shard_results[str(shard["shard_id"])]
+                self.ledger.write_summary(
+                    {
+                        **self.manifest.to_summary(),
+                        "status": "SHARD_COMPLETE" if shard_failed == 0 else "SHARD_PARTIAL",
+                        "shard_id": shard["shard_id"],
+                        "shard_accepted": shard_accepted,
+                        "shard_failed": shard_failed,
+                        "accepted": accepted,
+                        "failed": failed,
+                        "model_outcomes": self.ledger.model_outcomes(),
+                        "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
+                        "quality_stop_recommendations": self._quality_stop_recommendations(),
+                        "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+                        "acceleration_metrics": self.ledger.acceleration_metrics(),
+                    }
+                )
+                if shard_failed:
+                    failed_shard_ids.append(str(shard["shard_id"]))
+                if self.manifest.commit_policy.get("enabled", True):
+                    commit_sha = self._commit_verified_outputs(shard["shard_id"])
+                    if commit_sha:
+                        self.ledger.write_summary(
+                            {
+                                **self.manifest.to_summary(),
+                                "status": "SHARD_COMMITTED",
+                                "shard_id": shard["shard_id"],
+                                "commit_sha": commit_sha,
+                                "accepted": accepted,
+                                "failed": failed,
+                            }
+                        )
+            all_shards = []
         for shard in all_shards:
             if shard_ids and shard["shard_id"] not in shard_ids:
                 continue
