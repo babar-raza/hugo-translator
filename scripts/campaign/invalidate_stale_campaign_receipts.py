@@ -61,7 +61,12 @@ def main(argv: list[str] | None = None) -> int:
     for receipt in receipts:
         output = str(receipt.get("output_path") or "")
         if output not in ownership:
-            raise ValueError(f"receipt outside manifest: {output}")
+            # A refreshed missing-only manifest intentionally omits outputs
+            # that were already landed between campaign revisions. Preserve
+            # their receipt as evidence, but do not let historical scope make
+            # an unattended restart fail closed.
+            orphaned.append(receipt)
+            continue
         claimed = str(receipt.get("receipt_sha256") or "")
         unsigned = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
         if not claimed or receipt_fingerprint(unsigned) != claimed:
@@ -139,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "campaign_id": campaign_id,
                     "dropped_at": invalidated_at,
-                    "reason": "receipted_output_missing_from_content_repo",
+                "reason": "receipted_output_missing_from_content_repo_or_manifest_scope",
                     "prior_receipt": receipt,
                 },
                 ensure_ascii=False,
