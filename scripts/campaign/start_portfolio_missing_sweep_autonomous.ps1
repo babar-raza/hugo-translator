@@ -121,6 +121,25 @@ function Test-CampaignLive {
         $_.ProcessId -ne $PID
     })
 }
+function Release-StaleFamilyClaim {
+    # A terminated launcher may leave its durable claim until TTL expiry.  This
+    # is safe only after the OS-process guard above proves no campaign worker is
+    # live; release the recorded owner, never an invented PID/session.
+    $claimCode = @"
+from pathlib import Path
+from src.workers.work_claims import active_claim, release_claim
+path = Path(r'$ledger/claims.jsonl')
+key = 'family:$campaign'
+claim = active_claim(key, claims_path=path)
+if claim:
+    release_claim(key, claim['session_id'], claims_path=path)
+    print('released stale claim from ' + claim['session_id'])
+else:
+    print('no live family claim')
+"@
+    & $py -c $claimCode
+    if ($LASTEXITCODE -ne 0) { throw 'Could not inspect/release family claim.' }
+}
 function Invoke-Preflight {
     Set-Location $RuntimeRepo
     $receipts = Join-Path $ledger "$campaign\acceptance_receipts.jsonl"
@@ -168,6 +187,7 @@ function Invoke-PreWaveSpoolDrain {
 
 if (-not (Test-Path $py)) { throw "Python interpreter missing: $py" }
 if (Test-CampaignLive) { throw 'A campaign process is already live; refusing a second launcher.' }
+Release-StaleFamilyClaim
 
 # A clean clone can still be stale. Bind every launch to an immutable release
 # artifact before it can mutate TM or content.
