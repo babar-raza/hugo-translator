@@ -146,6 +146,19 @@ def open_tickets_for_source_path(
     ]
 
 
+def open_tickets_by_source_path(
+    *, heal_queue_path: Path | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """Index every unresolved OPEN ticket by exact source path in one queue pass."""
+    path = heal_queue_path or _HEAL_QUEUE_FILE
+    indexed: dict[str, list[dict[str, Any]]] = {}
+    for ticket in _load_tickets(path):
+        source_path = ticket.get("source_path")
+        if source_path and _counts_toward_quarantine(ticket):
+            indexed.setdefault(str(source_path), []).append(ticket)
+    return indexed
+
+
 def is_quarantined(
     target_lang: str,
     root_cause_class: str,

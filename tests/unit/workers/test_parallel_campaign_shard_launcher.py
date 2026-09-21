@@ -169,6 +169,7 @@ def test_gate5_child_receives_the_ledger_root_the_parent_verifies(tmp_path):
 
     assert command[1] == "-u"
     assert command[2].endswith("run_gate5_batch.py")
+    assert command[command.index("--device") + 1] == "cuda"
     assert Path(command[command.index("--ledger-root") + 1]) == kwargs["ledger_root"]
     assert command[command.index("--shard-id") + 1] == shard["shard_id"]
     assert "--resume" in command

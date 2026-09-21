@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory)] [string]$RuntimeRepo,
     [string]$ControlRepo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
-    [ValidateRange(1, 4)] [int]$MaxWorkers = 4,
+    [ValidateRange(1, 8)] [int]$MaxWorkers = 4,
     [string]$SessionId = ([guid]::NewGuid().ToString()),
     [string]$ShardList,
     [string]$WatchdogState,
@@ -69,6 +69,7 @@ $launcherErr = Join-Path $logRoot 'launcher.err.log'
 $controllerLog = Join-Path $logRoot 'controller.log'
 $WatchdogState = if ($WatchdogState) { [IO.Path]::GetFullPath($WatchdogState) } else { Join-Path $ledger "$campaign\watchdog_state.json" }
 $env:PYTHONPATH = $RuntimeRepo
+$env:CUDA_VISIBLE_DEVICES = '-1'
 # This campaign is explicitly Professionalize-only.  Do not permit a hidden
 # Hugging Face/Transformers download during engine startup: the FastText
 # detector is local and the only generative route is Professionalize.  A
@@ -227,6 +228,7 @@ $launcherScript = Join-Path $RuntimeRepo 'scripts\campaign\launch_parallel_campa
 $args = @(
     $launcherScript, '--campaign-manifest', $manifest,
     '--ledger-root', $ledger, '--child', 'gate5', '--max-workers', $MaxWorkers, '--wait',
+    '--device', 'cpu',
     '--tm-intent-spool-path', $spool, '--progress-interval-seconds', '30',
     '--session-id', $SessionId, '--watchdog-state', $WatchdogState,
     '--throughput-release', $ThroughputRelease

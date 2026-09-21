@@ -108,6 +108,7 @@ def build_real_engine(
     translator_repo: Path,
     max_gpu_memory_percent: int | None = None,
     tm_intent_spool_path: Path | None = None,
+    device_override: str = "auto",
 ):
     from src.model_runtime.loader import ModelLoader
     from src.model_runtime.registry import ModelRegistry
@@ -121,7 +122,9 @@ def build_real_engine(
     config_service = ConfigService(translator_repo / "config")
     raw = get_global_config()
     device = "cpu"
-    if (raw.get("hardware", {}) or {}).get("enable_gpu", True):
+    if device_override == "cuda":
+        device = "cuda"
+    elif device_override == "auto" and (raw.get("hardware", {}) or {}).get("enable_gpu", True):
         try:
             import torch
 
@@ -208,6 +211,7 @@ def main(argv: list[str] | None = None) -> int:
         help="VRAM budget for this process (TC-APT-047 dedicated GPU shard); "
         "omit to use config/global.yaml's hardware.max_gpu_memory_percent",
     )
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument(
         "--no-force-serialize",
         action="store_true",
@@ -224,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
             "TM writes; a separately supervised single writer applies them to canonical LMDB."
         ),
     )
+    parser.add_argument("--ledger-partition", help="Exclusive worker journal id")
     parser.add_argument(
         "--diagnostic-quarantine-root", type=Path,
         help="Protected local recovery evidence root; candidate text never enters ledgers.",
@@ -266,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:
         translator_repo,
         args.max_gpu_memory_percent,
         args.tm_intent_spool_path,
+        args.device,
     )
     print(f"[{manifest.campaign_id}] startup engine_ready", flush=True)
     # Child processes may run from an ACL-restricted pinned clone; keep the
@@ -290,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         translation_engine=engine,
         translator_repo=translator_repo,
         ledger_root=args.ledger_root,
+        ledger_partition=args.ledger_partition,
     )
     release = None
     if args.throughput_release:

@@ -52,7 +52,7 @@ from src.workers.campaign_manifest import (
     git_sha,
     sha256_file,
 )
-from src.workers.heal_queue import open_tickets_for_source_path
+from src.workers.heal_queue import open_tickets_by_source_path
 
 logger = logging.getLogger(__name__)
 
@@ -480,11 +480,12 @@ def build_manifest(
         raise DiscoveryError(f"locales outside the profile allowlist: {sorted(unknown)}")
     scoped = []
     excluded_known_broken: dict[str, list[str]] = {}
+    open_tickets_by_source = (
+        {} if include_known_broken else open_tickets_by_source_path(heal_queue_path=heal_queue_path)
+    )
     for item in sources:
         if not include_known_broken:
-            open_tickets = open_tickets_for_source_path(
-                item["source_path"], heal_queue_path=heal_queue_path
-            )
+            open_tickets = open_tickets_by_source.get(item["source_path"], [])
             if open_tickets:
                 root_causes = sorted({t.get("root_cause_class", "unknown") for t in open_tickets})
                 excluded_known_broken[item["source_path"]] = root_causes

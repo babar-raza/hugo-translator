@@ -23,6 +23,14 @@ def rows(path: Path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def journal_rows(root: Path, name: str) -> list[dict]:
+    paths = [root / name]
+    journals = root / "journals"
+    if journals.is_dir():
+        paths.extend(sorted(journals.glob(f"*/{name}")))
+    return [row for path in paths for row in rows(path)]
+
+
 def receipt_digest(receipt: dict) -> str:
     return str(
         receipt.get("receipt_sha256")
@@ -96,8 +104,14 @@ def main() -> int:
     args = parser.parse_args()
     manifest = CampaignManifest.load(args.manifest)
     root = args.ledger_root / manifest.campaign_id
-    receipts = {str(row.get("output_path")): row for row in rows(root / "acceptance_receipts.jsonl")}
-    failures = rows(root / "failure_metadata.jsonl")
+    receipts: dict[str, dict] = {}
+    for row in journal_rows(root, "acceptance_receipts.jsonl"):
+        output = str(row.get("output_path"))
+        previous = receipts.get(output)
+        if previous and receipt_digest(previous) != receipt_digest(row):
+            raise RuntimeError(f"conflicting partitioned receipt: {output}")
+        receipts[output] = row
+    failures = journal_rows(root, "failure_metadata.jsonl")
     committed_receipts: set[tuple[str, str]] = set()
     for batch in rows(root / "commit_batches.jsonl"):
         if batch.get("status") == "COMMITTED":
@@ -125,11 +139,17 @@ def main() -> int:
         if minutes > 0:
             rate = accepted / minutes
     spool = {"PENDING": None, "CLAIMED": None, "APPLIED": None, "FAILED": None}
-    if args.spool and args.spool.is_file():
+    if args.spool:
         spool = dict.fromkeys(spool, 0)
-        with sqlite3.connect(args.spool) as conn:
-            for state, count in conn.execute("select state, count(*) from tm_intents group by state"):
-                spool[str(state)] = count
+        spool_paths = [args.spool] + sorted(
+            args.spool.parent.glob(f"{args.spool.stem}.worker-*{args.spool.suffix}")
+        )
+        for spool_path in spool_paths:
+            if not spool_path.is_file():
+                continue
+            with sqlite3.connect(spool_path) as conn:
+                for state, count in conn.execute("select state, count(*) from tm_intents group by state"):
+                    spool[str(state)] += count
     remaining = max(0, manifest.expected_output_count - accepted)
     elapsed_seconds = 0.0
     if len(accepted_times) > 1:
@@ -147,6 +167,7 @@ def main() -> int:
         ),
     )
     payload = {"campaign": manifest.campaign_id, "accepted": accepted, "failures": len(failures), "rate_per_minute": round(rate, 3), "remaining": remaining, "eta_minutes": round(remaining / rate, 1) if rate else None, "committed": committed, "pending_commit": max(0, accepted-committed), "spool": spool, "metrics": metrics, "throughput": throughput}
+    payload["pending_journals"] = len(list((root / "journals").glob("*/acceptance_receipts.jsonl"))) if (root / "journals").is_dir() else 0
     payload["rolling_15m"] = rolling_receipt_rate(receipts.values(), now=time.time())
     payload["llm_slots"] = live_llm_slots(args.llm_slots, args.llm_slot_capacity)
     state_path = root / "watchdog_state.json"

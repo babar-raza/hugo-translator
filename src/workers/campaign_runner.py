@@ -67,13 +67,17 @@ def _force_serialize_all_backends() -> bool:
 class CampaignLedger:
     """Thread-safe metadata-only acceptance and rejection ledger."""
 
-    def __init__(self, root: Path, campaign_id: str) -> None:
+    def __init__(self, root: Path, campaign_id: str, partition_id: str | None = None) -> None:
         self.root = root / campaign_id
         self.root.mkdir(parents=True, exist_ok=True)
-        self.receipts_path = self.root / "acceptance_receipts.jsonl"
-        self.failures_path = self.root / "failure_metadata.jsonl"
-        self.summary_path = self.root / "summary.json"
-        self._process_lock_path = self.root / "ledger-process.lock"
+        self.partition_id = partition_id
+        self.write_root = self.root if partition_id is None else self.root / "journals" / partition_id
+        self.write_root.mkdir(parents=True, exist_ok=True)
+        self.receipts_path = self.write_root / "acceptance_receipts.jsonl"
+        self.failures_path = self.write_root / "failure_metadata.jsonl"
+        self.summary_path = self.write_root / "summary.json"
+        self.heal_queue_path = self.root.parent / "heal_queue.jsonl" if partition_id is None else self.write_root / "heal_queue.jsonl"
+        self._process_lock_path = self.write_root / "ledger-process.lock"
         self._lock = threading.RLock()
         self._receipt_index = self.receipts()
 
@@ -95,8 +99,28 @@ class CampaignLedger:
                     rows.append(json.loads(line))
         return rows
 
+    def _journal_paths(self, name: str) -> list[Path]:
+        if self.partition_id is not None:
+            return [self.write_root / name]
+        paths = [self.root / name]
+        journals = self.root / "journals"
+        if journals.is_dir():
+            paths.extend(sorted(journals.glob(f"*/{name}")))
+        return paths
+
     def receipts(self) -> dict[str, dict[str, Any]]:
-        return {row["output_path"]: row for row in self._read_jsonl(self.receipts_path)}
+        indexed: dict[str, dict[str, Any]] = {}
+        for path in self._journal_paths("acceptance_receipts.jsonl"):
+            for row in self._read_jsonl(path):
+                output = str(row["output_path"])
+                previous = indexed.get(output)
+                if previous and previous.get("receipt_sha256") != row.get("receipt_sha256"):
+                    raise ValueError(f"conflicting partitioned acceptance receipt: {output}")
+                indexed[output] = row
+        return indexed
+
+    def failures(self) -> list[dict[str, Any]]:
+        return [row for path in self._journal_paths("failure_metadata.jsonl") for row in self._read_jsonl(path)]
 
     def append_receipt(self, receipt: dict[str, Any]) -> None:
         if "content" in receipt or "translated_content" in receipt:
@@ -181,14 +205,9 @@ class CampaignLedger:
         """Return recent metadata-only failures for cumulative retry guidance."""
         if limit < 1:
             raise ValueError("failure history limit must be positive")
-        if not self.failures_path.is_file():
-            return []
         matches: list[dict[str, Any]] = []
-        with self.failures_path.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                if not line.strip():
-                    continue
-                row = json.loads(line)
+        for path in self._journal_paths("failure_metadata.jsonl"):
+            for row in self._read_jsonl(path):
                 if row.get("output_path") == output_path and row.get("target_lang") == target_lang:
                     matches.append(row)
                     if len(matches) > limit:
@@ -266,7 +285,7 @@ class CampaignLedger:
 
         for receipt in self.receipts().values():
             bucket(str(receipt.get("model_fingerprint") or "unknown"))["accepted"] += 1
-        for failure in self._read_jsonl(self.failures_path):
+        for failure in self.failures():
             model = bucket(str(failure.get("model_id") or "unknown"))
             if str(failure.get("gate")) == "campaign_job_exception":
                 model["provider_error"] += 1
@@ -317,7 +336,7 @@ class CampaignLedger:
             )
 
         seen: set[tuple[str, str, str]] = set()
-        for failure in self._read_jsonl(self.failures_path):
+        for failure in self.failures():
             model_id = str(failure.get("model_id") or "unknown")
             attempt = str(failure.get("attempt") if failure.get("attempt") is not None else "unknown")
             key = (str(failure.get("job_id") or failure.get("output_path") or "unknown"), attempt, model_id)
@@ -563,12 +582,13 @@ class CampaignRunner:
         translation_engine,
         translator_repo: Path,
         ledger_root: Path = Path("data/campaigns"),
+        ledger_partition: str | None = None,
     ) -> None:
         self.manifest = manifest
         self.engine = translation_engine
         self.translator_repo = translator_repo.resolve()
         self.content_repo = Path(manifest.content_repo).resolve()
-        self.ledger = CampaignLedger(ledger_root, manifest.campaign_id)
+        self.ledger = CampaignLedger(ledger_root, manifest.campaign_id, ledger_partition)
         # The engine owns one model instance.  Candidate jobs have distinct
         # source/output paths, while these two maps provide only narrowly
         # scoped retry routing for the currently running job.
@@ -2351,7 +2371,7 @@ class CampaignRunner:
         # over any automated quarantine dimension below -- checked first,
         # regardless of prior failure history, so an unseen locale on a held
         # file is skipped too, not silently attempted.
-        heal_queue_path = self.ledger.root.parent / "heal_queue.jsonl"
+        heal_queue_path = self.ledger.heal_queue_path
         hold = active_hold(source.source_path, heal_queue_path=heal_queue_path)
         if hold is not None:
             self._append_advisory_hold_skip(
@@ -3016,7 +3036,7 @@ class CampaignRunner:
             "tier": "unclassified",
             "note": note,
         }
-        heal_queue_path = self.ledger.root.parent / "heal_queue.jsonl"
+        heal_queue_path = self.ledger.heal_queue_path
         # TC-PORT-LLM-009: a heal ticket is best-effort observability, not a
         # correctness-critical write -- confirmed live under a real 4-worker
         # soak: enough jobs hit the QU-02/QU-38 quarantine-refresh branches in

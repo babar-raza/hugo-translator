@@ -132,23 +132,28 @@ def checkpoint_wave(args: argparse.Namespace, manifest: CampaignManifest, transl
     """
     from src.tm.intent_spool import TMIntentSpool
 
-    spool = TMIntentSpool(args.tm_intent_spool_path)
-    while True:
-        before = spool.stats()
-        if before.get("CLAIMED", 0):
-            raise RuntimeError("checkpoint refuses claimed TM intents")
-        if before.get("FAILED", 0):
-            raise RuntimeError("checkpoint refuses failed TM intents")
-        if not before.get("PENDING", 0):
-            break
-        subprocess.run([
-            sys.executable, "-m", "src.workers.tm_intent_writer",
-            "--repository-root", str(args.tm_repository_root),
-            "--spool-path", str(args.tm_intent_spool_path), "--no-l3", "--limit", "500",
-            "--owner", f"{manifest.campaign_id}-wave-writer",
-        ], check=True, timeout=600)
-        if spool.stats().get("PENDING", 0) >= before["PENDING"]:
-            raise RuntimeError("TM checkpoint writer made no progress")
+    base_spool = args.tm_intent_spool_path
+    spool_paths = [base_spool] + sorted(
+        base_spool.parent.glob(f"{base_spool.stem}.worker-*{base_spool.suffix}")
+    )
+    for spool_path in spool_paths:
+        spool = TMIntentSpool(spool_path)
+        while True:
+            before = spool.stats()
+            if before.get("CLAIMED", 0):
+                raise RuntimeError(f"checkpoint refuses claimed TM intents: {spool_path}")
+            if before.get("FAILED", 0):
+                raise RuntimeError(f"checkpoint refuses failed TM intents: {spool_path}")
+            if not before.get("PENDING", 0):
+                break
+            subprocess.run([
+                sys.executable, "-m", "src.workers.tm_intent_writer",
+                "--repository-root", str(args.tm_repository_root),
+                "--spool-path", str(spool_path), "--no-l3", "--limit", "500",
+                "--owner", f"{manifest.campaign_id}-wave-writer",
+            ], check=True, timeout=600)
+            if spool.stats().get("PENDING", 0) >= before["PENDING"]:
+                raise RuntimeError(f"TM checkpoint writer made no progress: {spool_path}")
     try:
         subprocess.run([
             sys.executable, str(translator_repo / "scripts/campaign/reconcile_receipted_commits.py"),
@@ -437,6 +442,7 @@ def _child_command(
     recovery_qualification: bool = False,
     child: str = "gate5",
     translator_repo: Path | None = None,
+    ledger_partition: str | None = None,
 ) -> list[str]:
     """Build one child's argv for a whole GROUP of shards, VRAM-budgeted if it holds GPU work.
 
@@ -463,6 +469,8 @@ def _child_command(
             "--ledger-root",
             str(ledger_root),
             "--resume",
+            "--device",
+            device,
             "--max-gpu-memory-percent",
             str(memory_percent),
         ]
@@ -478,6 +486,8 @@ def _child_command(
                 command += ["--shard-id", shard_id]
         if tm_intent_spool_path:
             command += ["--tm-intent-spool-path", str(tm_intent_spool_path)]
+        if ledger_partition:
+            command += ["--ledger-partition", ledger_partition]
         if throughput_release:
             command += ["--throughput-release", str(throughput_release)]
         if no_force_serialize:
@@ -561,14 +571,23 @@ def _run_wave(
     handles: list[Any] = []
     receipt_path = args.ledger_root / manifest.campaign_id / "acceptance_receipts.jsonl"
     failure_path = args.ledger_root / manifest.campaign_id / "failure_metadata.jsonl"
-    receipt_tail = TerminalLedgerTail(receipt_path)
-    failure_tail = TerminalLedgerTail(failure_path)
-    receipt_tail.poll()
-    failure_tail.poll()
+    partition_roots = [
+        args.ledger_root / manifest.campaign_id / "journals" / f"worker-{index:02d}"
+        for index in range(len(groups))
+    ]
+    receipt_tails = [TerminalLedgerTail(receipt_path)] + [
+        TerminalLedgerTail(root / "acceptance_receipts.jsonl") for root in partition_roots
+    ]
+    failure_tails = [TerminalLedgerTail(failure_path)] + [
+        TerminalLedgerTail(root / "failure_metadata.jsonl") for root in partition_roots
+    ]
+    for tail in receipt_tails + failure_tails:
+        tail.poll()
     fresh_failures: list[dict[str, Any]] = []
 
     def line_count(path: Path) -> int:
-        return receipt_tail.count if path == receipt_path else failure_tail.count
+        tails = receipt_tails if path == receipt_path else failure_tails
+        return sum(tail.count for tail in tails)
 
     accepted_at_start = line_count(receipt_path)
     failed_at_start = line_count(failure_path)
@@ -578,6 +597,10 @@ def _run_wave(
             "\n".join(str(shard["shard_id"]) for shard in group) + "\n",
             encoding="utf-8",
         )
+        worker_spool = None
+        if args.tm_intent_spool_path:
+            base = args.tm_intent_spool_path
+            worker_spool = base.with_name(f"{base.stem}.worker-{index:02d}{base.suffix}")
         command = _child_command(
             shards=group,
             config_root=config_root,
@@ -589,11 +612,12 @@ def _run_wave(
             gpu_shard_memory_percent=args.gpu_shard_memory_percent,
             gpu_locales=gpu_locales,
             shard_list_path=shard_list_path,
-            tm_intent_spool_path=args.tm_intent_spool_path,
+            tm_intent_spool_path=worker_spool,
             throughput_release=throughput_release,
             no_force_serialize=args.no_force_serialize,
             recovery_qualification=args.recovery_qualification,
             child=args.child,
+            ledger_partition=f"worker-{index:02d}",
         )
         log_path = log_dir / f"{manifest.campaign_id}_child{index}.log"
         handle = log_path.open("w", encoding="utf-8")
@@ -637,8 +661,10 @@ def _run_wave(
         # A silent wait made a healthy Professionalize batch look hung.  Emit
         # bounded, receipt-backed progress on the launcher's own console.
         while True:
-            receipt_tail.poll()
-            fresh_failures.extend(failure_tail.poll())
+            for tail in receipt_tails:
+                tail.poll()
+            for tail in failure_tails:
+                fresh_failures.extend(tail.poll())
             now = time.monotonic()
             child_timeout_seconds = int(getattr(args, "child_timeout_seconds", 900))
             for log_path in child_logs:
@@ -776,6 +802,12 @@ def _run_wave(
         stop_children(children)
         for handle in handles:
             handle.close()
+        # Consolidate every durable worker journal even on timeout, watchdog
+        # pause, Ctrl+C, or controller exception.  This keeps restart
+        # denominators exact and prevents accepted work being repeated.
+        from scripts.campaign.merge_campaign_journals import merge as merge_journals
+        merged = merge_journals(args.ledger_root / manifest.campaign_id)
+        print(f"journal_merge {json.dumps(merged, sort_keys=True)}", flush=True)
 
     for index, (code, log_path) in enumerate(zip(exit_codes, child_logs)):
         if code == 0:

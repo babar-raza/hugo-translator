@@ -19,6 +19,7 @@ from src.workers.heal_queue import (
     is_source_path_quarantined,
     main as heal_queue_main,
     open_ticket_counts_by_pair,
+    open_tickets_by_source_path,
     open_tickets_by_root_cause_class,
     open_tickets_for_source_path,
     quarantined_files,
@@ -176,6 +177,17 @@ class TestOpenTicketsForSourcePath:
             open_tickets_for_source_path("content/x/quickstart.md", heal_queue_path=tmp_path / "none.jsonl")
             == []
         )
+
+    def test_bulk_index_preserves_open_ticket_semantics(self, tmp_path):
+        queue = tmp_path / "heal_queue.jsonl"
+        _write_tickets(queue, [
+            _ticket("de", "auto:X", source_path="a.md"),
+            _ticket("fr", "auto:X", source_path="a.md"),
+            _ticket("es", "auto:X", source_path="b.md", disposition="FIXED_VERIFIED"),
+        ])
+        indexed = open_tickets_by_source_path(heal_queue_path=queue)
+        assert set(indexed) == {"a.md"}
+        assert {row["target_lang"] for row in indexed["a.md"]} == {"de", "fr"}
 
 
 class TestReQueueOnResolution:

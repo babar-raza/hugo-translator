@@ -35,6 +35,7 @@ _PHASES: dict[str, dict[str, int | bool]] = {
     "baseline": {"processes": 4, "max_parallel_jobs": 1, "fleet_llm_slots": 4, "force_serialize": True},
     "canary16": {"processes": 4, "max_parallel_jobs": 4, "fleet_llm_slots": 16, "force_serialize": False},
     "soak32": {"processes": 4, "max_parallel_jobs": 8, "fleet_llm_slots": 32, "force_serialize": False},
+    "production64": {"processes": 8, "max_parallel_jobs": 8, "fleet_llm_slots": 64, "force_serialize": False},
 }
 
 
@@ -79,4 +80,3 @@ def verify_release(path: Path, *, campaign_id: str, runtime_sha: str, manifest_p
     if release.manifest_sha256.lower() != manifest_sha256(manifest_path).lower():
         raise ThroughputReleaseError("manifest bytes do not match release artifact")
     return release
-
