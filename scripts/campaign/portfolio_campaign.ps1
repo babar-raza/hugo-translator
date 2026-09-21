@@ -42,7 +42,10 @@ function Sync-Runtime {
         $created = $true
     }
     if (-not $created -and (git -C $runtime status --porcelain)) { throw "Runtime clone is dirty: $runtime" }
-    git -C $runtime fetch $control $sha | Out-Null
+    # Fetch a named ref rather than a raw object id: local Git servers may
+    # reject unadvertised SHA fetches even when the source control checkout
+    # owns that commit.
+    git -C $runtime fetch $control main | Out-Null
     git -C $runtime checkout --detach $sha | Out-Null
     if ((git -C $runtime status --porcelain)) { throw 'Runtime clone did not remain clean.' }
     return $sha
