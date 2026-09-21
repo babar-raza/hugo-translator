@@ -4,13 +4,15 @@ param(
     [string]$Action = 'Status',
     [string]$CampaignId = 'portfolio-professionalize-unattended-20260921',
     [ValidateRange(1,168)] [int]$SoakHours = 8,
+    [string]$PythonPath,
     [switch]$Scheduled
 )
 
 $ErrorActionPreference = 'Stop'
 $control = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$py = if ($env:HUGO_TRANSLATOR_PYTHON) { $env:HUGO_TRANSLATOR_PYTHON } else { Join-Path $control '.venv\Scripts\python.exe' }
+$py = if ($PythonPath) { $PythonPath } elseif ($env:HUGO_TRANSLATOR_PYTHON) { $env:HUGO_TRANSLATOR_PYTHON } else { Join-Path $control '.venv\Scripts\python.exe' }
 $controlVenv = Join-Path $control '.venv\Scripts\python.exe'
+$env:HUGO_TRANSLATOR_PYTHON = $py
 $runtime = Join-Path $control '.local\portfolio-runtime-64'
 $manifest = Join-Path $control "data\campaigns\manifests\$CampaignId.yaml"
 $ledger = Join-Path $control 'data\campaigns'
@@ -20,6 +22,7 @@ $release = Join-Path $control "data\campaigns\throughput-releases\$CampaignId.js
 $evidence = Join-Path $control "reports\campaigns\$CampaignId\evidence\production64-soak.json"
 $pause = Join-Path $campaignRoot 'pause.requested'
 $taskName = 'HugoTranslator-PortfolioProfessionalize64'
+$qualificationTaskName = 'HugoTranslator-PortfolioProfessionalize64-Qualification'
 $contentRepo = 'D:\onedrive\Documents\GitHub\aspose.org'
 
 function Assert-Prerequisites {
@@ -35,17 +38,12 @@ function Assert-Prerequisites {
 
 function Sync-Runtime {
     $sha = (git -C $control rev-parse HEAD).Trim()
-    $created = $false
     if (-not (Test-Path (Join-Path $runtime '.git'))) {
         New-Item -ItemType Directory -Force (Split-Path $runtime) | Out-Null
         git clone --no-hardlinks --no-checkout $control $runtime | Out-Null
-        $created = $true
     }
-    if (-not $created -and (git -C $runtime status --porcelain)) { throw "Runtime clone is dirty: $runtime" }
-    # Fetch a named ref rather than a raw object id: local Git servers may
-    # reject unadvertised SHA fetches even when the source control checkout
-    # owns that commit.
-    git -C $runtime fetch $control main | Out-Null
+    if (git -C $runtime status --porcelain) { throw "Runtime clone is dirty: $runtime" }
+    git -C $runtime fetch $control $sha | Out-Null
     git -C $runtime checkout --detach $sha | Out-Null
     if ((git -C $runtime status --porcelain)) { throw 'Runtime clone did not remain clean.' }
     return $sha
@@ -94,6 +92,16 @@ if ($Action -eq 'Watch') { while ($true) { Clear-Host; Get-Date; Show-Status; St
 if ($Action -eq 'Pause') { New-Item -ItemType Directory -Force $campaignRoot | Out-Null; New-Item -ItemType File -Force $pause | Out-Null; Show-Status; exit 0 }
 if ($Action -eq 'Resume') { Remove-Item -LiteralPath $pause -Force -ErrorAction SilentlyContinue; Start-ScheduledTask -TaskName $taskName; Show-Status; exit 0 }
 if ($Action -eq 'Start' -and -not $Scheduled) { Start-ScheduledTask -TaskName $taskName; Show-Status; exit 0 }
+if ($Action -eq 'Qualify' -and -not $Scheduled) {
+    Assert-Prerequisites
+    $qualifyAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Action Qualify -Scheduled -CampaignId `"$CampaignId`" -SoakHours $SoakHours -PythonPath `"$py`"" -WorkingDirectory $control
+    $qualifySettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 2) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable
+    $qualifyPrincipal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
+    Register-ScheduledTask -TaskName $qualificationTaskName -Action $qualifyAction -Settings $qualifySettings -Principal $qualifyPrincipal -Force | Out-Null
+    Start-ScheduledTask -TaskName $qualificationTaskName
+    Get-ScheduledTask $qualificationTaskName | Select-Object TaskName,State
+    exit 0
+}
 
 Assert-Prerequisites
 $runtimeSha = Sync-Runtime
@@ -101,6 +109,11 @@ $env:PYTHONPATH = $runtime
 if ($Action -eq 'Qualify') {
     Build-Manifest $runtimeSha
     $start = Get-Date
+    # Initialize the shared language detector once. Starting eight processes
+    # against a missing model races on lid.176.tmp and can stall every worker
+    # before its first campaign job.
+    & $py -c "from pathlib import Path; from src.translation_engine.language_detection.fasttext_detector import FastTextDetector; d=FastTextDetector(cache_dir=Path(r'$control\data\models\fasttext'), auto_download=True, download_retries=3, fallback_to_langdetect=True); assert d.is_available, 'no language detector available'"
+    if ($LASTEXITCODE -ne 0) { throw 'Language detector preflight failed.' }
     # Qualification intentionally uses the identical production topology. It is
     # bounded by SoakHours and cannot approve a release without clean evidence.
     & $py (Join-Path $runtime 'scripts\campaign\llm_preflight_calibration.py') --model-id professionalize_llm --levels '1,2,4,8' --calls-per-level 8 --output "reports\campaigns\$CampaignId\evidence\professionalize-concurrency-calibration.json"
@@ -129,7 +142,7 @@ if ($Action -eq 'Install') {
     if (-not (Test-Path $release)) { throw 'Run -Action Qualify successfully before Install.' }
     & $py -c "from pathlib import Path; from src.workers.throughput_release import verify_release; verify_release(Path(r'$release'), campaign_id=r'$CampaignId', runtime_sha=r'$runtimeSha', manifest_path=Path(r'$manifest'))"
     if ($LASTEXITCODE -ne 0) { throw 'Production release does not match the immutable runtime and manifest.' }
-    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Action Start -Scheduled -CampaignId `"$CampaignId`"" -WorkingDirectory $control
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Action Start -Scheduled -CampaignId `"$CampaignId`" -PythonPath `"$py`"" -WorkingDirectory $control
     $triggers = @((New-ScheduledTaskTrigger -AtStartup),(New-ScheduledTaskTrigger -AtLogOn))
     $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 2) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable
     $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType S4U -RunLevel Highest
