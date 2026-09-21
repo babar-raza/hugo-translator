@@ -119,13 +119,8 @@ if ($Action -eq 'Qualify') {
     & $py (Join-Path $runtime 'scripts\campaign\llm_preflight_calibration.py') --model-id professionalize_llm --levels '1,2,4,8' --calls-per-level 8 --output "reports\campaigns\$CampaignId\evidence\professionalize-concurrency-calibration.json"
     if ($LASTEXITCODE -ne 0) { throw 'Professionalize calibration failed.' }
     $env:CUDA_VISIBLE_DEVICES='-1'; $env:OMP_NUM_THREADS='1'; $env:MKL_NUM_THREADS='1'
-    $deadline = $start.AddHours($SoakHours)
-    do {
-        & $py (Join-Path $runtime 'scripts\campaign\launch_parallel_campaign_shards.py') --campaign-manifest $manifest --ledger-root $ledger --child gate5 --max-workers 8 --wait --tm-intent-spool-path $spool --no-force-serialize --device cpu --checkpoint-wave-shards 64 --tm-repository-root $control
-        if ($LASTEXITCODE -ne 0) { throw '64-job qualification wave failed.' }
-        & $py scripts\campaign\merge_campaign_journals.py --campaign-id $CampaignId --ledger-root $ledger
-        if ($LASTEXITCODE -ne 0) { throw 'Qualification journal merge failed.' }
-    } while ((Get-Date) -lt $deadline)
+    & $py (Join-Path $runtime 'scripts\campaign\unattended_controller.py') --manifest $manifest --runtime $runtime --control $control --ledger-root $ledger --spool $spool
+    if ($LASTEXITCODE -ne 0) { throw "Native controller failed with exit $LASTEXITCODE." }
     & $py (Join-Path $runtime 'scripts\campaign\verify_concurrency_canary.py') --manifest $manifest --ledger-root $ledger --json-out $evidence
     if ($LASTEXITCODE -ne 0) { throw 'Canary verification failed.' }
     $report = Get-Content $evidence -Raw | ConvertFrom-Json
