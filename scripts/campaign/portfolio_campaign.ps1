@@ -95,8 +95,8 @@ if ($Action -eq 'Start' -and -not $Scheduled) { Start-ScheduledTask -TaskName $t
 if ($Action -eq 'Qualify' -and -not $Scheduled) {
     Assert-Prerequisites
     $qualifyAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Action Qualify -Scheduled -CampaignId `"$CampaignId`" -SoakHours $SoakHours -PythonPath `"$py`"" -WorkingDirectory $control
-    $qualifySettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 2) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable
-    $qualifyPrincipal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
+    $qualifySettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 2) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    $qualifyPrincipal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType S4U -RunLevel Limited
     Register-ScheduledTask -TaskName $qualificationTaskName -Action $qualifyAction -Settings $qualifySettings -Principal $qualifyPrincipal -Force | Out-Null
     Start-ScheduledTask -TaskName $qualificationTaskName
     Get-ScheduledTask $qualificationTaskName | Select-Object TaskName,State
