@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-09-07T14:49:25.741116+00:00",
+  "stamps": {
+    "loop_prompt_version": "10.7 (2026-09-06)",
+    "plan_revision": 18
+  },
+  "open_obligations": [
+    "TC-APT-004b",
+    "TC-APT-014",
+    "TC-APT-036",
+    "TC-APT-038",
+    "TC-APT-039",
+    "TC-APT-042",
+    "TC-APT-046",
+    "TC-APT-069",
+    "TC-APT-078",
+    "TC-APT-080",
+    "TC-APT-090",
+    "TC-APT-098"
+  ],
+  "active_clauses": {
+    "capacity_clause": {
+      "engaged": false,
+      "since": "2026-09-05T19:47:47+00:00",
+      "reason": "KPI 23 < floor 25 AND TC-APT-046/047 unlanded",
+      "effect": "no new-page Track-A attempts; wave-cells-rust-w1 blocked but built and env-verified; Track-B restricted to 043..047 in dependency order",
+      "released_at": "2026-09-05T23:16:13+00:00",
+      "release_reason": "Stale-state fix, found while orienting for TC-APT-077: logs/watchdog_state.json reads kpi_cells_24h=90 (floor 25), kpi_breach_open=false. The clauses own AND condition (TC-APT-043..047 unlanded AND KPI below floor) requires BOTH; KPI has not been below floor for a while (the peer already acted on this correctly for wave-cells-rust-w1, citing 'capacity clause released, KPI 43' -- this field just never caught up to that decision). TC-APT-046/047 remain unlanded, so a future KPI dip re-engages it automatically once checked against watchdog_state.json again."
+    },
+    "wave_scale": {
+      "value": 4,
+      "previous": 2,
+      "stepped_at": "2026-09-06T12:25:00+00:00",
+      "decision": "STEP UP 2 -> 4 per plan SS0.9/TC-APT-080",
+      "trigger": "wave2 closed at 71/74 attempted (95.9%, aggregating email/net recovery + email/cpp + email/python) >=80%; RECURRENCE gate clear; KPI 165 >= floor 25",
+      "next_step_up_requires": "recurrence gate clear AND KPI >= floor AND last closed wave acceptance >= 80%"
+    }
+  },
+  "next_action": "Check wave16 (pdf-document-management-go, PID 58472 LLM + 55168 m2m) summary.json/failure_metadata.jsonl; review+commit page-complete if gates pass. wave14 still awaits operator decision on source-fence fix; wave15 stays quarantined pending the link-duplication producer-side fix (Track-B)."
+}

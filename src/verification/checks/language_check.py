@@ -10,8 +10,34 @@ import re
 from typing import Any
 
 from .base import VerificationCheck, VerificationIssue
+from src.translation_engine.frontmatter_signal import (
+    MIN_FRONTMATTER_SIGNAL_ALPHA,
+    is_untranslated,
+)
+from src.translation_engine.governed_terms import governed_signal_alternation
 
 logger = logging.getLogger(__name__)
+
+# TC-APT-040: near-identical language pairs langdetect confuses on short
+# technical text. Keep in sync with engine.py's _SIMILAR_LANG_MAP (the
+# engine-side FrontmatterLanguageCheck) — this is the write-time verification
+# layer's copy of the same acceptance.
+_SIMILAR_LANGUAGE_ACCEPTS: dict[str, frozenset[str]] = {
+    "sr": frozenset({"hr", "bs"}),
+    "hr": frozenset({"sr", "bs"}),
+    "bs": frozenset({"sr", "hr"}),
+    "pt": frozenset({"es", "gl"}),
+    "es": frozenset({"pt", "gl"}),
+    "ms": frozenset({"id"}),
+    "id": frozenset({"ms"}),
+    "uk": frozenset({"ru", "bg"}),
+    "bg": frozenset({"ru", "uk"}),
+    "sk": frozenset({"cs"}),
+    "cs": frozenset({"sk"}),
+    "no": frozenset({"da", "nb"}),
+    "nb": frozenset({"no", "da"}),
+    "da": frozenset({"no", "nb"}),
+}
 
 # Lazy import for langdetect to handle missing dependency gracefully
 _langdetect = None
@@ -96,8 +122,67 @@ class LanguageDetectionCheck(VerificationCheck):
         "www.",
     ]
     PROTECTED_FRONTMATTER_TREES = {
+        # Hugo aliases are route identifiers (for example
+        # /3d/python/scene-management-in-python/), not localized prose.  The
+        # recovery write canary proved that language detection otherwise rejects
+        # correct output solely because this ASCII URL is preserved verbatim.
+        # Route integrity is checked independently by the frontmatter validator.
+        "aliases",
         "evidence",
         "grade_reasons",
+        # TC-APT-004b: found via qualification on real content --
+        # provenance.content_hash (a hex digest this mission's own
+        # fingerprinting relies on, see fingerprints.py) and the content
+        # repo's own graded_content_hash field are hash/ID metadata, never
+        # prose, but neither was in this skip set. langdetect classifies a
+        # hex string as some language with unpredictable confidence, so a
+        # zero-defect translation could be spuriously rejected for a field
+        # that was never supposed to be checked at all. Confirmed live:
+        # both fields fired on real content during TC-APT-004b's
+        # qualification run (19/25 of that run's verification failures,
+        # before this fix, were exactly this false positive).
+        "provenance",
+        "graded_content_hash",
+        # TC-APT-004b (2026-09-03): found via the full-sample qualification run --
+        # 734 language_detection flags on frontmatter.keywords[N] across just 51
+        # verification-failure events, heavily concentrated on Latin-script target
+        # locales (es/nl/th: 0% acceptance; it/ro/sv/pl: <=25%), vs. much better
+        # results on non-Latin-script locales (he/ko: ~54%) -- the locale skew
+        # itself was the tell, since a script-based false positive would hit
+        # Latin-script targets hardest and non-Latin targets least.
+        #
+        # Unlike evidence/provenance/graded_content_hash above, keywords ARE
+        # meant to be translated -- this is not "never check it," it's that
+        # THIS classifier (langdetect, char-n-gram based) is unreliable on
+        # keywords' actual shape: short (real content: "add chart word document
+        # dotnet", "format chart word document csharp"), multi-word SEO slugs
+        # dense with product/platform tokens, not prose sentences. Confirmed
+        # directly, not inferred from the model's output: a HAND-WRITTEN,
+        # unambiguously correct German translation of a real keyword
+        # ("Diagrammformat Word-Dokument csharp") was classified as English at
+        # confidence 0.9999967799308401 -- TECHNICAL_SIGNAL_RE stripping doesn't
+        # touch it ("csharp"/"Word-Dokument" aren't in that pattern), so this is
+        # the underlying classifier failing on short mixed text, not a stripping
+        # gap a smarter regex could close. No write gate (9-44) independently
+        # checks keyword translation either, so this is a real coverage gap
+        # left open, not a defect masked by a redundant check elsewhere --
+        # recorded honestly rather than silently accepted.
+        "keywords",
+        # 2026-09-11: linktitle is a structural nav-menu label, already
+        # classified as non-translatable in
+        # frontmatter_integrity_validator.py (grouped with generated_by/
+        # enhanced/howtoimage) -- confirmed live: 5 already-shipped locales
+        # (cs/fr/es/pt/ru) of content/docs.aspose.org/en/3d/java/developer-guide/
+        # format-support.md all kept linktitle: "Format Support" verbatim,
+        # untranslated, and were accepted fine. This check had no matching
+        # exemption, so any page whose linktitle string is long/distinct
+        # enough to cross langdetect's confidence threshold (e.g.
+        # "Compound File Support") fails language_detection on EVERY
+        # locale, unconditionally -- confirmed on
+        # email/net+python/developer-guide/compound-file-support.md during
+        # wave-tier1b-batch1-20260911 (0/56 accepted after ~20min, 2 of 8
+        # sources entirely blocked on this single field).
+        "linktitle",
     }
     # Language classifiers can be dominated by required ASCII product/platform
     # tokens in an otherwise-correct short title.  For example, langdetect
@@ -106,9 +191,22 @@ class LanguageDetectionCheck(VerificationCheck):
     # Korean.  Remove only syntax-shaped identifiers and the small governed
     # platform lexicon from the classifier input.  The untranslated-unit and
     # terminology gates still validate those tokens independently.
+    # TC-APT-069: governed portfolio terminology must be stripped here for the
+    # same reason ".NET" and "FOSS" are -- it is not prose and must not be
+    # counted as language evidence. This inventory is the FOURTH place the term
+    # has to be listed (profile preserve_patterns, engine.py's
+    # _FRONTMATTER_TECHNICAL_SIGNAL_RE, config/terminology.yaml, and here), and
+    # missing this one made seoTitle the dominant failure on words-document-net:
+    # the signal was "for - Document Object Model &" (22 alpha, checked and
+    # misdetected) instead of "for &" (3 alpha, correctly skipped by the
+    # TC-APT-052 floor below). Multi-word entries precede the single-token
+    # alternatives so they claim their span first.
     TECHNICAL_SIGNAL_RE = re.compile(
         r"(?<![A-Za-z0-9_])(?:"
-        r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
+        # TC-APT-079: derived from config/terminology.yaml rather than
+        # hand-copied, so this inventory cannot drift from engine.py's.
+        + governed_signal_alternation()
+        + r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
         r"\.NET|C\+\+|C#|"
         r"FOSS|SDK|API|HTTP|REST|JSON|XML|XLSX|PDF|DOCX|"
         r"Rust|Python|Java|JavaScript|Microsoft|Office|"
@@ -191,6 +289,7 @@ class LanguageDetectionCheck(VerificationCheck):
                 target_lang,
                 "frontmatter",
                 context,
+                source_data=(source or {}).get("frontmatter"),
             )
             issues.extend(frontmatter_issues)
 
@@ -215,6 +314,7 @@ class LanguageDetectionCheck(VerificationCheck):
         target_lang: str,
         path: str,
         context: dict[str, Any] | None = None,
+        source_data: Any = None,
     ) -> list[VerificationIssue]:
         """
         Recursively check dictionary fields for language issues.
@@ -236,7 +336,14 @@ class LanguageDetectionCheck(VerificationCheck):
 
             if isinstance(value, str):
                 if len(value) >= self.min_text_length:
-                    field_issues = self._check_text(value, target_lang, current_path, context)
+                    _src = source_data.get(key) if isinstance(source_data, dict) else None
+                    field_issues = self._check_text(
+                        value,
+                        target_lang,
+                        current_path,
+                        context,
+                        source_text=_src if isinstance(_src, str) else None,
+                    )
                     issues.extend(field_issues)
 
             elif isinstance(value, list):
@@ -262,6 +369,7 @@ class LanguageDetectionCheck(VerificationCheck):
         target_lang: str,
         location: str,
         context: dict[str, Any] | None = None,
+        source_text: str | None = None,
     ) -> list[VerificationIssue]:
         """
         Check a single text field for language issues.
@@ -289,8 +397,71 @@ class LanguageDetectionCheck(VerificationCheck):
 
         # Required product names, file formats, and platform identifiers must
         # not outvote the actual prose in short fields such as titles.
+        #
+        # TC-APT-052: a 2-char floor is not enough. A bare "_index.md" title
+        # like "Aspose.Note FOSS for Python" strips down to just the
+        # connector word ("for"/"dla"/"pro"/"para"/"per", 3-4 chars in most
+        # target languages) -- langdetect is unreliable on a single short
+        # word and frequently misclassifies it, causing a real, correctly
+        # translated connector word to fail this check. Confirmed live on
+        # blog.aspose.org/note/python/_index.md (cs/es/it/pl/uk all
+        # WRITE BLOCKED here, immediately after TC-APT-051 fixed the OTHER
+        # validator these same cells were failing) and previously on
+        # introducing-cells-foss-go/cs -- 2 source pages, the same
+        # short-signal-floor pattern already fixed once in engine.py's
+        # FrontmatterLanguageCheck (TC-APT-040) using a 6-char floor. Apply
+        # the same, empirically-set floor here: below it there is too
+        # little independent prose to make any reliable determination, so
+        # skip rather than misreport.
         detection_text = self._language_signal_text(text)
-        if sum(1 for char in detection_text if char.isalpha()) < 2:
+        signal_alpha = sum(1 for char in detection_text if char.isalpha())
+
+        # TC-APT-090 (2026-09-06): when the SOURCE field is available, a short
+        # residue is judged by comparison instead of by naming a language.
+        #
+        # The 6-character floor below was copied from engine.py by TC-APT-040,
+        # and that copy is why fixing the engine guard left this layer rejecting
+        # the same cells: cs and zh on introducing-cells-foss-go exhausted every
+        # attempt here at gate verification:language_detection, with the same
+        # field, fingerprint and 0.999996 confidence as the engine-side verdict.
+        #
+        # Below the calibrated floor the residue is page scaffolding, not prose:
+        # on introducing-cells-foss-rust the ENGLISH SOURCE seoTitle reads
+        # en 0.70 / ro 0.30, which is why cs, id, it, hi and ru were all called
+        # Romanian there while genuine Romanian passed. Accuracy on a residue is
+        # 66.2% at 6 alphabetic characters and 98.5% at 40, and confidence does
+        # NOT fall when the answer is wrong (median 1.000 when wrong), so no
+        # confidence cut helps.
+        #
+        # This does NOT weaken the check. An untranslated field is caught more
+        # directly than before -- its residue is identical to the source -- and
+        # the control is only skipped when there is genuinely nothing to compare
+        # and too little prose to judge. With no source_text the original
+        # behaviour is preserved exactly, which is what keeps this layer's
+        # existing tests meaningful.
+        if source_text and signal_alpha < MIN_FRONTMATTER_SIGNAL_ALPHA:
+            source_signal = self._language_signal_text(source_text)
+            if is_untranslated(source_signal, detection_text):
+                return [
+                    VerificationIssue(
+                        severity="error",
+                        check_name=self.name,
+                        location=location,
+                        message=(
+                            f"Field '{location}' is unchanged from the source, so it "
+                            f"was not translated into '{target_lang}'."
+                        ),
+                        metadata={
+                            "field": location,
+                            "reason": "untranslated_field",
+                            "signal_alpha": signal_alpha,
+                        },
+                    )
+                ]
+            logger.debug(f"Short residue differs from source at {location}; accepted")
+            return []
+
+        if signal_alpha < 6:
             logger.debug(f"No non-technical language signal at {location}")
             return []
 
@@ -430,7 +601,17 @@ class LanguageDetectionCheck(VerificationCheck):
         detected_base = detected.lower().split("-")[0]
         expected_base = expected.lower().split("-")[0]
 
-        return detected_base == expected_base
+        if detected_base == expected_base:
+            return True
+
+        # TC-APT-040 (4th manifestation, sibling-language false positives):
+        # langdetect cannot reliably separate near-identical language pairs on
+        # short technical fields — a correct Portuguese seoTitle read as
+        # Spanish at 100% confidence. Mirror the engine-side
+        # FrontmatterLanguageCheck's _SIMILAR_LANG_MAP; body-level purity
+        # checks still guard genuinely wrong-language content.
+        similar = _SIMILAR_LANGUAGE_ACCEPTS.get(expected_base, frozenset())
+        return detected_base in similar
 
     def is_enabled(self, context: dict[str, Any] | None = None) -> bool:
         """Check if language detection is enabled."""

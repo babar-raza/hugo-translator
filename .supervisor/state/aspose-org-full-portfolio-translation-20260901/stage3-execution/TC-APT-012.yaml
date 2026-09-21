@@ -1,0 +1,20 @@
+taskcard: TC-APT-012
+title: Claude review protocol implementation (plan 9.1-9.3, STOP trigger for section 10)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+deliverable: src/observability/claude_review.py
+schema:
+  - "ClaudeReviewResult exactly per plan 9.3 (review_id, campaign_id, batch_id, source/output path + sha256, target_lang, reviewed_at, reviewer_model, verdict, confidence 0..1, issues[], gate_hits_reviewed, fidelity_verdict_ref, judge_claude_disagreement, systemic_scope, recommended_action, linked_regression_fixture) with ClaudeReviewIssue (category, severity, description, gate_id_correlate, unit_fingerprint = truncated sha, never raw text)"
+  - "ledger_pointer() emits only {review_id, verdict, confidence, reviewed_at, issue_count} so the work ledger stays content-free (plan 7.1/9.3)"
+  - "FAIL-CLOSED, unlike FidelityVerdict (plan 2.7): blocked_external() constructs an explicit BLOCKED_EXTERNAL verdict with confidence 0.0, a critical issue and a recommended_action; there is no code path that returns None for an un-producible review"
+queues (plan 9.1):
+  block_queue: "every failure whose gate is one of the 13 unvalidated gates (31-35, 37-44) or whose gate/reason is llm_provider_failure -> batch_size 1, mandatory, deduplicated by (output_path, target_lang). Validated gates (e.g. 12, 36) are NOT queued here."
+  accepted_sample_queue: "stratified by (site_id, target_lang), deterministic (sorted by receipt_sha256 within each stratum, round-robin across strata) so a batch is reproducible from the ledger alone; every risk-flagged receipt is force-included at batch_size 1. Risk flags implemented: fallback_produced (rerouted / fallback_used / provider != primary), retried (attempt > 1), gate36_warn, revalidated_receipt (receipt_recovery), hallucination_routed, drift_adjacent."
+persistence: "append_review/load_reviews -> data/campaigns/<campaign_id>/claude_reviews.jsonl (same atomic-append convention as acceptance_receipts.jsonl)"
+stop_trigger (plan 10 step 1):
+  - "stop_decision(): REJECT_SYSTEMIC -> stop:true scope:portfolio with the implicated pipeline_stage, blocker_category (blocker_classifier taxonomy), affected_gate_ids and an audit_all_content.py blast-radius query; REJECT_ISOLATED -> stop:true scope:shard naming the single output; BLOCKED_EXTERNAL -> stop:false but mark_rows:true; APPROVE -> stop:false"
+  - "every rejection returns required_cycle naming the full section-10 sequence (persist -> earliest checkpoint -> two-dimension root cause -> regression fixture -> producer-side fix -> TM invalidation -> verify_fix -> sentinel sample -> resume)"
+verification:
+  - "pytest tests/unit/observability/test_claude_review.py -> 25 passed (schema + bounded confidence; redacted pointer; fail-closed BLOCKED_EXTERNAL; all 13 unvalidated gates enter the block queue, validated ones do not; dedup + batch size 1; each risk flag; stratified determinism with forced risk-flagged inclusion; jsonl roundtrip; a synthetic REJECT_SYSTEMIC verdict triggers the STOP decision end-to-end with the blast-radius query; REJECT_ISOLATED scopes to the shard; APPROVE/BLOCKED_EXTERNAL do not stop work)"
+acceptance: "a synthetic REJECT_SYSTEMIC verdict correctly triggers the section-10 state machine's STOP step in a dry run -> MET"

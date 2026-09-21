@@ -8,7 +8,7 @@ import hashlib
 import json
 import logging
 import threading
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -16,6 +16,10 @@ from typing import Any
 import lmdb
 
 from .normalization import make_tm_key, make_tm_key_scoped
+
+# TC-APT-096: hard ceiling on auto-resize growth (existing behavior, now a
+# named constant instead of a magic number repeated at every call site).
+_MAX_MAP_SIZE_MB = 8192
 
 # Module-level FastText singleton with 60-second retry cooldown (SW-3 / TC-01).
 # These are kept for test compatibility; active code uses L2PersistentTM._detector.
@@ -67,6 +71,11 @@ L2_DB_NAME = "l2.lmdb"
 logger = logging.getLogger(__name__)
 
 
+#: TC-APT-008: name of the lineage sub-database. LMDB stores a named sub-db under this key
+#: in the MAIN database, so every main-DB scan/count must skip it.
+LINEAGE_DB_NAME = b"by_config_fingerprint"
+
+
 @dataclass
 class TranslationEntry:
     """Translation memory entry."""
@@ -86,6 +95,9 @@ class TranslationEntry:
     # single-entry store() path already enforced. Default "" preserves the
     # legacy unscoped key for existing callers/entries.
     field_name: str = ""
+    # TC-APT-008 (plan 7.5): first-class lineage, dual-written alongside the metadata dict.
+    config_fingerprint: str | None = None
+    model_id: str | None = None
 
     def __post_init__(self):
         """Initialize defaults."""
@@ -93,6 +105,14 @@ class TranslationEntry:
             self.timestamp = datetime.now(timezone.utc).isoformat()
         if self.metadata is None:
             self.metadata = {}
+        if self.config_fingerprint is None or self.model_id is None:
+            from src.tm.lineage import lineage_of
+
+            fp, model = lineage_of(self.metadata)
+            if self.config_fingerprint is None:
+                self.config_fingerprint = fp
+            if self.model_id is None:
+                self.model_id = model
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -100,8 +120,9 @@ class TranslationEntry:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TranslationEntry":
-        """Create from dictionary."""
-        return cls(**data)
+        """Create from dictionary (unknown keys are ignored for forward compatibility)."""
+        known = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in data.items() if k in known})
 
     def is_valid(self) -> bool:
         """
@@ -141,7 +162,7 @@ class L2PersistentTM:
     with fast lookups and batch operations.
     """
 
-    def __init__(self, db_path: Path | str, max_size_mb: int = 4096):
+    def __init__(self, db_path: Path | str, max_size_mb: int = 4096, read_only: bool = False):
         """
         Initialize L2 persistent TM.
 
@@ -153,6 +174,7 @@ class L2PersistentTM:
                 the fallback of last resort.
         """
         self.db_path = Path(db_path)
+        self.read_only = read_only
         self.db_path.mkdir(parents=True, exist_ok=True)
 
         # Hard enforcement: reject unapproved LMDB paths at runtime
@@ -170,16 +192,31 @@ class L2PersistentTM:
         max_size_bytes = max_size_mb * 1024 * 1024
 
         # Open LMDB environment
-        self.env = lmdb.open(
-            str(self.db_path),
-            map_size=max_size_bytes,
-            max_dbs=1,
-            sync=True,  # Ensure durability
-            writemap=False,  # Safer for concurrent access
-        )
+        from src.tm.environment_lease import EnvironmentLease
+
+        self._environment_lease = None if read_only else EnvironmentLease(self.db_path)
+        try:
+            self.env = lmdb.open(
+                str(self.db_path),
+                map_size=max_size_bytes,
+                max_dbs=4,  # main + by_config_fingerprint lineage index
+                sync=True,
+                writemap=False,
+                readonly=read_only,
+            )
+        except BaseException:
+            if self._environment_lease is not None:
+                self._environment_lease.close()
+            raise
 
         self._lock = threading.RLock()
         self._lang_detector = None  # lazy-loaded; set externally or on first use
+        # TC-APT-008: secondary index config_fingerprint -> main key (dupsort), O(matches) lookup.
+        self._lineage_db = self.env.open_db(LINEAGE_DB_NAME, dupsort=True)
+        from src.tm.lineage import default_denylist
+
+        self._denylist = default_denylist()
+        self.denied_lookups = 0
 
     @property
     def _detector(self):
@@ -228,11 +265,24 @@ class L2PersistentTM:
             return True  # validation error → allow
         return True
 
-    def _warn_on_sibling_l2_dirs(self) -> None:
+    # ``l2_lmdb`` is retained solely so old test fixtures and historical
+    # diagnostics can be opened.  It is not a production writer/reader and
+    # therefore is not evidence of live split writes beside ``l2.lmdb``.
+    # Keep this list intentionally narrow: a newly discovered l2* directory
+    # must still be surfaced by the operational safety check below.
+    _INACTIVE_LEGACY_SIBLING_DIRS = frozenset({"l2_lmdb"})
+
+    def _warn_on_sibling_l2_dirs(self, *, strict: bool = False) -> None:
         """Emit a UserWarning if sibling l2*.lmdb directories exist alongside the canonical path.
 
-        Two live LMDB databases imply split writes (TC-TM-02 gap).  This is a
-        warning, not a hard error, so the worker can still start.  To fix, run::
+        Two live LMDB databases imply split writes (TC-TM-02 gap).  By default
+        this only warns so the worker can still start.  Pass ``strict=True``
+        (TM-01) to raise instead -- for a pre-flight/CI check that wants to
+        hard-fail on this condition rather than let it linger unresolved, as
+        happened live: five scripts kept opening a hardcoded sibling path
+        indefinitely with only a warning that nothing consumed.  Not the
+        default, to avoid surprising existing callers that only expect a
+        warning. To fix, run::
 
             python scripts/tm/migrate_l2_lmdb.py --dry-run
             python scripts/tm/migrate_l2_lmdb.py --apply
@@ -243,21 +293,91 @@ class L2PersistentTM:
         canonical_name = self.db_path.name
         # Match both "l2.lmdb" (dot-style) and "l2_lmdb" (underscore-style) variants.
         siblings = [p for p in parent.glob("l2*") if p.is_dir() and p.name != canonical_name]
-        if siblings:
-            names = ", ".join(p.name for p in siblings)
-            warnings.warn(
+        active_siblings = [
+            p for p in siblings if p.name not in self._INACTIVE_LEGACY_SIBLING_DIRS
+        ]
+        inactive_siblings = [
+            p for p in siblings if p.name in self._INACTIVE_LEGACY_SIBLING_DIRS
+        ]
+        if inactive_siblings:
+            logger.info(
+                "L2PersistentTM: inactive legacy/test-compatibility store(s) ignored: %s; "
+                "canonical active store: %s",
+                ", ".join(p.name for p in inactive_siblings),
+                self.db_path,
+            )
+        if active_siblings:
+            names = ", ".join(p.name for p in active_siblings)
+            message = (
                 f"L2PersistentTM: sibling LMDB director{'y' if len(siblings) == 1 else 'ies'} "
                 f"found alongside canonical '{canonical_name}': {names}. "
-                "This indicates split writes. Run scripts/tm/migrate_l2_lmdb.py to consolidate.",
-                UserWarning,
-                stacklevel=3,
+                "This indicates split writes. Run scripts/tm/migrate_l2_lmdb.py to consolidate."
             )
+            if strict:
+                raise RuntimeError(message)
+            warnings.warn(message, UserWarning, stacklevel=3)
             logger.warning(
                 "TC-TM-02: sibling L2 LMDB dir(s) detected: %s (canonical: %s). "
                 "Run scripts/tm/migrate_l2_lmdb.py --apply to consolidate.",
                 names,
                 self.db_path,
             )
+
+    def _run_txn_with_map_recovery(self, txn_fn, *, max_attempts: int = 3):
+        """Run `txn_fn()` -- a zero-arg callable that opens its OWN
+        `with self.env.begin(...) as txn:` block and returns a result --
+        with automatic recovery from the two failure modes an LMDB resize
+        can cause (TC-APT-096).
+
+        MapFullError (this environment is full): grow it, bounded by
+        _MAX_MAP_SIZE_MB, and retry. The failing transaction's `with` block
+        must have already exited (fully aborted) before set_mapsize is
+        called -- LMDB forbids resizing while ANY transaction is open in
+        this process. Confirmed by direct reproduction: nesting a second
+        write transaction inside the still-open failing one (the previous
+        code's shape) raised InvalidParameterError from set_mapsize itself,
+        then BadTxnError unwinding the outer transaction -- a hard crash,
+        not the graceful "resize and retry" the code's comments claimed.
+        Retrying the FULL txn_fn() (not a nested transaction) is the only
+        safe unit of retry: LMDB transactions have no partial commit.
+
+        MapResizedError (MDB_MAP_RESIZED): a SIBLING process -- a different
+        K-lane launcher sharing this same LMDB file (plan SS0.10 TC-APT-094)
+        -- resized the map first. This process's environment handle is now
+        stale; adopt the new size with set_mapsize(0) (LMDB's documented
+        "read the current size from disk" call) and retry. Unhandled prior
+        to this fix -- zero call sites anywhere caught it -- so any lane's
+        resize would crash every OTHER lane's very next TM read or write.
+        """
+        last_exc: Exception | None = None
+        for attempt in range(max_attempts):
+            try:
+                return txn_fn()
+            except lmdb.MapFullError as exc:
+                last_exc = exc
+                current_mb = self.env.info()["map_size"] // (1024 * 1024)
+                # +1 floor: int(current_mb * 1.5) truncates to a no-op growth
+                # at small starting sizes (e.g. 1 MB * 1.5 = 1.5 -> int() = 1),
+                # which would otherwise hit the "cannot grow further" raise
+                # below immediately, on the very first MapFullError, without
+                # ever actually resizing.
+                new_mb = min(max(int(current_mb * 1.5), current_mb + 1), _MAX_MAP_SIZE_MB)
+                if new_mb <= current_mb:
+                    raise
+                logger.warning(
+                    "LMDB MapFullError (attempt %d/%d) — resizing %d MB → %d MB",
+                    attempt + 1, max_attempts, current_mb, new_mb,
+                )
+                self.env.set_mapsize(new_mb * 1024 * 1024)
+            except lmdb.MapResizedError as exc:
+                last_exc = exc
+                logger.warning(
+                    "LMDB MDB_MAP_RESIZED (attempt %d/%d) — a sibling process resized "
+                    "the map; adopting its current size",
+                    attempt + 1, max_attempts,
+                )
+                self.env.set_mapsize(0)
+        raise last_exc
 
     def exact_lookup(
         self,
@@ -298,49 +418,60 @@ class L2PersistentTM:
                 make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name, ctx)
             )
         if field_name:
-            keys_to_try.append(
-                make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name)
-            )
+            keys_to_try.append(make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name))
         if ctx:
-            keys_to_try.append(
-                make_tm_key_scoped(site_id, src_lang, tgt_lang, text, context=ctx)
-            )
+            keys_to_try.append(make_tm_key_scoped(site_id, src_lang, tgt_lang, text, context=ctx))
         keys_to_try.append(make_tm_key(site_id, src_lang, tgt_lang, text))
 
-        with self._lock:
-            with self.env.begin() as txn:
-                value_bytes = None
-                for key in keys_to_try:
-                    value_bytes = txn.get(key.encode("utf-8"))
-                    if value_bytes is not None:
-                        break
+        def _do_lookup():
+            with self._lock:
+                with self.env.begin() as txn:
+                    value_bytes = None
+                    for key in keys_to_try:
+                        value_bytes = txn.get(key.encode("utf-8"))
+                        if value_bytes is not None:
+                            break
 
-                if value_bytes is None:
-                    return None
+                    if value_bytes is None:
+                        return None
 
-                # T204: Deserialize with corruption detection
-                try:
-                    value_dict = json.loads(value_bytes.decode("utf-8"))
-                    entry = TranslationEntry.from_dict(value_dict)
-                except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-                    # T204: Corrupted entry detected
-                    logger.warning(
-                        f"Corrupted cache entry detected and skipped: "
-                        f"site_id={site_id}, src_lang={src_lang}, tgt_lang={tgt_lang}, "
-                        f"text={text[:50]}..., error={e}"
-                    )
-                    return None
+                    # T204: Deserialize with corruption detection
+                    try:
+                        value_dict = json.loads(value_bytes.decode("utf-8"))
+                        entry = TranslationEntry.from_dict(value_dict)
+                    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+                        # T204: Corrupted entry detected
+                        logger.warning(
+                            f"Corrupted cache entry detected and skipped: "
+                            f"site_id={site_id}, src_lang={src_lang}, tgt_lang={tgt_lang}, "
+                            f"text={text[:50]}..., error={e}"
+                        )
+                        return None
 
-                # T204: Validate entry integrity
-                if not entry.is_valid():
-                    logger.warning(
-                        f"Invalid cache entry detected and skipped: "
-                        f"site_id={site_id}, src_lang={src_lang}, tgt_lang={tgt_lang}, "
-                        f"text={text[:50]}..."
-                    )
-                    return None
+                    # TC-APT-008: read-time lineage invalidation (reversible denylist, never a delete)
+                    if self._denylist.denies(entry):
+                        self.denied_lookups += 1
+                        logger.debug(
+                            "TM entry suppressed by lineage denylist: site=%s %s->%s fp=%s model=%s",
+                            site_id,
+                            src_lang,
+                            tgt_lang,
+                            entry.config_fingerprint,
+                            entry.model_id,
+                        )
+                        return None
+                    # T204: Validate entry integrity
+                    if not entry.is_valid():
+                        logger.warning(
+                            f"Invalid cache entry detected and skipped: "
+                            f"site_id={site_id}, src_lang={src_lang}, tgt_lang={tgt_lang}, "
+                            f"text={text[:50]}..."
+                        )
+                        return None
 
-                return entry
+                    return entry
+
+        return self._run_txn_with_map_recovery(_do_lookup)
 
     def store(
         self,
@@ -402,12 +533,10 @@ class L2PersistentTM:
             )
             raise ValueError("Translation entry failed validation")
 
-        key = make_tm_key_scoped(
-            site_id, src_lang, tgt_lang, text, field_name, context or ""
-        )
+        key = make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name, context or "")
         key_bytes = key.encode("utf-8")
 
-        try:
+        def _do_store():
             with self._lock:
                 # T204: LMDB transaction provides atomic write with automatic rollback on failure
                 with self.env.begin(write=True) as txn:
@@ -424,23 +553,18 @@ class L2PersistentTM:
                         logger.error(f"JSON serialization failed for entry: {e}")
                         raise RuntimeError(f"Failed to serialize translation entry: {e}")
 
-                    # T204: Store with automatic rollback on failure
-                    try:
-                        txn.put(key_bytes, value_json.encode("utf-8"))
-                    except lmdb.MapFullError:
-                        current_mb = self.env.info()["map_size"] // (1024 * 1024)
-                        new_mb = min(int(current_mb * 1.5), 8192)
-                        logger.warning(
-                            "LMDB MapFullError in store() — resizing %d MB → %d MB",
-                            current_mb,
-                            new_mb,
-                        )
-                        self.env.set_mapsize(new_mb * 1024 * 1024)
-                        with self.env.begin(write=True) as txn2:
-                            txn2.put(key_bytes, value_json.encode("utf-8"))
+                    # T204: Store with automatic rollback on failure. MapFullError/
+                    # MapResizedError propagate out of this ENTIRE function (past
+                    # both `with` blocks, so the transaction is fully aborted) to
+                    # _run_txn_with_map_recovery, which resizes/adopts and calls
+                    # _do_store() again fresh -- TC-APT-096, see that method's
+                    # docstring for why a nested transaction here is unsafe.
+                    txn.put(key_bytes, value_json.encode("utf-8"))
+                    self._index_lineage(txn, entry, key_bytes)
+                    return True
 
-            return True
-
+        try:
+            return self._run_txn_with_map_recovery(_do_store)
         except Exception as e:
             # T204: Log integrity failure and propagate
             logger.error(
@@ -475,9 +599,15 @@ class L2PersistentTM:
                 )
                 raise ValueError(f"Entry at index {i} failed validation")
 
-        try:
+        def _do_batch():
             with self._lock:
-                # T204: LMDB transaction provides atomic batch write with automatic rollback
+                # T204: LMDB transaction provides atomic batch write with automatic rollback.
+                # MapFullError/MapResizedError propagate out of this ENTIRE function (past
+                # the `with` block, so the transaction is fully aborted) to
+                # _run_txn_with_map_recovery, which resizes/adopts and calls _do_batch()
+                # again fresh, redoing the whole batch -- TC-APT-096, see that method's
+                # docstring for why a nested transaction here is unsafe. LMDB transactions
+                # have no partial commit, so a full-batch retry is the only safe unit.
                 with self.env.begin(write=True) as txn:
                     stored = 0
                     rejected = 0
@@ -522,19 +652,7 @@ class L2PersistentTM:
                         val_bytes = value_json.encode("utf-8")
                         if not overwrite and txn.get(key_bytes) is not None:
                             continue  # skip existing entry
-                        try:
-                            txn.put(key_bytes, val_bytes)
-                        except lmdb.MapFullError:
-                            current_mb = self.env.info()["map_size"] // (1024 * 1024)
-                            new_mb = min(int(current_mb * 1.5), 8192)
-                            logger.warning(
-                                "LMDB MapFullError in batch_store() — resizing %d MB → %d MB",
-                                current_mb,
-                                new_mb,
-                            )
-                            self.env.set_mapsize(new_mb * 1024 * 1024)
-                            with self.env.begin(write=True) as txn2:
-                                txn2.put(key_bytes, val_bytes)
+                        txn.put(key_bytes, val_bytes)
                         stored += 1
 
                     if rejected:
@@ -543,13 +661,81 @@ class L2PersistentTM:
                             rejected,
                             len(entries),
                         )
+                    return stored
 
-            return stored
-
+        try:
+            return self._run_txn_with_map_recovery(_do_batch)
         except Exception as e:
             # T204: Log integrity failure and propagate
             logger.error(f"Batch cache write failed (integrity safeguard triggered): error={e}")
             raise
+
+    # ------------------------------------------------------------------ TC-APT-008 lineage index
+    def _index_lineage(self, txn, entry: "TranslationEntry", key_bytes: bytes) -> None:
+        """Record key under its config_fingerprint in the dupsort index (no-op without lineage)."""
+        fp = entry.config_fingerprint
+        if fp:
+            txn.put(fp.encode("utf-8"), key_bytes, db=self._lineage_db, dupdata=True)
+
+    def iter_by_config_fingerprint(self, config_fingerprint: str):
+        """Yield every entry produced under ``config_fingerprint`` -- O(matches), not O(store).
+
+        TC-APT-096 known gap: unlike every other method here, this holds its
+        read transaction open across the caller's iteration (a generator),
+        so it is NOT wrapped in _run_txn_with_map_recovery -- retrying would
+        mean re-entering a generator mid-yield, which does not safely
+        resume the caller's own consumption loop. A sibling process's
+        resize mid-iteration will surface as an uncaught MapResizedError
+        here. Lower-frequency backfill/reporting path, not the blitz's hot
+        store/lookup path; restructuring to buffer-then-yield to make this
+        safely retryable is a follow-on if it proves to matter in practice.
+        """
+        with self._lock:
+            with self.env.begin() as txn:
+                cursor = txn.cursor(db=self._lineage_db)
+                if not cursor.set_key(config_fingerprint.encode("utf-8")):
+                    return
+                for main_key in cursor.iternext_dup():
+                    raw = txn.get(main_key)
+                    if raw is None:
+                        continue
+                    try:
+                        yield TranslationEntry.from_dict(json.loads(raw.decode("utf-8")))
+                    except Exception:
+                        continue
+
+    def count_by_config_fingerprint(self, config_fingerprint: str) -> int:
+        def _do_count():
+            with self._lock:
+                with self.env.begin() as txn:
+                    cursor = txn.cursor(db=self._lineage_db)
+                    if not cursor.set_key(config_fingerprint.encode("utf-8")):
+                        return 0
+                    return cursor.count()
+
+        return self._run_txn_with_map_recovery(_do_count)
+
+    def lineage_index_stats(self) -> dict[str, int]:
+        """Distinct fingerprints and indexed keys (cheap: index only)."""
+
+        def _do_stats():
+            with self._lock:
+                with self.env.begin() as txn:
+                    stat = txn.stat(db=self._lineage_db)
+                    cursor = txn.cursor(db=self._lineage_db)
+                    distinct = 0
+                    if cursor.first():
+                        distinct = 1
+                        while cursor.next_nodup():
+                            distinct += 1
+                    return {"indexed_keys": int(stat["entries"]), "distinct_fingerprints": distinct}
+
+        return self._run_txn_with_map_recovery(_do_stats)
+
+    def rewrite_entry_lineage(self, txn, key_bytes: bytes, entry: "TranslationEntry") -> None:
+        """Backfill helper: rewrite one stored entry with first-class lineage and index it."""
+        txn.put(key_bytes, json.dumps(entry.to_dict()).encode("utf-8"))
+        self._index_lineage(txn, entry, key_bytes)
 
     def delete(self, site_id: str, src_lang: str, tgt_lang: str, text: str) -> bool:
         """
@@ -566,9 +752,12 @@ class L2PersistentTM:
         """
         key = make_tm_key(site_id, src_lang, tgt_lang, text)
 
-        with self._lock:
-            with self.env.begin(write=True) as txn:
-                return txn.delete(key.encode("utf-8"))
+        def _do_delete():
+            with self._lock:
+                with self.env.begin(write=True) as txn:
+                    return txn.delete(key.encode("utf-8"))
+
+        return self._run_txn_with_map_recovery(_do_delete)
 
     def delete_namespace(
         self,
@@ -586,54 +775,81 @@ class L2PersistentTM:
         """
         if not site_id:
             raise ValueError("delete_namespace requires an exact site_id")
-        keys: list[bytes] = []
-        with self._lock:
-            with self.env.begin() as txn:
-                cursor = txn.cursor()
-                for key, value in cursor:
-                    try:
-                        entry = json.loads(value.decode("utf-8"))
-                    except Exception as exc:
+
+        def _do_delete_namespace():
+            keys: list[bytes] = []
+            with self._lock:
+                with self.env.begin() as txn:
+                    cursor = txn.cursor()
+                    for key, value in cursor:
+                        if key == LINEAGE_DB_NAME:
+                            continue  # TC-APT-008: sub-db name key, not a TM entry
+                        try:
+                            entry = json.loads(value.decode("utf-8"))
+                        except Exception as exc:
+                            raise RuntimeError(
+                                "refusing namespace deletion with an unreadable TM entry"
+                            ) from exc
+                        if entry.get("site_id") != site_id:
+                            continue
+                        if src_lang is not None and entry.get("src_lang") != src_lang:
+                            continue
+                        if tgt_lang is not None and entry.get("tgt_lang") != tgt_lang:
+                            continue
+                        keys.append(bytes(key))
+                if not keys:
+                    return 0
+                # Re-scanning and re-deleting on retry is safe: deleting an
+                # already-deleted key is a no-op, so redoing this whole
+                # function fresh after a resize (TC-APT-096) cannot double-count.
+                with self.env.begin(write=True) as txn:
+                    removed = sum(1 for key in keys if txn.delete(key))
+                    if removed != len(keys):
                         raise RuntimeError(
-                            "refusing namespace deletion with an unreadable TM entry"
-                        ) from exc
-                    if entry.get("site_id") != site_id:
-                        continue
-                    if src_lang is not None and entry.get("src_lang") != src_lang:
-                        continue
-                    if tgt_lang is not None and entry.get("tgt_lang") != tgt_lang:
-                        continue
-                    keys.append(bytes(key))
-            if not keys:
-                return 0
-            with self.env.begin(write=True) as txn:
-                removed = sum(1 for key in keys if txn.delete(key))
-                if removed != len(keys):
-                    raise RuntimeError("TM namespace deletion count changed during atomic removal")
-        logger.warning(
-            "Deleted %d L2 entries from exact namespace hash=%s",
-            len(keys),
-            hashlib.sha256(site_id.encode("utf-8")).hexdigest()[:16],
-        )
-        return len(keys)
+                            "TM namespace deletion count changed during atomic removal"
+                        )
+            return len(keys)
+
+        removed_count = self._run_txn_with_map_recovery(_do_delete_namespace)
+        if removed_count:
+            logger.warning(
+                "Deleted %d L2 entries from exact namespace hash=%s",
+                removed_count,
+                hashlib.sha256(site_id.encode("utf-8")).hexdigest()[:16],
+            )
+        return removed_count
 
     def count(self) -> int:
         """
         Get total number of entries in database.
 
+        Excludes the ``by_config_fingerprint`` sub-database's name key, which LMDB keeps in
+        the main database (TC-APT-008).
+
         Returns:
             Entry count
         """
-        with self._lock:
-            with self.env.begin() as txn:
-                return txn.stat()["entries"]
+        def _do_count():
+            with self._lock:
+                with self.env.begin() as txn:
+                    total = txn.stat()["entries"]
+                    if txn.get(LINEAGE_DB_NAME) is not None:
+                        total -= 1
+                    return max(total, 0)
+
+        return self._run_txn_with_map_recovery(_do_count)
 
     def clear(self) -> None:
-        """Delete all entries from database."""
-        with self._lock:
-            with self.env.begin(write=True) as txn:
-                # Drop and recreate the database
-                txn.drop(self.env.open_db())
+        """Delete all entries from database (including the TC-APT-008 lineage index)."""
+
+        def _do_clear():
+            with self._lock:
+                with self.env.begin(write=True) as txn:
+                    # Empty the lineage index first, then the main database.
+                    txn.drop(self._lineage_db, delete=False)
+                    txn.drop(self.env.open_db())
+
+        self._run_txn_with_map_recovery(_do_clear)
 
     def export_all(
         self, site_id: str | None = None, tgt_lang: str | None = None
@@ -648,27 +864,29 @@ class L2PersistentTM:
         Returns:
             List of TranslationEntry objects
         """
-        entries = []
+        def _do_export():
+            entries = []
+            with self._lock:
+                with self.env.begin() as txn:
+                    cursor = txn.cursor()
+                    for key, value in cursor:
+                        try:
+                            entry_dict = json.loads(value.decode("utf-8"))
+                            entry = TranslationEntry.from_dict(entry_dict)
 
-        with self._lock:
-            with self.env.begin() as txn:
-                cursor = txn.cursor()
-                for key, value in cursor:
-                    try:
-                        entry_dict = json.loads(value.decode("utf-8"))
-                        entry = TranslationEntry.from_dict(entry_dict)
+                            # Apply filters
+                            if site_id and entry.site_id != site_id:
+                                continue
+                            if tgt_lang and entry.tgt_lang != tgt_lang:
+                                continue
 
-                        # Apply filters
-                        if site_id and entry.site_id != site_id:
-                            continue
-                        if tgt_lang and entry.tgt_lang != tgt_lang:
-                            continue
+                            entries.append(entry)
 
-                        entries.append(entry)
+                        except Exception as e:
+                            logger.warning(f"Failed to parse entry {key[:20]!r}: {e}")
+            return entries
 
-                    except Exception as e:
-                        logger.warning(f"Failed to parse entry {key[:20]!r}: {e}")
-
+        entries = self._run_txn_with_map_recovery(_do_export)
         logger.info(f"Exported {len(entries)} entries from L2")
         return entries
 
@@ -677,11 +895,18 @@ class L2PersistentTM:
         site_id: str | None = None,
         tgt_lang: str | None = None,
     ):
-        """Streaming generator — constant-memory alternative to export_all()."""
+        """Streaming generator — constant-memory alternative to export_all().
+
+        TC-APT-096 known gap: same reasoning as iter_by_config_fingerprint --
+        a generator holding its read transaction open across the caller's
+        iteration cannot be safely wrapped in _run_txn_with_map_recovery.
+        """
         with self._lock:
             with self.env.begin() as txn:
                 cursor = txn.cursor()
                 for _key_bytes, value_bytes in cursor.iternext():
+                    if _key_bytes == LINEAGE_DB_NAME:
+                        continue  # TC-APT-008: sub-db name key, not a TM entry
                     try:
                         entry = TranslationEntry.from_dict(json.loads(value_bytes.decode("utf-8")))
                         if site_id and entry.site_id != site_id:
@@ -731,6 +956,9 @@ class L2PersistentTM:
         """Close database connection."""
         if self.env:
             self.env.close()
+        lease = getattr(self, "_environment_lease", None)
+        if lease is not None:
+            lease.close()
 
     def __enter__(self):
         """Context manager entry."""

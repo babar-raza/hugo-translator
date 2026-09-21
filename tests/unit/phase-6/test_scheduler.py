@@ -14,6 +14,13 @@ from src.orchestrator.scheduler import SweepScheduler, SweepStats
 from src.utils.models import BodyRules, OutputLayout, SiteProfile
 
 
+@pytest.fixture(autouse=True)
+def _legacy_sweep_override(monkeypatch):
+    """TC-APT-030: SweepScheduler is retired; these legacy unit tests run it under the
+    explicit forensic override so the class's internals stay covered."""
+    monkeypatch.setenv("HT_ALLOW_DEPRECATED_EXECUTION_PATH", "sweep_scheduler")
+
+
 @pytest.fixture
 def temp_content_dir():
     """Create temporary content directory structure."""

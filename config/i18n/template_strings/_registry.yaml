@@ -63,7 +63,7 @@ entries:
 - id: heading.installation
   en: Installation
   category: section_heading
-  status: pending
+  status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 58
 - id: heading.examples
@@ -344,6 +344,30 @@ entries:
   status: approved
   first_seen_incident: reference-i18n-hardening-20260725
   evidence_count: 273
+- id: table.header.component
+  en: Component
+  category: table_header
+  status: approved
+  first_seen_incident: aspose-org-full-portfolio-translation-20260901
+  evidence_count: 7
+- id: table.header.role
+  en: Role
+  category: table_header
+  status: approved
+  first_seen_incident: aspose-org-full-portfolio-translation-20260901
+  evidence_count: 58
+- id: table.header.renderer
+  en: Renderer
+  category: table_header
+  status: approved
+  first_seen_incident: aspose-org-full-portfolio-translation-20260901
+  evidence_count: 11
+- id: table.header.handles
+  en: Handles
+  category: table_header
+  status: approved
+  first_seen_incident: aspose-org-full-portfolio-translation-20260901
+  evidence_count: 11
 - id: heading.interfaces
   en: Interfaces
   category: section_heading
@@ -451,3 +475,81 @@ entries:
   placeholders:
   - platform
   - family
+- id: heading.charts
+  en: Charts
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-words-foss-net
+  evidence_count: 1
+- id: heading.format
+  en: Format
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-words-foss-net
+  evidence_count: 1
+- id: heading.extension
+  en: Extension
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-words-foss-net
+  evidence_count: 1
+- id: heading.annotations
+  en: Annotations
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-pdf-foss-typescript
+  evidence_count: 1
+- id: heading.tables
+  en: Tables
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-cells-foss-go
+  evidence_count: 1
+- id: heading.pictures
+  en: Pictures
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-cells-foss-go
+  evidence_count: 1
+- id: heading.encryption
+  en: Encryption
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-053-gate5-pdf-foss-cpp
+  evidence_count: 20
+- id: table.header.issue
+  en: Issue
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-108-wave-cellsrust-go-t1a
+  evidence_count: 0
+- id: table.header.cause
+  en: Cause
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-108-wave-cellsrust-go-t1a
+  evidence_count: 0
+- id: heading.prerequisites
+  en: Prerequisites
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-014-wave-cellsrust-quickstart-retrigger-20260911
+  evidence_count: 23
+- id: table.header.requirement
+  en: Requirement
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-014-wave-cellsrust-quickstart-retrigger-20260911
+  evidence_count: 23
+- id: table.header.detail
+  en: Detail
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-014-wave-cellsrust-quickstart-retrigger-20260911
+  evidence_count: 23
+- id: heading.quickstart
+  en: Quickstart
+  category: section_heading
+  status: approved
+  first_seen_incident: TC-APT-114-wave-cellsrust-quickstart-glueretrigger-20260911r2-audit
+  evidence_count: 507

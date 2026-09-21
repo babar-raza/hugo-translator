@@ -780,3 +780,53 @@ class TestSourceRelativeBaseline:
         # Should still catch true hallucination
         assert not result.success
         assert result.error_count > 0
+
+
+class TestShortSegmentWordFrequencyFloor:
+    """TC-APT-051: a percentage-based word-frequency ratio is statistically
+    noisy on very short translation segments -- 2 occurrences among 9 filtered
+    words already reads as 22.2%, past the default 20% warning threshold, even
+    though using one ordinary word twice in a short heading/sentence is normal
+    prose. Confirmed live on blog.aspose.org/note/python/_index.md (a minimal
+    _index.md page): most of its 25 languages hard-failed this way
+    (word_frequency count=2 threshold=0.2 frequency=0.222222).
+    """
+
+    def test_word_used_twice_in_short_segment_is_not_flagged(self):
+        """A word appearing twice among 9 filtered words (22.2%) must not warn."""
+        validator = RepetitionDetectorValidator()
+
+        # 9 non-stopword, non-whitelisted tokens after filtering, "result"
+        # repeated twice = 22.2%, replicating the exact note/python
+        # fingerprint (count=2, freq=0.222222).
+        translation = "quick example shows basic output result setup common result"
+
+        result = validator.validate(
+            source="Original",
+            translation=translation,
+            context={"translation_map": {0: translation}},
+        )
+
+        assert result.success
+        assert result.error_count == 0
+        assert result.warning_count == 0
+
+    def test_short_segment_genuine_corruption_still_caught(self):
+        """The floor must be narrow: a word massively dominating a short
+        segment (far beyond ordinary phrasing) must still be flagged, so the
+        exemption doesn't blanket-disable detection on short text.
+        """
+        validator = RepetitionDetectorValidator()
+
+        # 9 filtered words, "result" repeated 5x (>= the absolute floor) —
+        # genuine short-segment hallucination shape, not ordinary reuse.
+        translation = "result result result result result example shows basic output"
+
+        result = validator.validate(
+            source="Original",
+            translation=translation,
+            context={"translation_map": {0: translation}},
+        )
+
+        assert not result.success
+        assert result.error_count > 0

@@ -26,6 +26,14 @@ def _make_config():
         "content_hash": {"enabled": False},
         "retry_handler": {"enabled": False},
     }
+    # CFG-01: a bare MagicMock's auto-vivified get_validation_config() would
+    # return another MagicMock (truthy, non-int fields) instead of raising --
+    # engine_builder.py's decision-rule loading would then silently use
+    # mock garbage instead of falling back to its hardcoded defaults, which
+    # is what every test using this fixture actually expects/relies on. This
+    # mock has no real config/validation.yaml behind it, so raise, matching
+    # engine_builder.py's real "config unavailable" fallback trigger.
+    cfg.get_validation_config.side_effect = Exception("no validation config in test fixture")
     return cfg
 
 
@@ -212,6 +220,82 @@ class TestValidationModeWiring:
         builder.build_into(engine)
 
         assert engine.decision_engine.max_retry_attempts == 0
+
+
+class TestCFG01ValidationConfigPropagatesEndToEnd:
+    """CFG-01 (TC-APT-105 audit): config/validation.yaml must be the actual
+    source of truth it appears to be -- editing it must provably change
+    ValidationDecisionEngine's real, effective behavior, not silently do
+    nothing (which was true before this fix: the base decision_rules dict
+    was 100% hardcoded in engine_builder.py, independent of the YAML)."""
+
+    @patch("src.translation_engine.engine_builder.EngineBuilder._init_detection")
+    @patch("src.translation_engine.engine_builder.EngineBuilder._init_retry_handler")
+    def test_real_yaml_file_reject_on_error_count_reaches_decision_engine(
+        self, mock_det, mock_retry, tmp_path
+    ):
+        """A real, on-disk validation.yaml (parsed through the real
+        ValidationConfig/DecisionRules Pydantic models, not a mock) with a
+        distinctive, non-default reject_on_error_count must be the value
+        ValidationDecisionEngine actually uses -- the direct, end-to-end
+        proof that this config file is load-bearing."""
+        from src.utils.config_loader import ConfigService
+
+        validation_yaml = tmp_path / "validation.yaml"
+        validation_yaml.write_text(
+            "version: '1.0'\n"
+            "decision_rules:\n"
+            "  reject_on_error_count: 97\n",  # distinctive, unmistakably not a hardcoded default
+            encoding="utf-8",
+        )
+        real_config_service = ConfigService(tmp_path)
+        real_validation_config = real_config_service.get_validation_config()
+        assert real_validation_config.decision_rules.reject_on_error_count == 97, (
+            "sanity check: the real YAML parses to the expected value"
+        )
+
+        config = _make_config()
+        config.get_validation_config.side_effect = None
+        config.get_validation_config.return_value = real_validation_config
+
+        engine = MagicMock()
+        builder = EngineBuilder(
+            config_service=config,
+            tm=_make_tm(),
+            model_loader=_make_model_loader(),
+            validation_mode=None,
+            enable_validation=True,
+        )
+        builder.build_into(engine)
+
+        assert engine.decision_engine.reject_on_error_count == 97, (
+            "the real YAML's value must reach the constructed decision engine"
+        )
+
+    @patch("src.translation_engine.engine_builder.EngineBuilder._init_detection")
+    @patch("src.translation_engine.engine_builder.EngineBuilder._init_retry_handler")
+    def test_missing_config_falls_back_to_pre_existing_hardcoded_defaults(
+        self, mock_det, mock_retry
+    ):
+        """A config missing/unavailable (e.g. an older deployment without
+        this file, or a load error) must reproduce EXACTLY today's
+        pre-CFG-01 hardcoded behavior, not crash or silently use a wrong
+        default."""
+        config = _make_config()  # get_validation_config raises, per the fixture
+
+        engine = MagicMock()
+        builder = EngineBuilder(
+            config_service=config,
+            tm=_make_tm(),
+            model_loader=_make_model_loader(),
+            validation_mode=None,
+            enable_validation=True,
+        )
+        builder.build_into(engine)
+
+        assert engine.decision_engine.reject_on_error_count == 3
+        assert engine.decision_engine.max_retry_attempts == 2
+        assert engine.decision_engine.accept_warnings is True
 
 
 # ---------------------------------------------------------------------------

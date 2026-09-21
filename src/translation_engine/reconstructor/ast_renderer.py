@@ -11,6 +11,7 @@ from typing import Any
 
 from ..extractor.text_unit import TextUnit
 from ..parser.ast_nodes import ASTNode, NodeType
+from ..text_fidelity import normalize_injected_invisibles
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,10 @@ class ASTRenderer:
         self._missing_node_count: int = 0
         # Counter for unreplaced placeholder tokens (stray {PLACEHOLDER_N} in output - blocking)
         self._placeholder_leak_count: int = 0
+        # TC-APT-078: source heading text -> its own translation, for cross-reference correction
+        self._heading_translations: dict[str, str] = {}
+        # TC-APT-077: locale-aware invisible-character normalization needs the target language
+        self._target_lang: str | None = None
 
     @property
     def placeholder_leak_count(self) -> int:
@@ -101,6 +106,49 @@ class ASTRenderer:
         # Define punctuation characters to preserve
         LEADING_PUNCT = '.!?;:,‚„…'
         TRAILING_PUNCT = '.!?;:,‚„…'
+        # TC-APT-040 (Devanagari/CJK half): a translation that ends with the
+        # target script's OWN terminal already preserved the punctuation —
+        # appending the ASCII source char on top produced the recurring
+        # danda+period / fullwidth-stop+period / fullwidth-colon+colon
+        # artifacts (11+ per page in hi/ja/zh on introducing-pdf-foss-cpp).
+        EQUIVALENT_TERMINALS = {
+            ".": "।॥。．｡",
+            "!": "！",
+            "?": "？؟;",
+            ":": "：",
+            ";": "؛；",
+            ",": "，、،",
+        }
+
+        def _ends_with_equivalent(text: str, punct: str) -> bool:
+            equivalents = EQUIVALENT_TERMINALS.get(punct[-1], "")
+            return bool(equivalents) and bool(text) and text[-1] in equivalents
+
+        # TC-APT-073 (RB-005): the leading-punctuation branch below had no
+        # equivalent check, unlike the trailing branch above. When a segment
+        # immediately after a protected span started with a source ASCII
+        # comma and the model naturally rendered the script-appropriate
+        # comma (e.g. U+060C in ar/fa), `startswith(",")` was False, so the
+        # ASCII comma got prepended in front of it -- U+002C followed by
+        # U+060C, byte-identical at ar:503 and fa:503 on words-document-net.
+        def _starts_with_equivalent(text: str, punct: str) -> bool:
+            equivalents = EQUIVALENT_TERMINALS.get(punct[0], "")
+            return bool(equivalents) and bool(text) and text[0] in equivalents
+
+        # TC-APT-042 (reconstruction_punctuation_duplication, quickstart-punctuation-corruption
+        # ticket): the model sometimes rewrites the sentence to end in a DIFFERENT valid terminal
+        # mark than the source's (e.g. a colon-before-code-block source rendered as a period —
+        # confirmed directly on pdf-document-management-in-cpp es/pl/th: "...aspose_pdf_foss`.:"
+        # and "...guarda el resultado.:", the model's own period plus FIX-C's appended source
+        # colon). Neither the exact-match nor the equivalence check above catches this because the
+        # translation's mark is a genuinely different (not source-equivalent) terminal punctuation
+        # character, not a dropped one. Appending on top of an already-present terminal mark is
+        # always wrong, so once the translation ends in ANY terminal punctuation, treat the source's
+        # as preserved rather than doubling it.
+        _ALL_TERMINALS = set(TRAILING_PUNCT) | {c for chars in EQUIVALENT_TERMINALS.values() for c in chars}
+
+        def _ends_with_any_terminal(text: str) -> bool:
+            return bool(text) and text[-1] in _ALL_TERMINALS
 
         # Check if source had leading punctuation but translation doesn't
         if source_text and translated_text:
@@ -113,7 +161,11 @@ class ASTRenderer:
                     break
 
             # Check if translation is missing this punctuation
-            if source_leading_punct and not translated_text.startswith(source_leading_punct):
+            if (
+                source_leading_punct
+                and not translated_text.startswith(source_leading_punct)
+                and not _starts_with_equivalent(translated_text, source_leading_punct)
+            ):
                 logger.debug(
                     f"[FIX-C] Restoring leading punctuation '{source_leading_punct}' "
                     f"dropped by MT model. Source: {source_text[:30]}, "
@@ -130,7 +182,12 @@ class ASTRenderer:
                     break
 
             # Check if translation is missing trailing punctuation
-            if source_trailing_punct and not translated_text.endswith(source_trailing_punct):
+            if (
+                source_trailing_punct
+                and not translated_text.endswith(source_trailing_punct)
+                and not _ends_with_equivalent(translated_text, source_trailing_punct)
+                and not _ends_with_any_terminal(translated_text)
+            ):
                 logger.debug(
                     f"[FIX-C] Restoring trailing punctuation '{source_trailing_punct}' "
                     f"dropped by MT model. Source: {source_text[-30:]}, "
@@ -386,12 +443,17 @@ class ASTRenderer:
                 i += 1
 
             elif token.type == "link_open":
-                # Extract link URL
-                url = ""
-                for attr in token.attrs or []:
-                    if attr[0] == "href":
-                        url = attr[1]
-                        break
+                # Extract link URL. TC-APT-076: markdown-it-py 4.x's Token.attrs is a
+                # dict (hugo_parser.py's _get_attr already handles this); iterating it
+                # as a list of (key, value) tuples silently yielded attr[0] == a single
+                # character of the key string, so `attr[0] == "href"` was always False
+                # and every re-parsed link lost its URL -- reproduced directly: a
+                # whole-node paragraph containing "[text](url)" rendered as "[text]()".
+                attrs = token.attrs or {}
+                if isinstance(attrs, dict):
+                    url = attrs.get("href", "")
+                else:
+                    url = next((value for key, value in attrs if key == "href"), "")
 
                 # Find matching link_close
                 children_tokens = []
@@ -465,6 +527,14 @@ class ASTRenderer:
 
             # Sanitize language markers from frontmatter translations (FIX-BT-02)
             sanitized_translation = self._sanitize_language_markers(unit.translated_text)
+            # TC-APT-073: strip invisible/lookalike punctuation the model added
+            # that the source never had. Deliberately OUTSIDE the placeholder_map
+            # branch below: most injected characters sit in plain prose with no
+            # placeholders at all, and it must run BEFORE restoration so
+            # protected spans are still masked and cannot be rewritten.
+            sanitized_translation = normalize_injected_invisibles(
+                unit.source_text, sanitized_translation, self._target_lang
+            )
             placeholder_map = unit.metadata.get('placeholder_map', {})
             if placeholder_map:
                 sanitized_translation = self._restore_placeholders(
@@ -509,7 +579,48 @@ class ASTRenderer:
 
         logger.info(f"Applied {applied_count} frontmatter translations")
 
-    def apply_translations(self, ast: list[ASTNode], units: list[TextUnit], frontmatter: dict[str, Any] | None = None) -> None:
+    def _build_heading_translation_map(self, units: list[TextUnit]) -> dict[str, str]:
+        """TC-APT-078: body prose sometimes names a section by its (English) heading
+        text -- "see Quick Start below" -- while the heading itself translates fine.
+        The reference and the heading are separate TextUnits translated in different
+        contexts, so nothing makes them agree on its own. Measured deterministic in
+        9/9 regenerated locales on words-document-net (RB-007).
+
+        Returns source heading text -> its own translation, skipping headings the
+        model left same-as-source (nothing to correct toward) and very short
+        headings (avoids over-matching a common short word elsewhere in prose).
+        """
+        mapping: dict[str, str] = {}
+        for unit in units:
+            kind_value = getattr(unit.kind, "value", unit.kind)
+            if kind_value != "heading_text":
+                continue
+            source = (unit.source_text or "").strip()
+            translated = (unit.translated_text or "").strip()
+            if len(source) < 4 or not translated or source == translated:
+                continue
+            mapping[source] = translated
+        return mapping
+
+    def _correct_cross_references(self, text: str) -> str:
+        """Replace a verbatim source-heading-text reference with that heading's own
+        translation. Word-boundary, case-sensitive matching only -- this corrects an
+        exact echo of the source heading name, not a loose paraphrase."""
+        if not text or not self._heading_translations:
+            return text
+        for source_heading, translated_heading in self._heading_translations.items():
+            pattern = r"\b" + re.escape(source_heading) + r"\b"
+            if re.search(pattern, text):
+                text = re.sub(pattern, translated_heading.replace("\\", "\\\\"), text)
+        return text
+
+    def apply_translations(
+        self,
+        ast: list[ASTNode],
+        units: list[TextUnit],
+        frontmatter: dict[str, Any] | None = None,
+        target_lang: str | None = None,
+    ) -> None:
         """
         Apply translated TextUnits back to AST nodes and frontmatter.
 
@@ -517,6 +628,8 @@ class ASTRenderer:
             ast: The AST to update (modified in-place)
             units: Translated TextUnits with node addresses
             frontmatter: Optional frontmatter dictionary to update (FIX-BT-03)
+            target_lang: Target language code (TC-APT-077: locale-aware invisible-
+                character normalization; omit to get the conservative strip-always default)
 
         Raises:
             ValueError: If units cannot be applied (missing nodes, orphaned units)
@@ -526,6 +639,8 @@ class ASTRenderer:
         self.applied_units = set()
         self._missing_node_count = 0  # Reset per call
         self._placeholder_leak_count = 0  # Reset per call
+        self._heading_translations = self._build_heading_translation_map(units)
+        self._target_lang = target_lang
 
         # Separate frontmatter and body units (FIX-BT-03)
         frontmatter_units = [u for u in units if u.node_addr and u.node_addr.startswith('frontmatter.')]
@@ -598,6 +713,31 @@ class ASTRenderer:
             else:
                 # No translation or no source - use standard whitespace reattachment
                 final_text = unit.get_final_text()
+
+            # TC-APT-073: same normalization as the frontmatter path above, and
+            # for the same reasons -- before restoration, and not conditional on
+            # a placeholder_map existing.
+            final_text = normalize_injected_invisibles(unit.source_text, final_text, self._target_lang)
+
+            # TC-APT-078: fix a body reference that echoed a heading's SOURCE text
+            # verbatim after that heading itself was translated. Before placeholder
+            # restoration, same reasoning as the normalizer above.
+            #
+            # TC-APT-109: `unit.do_not_translate` (code spans/blocks, and any other
+            # content that must stay byte-for-byte identical) must also be excluded.
+            # Confirmed live: a fenced ```csharp block containing
+            # `using Aspose.Words.Drawing.Charts;` came back as
+            # `using Aspose.Words.Drawing.Diagramme;` whenever the page also has a
+            # "### Charts" heading -- the word-boundary regex substitution below
+            # matched "Charts" inside the namespace path (a dot is a non-word
+            # character, so `\bCharts\b` matches right after `Drawing.`) and replaced
+            # it with the heading's German translation, corrupting protected code.
+            # The heading_text exclusion alone only prevents a heading from
+            # "correcting" itself; it says nothing about code, which has its own,
+            # stronger, orthogonal protection contract that this call was bypassing.
+            kind_value = getattr(unit.kind, "value", unit.kind)
+            if kind_value != "heading_text" and not unit.do_not_translate:
+                final_text = self._correct_cross_references(final_text)
 
             # Restore placeholders (if any were applied during extraction)
             placeholder_map = unit.metadata.get('placeholder_map', {})

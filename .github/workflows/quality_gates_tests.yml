@@ -89,3 +89,16 @@ jobs:
       - name: i18n miner unit tests
         run: python -m pytest tests/unit/scripts/test_mine_heading_glossary.py -q
         shell: pwsh
+
+      # TC-APT-046: the "Test D permanent CI guard" this taskcard requires. Until
+      # now tests/regression/ was effectively unguarded -- release_gate.yml ran
+      # exactly two files from it, so the concurrency regression
+      # (test_backend_generation_concurrency.py) and every producer-fix guard
+      # written during this mission ran only when someone happened to run them
+      # locally. That includes the identity round-trip that vetoed a change which
+      # would have stripped the URL from every link in the portfolio, and the
+      # drift guard that catches governed terminology diverging between the two
+      # signal inventories. Those are exactly the tests that must not rot.
+      - name: Regression suite (producer-fix guards, concurrency, fidelity)
+        run: python -m pytest tests/regression/ -q
+        shell: pwsh

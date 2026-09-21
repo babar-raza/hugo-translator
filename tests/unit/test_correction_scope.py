@@ -160,6 +160,22 @@ class TestCorrectionBypassAllowlist:
         result = attempt_correction("src", "tgt", "en", "bg", [issue])
         assert result is None, "Language consistency failure must bypass LLM correction"
 
+    def test_link_duplicate_bypasses_correction(self):
+        """VA-05 (TC-APT-105 audit): LinkValidator issues -- including the
+        ERROR-severity genuine-duplicate-link signature VA-04 added -- must
+        bypass correction. LinkValidator is a separate class from
+        StructureValidator (already bypassed above) and, unlike a generic
+        count mismatch, has no ambiguity an LLM rewrite could plausibly
+        resolve better than the structured retry/reject path."""
+        from src.translation_engine.correction import attempt_correction
+        issue = self._make_issue(
+            "LinkValidator",
+            "URL 'https://reference.aspose.org/cells/go/' appears 1 extra "
+            "time(s) in the translation beyond its 1 source occurrence(s)",
+        )
+        result = attempt_correction("src", "tgt", "en", "de", [issue])
+        assert result is None, "Duplicated-link LinkValidator issue must bypass LLM correction"
+
     def test_mixed_bypass_and_correctable_proceeds(self):
         """If ANY issue is correctable, the LLM is called (bypass only when ALL bypass)."""
         from src.translation_engine.correction import attempt_correction

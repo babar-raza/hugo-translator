@@ -12,11 +12,19 @@ All providers implement BaseLLMProvider and return (text, input_tokens, output_t
 
 import logging
 import os
+import random
+import time
 from abc import ABC, abstractmethod
 
 from .contracts import LLMProviderConfig
 
 logger = logging.getLogger(__name__)
+
+
+# Injection points for tests (TC-APT-004): real sleep/jitter/clock in production.
+_sleep = time.sleep
+_rand = random.random
+_clock = time.perf_counter
 
 
 class BaseLLMProvider(ABC):
@@ -33,21 +41,90 @@ class BaseLLMProvider(ABC):
     def _generate_impl(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         """Subclass implementation of generation logic."""
 
+    @property
+    def breaker_key(self) -> str:
+        cfg = self._config
+        return (
+            getattr(cfg, "model_id", None)
+            or getattr(cfg, "model_name", None)
+            or type(self).__name__
+        )
+
     def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
-        """Instrumented generate — tracks LLM calls via LLMRunContext."""
+        from .campaign_llm_policy import accounted_generate
+
+        return accounted_generate(
+            self.breaker_key,
+            lambda: self._generate_governed(system_prompt, user_text),
+        )
+
+    def _generate_governed(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
+        """Hardened generate (TC-APT-004 / LLM-HARDEN-001).
+
+        * refuses immediately with ``LLMCircuitOpenError`` while the model's breaker is open;
+        * classifies every transport/provider exception (``LLMTransientError`` /
+          ``LLMFatalError``) and retries transient ones with bounded backoff (+/- jitter);
+        * records each logical call's outcome on the breaker and in the redacted health log;
+        * still tracks attempts/completions via ``LLMRunContext``.
+        Never returns the source text on failure -- it raises.
+        """
         from ..observability.llm_run_context import LLMRunContext
+        from .circuit_breaker import breaker_for, health_log, retry_policy
+        from .llm_errors import LLMCircuitOpenError, LLMFatalError, classify_exception
+
+        key = self.breaker_key
+        breaker = breaker_for(key)
+        if breaker is not None and not breaker.allow_request():
+            health_log(key, event="refused", ok=False, error_kind="LLMCircuitOpenError")
+            raise LLMCircuitOpenError(f"circuit breaker open for {key!r}; call refused")
+
         ctx = LLMRunContext.get_current()
-        if ctx:
-            ctx.record_attempted()
-        try:
-            result = self._generate_impl(system_prompt, user_text)
+        policy = retry_policy()
+        api_key_resolved = bool(self._resolve_api_key())
+        last_error: Exception | None = None
+        for attempt in range(1, policy.attempts + 1):
+            if ctx:
+                ctx.record_attempted()
+            started = _clock()
+            try:
+                result = self._generate_impl(system_prompt, user_text)
+            except Exception as exc:
+                if ctx:
+                    ctx.record_failed()
+                error = classify_exception(exc)
+                last_error = error
+                health_log(
+                    key,
+                    event="call",
+                    ok=False,
+                    attempt=attempt,
+                    seconds=round(_clock() - started, 3),
+                    error_class=type(exc).__name__,
+                    error_kind=type(error).__name__,
+                    api_key_resolved=api_key_resolved,
+                )
+                if isinstance(error, LLMFatalError) or attempt >= policy.attempts:
+                    if breaker is not None:
+                        breaker.record_failure(f"{type(exc).__name__}: {exc}"[:200])
+                    raise error from exc
+                _sleep(policy.delay(attempt - 1, _rand()))
+                continue
             if ctx:
                 ctx.record_completed(result[1], result[2])
+            if breaker is not None:
+                breaker.record_success()
+            health_log(
+                key,
+                event="call",
+                ok=True,
+                attempt=attempt,
+                seconds=round(_clock() - started, 3),
+                input_tokens=result[1],
+                output_tokens=result[2],
+                api_key_resolved=api_key_resolved,
+            )
             return result
-        except Exception:
-            if ctx:
-                ctx.record_failed()
-            raise
+        raise last_error or RuntimeError("unreachable")  # pragma: no cover
 
     def health_check(self) -> bool:
         """Test provider connectivity.
@@ -143,9 +220,7 @@ class OpenAIProvider(BaseLLMProvider):
         try:
             import openai
         except ImportError:
-            raise RuntimeError(
-                "openai SDK not installed. Install with: pip install openai>=1.0"
-            )
+            raise RuntimeError("openai SDK not installed. Install with: pip install openai>=1.0")
 
         self._config = config
         api_key = self._resolve_api_key()
@@ -155,7 +230,7 @@ class OpenAIProvider(BaseLLMProvider):
                 "environment variable."
             )
 
-        self._client = openai.OpenAI(api_key=api_key)
+        self._client = openai.OpenAI(api_key=api_key, max_retries=0)
         logger.info("OpenAIProvider initialized: model=%s", config.model_name)
 
     def _generate_impl(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
@@ -250,15 +325,14 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         try:
             import openai
         except ImportError:
-            raise RuntimeError(
-                "openai SDK not installed. Install with: pip install openai>=1.0"
-            )
+            raise RuntimeError("openai SDK not installed. Install with: pip install openai>=1.0")
 
         api_key = self._resolve_api_key() or "not-needed"
 
         self._client = openai.OpenAI(
             api_key=api_key,
             base_url=config.base_url,
+            max_retries=0,  # TC-APT-004: BaseLLMProvider.generate is the single retry authority
         )
         logger.info(
             "OpenAICompatibleProvider initialized: base_url=%s model=%s",

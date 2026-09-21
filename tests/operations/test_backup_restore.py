@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 # Add scripts and src to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts" / "tm"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import backup_tm

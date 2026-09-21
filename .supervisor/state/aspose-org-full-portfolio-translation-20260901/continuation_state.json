@@ -1,0 +1,20 @@
+{
+  "phase": "idle",
+  "run_id": null,
+  "started_at": null,
+  "updated_at": "2026-09-11T16:30:22.838125+00:00",
+  "completed_at": null,
+  "current_site": null,
+  "current_langs": [],
+  "runs_history": [],
+  "pending_work": [],
+  "blockers": [],
+  "next_action": null,
+  "stats": {
+    "total_runs": 0,
+    "total_files_processed": 0,
+    "total_files_accepted": 0,
+    "total_files_rejected": 0,
+    "consecutive_failures": 0
+  }
+}

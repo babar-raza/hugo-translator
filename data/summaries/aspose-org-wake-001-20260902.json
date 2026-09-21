@@ -1,0 +1,67 @@
+{
+  "run_id": "aspose-org-wake-001-20260902",
+  "mission_id": "aspose-org-full-portfolio-translation-20260901",
+  "wake": 1,
+  "started_at": "2026-09-02T05:30:00+00:00",
+  "finished_at": "2026-09-02T08:29:25.754139+00:00",
+  "phase": "A",
+  "gates_closed": [
+    0
+  ],
+  "taskcards_done": 23,
+  "taskcards_total": 33,
+  "remaining": [
+    "TC-APT-004b",
+    "TC-APT-010",
+    "TC-APT-013..020"
+  ],
+  "headline": "Gate 0 closed; Gates 1-3 all but two taskcards closed; no content written, no push",
+  "hugo_translator_commits": 17,
+  "content_repo_commits": [
+    "334d86406f56fdc60e922e21127328505687ebb2 (S-HT-01/02 governed path, local main, not pushed)"
+  ],
+  "measurements": {
+    "portfolio": {
+      "sources": 9186,
+      "cells": 229650,
+      "existing_targets": 112584,
+      "missing": 117066
+    },
+    "ledger_rows": 330696,
+    "llm_calibration": {
+      "safe_concurrency": 16,
+      "packing_speedup_x": 4.59,
+      "tokens_per_source_word": 13.16,
+      "failures_in_64_calls": 0
+    },
+    "provider_comparison": {
+      "llm_better_langs": 22,
+      "m2m100_better_langs": 3,
+      "llm_identifier_preservation": 0.861,
+      "m2m100_identifier_preservation": 0.72
+    },
+    "determinism_baseline": {
+      "byte_identical": 0.75,
+      "semantic_equivalence": 0.8125,
+      "divergent": 0.1875
+    },
+    "gate12_defects_in_content": 10,
+    "g04_backlog_resolved_by_ledger": 5141,
+    "pytest_collection_errors": 0
+  },
+  "defects_fixed_this_wake": [
+    "G-03 silent LLM passthrough (TC-APT-004)",
+    "CircuitBreaker FileLock not thread-safe (found by calibration run 4)",
+    "Gate-12 over-broad rewrite + body-wide bail-out (G-04)",
+    "PlaceholderManager non-bijective on literal {PLACEHOLDER_n} (found by the new fixture)",
+    "LMDB sub-db name leaking into main-DB counts (found by the TM suite)",
+    "comparison harness defaulted m2m100 to CPU",
+    "11 pytest collection errors (G-12)"
+  ],
+  "blockers": [],
+  "next_wake": [
+    "TC-APT-004b qualification run",
+    "TC-APT-010 gate promotion",
+    "then Gate 4 canary"
+  ]
+}

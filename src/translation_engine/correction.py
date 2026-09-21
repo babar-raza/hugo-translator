@@ -30,12 +30,21 @@ logger = logging.getLogger(__name__)
 #   YamlValidator                  — YAML parse errors (structural)
 #   FrontmatterIntegrityValidator  — frontmatter key/type corruption (structural)
 #   LanguageConsistencyValidator   — wrong-language content (purity; LLM is wrong tool)
+#   LinkValidator                  — VA-05 (TC-APT-105 audit): a SEPARATE
+#     class from StructureValidator (already bypassed above) that also
+#     counts/compares links, and since VA-04 can now emit ERROR-severity
+#     issues for a genuine duplicated link (TC-APT-105's exact reported
+#     defect signature) -- without this entry, enabling correction_pass
+#     would route exactly that defect into a whole-document LLM rewrite
+#     with only prompt-text "preserve exactly" instructions, no structural
+#     protection of links/code spans at all.
 _BYPASS_VALIDATORS: frozenset[str] = frozenset({
     "ShortcodePreservationValidator",
     "StructureValidator",
     "YAMLValidator",
     "FrontmatterIntegrityValidator",
     "LanguageConsistencyValidator",
+    "LinkValidator",
 })
 
 
@@ -165,7 +174,13 @@ def attempt_correction(
             "You are a translation quality fixer. Fix only the issues listed. "
             "Output only the corrected translation text, nothing else."
         )
-        response, _in_tok, _out_tok = backend._provider.generate(correction_system_prompt, prompt)
+        # TC-APT-094: this bypasses LLMModelBackend.translate()/translate_batch(),
+        # so it must acquire the cross-process slot itself or it evades the
+        # fleet-wide cap on in-flight professionalize_llm calls.
+        with backend._llm_slot():
+            response, _in_tok, _out_tok = backend._provider.generate(
+                correction_system_prompt, prompt
+            )
         if not response or not response.strip():
             logger.warning("Correction pass: empty response from LLM")
             return None

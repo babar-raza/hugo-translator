@@ -1,0 +1,41 @@
+taskcard: TC-APT-003
+title: Work ledger bootstrap (extend MetadataTracker, then aggregate)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+deliverables:
+  - "src/utils/metadata_tracker.py (extended): SourceFileMetadata/OutputFileMetadata gain sha256 + profile_fingerprint + protection_fingerprint (optional, legacy JSON still loads); optional root= for portable relative POSIX keys; get_source_sha256/get_output/entries; record_existing_output (status unknown_provenance, empty source_hash_at_translation); check_source_changed is SHA256-primary (fast_path_mtime now opt-in, default False)"
+  - "src/translation_engine/engine.py: _should_skip_translation passes fast_path_mtime=False (sha256 primary at the live call site)"
+  - "src/workers/fingerprints.py (new, plan 7.3): profile_fingerprint (sha256 of resolved SiteProfile.model_dump), protection_fingerprint (frontmatter modes, preserve/placeholder rule lists, AST switches, terminology block, bytes of the 4 terminology artifacts); default.yaml never an input (G-08)"
+  - "src/workers/git_provenance.py (new): the five governed-commit forensic rules factored out of campaign_runner._receipt_recovery_candidates (same diagnostics); bulk last_add_commits (one git log walk) + classify_bulk for backfills"
+  - "src/workers/campaign_runner.py: _receipt_recovery_candidates now delegates to git_provenance.verify_governed_add (behaviour-preserving; tests/unit/workers/test_campaign_manifest.py 50 passed)"
+  - "src/workers/work_ledger.py (new): SQLite page_language_work exactly per plan 14.1 (unique cell index, state/site-lang indexes), content-free invariant (recursive content/translated_content key rejection), enum/sha validation, batched ON CONFLICT upserts, append-only work_ledger_events.jsonl with replay_events rebuild"
+  - "scripts/campaign/backfill_provenance.py (new): per-site tracker population (sha256 + fingerprints), existing-target registration, provenance tiers RECEIPT_BACKED -> GIT_COMMIT_BACKED -> UNKNOWN, ledger rows for 25 approved + 11 excluded locales, tracker-vs-ledger consistency check"
+live_backfill_2026-09-02:
+  content_repo_sha: 338efbb6d37263a06c4d1baeaf609cb8b326025f
+  duration_seconds: 649.5
+  receipts_indexed: 0 (no acceptance_receipts.jsonl exists on this host)
+  git_governed_commits: 0 (content repo has zero one-file 'zero-defect shard' commits)
+  rows_total: 330696 (= 9186 sources x 36 codes)
+  duplicate_cells: 0
+  states:
+    EXCLUDED_BY_PROFILE: 101046   # 9186 x 11 excluded codes, legacy files untouched
+    MISSING_TRANSLATION: 117066   # == inventory missing_target_cells
+    UNKNOWN_PROVENANCE: 112584    # == inventory existing_target_cells; every pre-existing target (plan 7.4)
+  approved_locale_cells: 229650 (117066 + 112584; == TC-APT-002 cell_count)
+  per_site_rows: {blog: 6624, docs: 18684, kb: 13212, products: 2124, reference: 289512, websites: 540}
+  tracker_ledger_mismatches_sample200: none for any site
+  metadata_files: data/campaigns/metadata/<site>/.translation_metadata.json (sha256, relative keys)
+  ledger: data/campaigns/work_ledger.sqlite3 (299 MB); events: data/campaigns/work_ledger_events.jsonl (503 MB, 330696 lines)
+  summary_copy: stage3-execution/TC-APT-003-backfill-summary.json
+decisions:
+  - "GIT_COMMIT_BACKED without a receipt stays UNKNOWN_PROVENANCE (reason git_commit_backed_receipt_missing): a governed add commit proves bytes, not the source hash they were produced from; the runner's own recovery path revalidates such files and issues receipts. Moot on this host (0 such commits)."
+  - "Excluded-locale rows are recorded (EXCLUDED_BY_PROFILE, target_exists reflects the 35,161 legacy files) so the ledger is the complete portfolio record (plan 20); they are never acted on."
+  - "The engine's own tracker file location (output_dir/.translation_metadata.json, md5) is untouched; the mission's per-site sha256 trackers live under data/campaigns/metadata/ (work_ledger.metadata_path_for_site). Wiring the campaign runner to these per-site trackers is folded into TC-APT-031's runner changes."
+  - "UNKNOWN_PROVENANCE rows go through plan 7.4 stratified audit sampling (bucket=(site,family,lang), N=20/40) during Gate 2 (TC-APT-009 re-evaluation) and PHASE B; none is assumed current."
+  - "Performance: the first backfill attempt was killed after ~20 min at <4k rows (per-row SELECT + event-log reopen); bulk_upsert now batches 5,000 rows per transaction with one event-log open per batch -> 330,696 rows in 650 s including hashing 112,584 targets over OneDrive."
+verification:
+  - "pytest tests/unit/test_metadata_tracker.py tests/unit/test_metadata_tracker_tc003.py tests/unit/test_metadata_cleanup.py tests/unit/test_engine_content_hash.py tests/unit/workers/test_work_ledger.py tests/unit/workers/test_git_provenance.py tests/unit/workers/test_backfill_provenance.py tests/unit/workers/test_campaign_manifest.py -> 99 passed (after fixing test_should_skip_translation_content_changed, which was failing on HEAD because the mtime pre-check short-circuited before the hash path it claims to test)"
+  - "test_backfill_provenance::test_ledger_hashes_match_tracker_records_acceptance: ledger source_sha256/target_sha256 == tracker records == independent recomputation; rerun idempotent"
+  - "live: python -m scripts.campaign.backfill_provenance -> rows=330696 dup_cells=0; tracker_ledger_mismatches_sample200 = [] for all 6 sites"
+acceptance: "every one of the 229,650 candidate cells has exactly one row with a valid eligibility_state (plus 101,046 excluded rows), UNKNOWN_PROVENANCE isolated; unit test confirms ledger hashes match MetadataTracker's own records -> MET"

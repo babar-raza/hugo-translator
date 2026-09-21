@@ -50,7 +50,8 @@ class TestGateHeadingDeficit:
         with caplog.at_level(logging.WARNING):
             result = gate.evaluate(tr, src, "de", output_path)
 
-        assert result.passed is True  # warn-only
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block".
+        assert result.passed is False
         assert any("GATE34 HEADING DEFICIT" in r.message for r in caplog.records)
 
     def test_more_headings_in_translation_is_silent(self, caplog):
@@ -107,14 +108,21 @@ class TestGateDroppedTrailingLink:
             "## See Also\n- [Aspose.Cells — Enterprise Knowledge Base]"
             "(https://kb.aspose.com/cells/)\n"
         )
-        tr = "---\ntitle: Foo\n---\n## Übersicht\nkörper\n"
+        # TC-APT-010 (2026-09-02): keeps the SAME heading count as source
+        # (Gate 34 is now also "block" and, as a "block" gate running
+        # earlier in registry order, would otherwise short-circuit
+        # evaluate()'s block-gate loop before Gate 35 ever runs -- this
+        # fixture isolates Gate 35's own signal by dropping only the
+        # section's link, not the section itself).
+        tr = "---\ntitle: Foo\n---\n## Übersicht\nkörper\n\n## Siehe auch\nkeine Links hier.\n"
         gate = _make_gate()
         output_path = Path("/content/kb.aspose.org/de/cells/foo.md")
 
         with caplog.at_level(logging.WARNING):
             result = gate.evaluate(tr, src, "de", output_path)
 
-        assert result.passed is True  # warn-only
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block".
+        assert result.passed is False
         assert any("GATE35 DROPPED TRAILING LINK" in r.message for r in caplog.records)
 
     def test_last_section_without_links_is_out_of_scope(self, caplog):

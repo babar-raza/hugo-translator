@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import subprocess
 import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,8 +20,18 @@ from typing import Any
 
 import yaml
 
+from src.model_runtime.campaign_llm_policy import campaign_llm_scope
+from src.tm.rejected_task_queue import RejectedTaskQueue
+from src.tm.retry_records import RejectedTranslationTask
 from src.utils.atomic_write import atomic_write
-from src.utils.file_lock import FileLock
+from src.utils.file_lock import FileLock, LockError
+from src.workers.content_commit_title import content_commit_title
+from src.workers.git_provenance import (
+    GovernedProvenanceError,
+    governed_subject_pattern,
+    verify_governed_add,
+)
+from src.workers.heal_queue import active_hold, is_quarantined, is_source_path_quarantined
 
 from .campaign_manifest import (
     CampaignManifest,
@@ -28,6 +41,27 @@ from .campaign_manifest import (
     receipt_fingerprint,
     sha256_file,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _force_serialize_all_backends() -> bool:
+    """Read the TC-APT-046 rollback switch.
+
+    ``translation_engine.concurrency.force_serialize_all_backends`` defaults to
+    ``True``: until a real canary at ``max_parallel_jobs > 1`` has proven otherwise,
+    the campaign path behaves exactly as it did before TC-APT-044. Flipping the key
+    to ``false`` needs no code change. A missing/unreadable config must not silently
+    unserialize the run, so every failure resolves to ``True``.
+    """
+    try:
+        from src.utils.config_loader import get_global_config
+
+        config = get_global_config() or {}
+    except Exception:  # pragma: no cover - config load is exercised elsewhere
+        return True
+    concurrency = (config.get("translation_engine") or {}).get("concurrency") or {}
+    return bool(concurrency.get("force_serialize_all_backends", True))
 
 
 class CampaignLedger:
@@ -48,9 +82,17 @@ class CampaignLedger:
         if not path.is_file():
             return []
         rows: list[dict[str, Any]] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                rows.append(json.loads(line))
+        # Stream line-by-line rather than path.read_text().splitlines(): that
+        # held the whole file plus its split lines in memory at once, and
+        # heal_queue.jsonl (10k+ lines and growing) triggered a real
+        # MemoryError under 4-worker concurrent load (2026-09-17 full-portfolio
+        # sweep, PID contention over shared system RAM alongside per-worker
+        # model buffers).
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if line:
+                    rows.append(json.loads(line))
         return rows
 
     def receipts(self) -> dict[str, dict[str, Any]]:
@@ -101,6 +143,7 @@ class CampaignLedger:
         gate: str = "pipeline",
         source_sha256: str | None = None,
         candidate_sha256: str | None = None,
+        model_id: str | None = None,
     ) -> None:
         self._append(
             self.failures_path,
@@ -114,6 +157,7 @@ class CampaignLedger:
                 "attempt": attempt,
                 "source_sha256": source_sha256,
                 "candidate_sha256": candidate_sha256,
+                "model_id": model_id,
                 "failed_at": datetime.now(timezone.utc).isoformat(),
             },
         )
@@ -182,18 +226,204 @@ class CampaignLedger:
             os.fsync(handle.fileno())
 
     def write_summary(self, payload: dict[str, Any]) -> None:
-        with self._lock, FileLock(self._process_lock_path, timeout=30):
-            atomic_write(
-                path=self.summary_path,
-                content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
-                encoding="utf-8",
-                fsync=True,
-                create_parents=True,
+        # TC-PORT-LLM-009: summary.json is a reporting/progress artifact --
+        # reconcile_receipted_commits.py and _validated_resume_receipts both
+        # read acceptance_receipts.jsonl/commit_batches.jsonl directly and
+        # never this file, so losing one write is recoverable (the next
+        # write_summary call, or the next run, produces a fresh one).
+        # Confirmed live under a real 4-worker soak: with 4 concurrent child
+        # processes all finishing near the same moment, this call (including
+        # the mid-run progress checkpoints, not just the final one) can hit
+        # the same lock contention _append_heal_ticket already guards
+        # against, and previously crashed the whole worker process over a
+        # non-critical reporting write.
+        try:
+            with self._lock, FileLock(self._process_lock_path, timeout=30):
+                atomic_write(
+                    path=self.summary_path,
+                    content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+                    encoding="utf-8",
+                    fsync=True,
+                    create_parents=True,
+                )
+        except LockError as exc:
+            logger.error(
+                "summary.json write timed out under lock contention (this "
+                "write dropped, not fatal -- the next write_summary call or "
+                "run produces a fresh one): %s",
+                exc,
             )
+
+    def model_outcomes(self) -> dict[str, dict[str, int]]:
+        """Return candidate-free, current-campaign model dispositions."""
+        outcomes: dict[str, dict[str, int]] = {}
+
+        def bucket(model_id: str) -> dict[str, int]:
+            return outcomes.setdefault(
+                model_id or "unknown",
+                {"accepted": 0, "rejected": 0, "provider_error": 0, "queued": 0},
+            )
+
+        for receipt in self.receipts().values():
+            bucket(str(receipt.get("model_fingerprint") or "unknown"))["accepted"] += 1
+        for failure in self._read_jsonl(self.failures_path):
+            model = bucket(str(failure.get("model_id") or "unknown"))
+            if str(failure.get("gate")) == "campaign_job_exception":
+                model["provider_error"] += 1
+            else:
+                model["rejected"] += 1
+        retry_outcomes = self.retry_queue_outcomes()
+        # A deferred campaign writes a human-facing heal ticket *and* its
+        # canonical SQLite retry task.  Once the latter exists it is the
+        # lifecycle authority; counting both would leave an ACCEPTED retry
+        # falsely reported as still queued.
+        if not retry_outcomes:
+            for ticket in self._read_jsonl(self.root.parent / "heal_queue.jsonl"):
+                if ticket.get("campaign_id") != self.root.name:
+                    continue
+                bucket(str(ticket.get("processing_model") or "unknown"))["queued"] += 1
+        for outcome in retry_outcomes:
+            counts = bucket(str(outcome["model_target"]))
+            if outcome["state"] == "ACCEPTED":
+                counts["accepted"] += 1
+            elif outcome["state"] in {"QUEUED", "CLAIMED"}:
+                counts["queued"] += 1
+            elif outcome["state"] == "DEAD_LETTER":
+                counts["rejected"] += 1
+        return dict(sorted(outcomes.items()))
+
+    def retry_queue_outcomes(self) -> list[dict[str, Any]]:
+        """Read deferred retry dispositions for this campaign, if its queue exists."""
+        path = self.root.parent / "rejected_tasks.sqlite3"
+        if not path.is_file():
+            return []
+        return RejectedTaskQueue(path).campaign_outcomes(self.root.name)
+
+    def attempt_model_outcomes(self) -> dict[str, dict[str, dict[str, int]]]:
+        """Return active-campaign, candidate-free outcomes by model and attempt.
+
+        Failure metadata is append-only: a duplicate-retry suppression can add a
+        second row for the same invocation.  Count each ``job_id``/attempt/model
+        tuple once so summary counters describe provider/model attempts rather
+        than ledger writes.  Older receipts without the additive attempt fields
+        remain readable under ``unknown``.
+        """
+        outcomes: dict[str, dict[str, dict[str, int]]] = {}
+
+        def bucket(model_id: str, attempt: int | str) -> dict[str, int]:
+            return outcomes.setdefault(model_id or "unknown", {}).setdefault(
+                str(attempt),
+                {"attempted": 0, "accepted": 0, "rejected": 0, "provider_error": 0},
+            )
+
+        seen: set[tuple[str, str, str]] = set()
+        for failure in self._read_jsonl(self.failures_path):
+            model_id = str(failure.get("model_id") or "unknown")
+            attempt = str(failure.get("attempt") if failure.get("attempt") is not None else "unknown")
+            key = (str(failure.get("job_id") or failure.get("output_path") or "unknown"), attempt, model_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            counts = bucket(model_id, attempt)
+            counts["attempted"] += 1
+            if str(failure.get("gate")) == "campaign_job_exception":
+                counts["provider_error"] += 1
+            else:
+                counts["rejected"] += 1
+
+        for receipt in self.receipts().values():
+            model_id = str(
+                receipt.get("attempt_model_id") or receipt.get("model_fingerprint") or "unknown"
+            )
+            attempt = str(receipt.get("campaign_attempt") if receipt.get("campaign_attempt") is not None else "unknown")
+            key = (str(receipt.get("output_path") or "unknown"), attempt, model_id)
+            counts = bucket(model_id, attempt)
+            # A receipt may follow failure metadata for the same invocation
+            # only in malformed legacy artifacts.  Do not inflate attempts.
+            if key not in seen:
+                seen.add(key)
+                counts["attempted"] += 1
+            counts["accepted"] += 1
+
+        return {
+            model_id: {attempt: dict(counts) for attempt, counts in sorted(by_attempt.items())}
+            for model_id, by_attempt in sorted(outcomes.items())
+        }
+
+    def zero_acceptance_recommendations(
+        self,
+        *,
+        warning_after_attempts: int,
+        stop_recommendation_after_attempts: int,
+    ) -> dict[str, Any]:
+        """Return advisory systemic-failure recommendations; never stop a run."""
+        if warning_after_attempts < 1 or stop_recommendation_after_attempts < warning_after_attempts:
+            raise ValueError("zero-acceptance thresholds must be positive and ordered")
+        recommendations: list[dict[str, Any]] = []
+        for model_id, by_attempt in self.attempt_model_outcomes().items():
+            attempted = sum(counts["attempted"] for counts in by_attempt.values())
+            accepted = sum(counts["accepted"] for counts in by_attempt.values())
+            if attempted < warning_after_attempts or accepted:
+                continue
+            recommendations.append(
+                {
+                    "model_id": model_id,
+                    "attempted": attempted,
+                    "accepted": accepted,
+                    "recommendation": (
+                        "recommend_pause_and_investigate"
+                        if attempted >= stop_recommendation_after_attempts
+                        else "warn_and_continue"
+                    ),
+                }
+            )
+        return {
+            "warning_after_attempts": warning_after_attempts,
+            "stop_recommendation_after_attempts": stop_recommendation_after_attempts,
+            "recommendations": recommendations,
+        }
+
+    def llm_call_outcomes(self) -> dict[str, dict[str, int]]:
+        """Summarize policy-accounted LLM calls without candidate payloads."""
+        outcomes: dict[str, dict[str, int]] = {}
+        for event in self._read_jsonl(self.root / "llm_calls.jsonl"):
+            category = str(event.get("category") or "unknown")
+            outcome = str(event.get("outcome") or "unknown")
+            outcomes.setdefault(category, {})[outcome] = (
+                outcomes.setdefault(category, {}).get(outcome, 0) + 1
+            )
+        return {
+            category: dict(sorted(counts.items()))
+            for category, counts in sorted(outcomes.items())
+        }
+
+    def acceleration_metrics(self) -> dict[str, int]:
+        """Aggregate receipt-bound fast-path facts without reading candidate text."""
+        fields = (
+            "i18n_hits", "tm_hits", "l1_hits", "l2_hits", "semantic_tm_hits",
+            "professionalize_calls", "ast_batches", "individual_fallback_batches",
+            "validation_retries",
+        )
+        totals = {field: 0 for field in fields}
+        for receipt in self.receipts().values():
+            metrics = receipt.get("translation_stats") or {}
+            for field in fields:
+                try:
+                    totals[field] += int(metrics.get(field, 0) or 0)
+                except (TypeError, ValueError):
+                    # A malformed historical receipt must remain visible but
+                    # cannot make status reporting fail during recovery.
+                    continue
+        return totals
 
 
 class CampaignRunner:
     """Execute only jobs enumerated by a pinned CampaignManifest."""
+
+    # TC-APT-046: retry budget handed to the dedicated, out-of-process
+    # Professionalize retry consumer for a deferred campaign's terminal
+    # heal ticket (src/workers/professionalize_retry_worker.py).
+    _DEFERRED_RETRY_BUDGET = 2
 
     _LOCALE_NAMES = {
         "ar": "Arabic",
@@ -343,20 +573,89 @@ class CampaignRunner:
         # source/output paths, while these two maps provide only narrowly
         # scoped retry routing for the currently running job.
         self._engine_campaign_state_lock = threading.RLock()
-        # ModelLoader caches one mutable backend instance per model.  It has a
-        # load lock, but its generation call is not thread-safe on CUDA.  A
-        # campaign must fail closed rather than risk a native CUDA abort or
-        # cross-job sampling state.  Lightweight/fake engines remain fully
-        # parallel for qualification tests; real model-bearing engines share
-        # this lock across all CampaignRunner instances in the process.
-        self._model_execution_lock = None
-        if getattr(self.engine, "model_loader", None) is not None:
-            self._model_execution_lock = getattr(
-                self.engine, "_campaign_model_execution_lock", None
+        # TC-APT-044: the former engine-wide _model_execution_lock (which
+        # serialized EVERY translate_file call, GPU or API alike, and silently
+        # defeated LLM concurrency) is deleted. GPU generation is now
+        # serialized where the hazard actually lives: each
+        # HuggingFaceBackend/CTranslate2Backend instance carries its own
+        # _generation_lock, which also covers a circuit-breaker reroute to the
+        # m2m100 fallback (the returned instance is locked no matter how it
+        # was resolved). The shared-parser hazard the old lock also papered
+        # over was fixed at the source by TC-APT-043.
+        #
+        # TC-APT-046 step 1: an instant, code-free rollback to that old,
+        # fully-serialized behaviour, for the case where a canary at
+        # max_parallel_jobs > 1 shows something the regression tests do not.
+        # Scoped to the campaign path only -- the deleted lock never covered
+        # the CLI's parallel-language executor, so re-serializing that here
+        # would be a new restriction rather than a rollback. Inert while
+        # max_parallel_jobs is 1 (only one job is ever in flight), which is why
+        # it can default to the safe value without costing throughput today.
+        self._force_serialize_lock = threading.RLock()
+        self._force_serialize = _force_serialize_all_backends()
+        # A deferred escalation campaign must never make an incidental in-run
+        # Professionalize request from lower-level repair helpers.  Those
+        # cells fail closed and become queue tickets for the dedicated retry
+        # consumer instead.
+        if hasattr(self.engine, "campaign_context"):
+            self.engine.campaign_context["defer_llm_fallbacks"] = (
+                self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+                or bool(self.manifest.retry_policy.get("professionalize_only", False))
             )
-            if self._model_execution_lock is None:
-                self._model_execution_lock = threading.RLock()
-                self.engine._campaign_model_execution_lock = self._model_execution_lock
+
+    def _llm_event(self, event):
+        self.ledger._append(self.ledger.root / "llm_calls.jsonl", event)
+
+    def _startup_checkpoint(self, phase: str) -> None:
+        """Emit opt-in, candidate-free startup progress for bounded recovery probes."""
+        if os.environ.get("CAMPAIGN_STARTUP_DIAGNOSTICS") == "1":
+            print(f"[{self.manifest.campaign_id}] runner {phase}", flush=True)
+
+    # TC-APT-046: a deferred campaign's terminal heal ticket is also the
+    # dedicated retry consumer's only feed. Built lazily so campaigns that
+    # never open one (the immediate-mode majority) never create the file.
+    @property
+    def _rejected_task_queue(self) -> RejectedTaskQueue:
+        queue = getattr(self, "_rejected_task_queue_instance", None)
+        if queue is None:
+            queue = RejectedTaskQueue(self.ledger.root.parent / "rejected_tasks.sqlite3")
+            self._rejected_task_queue_instance = queue
+        return queue
+
+    def _enqueue_rejected_retry(
+        self,
+        *,
+        source: Any,
+        locale: str,
+        expected_output: str,
+        gate: str,
+        failure: dict[str, Any] | None,
+    ) -> None:
+        candidate_sha256 = str(failure.get("candidate_sha256") or "") if failure else ""
+        task = RejectedTranslationTask.from_mapping(
+            {
+                "campaign_id": self.manifest.campaign_id,
+                "site_id": getattr(source, "site_id", ""),
+                "source_path": source.source_path,
+                "output_path": expected_output,
+                "source_sha256": source.source_sha256,
+                "target_lang": locale,
+                "failure_category": f"auto:{gate}",
+                "failure_fingerprint": candidate_sha256 or f"auto:{gate}",
+                "retry_budget": self._DEFERRED_RETRY_BUDGET,
+                "model_target": str(self.manifest.retry_policy.get("llm_model") or "professionalize_llm"),
+            }
+        )
+        self._rejected_task_queue.enqueue(task)
+
+    @contextmanager
+    def _rollback_serialization(self):
+        """Serialize engine calls when the TC-APT-046 rollback switch is on."""
+        if not self._force_serialize:
+            yield
+            return
+        with self._force_serialize_lock:
+            yield
 
     def _validated_resume_receipts(self) -> dict[str, dict[str, Any]]:
         receipts = self.ledger.receipts()
@@ -435,7 +734,8 @@ class CampaignRunner:
             if sha256_file(output_path) != receipt.get("output_sha256"):
                 raise CampaignManifestError(f"receipt/output hash mismatch: {output}")
             gates = receipt.get("gate_results") or {}
-            expected_gate_ids = {str(index) for index in range(1, 45)}
+            max_gate_id = max((int(gate_id) for gate_id in gates), default=0)
+            expected_gate_ids = {str(index) for index in range(1, max_gate_id + 1)}
             invalid_gates = [
                 gate_id
                 for gate_id, item in gates.items()
@@ -452,7 +752,7 @@ class CampaignRunner:
                 }
                 or item.get("error") is not None
             ]
-            if set(gates) != expected_gate_ids or invalid_gates:
+            if max_gate_id < 44 or set(gates) != expected_gate_ids or invalid_gates:
                 raise CampaignManifestError(f"receipt is not all-pass: {output}")
             valid[output] = receipt_migrations.get(output, receipt)
         if receipt_migrations:
@@ -536,7 +836,8 @@ class CampaignRunner:
             **gate_result.gate_results,
         }
         gate_results[36] = accepted_gate36
-        expected_gate_ids = set(range(1, 45))
+        max_gate_id = max((int(gate_id) for gate_id in gate_results), default=0)
+        expected_gate_ids = set(range(1, max_gate_id + 1))
         invalid = [
             gate_id
             for gate_id, item in gate_results.items()
@@ -546,7 +847,7 @@ class CampaignRunner:
             in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
             or item.get("error") is not None
         ]
-        if set(gate_results) != expected_gate_ids or invalid:
+        if max_gate_id < 44 or set(gate_results) != expected_gate_ids or invalid:
             raise CampaignManifestError(f"receipt revalidation not all-pass: {output_path}")
         migrated = {
             key: value
@@ -571,7 +872,66 @@ class CampaignRunner:
                 raise CampaignManifestError(
                     f"receipt {field_name} is outside content repo: {absolute}"
                 ) from exc
+        # TC-APT-031: record the bytes this accepted output superseded (auditable, revertable).
+        replacing = getattr(self.engine, "campaign_context", {}).get("replace_existing") or {}
+        superseded = replacing.get(normalized["output_path"])
+        if superseded:
+            normalized["superseded_sha256"] = superseded
+        # The engine owns receipt creation and deliberately has no campaign
+        # attempt arguments.  The runner keeps this output-addressed mapping
+        # under its state lock so concurrent jobs cannot attribute a receipt to
+        # another job.  The fields are additive and legacy receipt readers
+        # continue to work when they are absent.
+        metadata = (
+            getattr(self.engine, "campaign_context", {})
+            .get("attempt_metadata_by_output", {})
+            .get(str(Path(receipt["output_path"]).resolve()))
+        )
+        if metadata:
+            normalized.update(metadata)
         self.ledger.append_receipt(normalized)
+
+    def _quality_stop_recommendations(self) -> dict[str, Any]:
+        """Read fail-safe advisory thresholds once for campaign summary evidence."""
+        try:
+            from src.utils.config_loader import get_global_config
+
+            raw = get_global_config().get("campaign_quality", {}) or {}
+            warning_after = int(raw.get("zero_acceptance_warning_after_attempts", 1))
+            stop_after = int(raw.get("zero_acceptance_stop_recommendation_after_attempts", 3))
+            hardware = get_global_config().get("hardware", {}) or {}
+            vram_budget = hardware.get("max_gpu_memory_percent")
+            result = self.ledger.zero_acceptance_recommendations(
+                warning_after_attempts=warning_after,
+                stop_recommendation_after_attempts=stop_after,
+            )
+            result["vram_budget_percent"] = vram_budget
+            return result
+        except (TypeError, ValueError):
+            # A malformed operator threshold must not silently terminate a
+            # campaign. Surface it as evidence and continue its unrelated work.
+            return {"configuration_error": "invalid campaign_quality zero-acceptance thresholds"}
+
+    def _summary_evidence(self) -> dict[str, Any]:
+        """Shared, payload-free evidence for run and verify-only summaries."""
+        return {
+            "model_outcomes": self.ledger.model_outcomes(),
+            "retry_queue_outcomes": self.ledger.retry_queue_outcomes(),
+            "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
+            "quality_stop_recommendations": self._quality_stop_recommendations(),
+            "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+            "acceleration_metrics": self.ledger.acceleration_metrics(),
+        }
+
+    def _unreplaced_declaration(self, source: Any, locale: str, relative: str) -> bool:
+        """TC-APT-031: True when ``relative`` is a declared replacement whose current bytes
+        still equal ``expected_sha256`` -- i.e. the pre-existing original, not yet replaced.
+        Such a file is governed provenance for recovery purposes and must never be deleted."""
+        spec = source.replacement_for(locale) if hasattr(source, "replacement_for") else None
+        if not spec:
+            return False
+        path = self.content_repo / relative
+        return path.is_file() and sha256_file(path) == spec.get("expected_sha256")
 
     def _receipt_recovery_candidates(
         self,
@@ -582,6 +942,10 @@ class CampaignRunner:
         that commit must be after the pinned content baseline and reachable
         from the current branch, and the current bytes must equal the commit
         blob.  This deliberately excludes arbitrary pre-existing files.
+
+        TC-APT-003: the five forensic rules live in ``src/workers/git_provenance``
+        so the provenance backfill and this recovery path share ONE definition of
+        governed commit provenance (diagnostics unchanged).
         """
         candidates: list[tuple[Any, str, str, str]] = []
         for source in self.manifest.sources:
@@ -593,87 +957,28 @@ class CampaignRunner:
                     raise CampaignManifestError(
                         f"receipt recovery output is not a file: {relative}"
                     )
-                log = (
-                    subprocess.run(
-                        ["git", "log", "-1", "--format=%H%x00%s", "--", relative],
-                        cwd=self.content_repo,
-                        check=True,
-                        capture_output=True,
-                    )
-                    .stdout.decode("utf-8", errors="strict")
-                    .strip()
+                if self._unreplaced_declaration(source, locale, relative):
+                    # TC-APT-031: a declared, not-yet-replaced original is governed by its
+                    # manifest declaration, not by a shard commit -- not a recovery candidate.
+                    continue
+                pattern = governed_subject_pattern(
+                    wave=source.wave,
+                    site_id=source.site_id,
+                    family=source.family,
+                    platform=source.platform,
+                    locale=locale,
                 )
-                if "\0" not in log:
-                    raise CampaignManifestError(
-                        f"receipt recovery path has no commit provenance: {relative}"
+                try:
+                    governed = verify_governed_add(
+                        self.content_repo,
+                        relative,
+                        subject_pattern=pattern,
+                        baseline_sha=self.manifest.content_repo_sha,
+                        current_sha256=sha256_file(output_path),
                     )
-                commit_sha, subject = log.split("\0", 1)
-                shard_prefix = (
-                    f"w{source.wave}:{source.site_id}:{source.family}:{source.platform}:{locale}:"
-                )
-                expected_subject = re.compile(
-                    rf"^content\(locale\): zero-defect shard "
-                    rf"{re.escape(shard_prefix)}[1-9][0-9]*$"
-                )
-                if not expected_subject.fullmatch(subject):
-                    raise CampaignManifestError(
-                        f"receipt recovery commit is not governed: {relative}"
-                    )
-                if (
-                    not subprocess.run(
-                        [
-                            "git",
-                            "merge-base",
-                            "--is-ancestor",
-                            self.manifest.content_repo_sha,
-                            commit_sha,
-                        ],
-                        cwd=self.content_repo,
-                        capture_output=True,
-                    ).returncode
-                    == 0
-                ):
-                    raise CampaignManifestError(
-                        f"receipt recovery commit predates pinned baseline: {relative}"
-                    )
-                if (
-                    not subprocess.run(
-                        ["git", "merge-base", "--is-ancestor", commit_sha, "HEAD"],
-                        cwd=self.content_repo,
-                        capture_output=True,
-                    ).returncode
-                    == 0
-                ):
-                    raise CampaignManifestError(
-                        f"receipt recovery commit is not reachable: {relative}"
-                    )
-                changed = subprocess.run(
-                    [
-                        "git",
-                        "diff-tree",
-                        "--no-commit-id",
-                        "--name-status",
-                        "-r",
-                        commit_sha,
-                    ],
-                    cwd=self.content_repo,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                ).stdout.splitlines()
-                if changed != [f"A\t{relative}"]:
-                    raise CampaignManifestError(
-                        f"receipt recovery requires a one-file add commit: {relative}"
-                    )
-                committed_bytes = subprocess.run(
-                    ["git", "show", f"{commit_sha}:{relative}"],
-                    cwd=self.content_repo,
-                    check=True,
-                    capture_output=True,
-                ).stdout
-                if hashlib.sha256(committed_bytes).hexdigest() != sha256_file(output_path):
-                    raise CampaignManifestError(f"receipt recovery blob drift: {relative}")
-                candidates.append((source, locale, relative, commit_sha))
+                except GovernedProvenanceError as exc:
+                    raise CampaignManifestError(str(exc)) from exc
+                candidates.append((source, locale, relative, governed.commit_sha))
         return sorted(candidates, key=lambda item: item[2])
 
     def recover_committed_receipts(self) -> dict[str, Any]:
@@ -693,8 +998,9 @@ class CampaignRunner:
             existing_expected = {
                 output
                 for source in self.manifest.sources
-                for output in source.outputs.values()
+                for locale, output in source.outputs.items()
                 if (self.content_repo / output).exists()
+                and not self._unreplaced_declaration(source, locale, output)
             }
             recovered_outputs = {item[2] for item in candidates}
             if recovered_outputs != existing_expected:
@@ -781,6 +1087,56 @@ class CampaignRunner:
             self.ledger.write_summary(summary)
             return summary
 
+    # GC-01: git's own ref update uses a compare-and-swap lock, so a race
+    # between two sessions committing to the same shared checkout at the
+    # same instant fails loudly and safely (no corruption) with a message
+    # matching one of these patterns -- confirmed live this session
+    # ("fatal: cannot lock ref 'HEAD': is at X but expected Y"). This is a
+    # transient, always-safely-retryable condition, unlike a genuine hook
+    # rejection or merge conflict, which must still fail immediately.
+    _GIT_REF_LOCK_RETRY_PATTERNS = ("cannot lock ref", "unable to lock")
+    _GIT_REF_LOCK_MAX_ATTEMPTS = 3
+    _GIT_REF_LOCK_RETRY_DELAY_S = 1.5
+
+    def _git_commit_with_ref_lock_retry(self, message: list[str]) -> None:
+        """Run `git commit` with a bounded retry for ref-lock contention only.
+
+        Every other failure (hook rejection, nothing to commit, merge
+        conflict, ...) propagates immediately on the first attempt -- this
+        never masks a real failure, it only absorbs the specific, git-native,
+        always-safe-to-retry race two concurrent sessions committing to the
+        same shared checkout can hit.
+        """
+        last_exc: subprocess.CalledProcessError | None = None
+        for attempt in range(1, self._GIT_REF_LOCK_MAX_ATTEMPTS + 1):
+            try:
+                subprocess.run(
+                    ["git", "commit", "-m", *message],
+                    cwd=self.content_repo,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                return
+            except subprocess.CalledProcessError as exc:
+                stderr = (exc.stderr or "").lower()
+                is_ref_lock = any(pattern in stderr for pattern in self._GIT_REF_LOCK_RETRY_PATTERNS)
+                if not is_ref_lock or attempt == self._GIT_REF_LOCK_MAX_ATTEMPTS:
+                    if exc.stderr:
+                        logger.error("git commit failed: %s", exc.stderr.strip())
+                    raise
+                logger.warning(
+                    "git commit hit ref-lock contention (attempt %d/%d), retrying in %.1fs: %s",
+                    attempt,
+                    self._GIT_REF_LOCK_MAX_ATTEMPTS,
+                    self._GIT_REF_LOCK_RETRY_DELAY_S,
+                    exc.stderr.strip() if exc.stderr else exc,
+                )
+                last_exc = exc
+                time.sleep(self._GIT_REF_LOCK_RETRY_DELAY_S)
+        if last_exc:  # pragma: no cover - unreachable, loop always returns or raises
+            raise last_exc
+
     def _commit_verified_outputs(self, shard_id: str) -> str | None:
         """Commit only checksum-verified, receipted campaign outputs."""
         branch = self.manifest.commit_policy.get("branch")
@@ -812,6 +1168,10 @@ class CampaignRunner:
         commit_paths = sorted(dirty & allowed)
         if not commit_paths:
             return None
+        try:
+            title = content_commit_title(commit_paths, f"zero-defect shard {shard_id}")
+        except ValueError as exc:
+            raise CampaignManifestError(str(exc)) from exc
         for relative in commit_paths:
             receipt = receipts[relative]
             output = self.content_repo / relative
@@ -835,7 +1195,7 @@ class CampaignRunner:
         if {Path(item).as_posix() for item in staged} != set(commit_paths):
             raise CampaignManifestError("staged diff differs from accepted output set")
         run_id = self._create_governed_skill_run(shard_id, len(commit_paths))
-        message = [f"content(locale): zero-defect shard {shard_id}"]
+        message = [title]
         if run_id:
             message.extend(
                 [
@@ -847,15 +1207,11 @@ class CampaignRunner:
                     "-m",
                     "Skills invoked: [S-HT-02]",
                     "-m",
-                    "Co-authored-by: Codex <noreply@openai.com>",
+                    "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>",
                 ]
             )
         try:
-            subprocess.run(
-                ["git", "commit", "-m", *message],
-                cwd=self.content_repo,
-                check=True,
-            )
+            self._git_commit_with_ref_lock_retry(message)
         except Exception:
             self._finalize_governed_skill_run(run_id, "failure")
             raise
@@ -961,17 +1317,46 @@ class CampaignRunner:
         error_count = len(getattr(result, "errors", None) or [])
         retry_count = int(getattr(result, "retry_attempts", 0) or 0)
         validation_result = getattr(result, "validation_result", None)
+        # VA-01 (TC-APT-105 audit): `validators` names the validator(s) that
+        # actually caused the reject decision -- ERROR severity only, since
+        # the decision engine's own Rule 1/2/5 REJECT paths are ERROR-driven
+        # (a WARNING-only validator can extend a retry loop or factor into
+        # Rule 5's arbitration, but never causes a reject on its own).
+        # Previously any validator reporting an issue at ANY severity showed
+        # up here -- including one that only ever warned -- misattributing
+        # causation, and this value also seeds a heal ticket's
+        # root_cause_class (self._append_heal_ticket), so the inflated set
+        # could quarantine on the wrong signal. warning_only_validators is
+        # kept separately for observability, not causation.
+        _issue_validator_severities: dict[str, set[str]] = {}
+        for issue in getattr(validation_result, "issues", []) or []:
+            severity = str(
+                getattr(getattr(issue, "severity", None), "value", getattr(issue, "severity", ""))
+            )
+            if severity not in {"error", "warning"}:
+                continue
+            # TC-PORT-LLM-011: src/translation_engine/models.py::ValidationIssue
+            # (used by segment_translator.py's own TranslationRetryableError
+            # raises, e.g. ASTTranslation/BatchLanguagePurity) has a `rule`
+            # field, not `validator` -- src/translation_engine/validation/
+            # base.py::ValidationIssue (used by the real per-cell validators)
+            # has `validator`, not `rule`. Falling back silently collapsed
+            # every issue of the first kind to "unknown", so a genuine,
+            # reproducible defect (e.g. empty translations for a blockquote
+            # text-run unit) fingerprinted identically to a truly unclassified
+            # failure -- indistinguishable in heal_queue.jsonl and unable to
+            # benefit from RECURRENCE ESCALATION grouping by root cause.
+            _issue_name = str(
+                getattr(issue, "validator", None) or getattr(issue, "rule", None) or "unknown"
+            )
+            _issue_validator_severities.setdefault(_issue_name, set()).add(severity)
         validators = sorted(
-            {
-                str(getattr(issue, "validator", "unknown"))
-                for issue in getattr(validation_result, "issues", []) or []
-                if str(
-                    getattr(
-                        getattr(issue, "severity", None), "value", getattr(issue, "severity", "")
-                    )
-                )
-                in {"error", "warning"}
-            }
+            name for name, severities in _issue_validator_severities.items() if "error" in severities
+        )
+        warning_only_validators = sorted(
+            name
+            for name, severities in _issue_validator_severities.items()
+            if severities == {"warning"}
         )
         verification_result = getattr(result, "verification_result", None)
         verification_checks = sorted(
@@ -1003,6 +1388,9 @@ class CampaignRunner:
             if not bool(gate_result.get("passed", False))
         )
         safe_codes = sorted({*safe_codes, *(f"GATE{gate_id}" for gate_id in failed_gate_ids)})
+        diagnostic_code = str(getattr(result, "rejection_diagnostic_code", "") or "")
+        if diagnostic_code:
+            safe_codes = sorted({*safe_codes, diagnostic_code})
         exception_classes = sorted(
             set(
                 re.findall(
@@ -1033,7 +1421,14 @@ class CampaignRunner:
                 re.sub(
                     r"[^A-Za-z0-9_-]",
                     "",
-                    str(getattr(issue, "validator", "unknown")),
+                    # See the matching comment above: this issue may carry
+                    # `rule` (models.ValidationIssue) instead of `validator`
+                    # (validation/base.py::ValidationIssue).
+                    str(
+                        getattr(issue, "validator", None)
+                        or getattr(issue, "rule", None)
+                        or "unknown"
+                    ),
                 )
                 or "unknown"
             )
@@ -1048,6 +1443,12 @@ class CampaignRunner:
                 issue_kind = "heading_repetition"
             elif validator == "FrontmatterLanguageCheck":
                 issue_kind = "frontmatter_language"
+            elif validator == "SemanticSimilarityValidator":
+                issue_kind = "semantic_similarity"
+            elif validator == "ASTTranslation":
+                issue_kind = "empty_translation_unit"
+            elif validator == "BatchLanguagePurity":
+                issue_kind = "batch_language_purity"
             else:
                 issue_kind = "generic"
             location_hash = hashlib.sha256(
@@ -1064,6 +1465,26 @@ class CampaignRunner:
                 "letter_count",
                 "latin_letter_ratio",
                 "target_script_ratio",
+                # StructureValidator's own numbers. Without these its failures
+                # fingerprinted as "generic:...:numeric=none", so a cell that
+                # exhausted five attempts told us nothing about WHAT mismatched --
+                # observed on words-document-net's de cell, where the validator had
+                # recorded the counts all along and the fingerprint discarded them.
+                # Appended rather than merged into a general sweep so every
+                # pre-existing fingerprint stays byte-identical.
+                "source_count",
+                "translation_count",
+                "source_level",
+                "translation_level",
+                "src_len",
+                "tgt_len",
+                # SemanticSimilarityValidator's measured score (TC-PORT-LLM-011).
+                # "threshold" was already here, but the one number that actually
+                # tells a genuine semantic-drift reject apart from a false one --
+                # the measured similarity itself -- was silently dropped, so
+                # every such reject fingerprinted as "generic:...:numeric=none"
+                # even when the validator had computed a real score.
+                "similarity",
             ):
                 value = details.get(key)
                 if isinstance(value, bool) or not isinstance(value, int | float):
@@ -1078,6 +1499,21 @@ class CampaignRunner:
                 value = str(details.get(key, "")).lower()
                 if re.fullmatch(r"[a-z]{2,3}(?:-[a-z]{2})?", value):
                     categorical_parts.append(f"{key}={value}")
+            # Structural tag names are schema, not candidate text, so they are safe to
+            # record and they say which element mismatched. Pattern-constrained so a
+            # detail value can never smuggle prose into the ledger.
+            for key in ("src_tag", "tgt_tag"):
+                value = str(details.get(key, "")).lower()
+                if re.fullmatch(r"[a-z][a-z0-9]{0,9}", value):
+                    categorical_parts.append(f"{key}={value}")
+            # A validator that failed to run at all (e.g. SemanticSimilarityValidator
+            # with no sentence encoder available) records details={"exception_type":
+            # type(exc).__name__} instead of a numeric score. Class names are schema,
+            # not candidate text, so safe to record; mirrors _SAFE_DETAIL_KEYS in
+            # file_pipeline.py::_quarantine_diagnostic_candidate (ce7bcb69).
+            exception_type_value = str(details.get("exception_type", ""))
+            if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,60}", exception_type_value):
+                categorical_parts.append(f"exception_type={exception_type_value}")
             payload_value = None
             for key in ("ngram", "word", "sentence", "heading"):
                 value = details.get(key)
@@ -1141,19 +1577,41 @@ class CampaignRunner:
                     ]
                 )
             )
+        # VA-01 closed over-attribution (a warning-only validator must not be
+        # named as the cause).  This closes the under-attribution half: under
+        # `validation_policy: zero-defect` the decision engine's Rule 5 runs with
+        # accept_after_max_retries=False and REJECTs a candidate whose only
+        # remaining issues are WARNING severity, so `validators` is legitimately
+        # empty and the gate fell through to the literal "pipeline" -- the heal
+        # ticket then named nothing (`auto:pipeline`) even though
+        # warning_only_validators recorded exactly what blocked the cell.  The
+        # `warning:` prefix keeps the two kinds of attribution distinguishable at
+        # a glance and in every root_cause_class that derives from this value.
         gate = (
             validators[0]
             if validators
             else (
                 f"verification:{verification_checks[0]}"
                 if verification_checks
-                else (safe_codes[0] if safe_codes else "pipeline")
+                else (
+                    safe_codes[0]
+                    if safe_codes
+                    else (
+                        f"warning:{warning_only_validators[0]}"
+                        if warning_only_validators
+                        else "pipeline"
+                    )
+                )
             )
         )
         validator_text = ",".join(validators) if validators else "unknown"
+        warning_only_validator_text = (
+            ",".join(warning_only_validators) if warning_only_validators else "none"
+        )
         reason = (
             f"translation_rejected; error_count={error_count}; "
             f"internal_retries={retry_count}; validators={validator_text}; "
+            f"warning_only_validators={warning_only_validator_text}; "
             f"codes={','.join(safe_codes) if safe_codes else 'unknown'}; "
             f"exceptions="
             f"{','.join(exception_classes) if exception_classes else 'unknown'}; "
@@ -1216,16 +1674,37 @@ class CampaignRunner:
             "with",
             "without",
         }
-        for token in tokens:
-            is_identifier = (
+
+        def _is_identifier(token: str) -> bool:
+            return (
                 "." in token
                 or token.isupper()
                 or bool(re.search(r"[a-z][A-Z]", token))
                 or token in known_protected
             )
+
+        connectors: list[str] = []
+        for idx, token in enumerate(tokens):
+            is_identifier = _is_identifier(token)
             target = protected if is_identifier else ordinary
             if token not in target:
                 target.append(token)
+            # TC-APT-108: a stopword sandwiched between two preserved tokens
+            # (e.g. "FOSS for Python") is exactly the shape the model was
+            # observed leaving untranslated -- it reads as part of a fixed
+            # product-name idiom. Naming it explicitly, instead of only
+            # covering it under the generic "translate every other token"
+            # instruction, is the channel the retry loop actually responds to.
+            if (
+                not is_identifier
+                and token.casefold() in stopwords
+                and idx > 0
+                and _is_identifier(tokens[idx - 1])
+                and idx + 1 < len(tokens)
+                and _is_identifier(tokens[idx + 1])
+                and token not in connectors
+            ):
+                connectors.append(token)
         substantive = [
             token for token in ordinary if token.casefold() not in stopwords and len(token) >= 4
         ][:40]
@@ -1233,11 +1712,19 @@ class CampaignRunner:
         protected_text = ", ".join(protected) if protected else "none"
         substantive_text = ", ".join(substantive) if substantive else "all ordinary words"
         locale_label = CampaignRunner._target_locale_label(target_lang)
-        return (
+        guidance = (
             f"For source field(s) {field_text}, preserve exactly only these source tokens: "
             f"{protected_text}. Translate every other English source token into {locale_label}, "
             f"including these ordinary technical terms: {substantive_text}."
         )
+        if connectors:
+            connector_text = ", ".join(f'"{token}"' for token in connectors)
+            guidance += (
+                f" These preserved tokens are not a single fixed phrase: connector words between "
+                f"them, such as {connector_text}, are ordinary language and must still be "
+                f"translated into {locale_label}, not left in English."
+            )
+        return guidance
 
     @classmethod
     def _target_locale_label(cls, target_lang: str) -> str:
@@ -1435,6 +1922,46 @@ class CampaignRunner:
         locale_retry_hint = CampaignRunner._LOCALE_RETRY_HINTS.get(
             target_lang.lower().split("-")[0]
         )
+        if "TerminologyPreservationValidator" in validators:
+            # TC-APT-069: the frontmatter retry sends the UNMASKED original to the
+            # model, so placeholder protection cannot preserve a governed term
+            # there -- which is why seoTitle translated it in every locale
+            # measured. The retry path does carry retry_feedback through to the
+            # backend, so an explicit instruction is the channel that works where
+            # masking cannot. Term names come from config/terminology.yaml, never
+            # from a candidate, so this stays candidate-free.
+            governed_terms = sorted(
+                {
+                    str((getattr(issue, "details", None) or {}).get("term", ""))
+                    for issue in issues
+                    if str(getattr(issue, "validator", "")) == "TerminologyPreservationValidator"
+                    and (getattr(issue, "details", None) or {}).get("term")
+                }
+            )
+            preamble = (
+                "Reproduce these governed terms exactly as they appear in the source, "
+                "character for character, without translating or transliterating them"
+            )
+            if governed_terms:
+                term_text = ", ".join(f'"{term}"' for term in governed_terms)
+                instructions.append(
+                    f"{preamble}: {term_text}. "
+                    "They are protected portfolio terminology and must stay in the source language "
+                    "even when the surrounding sentence is fully translated. Translate everything "
+                    "around them normally."
+                )
+            else:
+                # Resume path: persisted failure metadata records the validator but
+                # NOT the term, because string detail values are deliberately kept
+                # out of fingerprints. A generic instruction is still actionable and
+                # is better than losing the guidance entirely on restart.
+                instructions.append(
+                    "Reproduce every governed portfolio term exactly as it appears in the source, "
+                    "character for character, without translating or transliterating it. Governed "
+                    "terms are protected terminology and must stay in the source language even when "
+                    "the surrounding sentence is fully translated. Translate everything around them "
+                    "normally."
+                )
         if "FrontmatterLanguageCheck" in validators:
             fields = sorted(
                 {
@@ -1468,13 +1995,67 @@ class CampaignRunner:
                 instructions.append(locale_retry_hint)
         if "RepetitionDetectorValidator" in validators:
             instructions.append(
-                "Avoid adding repeated phrases or duplicate sentences beyond the source structure."
+                "Avoid adding repeated phrases or duplicate sentences beyond the source structure. "
+                "Before returning the final translation, compare repeated 3-8 word sequences "
+                "with the source and rewrite any model-created duplicate sentence or table-cell "
+                "phrase; preserve repetition that is demonstrably present in the source, such "
+                "as recurring headings, labels, or API names."
             )
         raw_error = str(getattr(result, "error", "") or "")
+        if "GATE5" in raw_error:
+            # Gate 5 is the file-level language-purity backstop. Its metadata
+            # intentionally contains no candidate prose, so retry feedback
+            # must be source/structure based: URLs and identifiers stay
+            # verbatim, while labels and ordinary prose must be regenerated.
+            instructions.append(
+                "Perform a final language-purity pass over every ordinary-prose segment, "
+                "especially Markdown link labels and headings. Preserve URLs, product names, "
+                "API identifiers, code, versions, and placeholders exactly, but translate every "
+                f"ordinary label/prose word into {locale_label}; do not leave or generate English "
+                "link-label prose."
+            )
+        if "GATE14" in raw_error or "Gate 14" in raw_error:
+            # Gate 14's non-Latin detector catches genuine untranslated prose,
+            # but Latin code/API spans remain intentional. Retry feedback must
+            # make that distinction explicit rather than repeating blindly.
+            instructions.append(
+                "Translate every ordinary prose line into the target locale, "
+                "including explanatory sentences and link labels. Preserve only "
+                "code fences, inline code, API identifiers, product names, URLs, "
+                "versions, and placeholders exactly; do not leave English prose "
+                f"unchanged in {locale_label}. This includes Markdown table-cell "
+                "descriptions, bullet/list text, frontmatter title/description, and "
+                "admonition labels; translate each such unit independently even when "
+                "the surrounding line contains an identifier."
+            )
         if "GATE36" in raw_error:
             instructions.append(
                 "Preserve every source claim and section with no omission, reversal, or invented fact."
             )
+        if "Gate 21 inline code translated" in raw_error:
+            # Found live 2026-09-17 investigating a self-healing retry gap: this
+            # exact defect (`Page.Annotations()` translated into the target
+            # language) reproduced identically across two different locales
+            # (ro, fa) with zero corrective guidance between attempts -- GATE5/
+            # GATE36/TC-SAS-01 already get a targeted retry instruction, GATE21
+            # never did, so every retry was a blind repeat of the same mistake.
+            gate21_match = re.search(
+                r"Gate 21 inline code translated: `(.*?)` → `(.*?)`", raw_error
+            )
+            if gate21_match:
+                original_span = gate21_match.group(1)
+                instructions.append(
+                    "Reproduce this inline code span exactly as it appears in the source, "
+                    f"character for character, without translating any part of it: `{original_span}`. "
+                    "It is a code or API reference (a method call, class member, or identifier) "
+                    "and must never be translated or transliterated, even partially."
+                )
+            else:
+                instructions.append(
+                    "Reproduce every inline code span (text inside backticks) exactly as it "
+                    "appears in the source, character for character. Inline code is never "
+                    "translated, even partially."
+                )
         if "TC-SAS-01" in raw_error:
             instructions.append(
                 "Translate every translatable source unit; identical output is allowed only for "
@@ -1568,6 +2149,8 @@ class CampaignRunner:
             validators.append("FrontmatterLanguageCheck")
         if "RepetitionDetectorValidator" in reason:
             validators.append("RepetitionDetectorValidator")
+        if "TerminologyPreservationValidator" in reason:
+            validators.append("TerminologyPreservationValidator")
         fields = re.findall(r"\bfield=(title|description|seoTitle|summary)\b", reason)
         issues = [
             SimpleNamespace(
@@ -1635,12 +2218,41 @@ class CampaignRunner:
             )
         return feedback
 
-    def verify(self, *, resume: bool = False) -> dict[str, Any]:
+    def verify(
+        self,
+        *,
+        resume: bool = False,
+        shard_ids: frozenset[str] | None = None,
+        require_clean: bool = True,
+    ) -> dict[str, Any]:
         receipts = self._validated_resume_receipts() if resume else {}
+        scope_sources: set[str] | None = None
+        scope_outputs: set[str] | None = None
+        if shard_ids:
+            max_outputs = int(self.manifest.commit_policy.get("max_outputs_per_commit", 250))
+            available = {
+                str(shard["shard_id"]): shard
+                for shard in self.manifest.shards(
+                    resume_receipts=set(receipts),
+                    max_outputs=max_outputs,
+                )
+            }
+            unknown = sorted(shard_ids - set(available))
+            if unknown:
+                raise CampaignManifestError(
+                    f"campaign shard is unknown or already complete: {unknown}"
+                )
+            selected = (available[shard_id] for shard_id in shard_ids)
+            jobs = [job for shard in selected for job in shard["jobs"]]
+            scope_sources = {source.source_path for source, _locale, _output in jobs}
+            scope_outputs = {output for _source, _locale, output in jobs}
         self.manifest.verify_environment(
             translator_repo=self.translator_repo,
-            require_clean=True,
+            require_clean=require_clean,
             allow_existing_accepted=set(receipts),
+            scope_sources=scope_sources,
+            scope_outputs=scope_outputs,
+            allow_campaign_tm_drift=resume,
         )
         return {
             **self.manifest.to_summary(),
@@ -1669,12 +2281,45 @@ class CampaignRunner:
                 + hashlib.sha256("\n".join(sorted(normalized)).encode("utf-8")).hexdigest()[:16]
                 + ".lock"
             )
+        self._startup_checkpoint("lock_wait")
         with FileLock(self.ledger.root / lock_name, timeout=0):
+            self._startup_checkpoint("lock_acquired")
             return self._run_locked(
                 resume=resume,
                 verify_only=verify_only,
                 shard_ids=normalized or None,
             )
+
+    def _primary_backend_is_deterministic(self, model_id: str) -> bool:
+        """Whether ``model_id`` is a fully deterministic (non-LLM) backend.
+
+        Every MT backend in config/model_registry.yaml (m2m100, nllb, opus,
+        marian, small100 -- anything routed to HuggingFaceBackend or
+        CTranslate2Backend) runs with do_sample=False and a fixed num_beams
+        (src/model_runtime/loader.py) and never receives retry-feedback text
+        (src/translation_engine/segment_translator.py only attaches it for
+        ``isinstance(mt_model, LLMModelBackend)``).  So once such a backend
+        rejects attempt 1, attempts 2 and 3 are guaranteed to reproduce
+        byte-identical output -- there is no code path that could make them
+        differ, and spending them is pure waste.
+
+        This reads the same registry `backend` field ``_llm_identity_gate``
+        already reads rather than instantiating a backend or hardcoding a
+        model-id allowlist: ``ModelLoader._create_backend``
+        (src/model_runtime/loader.py) routes backend in ("llm", "local_llm")
+        to LLMModelBackend and everything else to a deterministic backend, so
+        that field is the actual source of truth for the isinstance split.
+        A model_id the registry can't resolve (e.g. a lightweight engine
+        double in tests, or a future manifest field this campaign runner
+        doesn't otherwise validate) is "unknown" -- preserve today's full
+        3-attempt behaviour rather than guess.
+        """
+        try:
+            registry = self.engine.model_loader.registry
+            info = registry.get_model(model_id)
+        except Exception:
+            return False
+        return getattr(info, "backend", None) not in ("llm", "local_llm")
 
     def _run_campaign_job(
         self,
@@ -1699,6 +2344,58 @@ class CampaignRunner:
             raise CampaignManifestError(
                 f"output routing mismatch: calculated={calculated}, expected={expected}"
             )
+        resolved_output = str(expected.resolve())
+
+        # QU-03: an active advisory hold is a deliberate operator "stop
+        # touching this file" signal, distinct from and taking precedence
+        # over any automated quarantine dimension below -- checked first,
+        # regardless of prior failure history, so an unseen locale on a held
+        # file is skipped too, not silently attempted.
+        heal_queue_path = self.ledger.root.parent / "heal_queue.jsonl"
+        hold = active_hold(source.source_path, heal_queue_path=heal_queue_path)
+        if hold is not None:
+            self._append_advisory_hold_skip(
+                shard=shard, source=source, locale=locale, hold=hold
+            )
+            return False, resolved_output
+
+        # QU-02: a (source_path, root_cause_class) pair whose OPEN heal tickets
+        # span >=PER_FILE_QUARANTINE_THRESHOLD distinct locales is a systemic,
+        # file-level defect -- skip it even for a locale that has never been
+        # attempted, unlike the per-locale dimension below (the live case:
+        # quickstart.md kept accumulating fresh single-locale LinkValidator
+        # tickets across 7+ locales, never tripping the per-locale threshold).
+        recovery_qualification = bool(
+            getattr(self.engine, "campaign_context", {}).get("recovery_qualification", False)
+        )
+        file_quarantined, _file_root_cause = is_source_path_quarantined(
+            source.source_path, heal_queue_path=heal_queue_path
+        )
+        if file_quarantined and not recovery_qualification:
+            self._append_heal_ticket(
+                shard=shard, source=source, locale=locale, expected_output=expected_output
+            )
+            return False, resolved_output
+
+        # TC-APT-038: a (target_lang, root_cause_class) pair with >=3 OPEN heal
+        # tickets anywhere in the portfolio is quarantined -- skip spending
+        # fresh retry attempts on this job (no manifest/retry_policy needed)
+        # and go straight to a (refreshed) ticket instead. Only applies to a
+        # job with prior failure history on THIS exact cell: an unseen
+        # candidate always gets its first attempt (plan §3 item 4 -- never
+        # quarantine an unseen candidate).
+        prior_failure = self.ledger.latest_failure(output_path=expected_output, target_lang=locale)
+        if prior_failure is not None and not recovery_qualification:
+            prior_root_cause = f"auto:{prior_failure.get('gate')}"
+            if is_quarantined(
+                locale,
+                prior_root_cause,
+                heal_queue_path=heal_queue_path,
+            ):
+                self._append_heal_ticket(
+                    shard=shard, source=source, locale=locale, expected_output=expected_output
+                )
+                return False, resolved_output
 
         primary_attempts = int(self.manifest.retry_policy["primary_attempts"])
         llm_attempts = int(self.manifest.retry_policy["llm_escalation_attempts"])
@@ -1706,9 +2403,25 @@ class CampaignRunner:
         llm_model = str(self.manifest.retry_policy["llm_model"])
         receipt = None
         result = None
-        resolved_output = str(expected.resolve())
+        # TC-APT-031: governed replace-existing. An undeclared existing target is still a hard
+        # stop (verify_environment). A declared one may be overwritten only while its current
+        # bytes still hash to the declared expected_sha256 (no concurrent edit underneath).
+        declared = source.replacement_for(locale) if hasattr(source, "replacement_for") else None
+        original_sha = str(declared["expected_sha256"]) if declared else None
+        if declared:
+            if not expected.is_file():
+                raise CampaignManifestError(
+                    f"declared replacement target is missing: {expected_output}"
+                )
+            if sha256_file(expected) != original_sha:
+                raise CampaignManifestError(
+                    f"declared replacement pre-hash drift (concurrent change?): {expected_output}"
+                )
         with self._engine_campaign_state_lock:
-            prior_model_override = getattr(self.engine, "model_id_override", None)
+            if declared:
+                self.engine.campaign_context.setdefault("replace_existing", {})[expected_output] = (
+                    original_sha
+                )
             llm_paths = getattr(self.engine, "_rtq_llm_output_paths", None)
             if llm_paths is None:
                 llm_paths = set()
@@ -1717,11 +2430,29 @@ class CampaignRunner:
             if feedback_by_output is None:
                 feedback_by_output = {}
                 self.engine._campaign_retry_feedback_by_output = feedback_by_output
+            attempt_metadata_by_output = self.engine.campaign_context.setdefault(
+                "attempt_metadata_by_output", {}
+            )
 
         # The primary invocation owns initial output plus its two guided
         # retries.  LLM escalation has exactly two one-attempt invocations.
+        #
+        # A fully deterministic primary backend (do_sample=False, fixed
+        # num_beams, no retry-feedback channel -- see
+        # _primary_backend_is_deterministic) reproduces byte-identical output
+        # on every attempt, so its 2 guided retries are guaranteed no-ops:
+        # collapse the primary retry budget to 0 (exactly 1 real invocation)
+        # and fail fast to LLM escalation instead of burning 2 wasted GPU
+        # generation cycles per cell. The manifest's declared primary_attempts
+        # (and therefore the LLM phases' attempt numbering, which still
+        # starts at primary_attempts + 1 for audit-trail continuity) is
+        # unchanged -- only the wasted runtime re-invocations are skipped. An
+        # LLM primary backend keeps today's exact 3-attempt behaviour.
+        primary_retry_budget = primary_attempts - 1
+        if self._primary_backend_is_deterministic(primary_model):
+            primary_retry_budget = 0
         phases = [
-            (False, primary_attempts - 1, primary_attempts),
+            (False, primary_retry_budget, primary_attempts),
             *[(True, 0, primary_attempts + index) for index in range(1, llm_attempts + 1)],
         ]
         next_feedback = self._retry_feedback_from_failures(
@@ -1732,46 +2463,107 @@ class CampaignRunner:
             locale,
             source_path=source_path,
         )
+        seen_failure_fingerprints = {
+            (str(row.get("candidate_sha256")), str(row.get("gate")))
+            for row in self.ledger.recent_failures(
+                output_path=expected_output,
+                target_lang=locale,
+            )
+            if row.get("candidate_sha256")
+        }
         try:
             for use_llm, retry_budget, attempt_number in phases:
+                # A manifest model pin takes precedence over the adaptive
+                # selector. TC-APT-045: the pin travels as a call-scoped
+                # translate_file(model_id=...) argument instead of the former
+                # engine.model_id_override attribute mutation, which raced
+                # concurrent jobs sharing this engine instance.
+                phase_model_id = llm_model if use_llm else primary_model
                 with self._engine_campaign_state_lock:
-                    # A manifest model pin takes precedence over the adaptive
-                    # selector.  The selector can otherwise silently replace
-                    # the governed M2M100 primary with another backend before
-                    # the controlled professionalize_llm escalation phase.
-                    self.engine.model_id_override = llm_model if use_llm else primary_model
                     if use_llm:
                         llm_paths.add(resolved_output)
                     if next_feedback:
                         feedback_by_output[resolved_output] = next_feedback
+                    attempt_metadata_by_output[resolved_output] = {
+                        "campaign_attempt": attempt_number,
+                        "attempt_model_id": phase_model_id,
+                    }
                 translate_kwargs = {
                     "target_langs": [locale],
                     "validate": True,
-                    "force": False,
-                    "force_overwrite": False,
+                    # TC-APT-031/TC-APT-013: for a declared replace_existing cell, force=True
+                    # too, not just force_overwrite. engine.translate_file()'s own
+                    # _should_skip_translation runs BEFORE force_overwrite is ever consulted --
+                    # it skips retranslation outright whenever the target already exists, is
+                    # non-empty, and (mtime OR content-hash, whichever check fires) looks
+                    # "already up to date" relative to the source -- exactly the state a
+                    # replace_existing target is in by definition (unchanged source, existing
+                    # target). Confirmed directly: a real replace_existing run silently no-opped
+                    # (TranslationStats new=0, tm_hits=0, ~0.02s) with force=False despite a
+                    # correct force_overwrite=True declaration; force=True on the same call
+                    # produced a genuine translation. Leaving force=False for undeclared
+                    # (MISSING_TRANSLATION) cells is unchanged and correct -- there is no
+                    # existing target to skip past there. Portfolio-relevant: every declared
+                    # replace_existing cell (112,584 in TC-APT-031's remit) was at risk of this
+                    # same silent no-op depending on filesystem mtime ordering, which this fixes.
+                    "force": bool(declared),
+                    # TC-APT-031: overwrite ONLY the declared, pre-hash-verified target.
+                    "force_overwrite": bool(declared),
                     "trigger_type": "campaign",
                     "retry_budget_override": retry_budget,
+                    "model_id": phase_model_id,
                 }
-                if self._model_execution_lock is None:
+                policy_mode = (
+                    "deferred"
+                    if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+                    else "immediate"
+                )
+                with (
+                    self._rollback_serialization(),
+                    campaign_llm_scope(
+                        policy_mode,
+                        "retry" if use_llm else "primary",
+                        self._llm_event,
+                        professionalize_only=bool(
+                            self.manifest.retry_policy.get("professionalize_only", False)
+                        ),
+                        campaign_id=self.manifest.campaign_id,
+                        source_path=source.source_path,
+                        output_path=expected_output,
+                        target_lang=locale,
+                        attempt=attempt_number,
+                    ),
+                ):
                     result = self.engine.translate_file(
                         source.site_id, source_path, **translate_kwargs
                     )
-                else:
-                    with self._model_execution_lock:
-                        result = self.engine.translate_file(
-                            source.site_id, source_path, **translate_kwargs
-                        )
                 receipt = result.acceptance_receipts.get(locale)
                 if receipt is None:
                     receipt = self.ledger.receipts().get(expected_output)
                 if receipt is not None and expected.is_file():
                     break
                 if expected.exists():
-                    expected.unlink(missing_ok=True)
-                    raise CampaignManifestError(
-                        f"rejected attempt produced an unreceipted output: {expected_output}"
-                    )
+                    if declared and sha256_file(expected) == original_sha:
+                        # The untouched original survived a rejected attempt: keep it.
+                        pass
+                    else:
+                        expected.unlink(missing_ok=True)
+                        raise CampaignManifestError(
+                            f"rejected attempt produced an unreceipted output: {expected_output}"
+                        )
                 failure_gate, failure_reason = self._failure_metadata(result)
+                candidate_sha256 = (getattr(result, "candidate_sha256", {}) or {}).get(locale)
+                failure_fingerprint = (str(candidate_sha256), failure_gate)
+                # A retry must be source-based and materially different when
+                # it is meant to repair a prior failure.  The first repeated
+                # paid candidate is recorded for audit, then further paid
+                # retries are suppressed; the normal terminal heal ticket
+                # path below retains the cell for a later consumer.
+                duplicate_paid_candidate = (
+                    use_llm
+                    and candidate_sha256
+                    and failure_fingerprint in seen_failure_fingerprints
+                )
                 next_feedback = self._retry_feedback(
                     result,
                     locale,
@@ -1786,12 +2578,33 @@ class CampaignRunner:
                     attempt=attempt_number,
                     job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
                     source_sha256=source.source_sha256,
+                    candidate_sha256=candidate_sha256,
+                    model_id=phase_model_id,
                     gate=failure_gate,
                 )
+                seen_failure_fingerprints.add(failure_fingerprint)
+                if duplicate_paid_candidate:
+                    self.ledger.append_failure(
+                        source_path=source.source_path,
+                        output_path=expected_output,
+                        target_lang=locale,
+                        error="duplicate_candidate_failure_fingerprint",
+                        attempt=attempt_number,
+                        job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
+                        source_sha256=source.source_sha256,
+                        candidate_sha256=candidate_sha256,
+                        model_id=phase_model_id,
+                        gate="duplicate_retry_suppressed",
+                    )
+                    break
         except Exception as exc:
             # An engine crash must not leave an unreceipted bytes-on-disk
             # candidate behind.  Expected output is manifest-scoped.
-            if expected.exists() and receipt is None:
+            if (
+                expected.exists()
+                and receipt is None
+                and not (declared and sha256_file(expected) == original_sha)
+            ):
                 expected.unlink(missing_ok=True)
             if isinstance(exc, CampaignManifestError):
                 raise
@@ -1803,6 +2616,7 @@ class CampaignRunner:
                 attempt=0,
                 job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
                 source_sha256=source.source_sha256,
+                model_id=(llm_model if "llm_model" in locals() else None),
                 gate="campaign_job_exception",
             )
             return False, expected_output
@@ -1810,9 +2624,11 @@ class CampaignRunner:
             with self._engine_campaign_state_lock:
                 llm_paths.discard(resolved_output)
                 feedback_by_output.pop(resolved_output, None)
-                # Do not leak this campaign's model pin into later workers or
-                # ordinary translation calls sharing this engine instance.
-                self.engine.model_id_override = prior_model_override
+                attempt_metadata_by_output.pop(resolved_output, None)
+                if declared:
+                    (self.engine.campaign_context.get("replace_existing") or {}).pop(
+                        expected_output, None
+                    )
 
         if receipt is None or not expected.is_file():
             return False, expected_output
@@ -1821,6 +2637,76 @@ class CampaignRunner:
             raise CampaignManifestError(f"accepted receipt path mismatch for {expected_output}")
         return True, expected_output
 
+    def _llm_identity_gate(self) -> dict[str, Any] | None:
+        """TC-APT-021: run the model-identity canary for the manifest's LLM if the cadence elapsed.
+
+        DRIFT records a review item and quarantines the model (force-opens its breaker) so
+        ``ModelLoader`` reroutes to the automatic fallback and the campaign continues (plan
+        section 21). UNAVAILABLE is recorded in the drift log, never treated as a pass.
+        Returns the check as a dict for the run summary, or None when not applicable.
+        """
+        if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred":
+            # The identity canary is itself a provider request.  A deferred
+            # campaign promises to enqueue Professionalize work rather than
+            # perform any in-run provider call, so record this explicitly
+            # instead of making an unaccounted exception to that policy.
+            return {
+                "status": "SKIPPED",
+                "reason": "llm_escalation_mode=deferred",
+                "cadence": "deferred",
+            }
+        try:
+            te_cfg = self.engine.config.get_config().get("translation_engine", {}) or {}
+        except Exception:
+            te_cfg = {}
+        cfg = te_cfg.get("llm_identity_check") or {}
+        if not cfg.get("enabled", True):
+            return None
+        llm_model = str(self.manifest.retry_policy.get("llm_model") or "")
+        if not llm_model:
+            return None
+        try:
+            registry = self.engine.model_loader.registry
+            info = registry.get_model(llm_model)
+        except (
+            Exception
+        ) as exc:  # engine double without a registry (tests) -- not a provider failure
+            logger.info("identity gate skipped: no model registry available (%s)", exc)
+            return None
+        if getattr(info, "backend", None) != "llm":
+            return None
+        from src.model_runtime import model_identity
+        from src.model_runtime.contracts import LLMProviderConfig
+        from src.model_runtime.llm_providers import create_provider
+
+        interval = float(cfg.get("interval_hours", 6))
+        identity_dir = Path(
+            getattr(self.engine, "campaign_identity_dir", None)
+            or cfg.get("identity_dir", "data/runtime/llm_identity")
+        )
+        if not model_identity.should_check(
+            llm_model, interval_hours=interval, identity_dir=identity_dir
+        ):
+            last = model_identity.last_check(llm_model, identity_dir=identity_dir)
+            return {**(last or {}), "cadence": "not_due"}
+        provider = create_provider(LLMProviderConfig.from_model_info(info))
+        check = model_identity.check_identity(
+            provider,
+            llm_model,
+            identity_dir=identity_dir,
+            quarantine_on_drift=bool(cfg.get("quarantine_on_drift", True)),
+            quarantine_seconds=float(cfg.get("quarantine_seconds", 6 * 3600)),
+        )
+        level = logger.warning if check.status != "MATCH" else logger.info
+        level(
+            "model identity check for %s: %s (%s)%s",
+            llm_model,
+            check.status,
+            check.detail,
+            " -- QUARANTINED, work reroutes to the fallback" if check.quarantined else "",
+        )
+        return {**check.__dict__, "cadence": "checked"}
+
     def _run_locked(
         self,
         *,
@@ -1828,12 +2714,43 @@ class CampaignRunner:
         verify_only: bool = False,
         shard_ids: frozenset[str] | None = None,
     ) -> dict[str, Any]:
-        summary = self.verify(resume=resume)
+        diagnostic_no_write = getattr(self.engine, "diagnostic_no_write", False) is True
+        self._startup_checkpoint("verify_begin")
+        summary = self.verify(
+            resume=resume,
+            shard_ids=shard_ids,
+            # Diagnostic mode cannot write content, receipts, TM, or commits;
+            # unrelated shared-worktree dirt is therefore not relevant to its
+            # read-only candidate classification.
+            require_clean=not diagnostic_no_write,
+        )
+        self._startup_checkpoint("verify_complete")
         if verify_only:
-            self.ledger.write_summary({**summary, "status": "VERIFIED"})
+            self.ledger.write_summary({**summary, **self._summary_evidence(), "status": "VERIFIED"})
             return summary
 
+        # TC-APT-021: model-identity canary before new LLM work (cadence-gated).
+        identity_policy_mode = (
+            "deferred"
+            if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+            else "immediate"
+        )
+        self._startup_checkpoint("identity_begin")
+        with campaign_llm_scope(
+            identity_policy_mode,
+            "identity",
+            self._llm_event,
+            professionalize_only=bool(
+                self.manifest.retry_policy.get("professionalize_only", False)
+            ),
+            campaign_id=self.manifest.campaign_id,
+        ):
+            self._llm_identity_check = self._llm_identity_gate()
+        self._startup_checkpoint("identity_complete")
+
+        self._startup_checkpoint("receipts_begin")
         receipts = self._validated_resume_receipts() if resume else {}
+        self._startup_checkpoint("receipts_complete")
         self.engine.campaign_context.update(
             {
                 "campaign_id": self.manifest.campaign_id,
@@ -1846,35 +2763,128 @@ class CampaignRunner:
         failed = 0
         max_outputs = int(self.manifest.commit_policy.get("max_outputs_per_commit", 250))
         max_parallel_jobs = int(self.manifest.execution_policy.get("max_parallel_jobs", 1))
+        self._startup_checkpoint("shards_begin")
         all_shards = list(
             self.manifest.shards(
                 resume_receipts=set(receipts),
                 max_outputs=max_outputs,
             )
         )
+        self._startup_checkpoint(f"shards_complete count={len(all_shards)}")
         available_shards = {str(shard["shard_id"]) for shard in all_shards}
         if shard_ids and not shard_ids.issubset(available_shards):
             unknown = sorted(shard_ids - available_shards)
             raise CampaignManifestError(f"campaign shard is unknown or already complete: {unknown}")
+        # TC-APT-041 (plan G-29/§0.2): a shard with some failed jobs still commits its
+        # passing ones and the run still attempts every remaining shard -- a failing
+        # cell no longer costs its siblings (same shard) or other pages (other shards)
+        # their progress. Safe because _commit_verified_outputs only ever stages
+        # checksum-receipted paths (a failed job has no receipt, so it can never be
+        # swept into a commit); failed_shard_ids is surfaced in the final summary so
+        # failures stay visible instead of silently disappearing.
+        failed_shard_ids: list[str] = []
+        # When backend serialization is explicitly disabled by a governed
+        # throughput release, schedule across the selected shards as well as
+        # within each shard.  Many locale/platform shards contain only one
+        # cell; a per-shard executor therefore silently capped the real fleet
+        # at one provider call per process and made the 16/32-call release
+        # ineffective.  Receipt/ledger writes remain serialized by their
+        # existing locks and shard commits happen after all futures complete.
+        if not self._force_serialize and max_parallel_jobs > 1:
+            selected_shards = [
+                shard for shard in all_shards
+                if not shard_ids or shard["shard_id"] in shard_ids
+            ]
+            future_to_job: dict[Any, tuple[dict[str, Any], Any, str, str]] = {}
+            with ThreadPoolExecutor(max_workers=max_parallel_jobs) as executor:
+                for shard in selected_shards:
+                    self._startup_checkpoint(
+                        f"dispatch_begin shard={shard['shard_id']} jobs={len(shard['jobs'])}"
+                    )
+                    for source, locale, expected_output in shard["jobs"]:
+                        future = executor.submit(
+                            self._run_campaign_job,
+                            shard=shard,
+                            source=source,
+                            locale=locale,
+                            expected_output=expected_output,
+                        )
+                        future_to_job[future] = (shard, source, locale, expected_output)
+                shard_results: dict[str, list[int]] = {
+                    str(shard["shard_id"]): [0, 0] for shard in selected_shards
+                }
+                for future in as_completed(future_to_job):
+                    shard, source, locale, expected_output = future_to_job[future]
+                    job_accepted, _output = future.result()
+                    result = shard_results[str(shard["shard_id"])]
+                    if job_accepted:
+                        accepted += 1
+                        result[0] += 1
+                    else:
+                        failed += 1
+                        result[1] += 1
+                        self._append_heal_ticket(
+                            shard=shard,
+                            source=source,
+                            locale=locale,
+                            expected_output=expected_output,
+                        )
+            for shard in selected_shards:
+                shard_accepted, shard_failed = shard_results[str(shard["shard_id"])]
+                self.ledger.write_summary(
+                    {
+                        **self.manifest.to_summary(),
+                        "status": "SHARD_COMPLETE" if shard_failed == 0 else "SHARD_PARTIAL",
+                        "shard_id": shard["shard_id"],
+                        "shard_accepted": shard_accepted,
+                        "shard_failed": shard_failed,
+                        "accepted": accepted,
+                        "failed": failed,
+                        "model_outcomes": self.ledger.model_outcomes(),
+                        "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
+                        "quality_stop_recommendations": self._quality_stop_recommendations(),
+                        "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+                        "acceleration_metrics": self.ledger.acceleration_metrics(),
+                    }
+                )
+                if shard_failed:
+                    failed_shard_ids.append(str(shard["shard_id"]))
+                if self.manifest.commit_policy.get("enabled", True):
+                    commit_sha = self._commit_verified_outputs(shard["shard_id"])
+                    if commit_sha:
+                        self.ledger.write_summary(
+                            {
+                                **self.manifest.to_summary(),
+                                "status": "SHARD_COMMITTED",
+                                "shard_id": shard["shard_id"],
+                                "commit_sha": commit_sha,
+                                "accepted": accepted,
+                                "failed": failed,
+                            }
+                        )
+            all_shards = []
         for shard in all_shards:
             if shard_ids and shard["shard_id"] not in shard_ids:
                 continue
             shard_accepted = 0
             shard_failed = 0
+            self._startup_checkpoint(
+                f"dispatch_begin shard={shard['shard_id']} jobs={len(shard['jobs'])}"
+            )
             with ThreadPoolExecutor(
                 max_workers=min(max_parallel_jobs, len(shard["jobs"]))
             ) as executor:
-                futures = [
+                future_to_job = {
                     executor.submit(
                         self._run_campaign_job,
                         shard=shard,
                         source=source,
                         locale=locale,
                         expected_output=expected_output,
-                    )
+                    ): (source, locale, expected_output)
                     for source, locale, expected_output in shard["jobs"]
-                ]
-                for future in as_completed(futures):
+                }
+                for future in as_completed(future_to_job):
                     job_accepted, _output = future.result()
                     if job_accepted:
                         accepted += 1
@@ -1882,21 +2892,31 @@ class CampaignRunner:
                     else:
                         failed += 1
                         shard_failed += 1
+                        source, locale, expected_output = future_to_job[future]
+                        self._append_heal_ticket(
+                            shard=shard,
+                            source=source,
+                            locale=locale,
+                            expected_output=expected_output,
+                        )
             self.ledger.write_summary(
                 {
                     **self.manifest.to_summary(),
-                    "status": "SHARD_COMPLETE" if shard_failed == 0 else "SHARD_BLOCKED",
+                    "status": "SHARD_COMPLETE" if shard_failed == 0 else "SHARD_PARTIAL",
                     "shard_id": shard["shard_id"],
                     "shard_accepted": shard_accepted,
                     "shard_failed": shard_failed,
                     "accepted": accepted,
                     "failed": failed,
+                    "model_outcomes": self.ledger.model_outcomes(),
+                    "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
+                    "quality_stop_recommendations": self._quality_stop_recommendations(),
+                    "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+                    "acceleration_metrics": self.ledger.acceleration_metrics(),
                 }
             )
             if shard_failed:
-                raise CampaignManifestError(
-                    f"shard blocked: {shard['shard_id']} failures={shard_failed}"
-                )
+                failed_shard_ids.append(str(shard["shard_id"]))
             commit_sha = None
             if self.manifest.commit_policy.get("enabled", True):
                 commit_sha = self._commit_verified_outputs(shard["shard_id"])
@@ -1909,6 +2929,11 @@ class CampaignRunner:
                         "commit_sha": commit_sha,
                         "accepted": accepted,
                         "failed": failed,
+                        "model_outcomes": self.ledger.model_outcomes(),
+                        "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
+                        "quality_stop_recommendations": self._quality_stop_recommendations(),
+                        "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+                        "acceleration_metrics": self.ledger.acceleration_metrics(),
                     }
                 )
 
@@ -1917,21 +2942,145 @@ class CampaignRunner:
             **self.manifest.to_summary(),
             "accepted": accepted,
             "failed": failed,
+            "failed_shard_ids": failed_shard_ids,
             "remaining": self.manifest.expected_output_count - accepted,
+            "model_outcomes": self.ledger.model_outcomes(),
+            "attempt_model_outcomes": self.ledger.attempt_model_outcomes(),
+            "quality_stop_recommendations": self._quality_stop_recommendations(),
+            "llm_call_outcomes": self.ledger.llm_call_outcomes(),
+            "acceleration_metrics": self.ledger.acceleration_metrics(),
             "status": (
                 "SHARD_SET_COMPLETE"
                 if partial and failed == 0
                 else (
                     "COMPLETE"
                     if accepted == self.manifest.expected_output_count and failed == 0
-                    else "INCOMPLETE"
+                    else "PARTIAL_WITH_TICKETS"
                 )
             ),
         }
         self.ledger.write_summary(final)
         if final["status"] not in {"COMPLETE", "SHARD_SET_COMPLETE"}:
-            raise CampaignManifestError(
-                f"campaign incomplete: accepted={accepted}, failed={failed}, "
-                f"remaining={final['remaining']}"
-            )
+            # TC-APT-041 (plan §11): shards that failed already committed their
+            # receipted outputs above -- an ordinary per-file review rejection
+            # is expected Track-A traffic (it has a heal ticket now), not an
+            # infrastructure failure, so it must never propagate as an
+            # unhandled exception. execution_policy.on_job_failure="raise" is
+            # kept for a caller that deliberately wants strict all-or-nothing
+            # behavior (e.g. a targeted regression re-run proving a fix).
+            on_job_failure = str(self.manifest.execution_policy.get("on_job_failure", "continue"))
+            if on_job_failure == "raise":
+                err = CampaignManifestError(
+                    f"campaign incomplete: accepted={accepted}, failed={failed}, "
+                    f"remaining={final['remaining']}, failed_shard_ids={failed_shard_ids}"
+                )
+                err.summary = final
+                raise err
         return final
+
+    def _append_heal_ticket(
+        self,
+        *,
+        shard: dict[str, Any],
+        source: Any,
+        locale: str,
+        expected_output: str,
+    ) -> None:
+        """TC-APT-041/038: record a content-free heal ticket for a job that
+        exhausted every retry, so a per-file rejection is never silently lost
+        once the run stops raising for it."""
+        failure = self.ledger.latest_failure(output_path=expected_output, target_lang=locale)
+        gate = str(failure.get("gate")) if failure else "unclassified"
+        note = str(failure.get("reason", ""))[:1000] if failure else ""
+        ticket = {
+            "ticket_id": (
+                f"auto-{self.manifest.campaign_id}-{shard['shard_id']}-"
+                f"{Path(source.source_path).stem}"
+            ),
+            "site_id": shard.get("site_id", getattr(source, "site_id", "")),
+            "source_path": source.source_path,
+            "target_lang": locale,
+            "opened_at": datetime.now(timezone.utc).isoformat(),
+            "root_cause_class": f"auto:{gate}",
+            "evidence_path": f"data/campaigns/{self.manifest.campaign_id}/failure_metadata.jsonl",
+            "status": (
+                "QUEUED"
+                if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+                else "OPEN"
+            ),
+            "processing_model": (
+                self.manifest.retry_policy.get("llm_model")
+                if self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
+                else None
+            ),
+            "tier": "unclassified",
+            "note": note,
+        }
+        heal_queue_path = self.ledger.root.parent / "heal_queue.jsonl"
+        # TC-PORT-LLM-009: a heal ticket is best-effort observability, not a
+        # correctness-critical write -- confirmed live under a real 4-worker
+        # soak: enough jobs hit the QU-02/QU-38 quarantine-refresh branches in
+        # the same burst (heavily-contaminated candidate pool) that one
+        # thread's FileLock(ledger-process.lock, timeout=30) exceeded 30s,
+        # raised LockError, and (uncaught) crashed the ENTIRE worker process
+        # via the ThreadPoolExecutor future -- losing every other job still
+        # in flight on the other 3 threads, not just this one ticket write.
+        # Losing one ticket write is recoverable (the next attempt on this
+        # cell regenerates it); losing a whole worker's in-flight batch is
+        # not. Log loudly, never let this crash the process.
+        try:
+            self.ledger._append(heal_queue_path, ticket)
+        except LockError as exc:
+            logger.error(
+                "Heal ticket write timed out under lock contention (ticket %s dropped, "
+                "not fatal): %s",
+                ticket["ticket_id"],
+                exc,
+            )
+        if ticket["status"] == "QUEUED":
+            self._enqueue_rejected_retry(
+                source=source,
+                locale=locale,
+                expected_output=expected_output,
+                gate=gate,
+                failure=failure,
+            )
+
+    def _append_advisory_hold_skip(
+        self,
+        *,
+        shard: dict[str, Any],
+        source: Any,
+        locale: str,
+        hold: dict[str, Any],
+    ) -> None:
+        """QU-03: record that a job was skipped because of an active advisory
+        hold, distinct from a heal ticket -- a hold is an operator decision,
+        not a validator finding, and must never count toward either
+        quarantine dimension in heal_queue.py. Written to its own file so
+        campaign output clearly distinguishes a held job from a
+        genuinely-attempted-and-failed one."""
+        record = {
+            "campaign_id": self.manifest.campaign_id,
+            "shard_id": shard.get("shard_id"),
+            "site_id": shard.get("site_id", getattr(source, "site_id", "")),
+            "source_path": source.source_path,
+            "target_lang": locale,
+            "outcome": "held_by_advisory",
+            "hold_reason": hold.get("reason"),
+            "hold_expiry": hold.get("expiry"),
+            "hold_created_at": hold.get("created_at"),
+            "skipped_at": datetime.now(timezone.utc).isoformat(),
+        }
+        # TC-PORT-LLM-009: same reasoning as _append_heal_ticket -- best-effort
+        # observability, must never crash the worker over lock contention.
+        try:
+            self.ledger._append(self.ledger.root / "advisory_holds_skipped.jsonl", record)
+        except LockError as exc:
+            logger.error(
+                "Advisory-hold-skip record write timed out under lock contention "
+                "(source=%s locale=%s dropped, not fatal): %s",
+                source.source_path,
+                locale,
+                exc,
+            )

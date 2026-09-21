@@ -46,6 +46,14 @@ class SegmentContext:
     parent_node_type: NodeType | None = None
     depth: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Stable AST node address (ASTNode.node_addr, e.g. "body.para[2]"),
+    # assigned once at parse time by ASTNode.assign_addresses() and shared
+    # with the AST-based TextUnitExtractor pass over the SAME doc.ast node
+    # instances. Threaded through here (HT-QUALITY-GATES-001, AST-reuse
+    # identity fix) so segment_translator.py's legacy-translation reuse map
+    # can key on a real, collision-proof node identity instead of
+    # re-normalized, placeholder-protected text.
+    node_addr: str | None = None
 
 
 @dataclass
@@ -426,6 +434,7 @@ class SegmentExtractor:
         context = SegmentContext(
             context_type=context_type,
             node_id=node.node_id,
+            node_addr=node.node_addr,
             parent_node_type=parent_type,
             depth=depth,
             metadata={

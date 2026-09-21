@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     TC-SYS-03: Read-only diagnostic — dump HugoTranslator Task Scheduler task states.
 

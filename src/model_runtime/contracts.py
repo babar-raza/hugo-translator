@@ -67,6 +67,10 @@ class LLMProviderConfig(BaseModel):
             "as placeholders. If None, uses built-in default."
         ),
     )
+    model_id: str | None = Field(
+        default=None,
+        description="Registry model_id (TC-APT-004: keys the circuit breaker and health log)",
+    )
 
     @classmethod
     def from_model_info(cls, model_info) -> LLMProviderConfig:
@@ -85,8 +89,11 @@ class LLMProviderConfig(BaseModel):
             api_key_env=model_info.api_key_env,
             temperature=model_info.temperature if model_info.temperature is not None else 0.1,
             max_tokens=model_info.max_tokens if model_info.max_tokens is not None else 4096,
-            timeout_seconds=model_info.timeout_seconds if model_info.timeout_seconds is not None else 120,
+            timeout_seconds=model_info.timeout_seconds
+            if model_info.timeout_seconds is not None
+            else 120,
             system_prompt_template=model_info.system_prompt_template,
+            model_id=model_info.model_id,
         )
 
 
@@ -96,12 +103,8 @@ class TranslationRequest(BaseModel):
     texts: list[str] = Field(description="Source texts to translate")
     src_lang: str = Field(description="Source language code (ISO 639-1, e.g., 'en')")
     tgt_lang: str = Field(description="Target language code (ISO 639-1, e.g., 'fr')")
-    max_tokens: int | None = Field(
-        default=None, description="Override max tokens per response"
-    )
-    temperature: float | None = Field(
-        default=None, description="Override sampling temperature"
-    )
+    max_tokens: int | None = Field(default=None, description="Override max tokens per response")
+    temperature: float | None = Field(default=None, description="Override sampling temperature")
 
 
 class TranslationResponse(BaseModel):
@@ -113,6 +116,4 @@ class TranslationResponse(BaseModel):
     provider: str | None = Field(
         default=None, description="LLM provider name (None for MT backends)"
     )
-    token_usage: TokenUsage = Field(
-        default_factory=TokenUsage, description="Token usage metrics"
-    )
+    token_usage: TokenUsage = Field(default_factory=TokenUsage, description="Token usage metrics")

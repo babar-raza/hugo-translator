@@ -19,7 +19,7 @@ import pytest
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from scripts.e2e_verify_single_file import (
+from scripts.e2e.e2e_verify_single_file import (
     check_excessive_untranslated,
     generate_untranslated_breakdown,
 )

@@ -10,11 +10,13 @@ Orchestrates the complete translation workflow:
 6. Write output files
 """
 
+import difflib as _difflib
 import hashlib
 import logging
 import hashlib
 import os
 import re
+import threading
 import time
 import unicodedata
 from pathlib import Path
@@ -57,6 +59,7 @@ from .validation import ValidationSuite
 from .validation.base import ValidationIssue as _ValIssue
 from .validation.base import ValidationSeverity as _ValSeverity
 from .validation.decision_engine import ValidationDecisionEngine
+from .governed_terms import governed_signal_alternation
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +78,27 @@ _TARGET_SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
     "zh": ((0x3400, 0x9FFF),),
 }
 
+# TC-APT-069 (2026-09-05): "Document Object Model" is a governed technical term
+# for this portfolio, decided on published precedent rather than convenience --
+# three tracked, genuinely localized pages keep it verbatim in English
+# (docs.aspose.org/ar, kb.aspose.org/nl, reference.aspose.org/de), against zero
+# counter-examples in 3771 tracked localized files. It is listed here for the
+# same reason ".NET" and "FOSS" are: it must not be counted as prose evidence
+# when attesting that a frontmatter field was translated. This does NOT lower
+# the >= 6 signal_alpha floor and does NOT relax the gate -- an untranslated
+# field whose residue is ordinary prose still fails, which is the property
+# pinned by tests/unit/translation_engine/
+# test_frontmatter_language_token_dominated_fields.py.
+# Multi-word entries must precede the single-token alternatives below so they
+# claim their span first (same ordering rule as the profile preserve_patterns).
 _FRONTMATTER_TECHNICAL_SIGNAL_RE = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
-    r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
+    # TC-APT-079: governed multi-word terms come from config/terminology.yaml,
+    # the single source of truth, instead of being hand-copied here and into
+    # verification/checks/language_check.py. Hand-copying is what let this list
+    # hold 1 of the config's 15 governed terms.
+    + governed_signal_alternation()
+    + r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
     r"\.NET|C\+\+|C#|"
     r"FOSS|SDK|API|HTTP|REST|JSON|XML|XLSX|PDF|DOCX|"
     r"Rust|Python|Java|JavaScript|Microsoft|Office|"
@@ -85,6 +106,18 @@ _FRONTMATTER_TECHNICAL_SIGNAL_RE = re.compile(
     r"[A-Z][A-Z0-9_+#-]{1,}|"
     r"[A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+"
     r")(?![A-Za-z0-9_.])"
+)
+
+# TC-APT-090: the thresholds live in a leaf module because the write-time
+# verification layer enforces the same rule and previously carried a COPY of
+# engine.py's floor. Fixing one layer left the other rejecting the same cells,
+# which cost two retrigger cycles. Re-exported here so existing importers of
+# engine.MIN_FRONTMATTER_SIGNAL_ALPHA keep working.
+from .frontmatter_signal import (  # noqa: E402
+    FRONTMATTER_UNTRANSLATED_SIMILARITY,
+    MIN_FRONTMATTER_SIGNAL_ALPHA,
+    is_untranslated as _residue_is_untranslated,
+    residue_similarity as _residue_similarity,
 )
 
 
@@ -206,6 +239,44 @@ class TranslationEngine:
     Integrates parser, extractor, TM, model loader, and reconstructor
     into a cohesive translation workflow.
     """
+
+    _parser_tls_lock = threading.Lock()
+
+    @property
+    def parser(self):
+        """One HugoParser per thread (TC-APT-043).
+
+        HugoParser carries per-parse mutable state (its ruamel.yaml instance,
+        ``_node_counter``, the MarkdownIt object), so a single shared instance
+        corrupts concurrent ``translate_file()`` calls. Call sites keep using
+        ``self.parser.parse_string(...)`` unchanged; each thread lazily gets
+        its own instance. An explicit assignment (engine_builder, tests) pins
+        that object for the assigning thread and its type as the factory for
+        other threads.
+        """
+        tls = self.__dict__.get("_parser_tls")
+        if tls is None:
+            with TranslationEngine._parser_tls_lock:
+                tls = self.__dict__.setdefault("_parser_tls", threading.local())
+        parser = getattr(tls, "parser", None)
+        if parser is None:
+            factory = self.__dict__.get("_parser_factory")
+            if factory is None:
+                from .parser import HugoParser as _HugoParser
+
+                factory = _HugoParser
+            parser = factory()
+            tls.parser = parser
+        return parser
+
+    @parser.setter
+    def parser(self, value):
+        tls = self.__dict__.get("_parser_tls")
+        if tls is None:
+            with TranslationEngine._parser_tls_lock:
+                tls = self.__dict__.setdefault("_parser_tls", threading.local())
+        tls.parser = value
+        self.__dict__["_parser_factory"] = type(value)
 
     def __init__(
         self,
@@ -718,7 +789,9 @@ class TranslationEngine:
         if self.enable_content_hash and self.metadata_tracker:
             try:
                 # Check if source content changed
-                fast_path = True  # Default: use fast-path mtime optimization
+                # TC-APT-003 (plan 2.7/7.1): SHA256 comparison is primary; the mtime
+                # shortcut is opt-in only and never used for zero-defect rigor.
+                fast_path = False
                 changed, reason = self.metadata_tracker.check_source_changed(
                     source_path, fast_path_mtime=fast_path
                 )
@@ -924,6 +997,7 @@ class TranslationEngine:
         validate: bool | None = None,
         trigger_type: str = "cli",
         retry_budget_override: int | None = None,
+        model_id: str | None = None,
     ) -> TranslationResult:
         """
         Translate a single Hugo markdown file.
@@ -935,6 +1009,9 @@ class TranslationEngine:
             force: If True, bypass TM and force retranslation
             validate: Whether to validate translation quality. If None, uses engine default.
             trigger_type: How translation was triggered ("cli", "scheduled", "web", etc.)
+            model_id: Call-scoped model pin (TC-APT-045). Replaces the racy
+                engine.model_id_override attribute mutation for campaign jobs;
+                an in-flight LLM escalation override still takes precedence.
 
         Returns:
             TranslationResult with outcomes for all target languages
@@ -1209,6 +1286,7 @@ class TranslationEngine:
                     max_retry_attempts=max_retry_attempts,
                     output_paths_cache=output_paths_cache,
                     llm_model_override=_llm_model_override,
+                    model_id_pin=model_id,
                 )
 
                 self._file_pipeline.translate_language(_lang_ctx, result)
@@ -1713,7 +1791,16 @@ class TranslationEngine:
             },
         )
         validation_result.issues.extend(
-            self._check_frontmatter_language(translated_content, target_lang)
+            self._check_frontmatter_language(
+                translated_content, target_lang, source_content=source_content
+            )
+        )
+        # TC-APT-112: see _check_frontmatter_glued_identifiers docstring --
+        # the main validator suite above never sees frontmatter text at all.
+        validation_result.issues.extend(
+            self._check_frontmatter_glued_identifiers(
+                translated_content, source_content=source_content
+            )
         )
         if (
             getattr(validation_result, "error_count", 0) > 0
@@ -1812,11 +1899,23 @@ class TranslationEngine:
                 f"failed_gates={','.join(map(str, failed_gates)) or 'unknown'} "
                 f"reason_sha256={reason_hash}"
             )
-        expected_gate_ids = set(range(2, 45))
-        if set(gate_result.gate_results) != expected_gate_ids or any(
+        actual_gate_ids = set(gate_result.gate_results)
+        # Gate 45 is an independently registered zero-defect gate.  Keep the
+        # historical baseline (2..44) mandatory, but derive the upper bound
+        # from the registry so adding a governed gate cannot make every valid
+        # candidate fail at the receipt contract.
+        expected_gate_ids = set(range(2, max(actual_gate_ids, default=0) + 1))
+        # A newly accepted candidate must carry Gate 45 as well as the
+        # historical gates.  This prevents stale pre-Gate-45 receipts from
+        # authorizing new content writes while preserving old receipt reads.
+        if max(actual_gate_ids, default=0) < 45 or actual_gate_ids != expected_gate_ids or any(
             not item.get("passed", False) for item in gate_result.gate_results.values()
         ):
-            raise ValueError("candidate lacks an all-pass 43-gate write receipt")
+            actual_gate_ids = ",".join(str(gate_id) for gate_id in sorted(actual_gate_ids))
+            raise ValueError(
+                "candidate lacks an all-pass registered-gate write receipt "
+                f"gate_ids={actual_gate_ids or 'none'}"
+            )
         final_content = (
             gate_result.cleaned_content
             if gate_result.cleaned_content is not None
@@ -1838,7 +1937,9 @@ class TranslationEngine:
         )
         if not pre_write_passed:
             raise ValueError(
-                f"candidate rejected by pre-write validation ({len(pre_write_errors)} finding(s))"
+                "candidate rejected by pre-write validation "
+                f"({len(pre_write_errors)} finding(s)): "
+                + " | ".join(pre_write_errors)
             )
 
         gate_receipt = {
@@ -1891,7 +1992,12 @@ class TranslationEngine:
             raise TypeError("zero-defect writer requires AcceptedTranslation")
         if accepted.validation_policy != "zero-defect":
             raise ValueError("accepted translation has the wrong validation policy")
-        expected_gate_ids = set(range(1, 45))
+        # Receipts produced after Gate 45 was registered must include every
+        # registered gate (1..45).  Keep accepting historical 1..44 receipts
+        # during read-only recovery so previously committed outputs remain
+        # verifiable; new writes are guarded by accept_candidate_bytes below.
+        max_gate_id = max((int(gate_id) for gate_id in accepted.gate_results), default=0)
+        expected_gate_ids = set(range(1, max_gate_id + 1))
         invalid_gates = [
             gate_id
             for gate_id, item in accepted.gate_results.items()
@@ -1901,7 +2007,7 @@ class TranslationEngine:
             in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
             or item.get("error") is not None
         ]
-        if set(accepted.gate_results) != expected_gate_ids or invalid_gates:
+        if max_gate_id < 44 or set(accepted.gate_results) != expected_gate_ids or invalid_gates:
             raise ValueError("accepted translation contains a non-final gate receipt")
 
         file_existed = accepted.output_path.exists()
@@ -1929,7 +2035,7 @@ class TranslationEngine:
         receipt_sink = getattr(self, "campaign_context", {}).get("receipt_sink")
         if receipt_sink is not None:
             try:
-                receipt_sink(accepted.receipt())
+                receipt_sink(accepted.receipt(stats))
             except Exception:
                 accepted.output_path.unlink(missing_ok=True)
                 raise
@@ -1940,7 +2046,8 @@ class TranslationEngine:
 
         if not isinstance(accepted, AcceptedTranslation):
             raise TypeError("TM flush requires AcceptedTranslation")
-        expected_gate_ids = set(range(1, 45))
+        max_gate_id = max((int(gate_id) for gate_id in accepted.gate_results), default=0)
+        expected_gate_ids = set(range(1, max_gate_id + 1))
         invalid_gates = [
             gate_id
             for gate_id, item in accepted.gate_results.items()
@@ -1950,7 +2057,7 @@ class TranslationEngine:
             in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
             or item.get("error") is not None
         ]
-        if set(accepted.gate_results) != expected_gate_ids or invalid_gates:
+        if max_gate_id < 44 or set(accepted.gate_results) != expected_gate_ids or invalid_gates:
             raise ValueError("TM flush requires an all-44-gates acceptance receipt")
         for entry in buffered_entries:
             self.tm.store(**entry)
@@ -1976,7 +2083,9 @@ class TranslationEngine:
         except Exception:
             return []
 
-    def _check_frontmatter_language(self, translated_content: str, target_lang: str) -> list:
+    def _check_frontmatter_language(
+        self, translated_content: str, target_lang: str, source_content: str = ""
+    ) -> list:
         """Detect mixed-language corruption in translatable frontmatter fields.
 
         Checks title, description, seoTitle, and summary fields to ensure they
@@ -2014,6 +2123,25 @@ class TranslationEngine:
         except Exception:
             return issues
 
+        # TC-APT-090: the SOURCE frontmatter, parsed the same way, so a residue can be
+        # compared against the text it was translated from. Absent or unparseable
+        # source frontmatter simply disables that comparison; it never fabricates a
+        # verdict.
+        source_fields: dict[str, str] = {}
+        if source_content:
+            source_match = _re.match(r"^---\s*\n(.*?)\n?---\s*\n", source_content, _re.DOTALL)
+            if source_match:
+                try:
+                    source_loaded = _yaml.safe_load(source_match.group(1).strip()) or {}
+                except Exception:
+                    source_loaded = {}
+                if isinstance(source_loaded, dict):
+                    source_fields = {
+                        key: value
+                        for key, value in source_loaded.items()
+                        if isinstance(value, str)
+                    }
+
         try:
             import langdetect as _ld
             from langdetect import DetectorFactory
@@ -2040,6 +2168,13 @@ class TranslationEngine:
             "sr": {"hr", "bs"},  # South Slavic Latin-script
             "hr": {"sr", "bs"},
             "bs": {"sr", "hr"},
+            # TC-APT-040 (3rd manifestation): langdetect called a correct
+            # Portuguese seoTitle ("Biblioteca PDF de código aberto,
+            # licenciada sob MIT") Spanish at 100% on 61 letters — es/pt are
+            # too close for short technical fields. Body-level purity checks
+            # still guard against a genuinely wrong-language body.
+            "pt": {"es", "gl"},
+            "es": {"pt", "gl"},
             "ms": {"id"},  # Malay ↔ Indonesian
             "id": {"ms"},
             "uk": {"ru", "bg"},  # East Slavic Cyrillic
@@ -2074,9 +2209,64 @@ class TranslationEngine:
                 # short, otherwise-correct Latin-script title. Accept only a
                 # strong positive target-language verdict from ordinary prose
                 # with governed technical tokens removed. If that positive
-                # attestation is absent, retain the stricter raw-text check.
+                # attestation is absent, retain the stricter raw-text check --
+                # but only when there was enough signal text to attempt it in
+                # the first place (see the `else` branch below, TC-APT-040).
                 signal_text = _frontmatter_language_signal_text(v_stripped)
-                if sum(character.isalpha() for character in signal_text) >= 6:
+                signal_alpha_count = sum(character.isalpha() for character in signal_text)
+                # TC-APT-090 (2026-09-06): below the floor, langdetect carries no
+                # information, so an untranslated field is identified by comparing the
+                # residue with the SOURCE residue instead of by naming its language.
+                # TC-APT-090: a short residue cannot support a language verdict, but it
+                # CAN be compared with the source. When the source is available, judge by
+                # comparison; when it is not, fall through to the legacy language check
+                # rather than silently dropping the guard. Two callers in
+                # file_pipeline.py still pass no source, and the full suite caught that
+                # the first version of this change disarmed them.
+                source_value = source_fields.get(field)
+                if signal_alpha_count < MIN_FRONTMATTER_SIGNAL_ALPHA and source_value:
+                    source_signal = _frontmatter_language_signal_text(source_value.strip())
+                    similarity = _residue_similarity(source_signal, signal_text)
+                    if _residue_is_untranslated(source_signal, signal_text):
+                        # TC-APT-108: the message above names the field but never the
+                        # actual leftover text, so a retry built from it (decision_engine
+                        # ._generate_retry_feedback reads details["suggestion"] verbatim)
+                        # told the model only that *something* was untranslated, not
+                        # *which word*. Confirmed live on "Aspose.PDF FOSS for Python"
+                        # -type titles: the residue is a short connector ("for") sitting
+                        # between two tokens that read as protected/technical, and 3
+                        # straight attempts (professionalize_llm + 2x m2m100) left it
+                        # untouched because nothing ever named it explicitly.
+                        residue_preview = signal_text.strip()
+                        suggestion = (
+                            f"The word(s) \"{residue_preview}\" in this field were left "
+                            f"in English -- translate them into {target_lang}. Every "
+                            "other part of the field (product names, API identifiers, "
+                            "platform/language names) is already correctly preserved "
+                            "and must stay exactly as-is; only this leftover text needs "
+                            "to change."
+                        ) if residue_preview else None
+                        issues.append(
+                            _ValIssue(
+                                severity=_ValSeverity.ERROR,
+                                validator="FrontmatterLanguageCheck",
+                                message=(
+                                    f"Frontmatter field '{field}' is unchanged from the "
+                                    f"source (residue similarity {similarity:.2f}), so it "
+                                    f"was not translated into '{target_lang}'."
+                                ),
+                                location=f"frontmatter.{field}",
+                                details={
+                                    "field": field,
+                                    "residue_similarity": round(similarity, 4),
+                                    "signal_alpha": signal_alpha_count,
+                                    "reason": "untranslated_frontmatter_field",
+                                    **({"suggestion": suggestion} if suggestion else {}),
+                                },
+                            )
+                        )
+                    continue
+                if signal_alpha_count >= 6:
                     signal_langs = _ld.detect_langs(signal_text)
                     if signal_langs:
                         signal_top = signal_langs[0]
@@ -2085,7 +2275,37 @@ class TranslationEngine:
                             signal_top.lang == target_lang or signal_top.lang in signal_accepted
                         ) and signal_top.prob > CONFIDENCE_THRESHOLD:
                             continue
-                detected_langs = _ld.detect_langs(v_stripped)
+                else:
+                    # TC-APT-040: fewer than 6 alphabetic characters of real prose
+                    # survive stripping governed technical tokens (e.g. "Aspose.Note
+                    # FOSS for Python" strips to just "for", 3 chars). The old
+                    # fallback below re-detects the language of `v_stripped` -- the
+                    # FULL, UNSTRIPPED field -- which is still dominated by the very
+                    # tokens just removed and therefore reads as English with high
+                    # confidence regardless of whether the tiny residual (a bare
+                    # connector word) was actually translated. Confirmed live: this
+                    # exact mechanism hard-failed 25/25 languages identically on
+                    # blog.aspose.org/note/python/_index.md's title field
+                    # (data/summaries/fp-gate5-note-python-20260904.json) -- a
+                    # structurally guaranteed false positive, not a real signal, for
+                    # any field this dominated by required technical tokens. There is
+                    # too little independent prose left to make ANY reliable
+                    # determination either way, so skip rather than misreport.
+                    continue
+                # TC-APT-040 (second manifestation, 2026-09-05): judge the fallback
+                # on the SIGNAL text, never on the full unstripped field. The <6-char
+                # branch above already refuses to re-detect `v_stripped` because it is
+                # "dominated by the very tokens just removed" -- that reasoning does not
+                # stop applying just because the field is long. Confirmed live on
+                # cells/go/introducing-cells-foss-go's `seoTitle`, where `de` exhausted
+                # all five attempts: a correct German rendering
+                # ("Aspose.Cells FOSS fuer Go -- Open-Source-Go-Excel-Bibliothek")
+                # attests de at only 0.43 in its prose because German compounds keep the
+                # English technical tokens, while the FULL field reads en at 0.999996 --
+                # the exact confidence the failure record logged. Detecting on prose keeps
+                # the guard's real job (an untranslated field still reads en at 0.99997
+                # here) without rejecting correct translations of token-dominated fields.
+                detected_langs = _ld.detect_langs(signal_text)
                 if detected_langs:
                     top = detected_langs[0]
                     # Accept linguistically near-identical languages that share script/vocabulary space.
@@ -2117,6 +2337,75 @@ class TranslationEngine:
                         )
             except Exception:
                 pass  # langdetect is probabilistic; silently skip on any detection error
+
+        return issues
+
+    def _check_frontmatter_glued_identifiers(
+        self, translated_content: str, source_content: str = ""
+    ) -> list:
+        """TC-APT-112 (2026-09-11): GluedIdentifierValidator (TC-APT-110)
+        only ever sees `source_body`/`translated_body` -- both callers of
+        `validation_suite.validate_aggregated()` (this class and
+        file_pipeline.py) build those from content with the frontmatter
+        delimiters stripped out (see the "Match the production file
+        pipeline exactly" comment a few lines above this method's own call
+        site), matching `_check_frontmatter_language`'s equally separate
+        frontmatter-only pass. The main validator suite therefore
+        structurally never evaluates frontmatter field text at all, so a
+        glued technical identifier confined to e.g. the `description`
+        field (every real occurrence found so far: wave-cellsrust-
+        quickstart-glueretrigger-20260911{,r2,r3}, all 3 waves, cs/hu still
+        glued in r3 despite the new gate landing in 17073573) can never
+        reach it regardless of how correct the gate itself is. This mirrors
+        `_check_frontmatter_language`'s own pattern (parse both frontmatter
+        blocks, walk the same CHECKED_FIELDS) but delegates the actual
+        glue detection to GluedIdentifierValidator so the two validation
+        paths cannot drift on what counts as a glued identifier.
+
+        Args:
+            translated_content: Full translated document including frontmatter
+            source_content: Full source document including frontmatter
+
+        Returns:
+            List of _ValIssue objects (empty if no source, no frontmatter,
+            or no glued identifiers found)
+        """
+        import re as _re
+
+        from .validation.glued_identifier_validator import GluedIdentifierValidator
+
+        issues: list = []
+        if not source_content:
+            return issues
+
+        fm_match = _re.match(r"^---\s*\n(.*?)\n?---\s*\n", translated_content, _re.DOTALL)
+        source_match = _re.match(r"^---\s*\n(.*?)\n?---\s*\n", source_content, _re.DOTALL)
+        if not fm_match or not source_match:
+            return issues
+
+        try:
+            import yaml as _yaml
+
+            fm_data = _yaml.safe_load(fm_match.group(1).strip()) or {}
+            source_data = _yaml.safe_load(source_match.group(1).strip()) or {}
+        except Exception:
+            return issues
+        if not isinstance(fm_data, dict) or not isinstance(source_data, dict):
+            return issues
+
+        validator = GluedIdentifierValidator()
+        for field in ("title", "description", "seoTitle", "summary"):
+            translated_value = fm_data.get(field)
+            source_value = source_data.get(field)
+            if not isinstance(translated_value, str) or not isinstance(source_value, str):
+                continue
+            if not translated_value.strip() or not source_value.strip():
+                continue
+            result = validator.validate(source_value, translated_value)
+            for issue in result.issues:
+                issue.location = f"frontmatter.{field}"
+                issue.details = {**(issue.details or {}), "field": field}
+                issues.append(issue)
 
         return issues
 

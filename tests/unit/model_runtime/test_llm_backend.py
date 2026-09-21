@@ -413,6 +413,7 @@ class TestLLMModelBackend:
         prompt = mock_provider.generate.call_args.kwargs["system_prompt"]
         assert "technical documentation translator" in prompt
         assert "Translate description fully into hi." in prompt
+        assert "Translate every other word and phrase into Hindi" in prompt
 
     def test_packed_retry_feedback_does_not_modify_numbered_sources(self, ollama_model_info):
         backend = LLMModelBackend(ollama_model_info, device="api")
@@ -462,7 +463,10 @@ class TestLLMModelBackend:
         assert backend.last_input_tokens == 11
         assert backend.last_output_tokens == 7
 
-    def test_translate_error_fallback_to_source(self, ollama_model_info):
+    def test_translate_error_fails_loudly_never_source(self, ollama_model_info):
+        """TC-APT-004 / G-03: a provider failure must never ship the source text."""
+        from src.model_runtime.llm_errors import LLMSegmentFailure
+
         backend = LLMModelBackend(ollama_model_info, device="api")
         backend.loaded = True
 
@@ -470,8 +474,10 @@ class TestLLMModelBackend:
         mock_provider.generate.side_effect = RuntimeError("API error")
         backend._provider = mock_provider
 
-        result = backend.translate(["Hello"], "en", "fr")
-        assert result == ["Hello"]  # Falls back to source text
+        with pytest.raises(LLMSegmentFailure):
+            backend.translate(["Hello"], "en", "fr")
+        assert backend.last_segment_outcomes[0].failed is True
+        assert backend.last_segment_outcomes[0].text == ""  # never "Hello"
 
     def test_translate_empty_text_passthrough(self, ollama_model_info):
         backend = LLMModelBackend(ollama_model_info, device="api")

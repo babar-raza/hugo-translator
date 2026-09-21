@@ -1,0 +1,28 @@
+{
+  "model_id": "professionalize_llm",
+  "configured_alias": "recommended",
+  "canary_system": "You are a deterministic echo service. Reply with exactly the user text, nothing else.",
+  "canary_user": "ASPOSE-ORG-MODEL-IDENTITY-CANARY-2026-09-02 :: 7f3a9c1e :: translate nothing",
+  "response_sha256": "539e20d356f59cd7132bdd8ab90b8511128f5edab73d6e88df28aab413ffd17d",
+  "echo_exact": true,
+  "models_listed": [
+    "Qwen2.5-VL-7B",
+    "experimental",
+    "gpt-oss",
+    "qwen3-embedding-8b",
+    "qwen3-next",
+    "recommended",
+    "stable-diffusion-3.5-large"
+  ],
+  "alias_matches": [
+    "experimental",
+    "qwen3-next"
+  ],
+  "alias_resolution": {
+    "experimental": "539e20d356f59cd7132bdd8ab90b8511128f5edab73d6e88df28aab413ffd17d",
+    "gpt-oss": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "qwen3-next": "539e20d356f59cd7132bdd8ab90b8511128f5edab73d6e88df28aab413ffd17d"
+  },
+  "calibration": {},
+  "recorded_at": "2026-09-15T14:28:12.219892+00:00"
+}

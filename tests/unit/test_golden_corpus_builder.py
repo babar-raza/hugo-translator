@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 # Add scripts to path to import build_golden_corpus
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts" / "analysis"))
 
 from build_golden_corpus import (
     build_corpus,

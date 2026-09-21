@@ -14,6 +14,7 @@ from pathlib import Path
 
 from src.utils.config_loader import ConfigService
 from src.utils.content_discovery import resolve_translated_path
+from src.utils.deprecated_execution_guard import check_deprecated_entrypoint
 from src.utils.models import SiteProfile
 
 from .models import JobMode, JobType, TranslationJob
@@ -37,6 +38,10 @@ class SweepScheduler:
     """
     Periodic scheduler for sweeping content directories.
 
+    RETIRED (TC-APT-030 / G-19, 2026-09-02): see ``src/utils/deprecated_execution_guard``.
+    The only sanctioned translation execution path is ``src/workers/campaign_runner.py``
+    under ``validation_policy: zero-defect``.
+
     Identifies files that need translation and enqueues batch jobs.
     """
 
@@ -54,6 +59,11 @@ class SweepScheduler:
             job_enqueue_callback: Callback to enqueue jobs
             sweep_interval_minutes: Time between sweeps
         """
+        # TC-APT-030 (G-19): the mtime-only sweep path is RETIRED. It decides 'needs
+        # translation' from st_mtime and enqueues ungoverned jobs, bypassing the
+        # zero-defect campaign path. Constructing it now requires the explicit forensic
+        # override HT_ALLOW_DEPRECATED_EXECUTION_PATH=sweep_scheduler; otherwise it raises.
+        check_deprecated_entrypoint("sweep_scheduler")
         self.config_service = config_service
         self.job_enqueue_callback = job_enqueue_callback
         self.sweep_interval_minutes = sweep_interval_minutes

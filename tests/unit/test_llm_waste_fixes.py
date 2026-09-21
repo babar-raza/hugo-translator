@@ -584,6 +584,94 @@ class TestFix3PromptPacking:
         # Should have made exactly 1 API call (packed), not 3
         assert provider.generate.call_count == 1
 
+    def test_duplicate_segments_deduped_to_one_prompt_line(self):
+        """Recurrence 2026-09-08: a byte-identical short segment (e.g. a
+        table's repeated "Yes" cell) appearing twice in one packed prompt
+        reliably corrupted the second occurrence (confirmed on 17 cells
+        across 2 real pages, always rendering as a politeness/question
+        phrase instead of a translation). Fix: send each unique text ONCE.
+        """
+        backend = self._make_backend()
+        provider = MagicMock()
+        # Only 2 unique texts ("Yes", "No") -> the model must see exactly 2
+        # <<<SEG_N>>> lines, never 3, even though 3 units were requested.
+        provider.generate.return_value = ("<<<SEG_1>>> Oui\n<<<SEG_2>>> Non", 20, 10)
+        backend._provider = provider
+
+        texts = ["Yes", "No", "Yes"]
+        result, inp, out = backend.translate_with_token_counts(texts, "en", "fr")
+
+        assert result == ["Oui", "Non", "Oui"]
+        assert provider.generate.call_count == 1
+        sent_prompt = provider.generate.call_args.kwargs["user_text"]
+        assert sent_prompt.count("<<<SEG_") == 2, (
+            f"expected exactly 2 packed lines (deduped), got prompt: {sent_prompt!r}"
+        )
+        assert "Yes" in sent_prompt and "No" in sent_prompt
+
+    def test_duplicate_segments_shrink_stated_segment_count(self):
+        """The system prompt's own stated count must match the DEDUPED line
+        count, not the raw request count -- telling the model to expect 3
+        segments while sending 2 lines is exactly the kind of mismatch this
+        fix exists to avoid."""
+        backend = self._make_backend()
+        provider = MagicMock()
+        provider.generate.return_value = ("<<<SEG_1>>> Oui\n<<<SEG_2>>> Non", 20, 10)
+        backend._provider = provider
+
+        backend.translate_with_token_counts(["Yes", "No", "Yes"], "en", "fr")
+
+        sent_system_prompt = provider.generate.call_args.kwargs["system_prompt"]
+        assert "3 numbered segments" not in sent_system_prompt
+        assert "2 numbered segments" in sent_system_prompt
+
+    def test_three_way_duplicate_all_share_one_translation(self):
+        """All indices sharing one duplicated text get the identical result,
+        not just the first and last."""
+        backend = self._make_backend()
+        provider = MagicMock()
+        provider.generate.return_value = ("<<<SEG_1>>> Oui\n<<<SEG_2>>> Non", 20, 10)
+        backend._provider = provider
+
+        result, _, _ = backend.translate_with_token_counts(
+            ["Yes", "Yes", "No", "Yes"], "en", "fr"
+        )
+        assert result == ["Oui", "Oui", "Non", "Oui"]
+        assert provider.generate.call_args.kwargs["user_text"].count("<<<SEG_") == 2
+
+    def test_duplicate_segment_with_term_protection_restores_independently(self):
+        """Each duplicate index gets its OWN ProtectedResult (protect() is a
+        pure function of the text, so duplicates compute an identical-shaped
+        result independently) -- restoration must not break just because two
+        indices share one packed prompt line."""
+        from types import SimpleNamespace
+
+        backend = self._make_backend()
+        provider = MagicMock()
+        provider.generate.return_value = ("<<<SEG_1>>> Bonjour {TERM_0}", 20, 10)
+        backend._provider = provider
+
+        class FakeTm:
+            def protect(self, text):
+                if "Aspose" not in text:
+                    return None
+                # Deterministic per input text, like the real protector.
+                return SimpleNamespace(protected_text="Hello {TERM_0}", term_mapping={0: "Aspose"})
+
+            def restore(self, protected):
+                text = protected.protected_text
+                for term_id, term in protected.term_mapping.items():
+                    text = text.replace(f"{{TERM_{term_id}}}", term)
+                return text
+
+        backend._terminology_manager = FakeTm()
+
+        result, _, _ = backend.translate_with_token_counts(
+            ["Hello Aspose", "Hello Aspose"], "en", "fr"
+        )
+        assert result == ["Bonjour Aspose", "Bonjour Aspose"]
+        assert provider.generate.call_args.kwargs["user_text"].count("<<<SEG_") == 1
+
     def test_packed_parsing_failure_falls_back(self):
         """If packed output can't be parsed, falls back to per-segment calls."""
         backend = self._make_backend()

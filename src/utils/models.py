@@ -313,6 +313,9 @@ class DecisionRules(BaseModel):
     reject_on_link_error: bool = Field(
         default=True, description="Reject if links are broken"
     )
+    reject_on_repetition_error: bool = Field(
+        default=True, description="Hard-reject on excessive repetition"
+    )
     max_retry_attempts: int = Field(
         default=2, ge=0, le=5, description="Maximum number of retry attempts"
     )
@@ -356,6 +359,14 @@ class ValidationMode(BaseModel):
     )
     max_retry_attempts: int = Field(
         default=2, ge=0, le=5, description="Max retry attempts"
+    )
+    # CFG-01: "fast" mode's own semantics require overriding this (MT
+    # backends can't retry with feedback, so max_retry_attempts=0 must fall
+    # through to accept-best-effort for non-critical validators). Optional
+    # (None) so strict/normal/lenient, which don't set it, leave the
+    # engine's own base default untouched rather than silently forcing it.
+    accept_after_max_retries: bool | None = Field(
+        default=None, description="Override accept-after-max-retries for this mode"
     )
 
 

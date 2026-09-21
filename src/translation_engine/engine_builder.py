@@ -14,12 +14,70 @@ import logging
 from collections import deque
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .engine import TranslationEngine
 
 logger = logging.getLogger(__name__)
+
+
+def wire_semantic_similarity_encoder(engine) -> None:
+    """Wire SemanticSimilarityValidator's shared encoder onto `engine`.
+
+    TC-PORT-LLM-011 follow-up: this used to run only as part of
+    EngineBuilder._init_tm_wiring, which every EngineBuilder-constructed
+    engine gets for free -- but scripts/campaign/run_gate5_batch.py, the
+    actual entrypoint every real campaign cell runs through, constructs
+    TranslationEngine directly and never calls it. Confirmed live: a real
+    canary run hit SemanticSimilarityValidator rejects with
+    issue_fingerprints=...:numeric=none on 3 different, unrelated files --
+    not a genuine content-quality signal, but every check silently hitting
+    the "no encoder available" branch because _shared_encoder was never set
+    in that process at all. Extracted so both callers share one
+    implementation instead of the campaign path silently diverging from the
+    interactive path again in the future.
+    """
+    try:
+        from src.translation_engine.validation.semantic_similarity_validator import (
+            SemanticSimilarityValidator,
+        )
+
+        _configured_model = (
+            engine.config.get_config()
+            .get("tm_defaults", {})
+            .get("l3_embedding_model", "all-MiniLM-L6-v2")
+        )
+        _l3 = getattr(engine.tm, "l3", None)
+        _l3_enc = getattr(_l3, "encoder", None)
+        _l3_model = getattr(_l3, "embedding_model_name", None)
+        if _l3_enc is not None and _l3_model == _configured_model:
+            SemanticSimilarityValidator.set_encoder(_l3_enc)
+        else:
+            # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 1): L3 lookups
+            # and semantic-similarity VALIDATION are unrelated
+            # capabilities that happened to share one model artifact --
+            # engine.tm.l3 being None (skip_l3=True, the documented
+            # production default for multi-shard GPU runs) used to mean
+            # the validator's encoder was NEVER set, silently, on every
+            # run. Load a standalone encoder instead of leaving it
+            # unset. Defaults to CPU specifically to avoid reintroducing
+            # the GPU memory pressure skip_l3=True exists to prevent --
+            # see load_standalone_sentence_encoder()'s docstring.
+            from src.tm.l3_semantic import load_standalone_sentence_encoder
+
+            _standalone_enc = load_standalone_sentence_encoder(_configured_model, use_gpu=False)
+            SemanticSimilarityValidator.set_encoder(_standalone_enc)
+            logger.info(
+                "SemanticSimilarityValidator: loaded standalone CPU encoder "
+                "(%s) because the active L3 encoder is absent or uses a "
+                "different, non-governed model",
+                _configured_model,
+            )
+    except Exception as _sem_wire_err:
+        logger.debug(
+            "SemanticSimilarityValidator encoder wiring failed (non-fatal): %s", _sem_wire_err
+        )
 
 
 class EngineBuilder:
@@ -295,35 +353,94 @@ class EngineBuilder:
         max_retries = p["max_retries"]
         validation_mode = p["validation_mode"]
 
+        # CFG-01 (TC-APT-105 audit): read decision-rule defaults from
+        # config/validation.yaml instead of a second, hardcoded literal set
+        # that could (and did) silently diverge from it -- editing the YAML
+        # previously had zero effect on runtime behavior (confirmed:
+        # decision_rules.reject_on_error_count=2 in the YAML, hardcoded to 3
+        # here; validation_modes.strict.max_retry_attempts=1 in the YAML,
+        # never read at all). Falls back to the exact pre-existing hardcoded
+        # values if the config is missing/malformed, so a deployment without
+        # this file (or an older copy missing a newer key) behaves exactly
+        # as before this change.
+        _base_rules = None
+        _mode_overrides: dict[str, Any] = {}
+        try:
+            _validation_cfg = engine.config.get_validation_config()
+            _base_rules = _validation_cfg.decision_rules
+            _mode_overrides = _validation_cfg.validation_modes
+        except Exception as _cfg_exc:
+            logger.debug(
+                "CFG-01: config/validation.yaml unavailable (%s); using built-in "
+                "decision-rule defaults",
+                _cfg_exc,
+            )
+
         decision_config = {
             "decision_rules": {
-                "max_retry_attempts": max_retries if max_retries is not None else 2,
-                "reject_on_error_count": 3,
-                "accept_warnings": True,
-                "accept_after_max_retries": False,
-                "reject_on_placeholder_error": True,
-                "reject_on_code_block_error": True,
-                "reject_on_link_error": True,
-                "reject_on_repetition_error": True,
-                "retry_on_structure_error": True,
-                "retry_on_terminology_warning": True,
+                "max_retry_attempts": (
+                    max_retries
+                    if max_retries is not None
+                    else (_base_rules.max_retry_attempts if _base_rules else 2)
+                ),
+                "reject_on_error_count": (
+                    _base_rules.reject_on_error_count if _base_rules else 3
+                ),
+                "accept_warnings": _base_rules.accept_warnings if _base_rules else True,
+                "accept_after_max_retries": (
+                    _base_rules.accept_after_max_retries if _base_rules else False
+                ),
+                "reject_on_placeholder_error": (
+                    _base_rules.reject_on_placeholder_error if _base_rules else True
+                ),
+                "reject_on_code_block_error": (
+                    _base_rules.reject_on_code_block_error if _base_rules else True
+                ),
+                "reject_on_link_error": _base_rules.reject_on_link_error if _base_rules else True,
+                "reject_on_repetition_error": (
+                    _base_rules.reject_on_repetition_error if _base_rules else True
+                ),
+                "retry_on_structure_error": (
+                    _base_rules.retry_on_structure_error if _base_rules else True
+                ),
+                "retry_on_terminology_warning": (
+                    _base_rules.retry_on_terminology_warning if _base_rules else True
+                ),
             }
         }
 
+        _mode_cfg = _mode_overrides.get(validation_mode) if validation_mode else None
+
         if validation_mode == "strict":
-            decision_config["decision_rules"]["reject_on_error_count"] = 1
-            decision_config["decision_rules"]["accept_warnings"] = False
+            decision_config["decision_rules"]["reject_on_error_count"] = (
+                _mode_cfg.reject_on_error_count if _mode_cfg else 1
+            )
+            decision_config["decision_rules"]["accept_warnings"] = (
+                _mode_cfg.accept_warnings if _mode_cfg else False
+            )
         elif validation_mode == "lenient":
-            decision_config["decision_rules"]["reject_on_error_count"] = 5
-            decision_config["decision_rules"]["accept_warnings"] = True
+            decision_config["decision_rules"]["reject_on_error_count"] = (
+                _mode_cfg.reject_on_error_count if _mode_cfg else 5
+            )
+            decision_config["decision_rules"]["accept_warnings"] = (
+                _mode_cfg.accept_warnings if _mode_cfg else True
+            )
         elif validation_mode == "fast":
             # Fast mode for MT batch runs: accepts non-critical single errors.
             # max_retry_attempts=0 skips RETRY→REJECT loop; accept_after_max_retries=True
             # allows non-critical validator failures to pass (LanguageConsistency, etc.).
             # Critical validators (Placeholder, CodeBlock, Link, Structure) still block.
-            decision_config["decision_rules"]["max_retry_attempts"] = 0
-            decision_config["decision_rules"]["accept_after_max_retries"] = True
-            decision_config["decision_rules"]["accept_warnings"] = True
+            decision_config["decision_rules"]["max_retry_attempts"] = (
+                _mode_cfg.max_retry_attempts if _mode_cfg else 0
+            )
+            decision_config["decision_rules"]["accept_after_max_retries"] = (
+                _mode_cfg.accept_after_max_retries
+                if _mode_cfg and _mode_cfg.accept_after_max_retries is not None
+                else True
+            )
+            decision_config["decision_rules"]["accept_warnings"] = (
+                _mode_cfg.accept_warnings if _mode_cfg else True
+            )
 
         if p["decision_engine"] is not None:
             engine.decision_engine = p["decision_engine"]
@@ -575,46 +692,7 @@ class EngineBuilder:
             except Exception as _tm_wire_err:
                 logger.debug(f"TM detector wiring failed (non-fatal): {_tm_wire_err}")
 
-        try:
-            from src.translation_engine.validation.semantic_similarity_validator import (
-                SemanticSimilarityValidator,
-            )
-
-            _configured_model = (
-                engine.config.get_config()
-                .get("tm_defaults", {})
-                .get("l3_embedding_model", "all-MiniLM-L6-v2")
-            )
-            _l3 = getattr(engine.tm, "l3", None)
-            _l3_enc = getattr(_l3, "encoder", None)
-            _l3_model = getattr(_l3, "embedding_model_name", None)
-            if _l3_enc is not None and _l3_model == _configured_model:
-                SemanticSimilarityValidator.set_encoder(_l3_enc)
-            else:
-                # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 1): L3 lookups
-                # and semantic-similarity VALIDATION are unrelated
-                # capabilities that happened to share one model artifact --
-                # engine.tm.l3 being None (skip_l3=True, the documented
-                # production default for multi-shard GPU runs) used to mean
-                # the validator's encoder was NEVER set, silently, on every
-                # run. Load a standalone encoder instead of leaving it
-                # unset. Defaults to CPU specifically to avoid reintroducing
-                # the GPU memory pressure skip_l3=True exists to prevent --
-                # see load_standalone_sentence_encoder()'s docstring.
-                from src.tm.l3_semantic import load_standalone_sentence_encoder
-
-                _standalone_enc = load_standalone_sentence_encoder(_configured_model, use_gpu=False)
-                SemanticSimilarityValidator.set_encoder(_standalone_enc)
-                logger.info(
-                    "SemanticSimilarityValidator: loaded standalone CPU encoder "
-                    "(%s) because the active L3 encoder is absent or uses a "
-                    "different, non-governed model",
-                    _configured_model,
-                )
-        except Exception as _sem_wire_err:
-            logger.debug(
-                "SemanticSimilarityValidator encoder wiring failed (non-fatal): %s", _sem_wire_err
-            )
+        wire_semantic_similarity_encoder(engine)
 
     # ------------------------------------------------------------------
     # Phase 15: Extracted components

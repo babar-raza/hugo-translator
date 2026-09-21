@@ -1,0 +1,29 @@
+taskcard: TC-APT-025
+title: Update the content repo's handoff skill docs to the governed pipeline (G-16, G-18)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+content_repo_commit: 334d86406f56fdc60e922e21127328505687ebb2 (local main, NOT pushed)
+files (8):
+  - skills/ht-translate.md (S-HT-01, canonical)
+  - skills/ht-translate-batch.md (S-HT-02, canonical)
+  - .claude/commands/ht-translate.md, .claude/commands/ht-translate-batch.md (mirrors)
+  - .agents/skills/ht-translate/SKILL.md, .agents/skills/ht-translate-batch/SKILL.md (mirrors)
+  - .kilocode/skills/ht-translate/SKILL.md, .kilocode/skills/ht-translate-batch/SKILL.md (mirrors)
+changes:
+  - "plain-CLI invocation (`src.cli ... --validation-mode normal --force-accept --no-commit`) replaced by the governed path: build_campaign_manifest.py scoped manifest -> autonomous_content_translation_worker --campaign-manifest <yaml> --validation-policy zero-defect (--verify-only first; --resume after interruption)"
+  - "{locales}=all now means the 25 approved codes; the 11 Hugo-disabled codes are named and never generated (G-18)"
+  - "websites.aspose.org added to the valid-site list with the per-commit override-token requirement; www.aspose.org marked out of scope"
+  - "outputs land directly in content/<site>/<lang>/ with receipts (no temp dir / copy step); pre-existing targets need the TC-APT-031 replace_existing declaration; adopt exactly the receipt-listed paths; commit via /commit with Skills invoked: [S-HT-0x]"
+  - "bare `python` mentions removed (hook Step 12 venv enforcement); mirrors regenerated from canonical bodies with their provider headers"
+governed_commit_procedure (plan 19.2, executed):
+  - "session_ledger.py adopt --files <8> -> Adopted 8 files; candidates --format json -> exactly the 8 paths"
+  - "path_guard.py --stdin -> all 8 DENY (skills/, .claude/, .agents/, .kilocode/ are forbidden prefixes) -> override_manager.py create --paths <8> --reason ... --plan <plan> -> token 20260902-061209-skills-ht-translate-md"
+  - "git add <8 explicit paths>; skill_context.py begin --skill S-76 --scope <8 paths> --session-id <AGENT_SESSION_ID>"
+  - "git commit -F <message>: pre-commit-audit 39 passed / 2 skipped / 0 failed (incl. Step 3 forbidden-path w/ token, Step 12 venv enforcement, Step 33 skill-mirror parity, Step 39 author identity); commit-msg hook: Skills invoked: [S-76] + exactly one Co-Authored-By; post-commit consumed the token -> archived, linked to 334d86406f"
+  - "skill_context.py end --skill S-76 --status completed; git status shows none of the 8 paths dirty"
+verification:
+  - "sync_skills.py --check --report -> PARITY CHECK: PASS"
+  - "enforce_venv_python.py --check --files <8> -> No violations found"
+  - "content repo pytest: governance/skill subset (test_sync_skills, test_path_guard, test_skill_run_manager, test_kilocode_gate, test_kilocode_postcheck, test_skill_provenance_templates, test_preflight, test_content_governance_checks_workflow) -> 182 passed, 105 subtests passed; the full 11,859-test suite has a PRE-EXISTING whole-dir collection error (test_git_identity_guard.py imports from a shadowed conftest; module passes alone) and was 41% through with 1 unrelated failure when stopped after 50 min"
+acceptance: "both skill docs reference only the governed path and the 25-code set; websites.aspose.org listed; committed through the repo's own governed procedure -> MET"

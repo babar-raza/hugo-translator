@@ -439,7 +439,7 @@ The system includes autonomous decision-making and cross-session state managemen
 - **Contradiction Detector** (`src/observability/contradiction_detector.py`) — Audits config claims against observed runtime behavior to detect drift.
 - **Run Summarizer** (`src/observability/run_summarizer.py`) — LLM-backed generation of human-readable run summaries.
 - **Evidence Declaration** (`src/observability/evidence_declaration.py`) — Pydantic-validated evidence schema with JSON schema export for audit trails.
-- **Reviewer Bridge** (`scripts/ops/reviewer_bridge.py`) — MCP JSON-RPC 2.0 bridge for posting run signals to external review systems.
+- ~~Reviewer Bridge~~ — `scripts/ops/reviewer_bridge.py` was removed (commit `5f5ac754`, "dead code — reviewer app schema incompatible"); the supervisory review artifact is `ClaudeReviewResult` in `src/observability/claude_review.py` (mission aspose-org-full-portfolio-translation-20260901, TC-APT-012).
 
 All agentic modules default to `enabled: false` / `dry_run: true` in `config/global.yaml` and can be activated per-module.
 

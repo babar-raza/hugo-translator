@@ -599,13 +599,13 @@ class TestLoadStandaloneSentenceEncoder:
         with patch("src.tm.l3_semantic.SentenceTransformer") as mock_st:
             load_standalone_sentence_encoder("some-model-name")
 
-        mock_st.assert_called_once_with("some-model-name", device="cpu")
+        mock_st.assert_called_once_with("some-model-name", device="cpu", local_files_only=True)
 
     def test_use_gpu_true_requests_cuda(self):
         with patch("src.tm.l3_semantic.SentenceTransformer") as mock_st:
             load_standalone_sentence_encoder("some-model-name", use_gpu=True)
 
-        mock_st.assert_called_once_with("some-model-name", device="cuda")
+        mock_st.assert_called_once_with("some-model-name", device="cuda", local_files_only=True)
 
     def test_returns_the_loaded_encoder(self):
         with patch("src.tm.l3_semantic.SentenceTransformer") as mock_st:
@@ -613,3 +613,15 @@ class TestLoadStandaloneSentenceEncoder:
             result = load_standalone_sentence_encoder("some-model-name")
 
         assert result == "encoder-instance"
+
+    def test_uses_cached_snapshot_without_relaxing_offline_mode(self, tmp_path, monkeypatch):
+        cache = tmp_path / "hub"
+        snapshot = cache / "models--org--model" / "snapshots" / "abc"
+        snapshot.mkdir(parents=True)
+        ref = cache / "models--org--model" / "refs"
+        ref.mkdir(parents=True)
+        (ref / "main").write_text("abc", encoding="utf-8")
+        monkeypatch.setenv("HF_HUB_CACHE", str(cache))
+        with patch("src.tm.l3_semantic.SentenceTransformer") as mock_st:
+            load_standalone_sentence_encoder("org/model")
+        mock_st.assert_called_once_with(str(snapshot.resolve()), device="cpu", local_files_only=True)

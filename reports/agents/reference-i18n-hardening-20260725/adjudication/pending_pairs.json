@@ -186,5 +186,733 @@
   {
     "locale": "vi",
     "id": "phrase.enum_defines_values"
+  },
+  {
+    "locale": "ar",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "ar",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "ar",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "ar",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "bg",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "bg",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "bg",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "bg",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "ca",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "ca",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "ca",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "ca",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "cs",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "cs",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "cs",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "cs",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "da",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "da",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "da",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "da",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "de",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "de",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "de",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "de",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "el",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "el",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "el",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "el",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "es",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "es",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "es",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "es",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "fa",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "fa",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "fi",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "fi",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "fi",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "fi",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "fr",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "fr",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "fr",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "fr",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "he",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "he",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "he",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "he",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "hi",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "hi",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "hr",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "hr",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "hr",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "hr",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "hu",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "hu",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "hu",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "hu",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "id",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "id",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "id",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "id",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "it",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "it",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "it",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "it",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "lt",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "lt",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "lt",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "lt",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "lv",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "lv",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "lv",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "lv",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "ms",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "ms",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "ms",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "ms",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "no",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "no",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "no",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "no",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "pl",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "pl",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "pl",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "pl",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "pt",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "pt",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "pt",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "pt",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "ro",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "ro",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "ro",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "ro",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "ru",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "ru",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "ru",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "ru",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "sk",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "sk",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "sk",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "sk",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "sr",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "sr",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "sr",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "sr",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "sv",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "sv",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "sv",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "sv",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "th",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "th",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "th",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "th",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "tr",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "tr",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "tr",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "tr",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "uk",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "uk",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "uk",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "uk",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "vi",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "vi",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "vi",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "vi",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "zh",
+    "id": "table.header.component"
+  },
+  {
+    "locale": "zh",
+    "id": "table.header.handles"
+  },
+  {
+    "locale": "zh",
+    "id": "table.header.role"
+  },
+  {
+    "locale": "zh",
+    "id": "table.header.renderer"
+  },
+  {
+    "locale": "ar",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "bg",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "ca",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "da",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "el",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "es",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "fi",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "he",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "hr",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "hu",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "id",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "ko",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "lt",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "lv",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "ms",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "no",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "pt",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "ro",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "sk",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "sr",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "sv",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "th",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "tr",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "uk",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "vi",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "zh",
+    "id": "heading.installation"
+  },
+  {
+    "locale": "ar",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "bg",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "ca",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "da",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "el",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "es",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "fi",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "he",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "hr",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "hu",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "id",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "ko",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "lt",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "lv",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "ms",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "no",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "pt",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "ro",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "sk",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "sr",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "sv",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "th",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "tr",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "uk",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "vi",
+    "id": "heading.quickstart"
+  },
+  {
+    "locale": "zh",
+    "id": "heading.quickstart"
   }
 ]

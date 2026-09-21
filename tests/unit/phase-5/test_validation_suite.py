@@ -46,8 +46,19 @@ class TestValidationSuite:
         """Test simple validation."""
         suite = ValidationSuite()
 
-        source = "This is [a link](url) with {{CODE_1}}"
-        translation = "Ceci est [un lien](url) avec {{CODE_1}}"
+        # TC-APT-091: link text is now excluded from language-purity detection
+        # (a governed brand/nav label kept in English by design must not be
+        # judged as prose), so this fixture carries real sentence-length
+        # French prose alongside the link instead of relying on the link
+        # text itself as the only detectable-language signal.
+        source = (
+            "This is a short paragraph explaining the feature, with "
+            "[a link](url) and {{CODE_1}} included for good measure."
+        )
+        translation = (
+            "Voici un court paragraphe qui explique la fonctionnalité, avec "
+            "[un lien](url) et {{CODE_1}} inclus pour faire bonne mesure."
+        )
         context = {"target_lang": "fr"}  # Provide target language for LanguageConsistencyValidator
 
         # Use validate_aggregated for single result

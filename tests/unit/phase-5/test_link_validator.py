@@ -177,3 +177,84 @@ class TestLinkValidator:
         result = validator.validate(source, translation)
 
         assert result.success is True
+
+
+class TestLinkValidatorRegexUnificationAndDuplicateSeverity:
+    """VA-04 (TC-APT-105 audit)."""
+
+    @pytest.fixture
+    def validator(self):
+        return LinkValidator()
+
+    def test_empty_alt_image_counts_the_same_as_structure_validator(self, validator):
+        """A legitimate empty-alt image (`![](image.png)`) must be counted
+        by LinkValidator -- confirming the shared, permit-empty regex is in
+        effect (the old StructureValidator-only regex required non-empty
+        anchor text and would have silently missed this)."""
+        source = "See the diagram: ![](diagram.png)"
+        translation = "Voir le diagramme : ![](diagram.png)"
+
+        result = validator.validate(source, translation)
+
+        assert result.success is True
+        assert not any("count mismatch" in issue.message for issue in result.issues)
+
+    def test_genuine_duplicate_link_is_error_severity(self, validator):
+        """TC-APT-105's exact reported shape: the same link duplicated in
+        the translation, appearing more times than in source, must be
+        ERROR severity (not the generic WARNING count-mismatch), so it
+        drives decision_engine's critical-failure path on its own."""
+        source = (
+            "- **[API Reference](https://reference.aspose.org/cells/go/)**: "
+            "Full class and method documentation"
+        )
+        translation = (
+            "- **[API Reference](https://reference.aspose.org/cells/go/)**:"
+            "**[API Reference](https://reference.aspose.org/cells/go/)**: "
+            "Vollstaendige Klassen- und Methodendokumentation"
+        )
+
+        result = validator.validate(source, translation)
+
+        assert result.success is False
+        error_issues = [i for i in result.issues if i.severity == ValidationSeverity.ERROR]
+        assert len(error_issues) == 1
+        assert "reference.aspose.org/cells/go" in error_issues[0].message
+        assert error_issues[0].details["extra_occurrences"] == 1
+
+    def test_missing_link_stays_warning_not_error(self, validator):
+        """A link present in source but dropped from the translation is a
+        DIFFERENT defect shape (a deficit, not a duplicate) and must remain
+        WARNING, per this validator's existing, deliberate false-positive-
+        avoidance history -- the new duplicate check must not affect it."""
+        source = "See [Installation](../installation/) and [API](../api/)"
+        translation = "Voir [Installation](../installation/)"
+
+        result = validator.validate(source, translation)
+
+        assert not any(i.severity == ValidationSeverity.ERROR for i in result.issues)
+        assert any(i.severity == ValidationSeverity.WARNING for i in result.issues)
+
+    def test_added_link_not_in_source_stays_warning_not_error(self, validator):
+        """A URL that appears in translation but never in source at all
+        (extra_urls, not a duplicate of an existing one) must remain
+        WARNING/INFO via the existing _check_url_preservation path -- the
+        new duplicate check only fires for a URL exceeding its OWN source
+        count, never for a URL with zero source occurrences."""
+        source = "See [Installation](../installation/)"
+        translation = "Voir [Installation](../installation/) et [Extra](../extra/)"
+
+        result = validator.validate(source, translation)
+
+        assert not any(i.severity == ValidationSeverity.ERROR for i in result.issues)
+
+    def test_same_url_legitimately_repeated_equally_is_not_flagged(self, validator):
+        """A URL genuinely appearing twice in BOTH source and translation
+        (e.g. a nav link repeated at top and bottom) must never be flagged
+        -- only an INCREASE beyond the source's own count is a defect."""
+        source = "[Docs](https://x/) ... later ... [Docs](https://x/)"
+        translation = "[Documentation](https://x/) ... plus tard ... [Documentation](https://x/)"
+
+        result = validator.validate(source, translation)
+
+        assert not any(i.severity == ValidationSeverity.ERROR for i in result.issues)

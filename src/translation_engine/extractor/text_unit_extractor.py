@@ -11,6 +11,7 @@ import logging
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from src.utils.log_sanitizer import sanitize_for_log
 
@@ -258,6 +259,157 @@ def analyze_segment_variance(segments: list[str]) -> dict[str, Any]:
             "recommendation": "default",
             "suggested_factor": 1.0,
         }
+
+
+_ASPOSE_BRAND_PREFIX_RE = re.compile(r"^Aspose(?:\.[A-Za-z0-9]+)+")
+_TITLE_CASE_OR_CAPS_WORD_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$|^[A-Z]{2,}$")
+_LEADING_SEPARATOR_RE = re.compile(r"^[\s—–|:-]+")
+# Matches an optional "for <Platform>" clause immediately after the brand
+# token, before a separator+"Enterprise ..." tail -- see the carve-out in
+# _link_text_is_brand_navigation_label below. <Platform> covers the
+# portfolio's platform-name shapes (".NET", "C++", "Node.js", "Python", ...).
+_FOR_PLATFORM_RE = re.compile(r"^for\s+[A-Za-z0-9.][A-Za-z0-9.+#]*\s+")
+
+
+_WHOLE_LINK_RE = re.compile(r"^\[(?P<anchor>[^\]]+)\]\([^)]*\)$")
+
+
+def _whole_node_is_brand_navigation_link(text: str) -> bool:
+    """True when a node's entire content is one link whose anchor is a brand label.
+
+    TC-APT-085. On the full-sentence extraction path the candidate text is the
+    RAW markdown -- ``[Aspose.Cells - Enterprise Blog](https://blog.aspose.com/)``
+    -- not the anchor text the LINK path sees, so testing the brand predicate
+    against it directly always fails on the leading bracket. Verified on the real
+    failing page before and after: the naive version left the unit translatable.
+
+    Requiring the link to be the WHOLE node keeps this narrow -- a list item
+    mixing prose with a nav link stays translatable prose.
+    """
+    match = _WHOLE_LINK_RE.match(text.strip())
+    if not match:
+        return False
+    return _link_text_is_brand_navigation_label(match.group("anchor"))
+
+
+def _link_text_is_brand_navigation_label(text: str) -> bool:
+    """A link whose text is a brand token (``Aspose.3D``, ``Aspose.Slides``, ...)
+    optionally followed by short Title-Case/ALL-CAPS words -- e.g. ``Aspose.3D KB``,
+    ``Aspose.3D API Reference``, ``Aspose.Slides -- Enterprise API Reference`` -- is a
+    fixed site-navigation label, not prose. Confirmed against real, already-shipped
+    translations, not guessed: reference.aspose.org's own French and German
+    translations of blog.aspose.org/3d/net/introducing-3d-foss-dotnet/index.md both
+    leave ``[Aspose.3D KB]`` completely untranslated while translating the
+    surrounding prose -- this is the established site convention, and TC-SAS-01's
+    zero-tolerance same-as-source check was penalizing a model for correctly
+    matching it (128+ links across just blog.aspose.org use this exact "Aspose.X
+    KB"/"Aspose.X API Reference" shape, so this is a portfolio-scale pattern, not
+    an isolated case).
+
+    Deliberately narrow: only fires when EVERY word after the brand token is
+    Title-Case or ALL-CAPS (no lowercase connector words), which is what
+    distinguishes a navigation label ("Aspose.3D API Reference") from a real
+    sentence that happens to mention a product ("Aspose.3D FOSS for Java" has a
+    lowercase "for" and stays translatable prose).
+    """
+    text = text.strip()
+    if not text or len(text) > 60:
+        return False
+    match = _ASPOSE_BRAND_PREFIX_RE.match(text)
+    if not match:
+        return False
+    remainder = _LEADING_SEPARATOR_RE.sub("", text[match.end() :]).strip()
+    if not remainder:
+        return True
+    if all(_TITLE_CASE_OR_CAPS_WORD_RE.match(word) for word in remainder.split()):
+        return True
+    # 2026-09-10: "Aspose.X for <Platform> -- Enterprise <Suffix>" is ALSO a
+    # fixed nav-label/CTA shape (this exact link is the portfolio's "See
+    # Also"-footer / "Related Resources"-list CTA, appearing verbatim across
+    # many product/platform pages), not prose -- despite the lowercase "for"
+    # that the check above deliberately excludes for real sentences like
+    # "Aspose.3D FOSS for Java" (still correctly excluded here too: it has no
+    # "-- Enterprise" trigger, so it falls through to the final `return False`
+    # below exactly as before). Confirmed via two independent, portfolio-real
+    # failure modes, not guessed: wave24 (blog.aspose.org words/python)
+    # mistranslated the "Enterprise Product" tail into the target language
+    # (RB-006); wave25 (docs.aspose.org 3d/net/developer-guide, 4 pages) saw
+    # BOTH professionalize_llm and m2m100_418m repeatedly hallucinate/
+    # duplicate this exact "Aspose.3D for .NET -- Enterprise Documentation"
+    # link many times over in the same "## See Also" position (LinkValidator
+    # source_count=2 vs translation_count=13, identical failure across ar/cs/
+    # de and all 4 pages -- traced to this exact link via its n-gram hash,
+    # not assumed).
+    platform_match = _FOR_PLATFORM_RE.match(remainder)
+    if platform_match:
+        tail = _LEADING_SEPARATOR_RE.sub("", remainder[platform_match.end() :]).strip()
+        tail_words = tail.split()
+        if tail_words and tail_words[0] == "Enterprise":
+            return all(_TITLE_CASE_OR_CAPS_WORD_RE.match(word) for word in tail_words)
+    return False
+
+
+#: See the code comment at the call site in _is_non_translatable for the
+#: evidence backing this set.
+_CONFIRMED_FIXED_TECHNICAL_HEADINGS = {"Scene Graph"}
+
+
+def _link_text_is_schemeless_bare_url(text: str, url: str) -> bool:
+    """A link's visible text that is the URL itself minus its scheme -- e.g.
+
+        [github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go](https://github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go)
+
+    -- is a bare URL reference, not prose. `_is_non_translatable`'s Strategy 0.6
+    already protects the scheme-prefixed form (``^https?://\\S+$``), found via
+    TC-APT-004b qualification; this catches the equally common scheme-less form
+    (confirmed on real content, TC-APT-014 Gate 5: professionalize_llm AND
+    m2m100_418m both failed TC-SAS-01 on this exact text, since translating it
+    even slightly would break the reader's ability to recognize it as the URL).
+    Exact comparison against the URL's netloc+path, mirroring
+    ``_link_text_matches_url_slug``'s "the text IS the [slug]" reasoning one
+    level broader (the whole URL, not just its final segment).
+    """
+    if not text or not url:
+        return False
+    parsed = urlsplit(url)
+    if not parsed.netloc:
+        return False
+    without_scheme = (parsed.netloc + parsed.path).rstrip("/")
+    return text.strip().rstrip("/") == without_scheme
+
+
+def _link_text_matches_url_slug(text: str, url: str) -> bool:
+    """A link's visible text that is literally the URL's final path segment is an
+    identifier (a repo/product slug), not prose -- e.g. the Markdown
+
+        [Aspose.3D-FOSS-for-Java](https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-Java)
+
+    has anchor text that is neither CamelCase, snake_case nor a version number, so none of
+    ``_is_technical_identifier``'s patterns catch it, and a hyphen-tolerant heuristic would
+    be too broad (it would also swallow ordinary hyphenated English like "state-of-the-art").
+    Comparing against the URL is narrow and self-justifying: the text IS the slug.
+
+    Found via TC-APT-014 Gate 5 (introducing-words-foss-net, 2026-09-04): the normalizer
+    used to also strip whitespace, so ordinary Title Case navigation link text like
+    "Getting Started" and "Developer Guide" normalized identically to their own URL's
+    hyphenated slug ("getting-started", "developer-guide") and got silently excluded from
+    translation in every reviewed language (ar/cs/el/es all reproduced it). A real slug/
+    identifier never contains a natural space -- that is exactly what distinguishes it from
+    human-readable link text that merely happens to share the same words as its URL's slug.
+    Whitespace is deliberately NOT stripped here so a spaced multi-word text can only match
+    a spaceless slug if it collapses to one token on its own (e.g. hyphens/dots removed),
+    not by conflating " " with "-".
+    """
+    if not text or not url:
+        return False
+    slug = unquote(urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1])
+    if not slug:
+        return False
+
+    def _normalize(value: str) -> str:
+        return re.sub(r"[._-]+", "", value).casefold()
+
+    return _normalize(slug) == _normalize(text)
 
 
 class TextUnitExtractor:
@@ -1639,6 +1791,7 @@ class TextUnitExtractor:
 
     def _extract_link(self, node: ASTNode, units: list[TextUnit]) -> None:
         """Extract link text content (not URL)."""
+        url = (node.attrs.get("url", "") if node.attrs else "") or ""
         # Traverse children for link text
         for child in node.children:
             if child.type == NodeType.TEXT:
@@ -1650,7 +1803,12 @@ class TextUnitExtractor:
                         node_addr=child.node_addr,
                         kind=TextUnitKind.LINK_TEXT,
                         source_text=text,
-                        do_not_translate=self._is_non_translatable(text),
+                        do_not_translate=(
+                            self._is_non_translatable(text)
+                            or _link_text_matches_url_slug(text, url)
+                            or _link_text_is_schemeless_bare_url(text, url)
+                            or _link_text_is_brand_navigation_label(text)
+                        ),
                     )
                     units.append(unit)
             else:
@@ -1716,7 +1874,18 @@ class TextUnitExtractor:
         # Check if non-translatable FIRST (before applying placeholders)
         do_not_translate = self._is_non_translatable(
             stripped_text, kind=kind, column_header=_col_header or None
-        )
+        ) or _whole_node_is_brand_navigation_link(stripped_text)
+        # TC-APT-085: the brand-navigation-label check ran ONLY on the LINK
+        # extraction path (_extract_link), so a governed label survived when it
+        # sat inside a paragraph but was translated when it stood alone in a
+        # list item, which routes here instead. Measured on
+        # introducing-cells-foss-go: the same label preserved 17/18 locales in a
+        # paragraph link, 8/18 alone in a list item. "API Reference" survived
+        # that position only because it has an independent terminology.yaml
+        # entry. The predicate is deliberately narrow -- brand prefix plus
+        # Title-Case/ALL-CAPS words only -- so ordinary prose mentioning a
+        # product ("Aspose.Words FOSS for .NET" has a lowercase "for") stays
+        # translatable.
 
         # Apply preserve_patterns protection (if configured and not already protected)
         placeholder_map = {}
@@ -1903,18 +2072,85 @@ class TextUnitExtractor:
             )
             return False
 
+    _LINK_TAIL_PROBE = "](https://example.com/x)"
+
+    def _link_syntax_is_protected(self) -> bool:
+        """True when some preserve_pattern masks a markdown link tail.
+
+        TC-APT-036 lets a paragraph containing a link be extracted whole, which is
+        only safe if the "](url)" tail is placeholder-protected first. Deciding it
+        from the patterns actually configured keeps the guarantee local to this
+        object instead of resting on every site profile being edited correctly.
+        """
+        cached = getattr(self, "_link_protection_cache", None)
+        if cached is not None:
+            return cached
+        protected = False
+        for pattern in self.preserve_patterns or []:
+            try:
+                if re.search(pattern, self._LINK_TAIL_PROBE):
+                    protected = True
+                    break
+            except re.error:
+                continue
+        self._link_protection_cache = protected
+        return protected
+
     def _has_inline_formatting(self, node: ASTNode) -> bool:
         """Check if node contains inline formatting (strong/em/link/shortcodes/etc.)."""
         formatting_types = {
             NodeType.STRONG,
             NodeType.EMPHASIS,
-            NodeType.CODE_SPAN,
-            NodeType.LINK,
             NodeType.IMAGE,
+            # LINK is excluded ONLY when a preserve_pattern actually protects link
+            # syntax (TC-APT-036, 2026-09-05), for the same
+            # reason as CODE_SPAN below: forcing leaf-level extraction split a
+            # sentence at each link boundary, so the prose fragment and the link
+            # text were translated with no knowledge of each other. Measured on
+            # cells-spreadsheet-management-go, where the source wraps as
+            # "...or cloud integration, the" / "[Aspose.Cells — Enterprise Product
+            # Family](...) is a": the fragment ended in a bare article governing a
+            # noun it never saw, so 11 of 23 locales emitted the English "the"
+            # verbatim, ru/fa substituted a demonstrative, and de/nl lost V2
+            # inversion. The head noun in "[<Product> repository]" was likewise
+            # unorderable, wrong in 15/15 locales of introducing-words-foss-net.
+            #
+            # Safe only because the site profile's markdown-link preserve_pattern
+            # was narrowed in the same change to the "](url)" TAIL: the URL and
+            # markdown punctuation stay protected while the link TEXT remains
+            # inside the translatable sentence. With the OLD whole-span pattern
+            # this exclusion would mask the link text entirely and it would never
+            # be translated -- verified before landing, both directions.
+            # STRONG/EMPHASIS/IMAGE stay in this set: no preserve_pattern protects
+            # `**bold**`/`*em*`/`![alt](src)` syntax, so FIX-B's markdown-loss
+            # fallback is still load-bearing for them.
             # INLINE_HTML intentionally excluded: shortcodes are self-contained leaf nodes
             # that _collect_text_from_node handles via node.raw. Excluding them allows
             # full-sentence extraction so placeholder_manager can protect inline shortcodes.
+            #
+            # CODE_SPAN intentionally excluded (TC-APT-013 Gate 4 canary, confirmed by direct
+            # code read + two failed real-content reviews): forcing leaf-level extraction
+            # splits a sentence into independent fragments at each code-span boundary, and
+            # each fragment is translated with no knowledge of the others -- the observed
+            # failure mode was grammatically incomplete German (dropped finite verbs, wrong
+            # case/gender, garbled word order) exactly at fragment seams around `Code.Spans`.
+            # _collect_text_from_node already reconstructs the literal `` `code` `` markdown
+            # for CODE_SPAN nodes, and HT-INLINE-CODE-001/TC-ICR-002/TC-ICR-003's global
+            # body.preserve_patterns entry (`` `[^`\n]+` ``, config/global.yaml) already
+            # placeholder-protects exactly that substring before the full-sentence text is
+            # sent to the model -- the same mechanism this exclusion already relies on for
+            # INLINE_HTML above. STRONG/EMPHASIS/LINK/IMAGE stay in this set: no matching
+            # preserve_pattern protects `**bold**`/`*em*`/`[text](url)` syntax today, so
+            # leaf-level extraction is still the safe choice for those.
         }
+
+        if not self._link_syntax_is_protected():
+            # No preserve_pattern shields "](url)" in this configuration, so a
+            # full-sentence unit would carry the raw URL into the model. Fall back
+            # to the old leaf behaviour rather than depend on an unenforced config
+            # invariant -- websites.aspose.org has no link pattern at all, and the
+            # extractor is constructed with preserve_patterns=[] in tests.
+            formatting_types = formatting_types | {NodeType.LINK}
 
         # Check children
         for child in node.children:
@@ -1983,20 +2219,66 @@ class TextUnitExtractor:
 
     def _has_technical_content(self, node: ASTNode) -> bool:
         """Check if node contains code, URLs, or technical identifiers."""
-        # Check for code nodes
+        # Check for code nodes. CODE_SPAN deliberately excluded here too (see the
+        # matching exclusion + full rationale in _has_inline_formatting, TC-APT-013):
+        # preserve_patterns already placeholder-protects `` `code` `` spans within a
+        # full-sentence unit, so forcing leaf-level fallback for CODE_SPAN alone only
+        # loses sentence-level grammatical coherence without buying any safety. Full
+        # CODE_BLOCK stays a fallback trigger -- it isn't markdown-reconstructable as
+        # inline text the same way.
         for child in node.children:
-            if child.type in (NodeType.CODE_SPAN, NodeType.CODE_BLOCK):
+            if child.type is NodeType.CODE_BLOCK:
                 return True
 
-            # Check for links (URLs are technical)
-            if child.type == NodeType.LINK:
-                return True
+            # TC-APT-076: LINK deliberately NOT a fallback trigger, for the same
+            # reason CODE_SPAN is excluded above (TC-APT-013). The URL is never in
+            # translatable text -- it lives in node.attrs, and the profile's
+            # `](...)` preserve_pattern protects the link tail inside a
+            # full-sentence unit -- so forcing leaf extraction here bought no
+            # safety and cost sentence-level grammatical coherence.
+            #
+            # It cost a great deal of it. TC-APT-036 removed LINK from
+            # _has_inline_formatting's leaf-forcing set so link-bearing paragraphs
+            # would translate whole, but THIS second, independent gate kept
+            # splitting them anyway, so that half of TC-APT-036 never took effect.
+            # Measured on words-document-net: the paragraph became three units --
+            # a 453-char unit ENDING on a dangling subordinator, the 21-char anchor
+            # with no sentence context, and a 172-char unit STARTING with a
+            # subjectless verb phrase. The orphaned subordinator had nothing to
+            # attach to and survived untranslated into 4 of 11 locales at the same
+            # line; reviewers found all 3 in-prose links defective in fa.
+            #
+            # SEQUENCING (this is why the change is safe only now): removing this
+            # trigger was falsified on 2026-09-05 -- an identity round-trip over 14
+            # real pages went 14/14 -> 0/14 byte-identical, because re-parsing a
+            # whole translated paragraph dropped every link's URL ("[text]()"). That
+            # was a latent markdown-it-py 4.x bug in the renderer (Token.attrs is a
+            # dict, but the re-parse iterated it as (key, value) tuples, so the href
+            # lookup never matched), fixed separately in e065151. With that landed,
+            # the identity round-trip is 14/14 again WITH this trigger removed, so
+            # the extractor change is now output-neutral.
+            # See data/summaries/fp-link-paragraph-still-leaf-split-20260905.json
+            # and data/summaries/fp-tc-apt-076-falsified-20260905.json
 
-            # Check text for technical patterns
-            if child.type == NodeType.TEXT and child.raw:
-                text = child.raw.strip()
-                if self._is_technical_identifier(text):
-                    return True
+            # Deliberately NOT checking child.type == TEXT fragments against
+            # _is_technical_identifier here (TC-APT-013, confirmed by direct-read
+            # review of real content): that regex is anchored (^...$) and designed
+            # to classify a text node whose ENTIRE content is a standalone
+            # identifier -- appropriate at the leaf/do_not_translate level. Applied
+            # here to a mere fragment of a longer sentence (e.g. the plain-text run
+            # before a paragraph's first code span or link), it cannot distinguish
+            # a real identifier from an ordinary capitalized English word of 4+
+            # letters -- practically every sentence-initial word looks the same
+            # shape. A real case: "Call `Annotation.Flatten()` to burn ... into the
+            # page content." -- "Call" (an imperative verb, not an identifier)
+            # matched, forcing this whole sentence to leaf-level fallback and
+            # reproducing the exact dropped-verb/incomplete-sentence defect this
+            # taskcard's CODE_SPAN exclusion (above) was written to fix. The
+            # asymmetry favors leaving this out: full-sentence extraction with the
+            # fragment's plain text is very unlikely to actually mistranslate a
+            # genuine bare identifier fragment sitting next to a protected code
+            # span, in contrast to the confirmed, portfolio-relevant grammar
+            # breakage caused by leaf-splitting a sentence that shouldn't be split.
 
             # Recursively check nested children
             if self._has_technical_content(child):
@@ -2049,6 +2331,18 @@ class TextUnitExtractor:
             logger.debug(
                 "Punctuation-only text detected (protected)",
                 extra={"source_text": sanitize_for_log(text_stripped, 50)},
+            )
+            return True
+
+        # Strategy 0.6: the text IS a bare URL - NEVER translate. Found via
+        # TC-APT-004b qualification on real content: a link whose visible text is
+        # its own href (a common markdown pattern for a plain reference link, e.g.
+        # `[https://github.com/x/y](https://github.com/x/y)`) has no natural
+        # language content at all, but matched none of the other strategies here.
+        if re.match(r"^https?://\S+$", text_stripped):
+            logger.debug(
+                "Bare URL text detected (protected)",
+                extra={"source_text": sanitize_for_log(text_stripped, 80)},
             )
             return True
 
@@ -2106,6 +2400,24 @@ class TextUnitExtractor:
         ):
             return False
 
+        # Strategy 1.5: confirmed fixed technical-domain headings. Found via
+        # TC-APT-013's Gate 4 canary run: "Scene Graph" recurred as the SAME
+        # same-as-source TC-SAS-01 fingerprint across two unrelated real
+        # source files (both m2m100 and professionalize_llm consistently
+        # left it unchanged, all 5 retry attempts). CONFIRMED, not assumed,
+        # against already-shipped translations: blog.aspose.org's own nl/no/
+        # ru versions of two different 3D posts all keep "### Scene Graph"
+        # verbatim -- including ru, where an untranslated English heading
+        # would be maximally visible if it were a defect. Matches "Aspose.X
+        # KB"-style navigation labels' lesson: the model reproducing the
+        # site's own established convention is correct, not a failure.
+        # Deliberately a small, explicit, evidence-backed set rather than a
+        # general "known compound technical term" heuristic (which would
+        # risk silently protecting real translatable prose with no comparable
+        # evidence behind it).
+        if text_stripped in _CONFIRMED_FIXED_TECHNICAL_HEADINGS:
+            return True
+
         # Strategy 2: Heuristic-based detection
         if self._is_technical_identifier(text_stripped):
             return True
@@ -2133,7 +2445,21 @@ class TextUnitExtractor:
         # Requires 4+ chars total to avoid false-positive on common 3-char words (Use, The, For, See).
         # Changed from r"^[A-Z][a-z]+(?:[A-Z][a-z]+)+$" which required 2+ components
         # and incorrectly allowed translation of single-word API class names.
-        if re.match(r"^[A-Z][a-z0-9]{3,}(?:[A-Z][a-z0-9]*)*$", text):
+        #
+        # TC-APT-013 (Gate 4 canary): "PbrMaterial" -- a real API class name, confirmed
+        # by direct extraction from a real source file -- failed BOTH branches: as a
+        # single segment it's only 11 chars total but the {3,} floor applies to the
+        # FIRST segment alone ("Pbr" has just 2 lowercase chars after "P"), and the
+        # multi-segment case inherited that same per-segment floor. A second
+        # alternative drops the per-segment minimum once there are 2+ capitalized
+        # segments: the second internal capital is itself strong-enough signal (no
+        # ordinary English word has one), so short segments like "Pbr", "Rgb", "Io",
+        # or a single letter ("X"/"Y" axis prefixes, common in this 3D-graphics
+        # domain) are legitimate there without risking the 3-char-word false positive
+        # the {3,} floor exists to prevent for single-segment text.
+        if re.match(
+            r"^[A-Z][a-z0-9]{3,}(?:[A-Z][a-z0-9]*)*$|^(?:[A-Z][a-z0-9]*){2,}$", text
+        ):
             return True
 
         # PascalCase.With.Dots — full match required; no trailing words/spaces
@@ -2142,8 +2468,20 @@ class TextUnitExtractor:
         if re.match(r"^[A-Z][a-z]+(?:\.[A-Z][A-Za-z0-9]*)+$", text):
             return True
 
-        # snake_case (lowercase with underscores)
-        if "_" in text and text.islower():
+        # snake_case (lowercase with underscores) -- full match required.
+        # The prior check ("_" in text and text.islower()) matched ANY text
+        # containing an underscore anywhere with no uppercase letters at all,
+        # so a full lowercase prose sentence merely mentioning a snake_case
+        # identifier (e.g. a list item "`display_string_value` -- the cell's
+        # display text when reading values back.") was itself protected and
+        # left untranslated in every locale. Found via review of
+        # wave-cellsrust-quickstart-retrigger-20260911r3 (23/23 reviewed
+        # locales carried this exact sentence untranslated). Anchoring to the
+        # whole string, matching every other identifier-shape check in this
+        # method, still protects a standalone identifier unit
+        # ("aspose_slides_low_code") while letting prose that merely contains
+        # one through to normal translation.
+        if re.match(r"^[a-z][a-z0-9_]*$", text):
             return True
 
         # ALL_CAPS (2+ characters)

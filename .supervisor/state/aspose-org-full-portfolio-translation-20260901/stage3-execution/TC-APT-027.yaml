@@ -1,0 +1,14 @@
+taskcard: TC-APT-027
+title: websites.aspose.org path-guard handling (G-17)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+decision: "path_guard.py is never edited (FORBIDDEN_EXACT, self-protected); every commit touching content/websites.aspose.org/ uses the repo's own override-token mechanism (override_manager.py create -> pre-commit validates from reports/overrides/pending/ -> post-commit consumes/archives)"
+mechanism_proof_no_commit_performed:
+  - "path_guard.py --stdin: content/websites.aspose.org/de/_index.md -> DENY (printed); content/docs.aspose.org/de/_index.md -> ALLOW; skills/ht-translate.md -> DENY (forbidden prefix)"
+  - "override_manager.py create --paths content/websites.aspose.org/de/_index.md --reason 'TC-APT-027 ... LIFECYCLE PROOF ... no commit' --plan <plan> --operation create -> token 20260902-060010-content-websites-aspose-org-de-_index-md"
+  - "override_manager.py validate-for-path content/websites.aspose.org/de/_index.md -> VALID (exit 0)"
+  - "token withdrawn (own pending JSON removed) so no live authorization lingers; list-pending shows only the other session's MISSION_AUTHORITY token"
+operational_procedure: "documented in skills/ht-translate.md Step 7 and skills/ht-translate-batch.md Step 8 (TC-APT-025); the loop's per-batch commit step (plan 19.2 step 4) creates one token per websites batch (<=20 paths per token call) before staging"
+gate6_recheck: "at the first real websites.aspose.org commit, override_manager.py audit must show the consumed token bound to that commit sha; recorded in the Gate 6 evidence"
+acceptance: "mechanism verified end-to-end short of the commit itself; every future websites commit is token-backed by construction (pre-commit Step 3 blocks otherwise) -> MET for Gate 0; audit re-verified at Gate 6"

@@ -96,14 +96,16 @@ def test_should_skip_translation_content_changed(tmp_path):
 
     method = RealEngine._should_skip_translation
 
-    # Call
+    # Call with the mtime pre-check disabled so the CONTENT HASH path is what decides
+    # (with use_mtime_check=True the engine returns "source has been modified (mtime)"
+    # before ever consulting the tracker, which is not what this test claims to cover).
     should_skip, reason = method(
-        engine, source_file, output_file, force_retranslate=False, use_mtime_check=True
+        engine, source_file, output_file, force_retranslate=False, use_mtime_check=False
     )
 
-    # Should NOT skip because content changed
+    # Should NOT skip because content changed (TC-APT-003: sha256 comparison is primary)
     assert should_skip is False
-    assert "changed" in reason
+    assert "changed" in reason and "sha256" in reason
 
 
 def test_should_skip_translation_force_retranslate(tmp_path):

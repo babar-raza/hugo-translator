@@ -4,6 +4,7 @@ Tests retry loop, feedback guard, MT retry guard (TC-BUGFIX-B),
 correction pass, and TM buffer lifecycle.
 """
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -18,6 +19,7 @@ from src.translation_engine.file_pipeline import (
     FileTranslationPipeline,
     LanguageResult,
     LanguageTranslationContext,
+    _quarantine_diagnostic_candidate,
     verification_error_metadata,
 )
 
@@ -46,6 +48,83 @@ def test_verification_error_metadata_excludes_candidate_text():
         }
     ]
     assert "SECRET" not in repr(metadata)
+
+
+def test_quarantine_diagnostic_candidate_preserves_safe_details_only(tmp_path):
+    """A recovery-qualification rejection must record the actual similarity
+    score/threshold/exception type (so it can be told apart from an
+    encoder-unavailable false rejection) while never leaking candidate text
+    or arbitrary/unvetted detail keys into the quarantine metadata."""
+    quarantine_root = tmp_path / ".local" / "rating-cause-analysis-runs" / "probe"
+    engine = SimpleNamespace(diagnostic_quarantine_root=str(quarantine_root))
+
+    issue = SimpleNamespace(
+        validator="SemanticSimilarityValidator",
+        severity=SimpleNamespace(value="error"),
+        location="",
+        message="Semantic similarity 0.180 < 0.25 — translation meaning diverges significantly from source",
+        details={"similarity": 0.180, "threshold": 0.25, "unexpected_key": "SECRET CANDIDATE TEXT"},
+    )
+    validation_result = SimpleNamespace(issues=[issue])
+
+    _quarantine_diagnostic_candidate(
+        engine,
+        source_content="Source body text.",
+        candidate="SECRET CANDIDATE TEXT",
+        output_path=Path("index.it.md"),
+        target_lang="it",
+        retry_count=0,
+        error="write blocked",
+        validation_result=validation_result,
+        retry_feedback=None,
+    )
+
+    metadata_files = list(quarantine_root.glob("candidates/*/metadata.json"))
+    assert len(metadata_files) == 1
+    metadata = json.loads(metadata_files[0].read_text(encoding="utf-8"))
+
+    assert metadata["source_body_chars"] == len("Source body text.")
+    assert metadata["candidate_body_chars"] == len("SECRET CANDIDATE TEXT")
+    [recorded] = metadata["validator_details"]
+    assert recorded["validator"] == "SemanticSimilarityValidator"
+    assert recorded["details"] == {"similarity": 0.180, "threshold": 0.25}
+    assert "unexpected_key" not in recorded["details"]
+    assert "SECRET" not in repr(metadata)
+
+
+def test_quarantine_diagnostic_candidate_records_encoder_unavailable_with_no_score(tmp_path):
+    """The 'no encoder' rejection path carries no similarity value at all --
+    the quarantine record must show an empty details dict (not a fabricated
+    score), so it reads as distinguishable from a real low-similarity reject."""
+    quarantine_root = tmp_path / ".local" / "rating-cause-analysis-runs" / "probe"
+    engine = SimpleNamespace(diagnostic_quarantine_root=str(quarantine_root))
+
+    issue = SimpleNamespace(
+        validator="SemanticSimilarityValidator",
+        severity=SimpleNamespace(value="error"),
+        location="",
+        message="Validator unavailable (no sentence encoder available)",
+        details={},
+    )
+    validation_result = SimpleNamespace(issues=[issue])
+
+    _quarantine_diagnostic_candidate(
+        engine,
+        source_content="Source body text.",
+        candidate="Candidate body text.",
+        output_path=Path("index.it.md"),
+        target_lang="it",
+        retry_count=0,
+        error="write blocked",
+        validation_result=validation_result,
+        retry_feedback=None,
+    )
+
+    metadata_files = list(quarantine_root.glob("candidates/*/metadata.json"))
+    metadata = json.loads(metadata_files[0].read_text(encoding="utf-8"))
+    [recorded] = metadata["validator_details"]
+    assert recorded["message"] == "Validator unavailable (no sentence encoder available)"
+    assert recorded["details"] == {}
 
 
 def test_zero_defect_warning_block_preserves_verification_result_in_memory():
@@ -96,6 +175,48 @@ def test_zero_defect_warning_block_preserves_verification_result_in_memory():
     assert result.verification_result is verification_result
     assert result.error == ("Zero-defect verification requires zero errors and zero warnings")
     engine._write_accepted_output.assert_not_called()
+
+
+def test_zero_defect_blocks_structural_warning_before_any_write():
+    """A topology warning is blocking under the configured campaign policy."""
+    from src.translation_engine.validation.post_translation_validator import (
+        ValidationDecision as PostValidationDecision,
+    )
+
+    engine = _make_engine(validation_enabled=True)
+    engine.validation_policy = "zero-defect"
+    structure_warning = SimpleNamespace(
+        severity="warning",
+        validator="StructureValidator",
+        check_name="structure",
+        location="links",
+        message="Link/image count mismatch: source has 1, translation has 2",
+        details={"source_count": 1, "translation_count": 2},
+    )
+    validation_result = SimpleNamespace(
+        issues=[structure_warning], error_count=0, warning_count=1, info_count=0
+    )
+    engine.validation_suite.validate_aggregated.return_value = validation_result
+    engine.decision_engine.make_decision.return_value = SimpleNamespace(
+        decision=PostValidationDecision.ACCEPT,
+        decision_reason="ordinary validator policy would accept",
+    )
+    verification_result = SimpleNamespace(
+        passed=True, issues=[], error_count=0, warning_count=0
+    )
+    engine._get_verification_agent.return_value.verify.return_value = verification_result
+    engine.parser.parse_string.return_value = SimpleNamespace(
+        frontmatter={"title": "Translated"}, body="Translated body"
+    )
+
+    result = _make_result()
+    language = FileTranslationPipeline(engine).translate_language(
+        _make_ctx(should_validate=True, should_verify=True), result
+    )
+
+    assert not language.success
+    assert result.error == "Zero-defect validation requires zero errors and zero warnings"
+    engine._write_output.assert_not_called()
 
 
 def _make_engine(
@@ -347,6 +468,57 @@ class TestBasicPipelineFlow:
         assert result.validation_result is validation_result
         assert "LanguageConsistencyValidator" in result.error
 
+    def test_rejection_records_retry_attempts_matching_the_retry_count(self):
+        """RT-02: result.retry_attempts (read by campaign_runner.py's
+        _failure_metadata() as `internal_retries=` in every failure ledger
+        row) used to be set ONLY inside the success/accept branch -- on a
+        TranslationRejectedError exit, it was silently left unset, so the
+        campaign ledger recorded `internal_retries=0` even when real retries
+        happened, disagreeing with the "High retry overhead" log line
+        (sourced from the always-correct `lang_result.retry_count`).
+        """
+        engine = _make_engine()
+        engine._translate_to_language.side_effect = TranslationRejectedError(
+            message="Rejected",
+            file_path="/tmp/test.md",
+            validation_result=SimpleNamespace(issues=[]),
+            rejection_reason="LinkValidator source_count=6 translation_count=7",
+        )
+        result = _make_result()
+
+        language = FileTranslationPipeline(engine).translate_language(
+            _make_ctx(max_retry_attempts=2), result
+        )
+
+        assert not language.success
+        assert result.retry_attempts == language.retry_count, (
+            f"result.retry_attempts ({result.retry_attempts}) must match "
+            f"language.retry_count ({language.retry_count}) -- these are the "
+            f"two counters campaign_runner.py's ledger and its stderr log "
+            f"line read independently, and they must never disagree"
+        )
+
+    def test_exhausted_retryable_error_records_nonzero_retry_attempts(self):
+        """Companion to the rejection case above, for the exhausted-
+        TranslationRetryableError exit path -- the other branch RT-02 found
+        silently skipping result.retry_attempts."""
+        engine = _make_engine()
+        engine._translate_to_language.side_effect = TranslationRetryableError(
+            message="Retry",
+            file_path="/tmp/test.md",
+            validation_result=SimpleNamespace(issues=[]),
+            retry_feedback="try again",
+        )
+        result = _make_result()
+
+        language = FileTranslationPipeline(engine).translate_language(
+            _make_ctx(max_retry_attempts=0), result
+        )
+
+        assert not language.success
+        assert language.retry_count > 0, "sanity check: a real retry must have happened"
+        assert result.retry_attempts == language.retry_count
+
     def test_unexpected_exception_preserves_class_and_cause_in_memory(self):
         engine = _make_engine()
         engine._translate_to_language.side_effect = ValueError("SECRET REJECTED CANDIDATE")
@@ -521,7 +693,19 @@ class TestRetryAndFeedbackGuard:
 
 class TestMTRetryGuard:
     def test_mt_backend_retry_escalates_to_reject(self):
-        """MT backend on RETRY decision → immediate rejection (no futile retry)."""
+        """MT backend on RETRY decision → immediate rejection (no futile retry).
+
+        VA-02 (TC-APT-105 audit): file_pipeline.py no longer re-derives its
+        own "is this critical" check for MT backends (the old, policy-blind
+        BUG-022 logic this test used to exercise via an unconfigured
+        MagicMock's default-truthy return value from
+        `decision_engine._check_critical_failure`, not genuine critical-
+        failure semantics). It instead re-invokes the SAME
+        `make_decision()` with the budget pretend-exhausted, so this
+        scenario is now expressed as a second call returning REJECT --
+        exactly mirroring `test_llm_backend_retry_allowed`'s existing
+        two-call `side_effect` pattern below.
+        """
         from src.translation_engine.validation.post_translation_validator import (
             ValidationDecision as PostValidationDecision,
         )
@@ -532,7 +716,12 @@ class TestMTRetryGuard:
         decision_retry.decision = PostValidationDecision.RETRY
         decision_retry.retry_feedback = "Fix terminology"
         decision_retry.decision_reason = "Terminology issues"
-        engine.decision_engine.make_decision.return_value = decision_retry
+
+        decision_reject = MagicMock()
+        decision_reject.decision = PostValidationDecision.REJECT
+        decision_reject.decision_reason = "Failed after 0 retries"
+
+        engine.decision_engine.make_decision.side_effect = [decision_retry, decision_reject]
 
         vr = MagicMock()
         vr.issues = []
@@ -548,6 +737,111 @@ class TestMTRetryGuard:
         lang_result = pipeline.translate_language(ctx, result)
         assert not lang_result.success
         # Only 1 translation call — no futile retry
+        assert engine._translate_to_language.call_count == 1
+        # Re-arbitrated via the SAME decision engine, not a separate guess.
+        assert engine.decision_engine.make_decision.call_count == 2
+
+    def test_mt_backend_honors_real_decision_engines_reject_policy(self):
+        """VA-02 (TC-APT-105 audit), against the REAL ValidationDecisionEngine
+        (not a mock): with accept_after_max_retries=False, a WARNING-only,
+        non-critical result must REJECT for an MT backend, exactly as it
+        already does for LLM backends -- not silently downgrade to
+        accept-best-effort just because nothing is ERROR-severity, which is
+        the exact live incident shape this taskcard closes."""
+        from src.translation_engine.validation.base import (
+            ValidationIssue,
+            ValidationResult,
+            ValidationSeverity,
+        )
+        from src.translation_engine.validation.decision_engine import (
+            ValidationDecisionEngine,
+        )
+
+        engine = _make_engine(validation_enabled=True)
+        engine.decision_engine = ValidationDecisionEngine(
+            {
+                "decision_rules": {
+                    "reject_on_error_count": 3,
+                    "max_retry_attempts": 2,
+                    "accept_warnings": False,
+                    "accept_after_max_retries": False,
+                }
+            }
+        )
+        validation_result = ValidationResult(
+            success=True,
+            issues=[
+                ValidationIssue(
+                    severity=ValidationSeverity.WARNING,
+                    validator="TerminologyPreservationValidator",
+                    message="term suggestion",
+                )
+            ],
+        )
+        engine.validation_suite.validate_aggregated.return_value = validation_result
+
+        pipeline = FileTranslationPipeline(engine)
+        # A positive budget so Rule 4 genuinely returns RETRY on the first
+        # call (exercising this taskcard's new re-arbitration code in the
+        # RETRY branch), not VA-01's separate zero-budget-on-first-call fix.
+        ctx = _make_ctx(should_validate=True, max_retry_attempts=2)
+        result = _make_result()
+        result.stats.model_used = "m2m100_418M"  # MT backend (not LLM)
+
+        lang_result = pipeline.translate_language(ctx, result)
+
+        assert not lang_result.success
+        # Only 1 translation call — re-arbitrated without a futile retranslation.
+        assert engine._translate_to_language.call_count == 1
+
+    def test_mt_backend_honors_real_decision_engines_accept_policy(self):
+        """Inverse of the above, same real decision engine: with
+        accept_after_max_retries=True (the production default), the same
+        WARNING-only, non-critical result IS accepted best-effort -- this
+        fix changes WHO decides (the shared decision engine, policy-aware),
+        not the production-default outcome for the common case."""
+        from src.translation_engine.validation.base import (
+            ValidationIssue,
+            ValidationResult,
+            ValidationSeverity,
+        )
+        from src.translation_engine.validation.decision_engine import (
+            ValidationDecisionEngine,
+        )
+
+        engine = _make_engine(validation_enabled=True)
+        engine.decision_engine = ValidationDecisionEngine(
+            {
+                "decision_rules": {
+                    "reject_on_error_count": 3,
+                    "max_retry_attempts": 2,
+                    "accept_warnings": False,
+                    "accept_after_max_retries": True,
+                }
+            }
+        )
+        validation_result = ValidationResult(
+            success=True,
+            issues=[
+                ValidationIssue(
+                    severity=ValidationSeverity.WARNING,
+                    validator="TerminologyPreservationValidator",
+                    message="term suggestion",
+                )
+            ],
+        )
+        engine.validation_suite.validate_aggregated.return_value = validation_result
+
+        pipeline = FileTranslationPipeline(engine)
+        # See the reject-policy test above: a positive budget exercises this
+        # taskcard's new re-arbitration code, not VA-01's separate fix.
+        ctx = _make_ctx(should_validate=True, max_retry_attempts=2)
+        result = _make_result()
+        result.stats.model_used = "m2m100_418M"  # MT backend (not LLM)
+
+        lang_result = pipeline.translate_language(ctx, result)
+
+        assert lang_result.success
         assert engine._translate_to_language.call_count == 1
 
     def test_llm_backend_retry_allowed(self):

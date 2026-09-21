@@ -19,6 +19,9 @@ from src.workers.campaign_manifest import (
 )
 from src.workers.campaign_runner import CampaignLedger, CampaignRunner
 from src.translation_engine.models import AcceptedTranslation
+from src.model_runtime.llm_providers import BaseLLMProvider
+from src.tm.rejected_task_queue import RejectedTaskQueue
+from src.tm.retry_records import RejectedTranslationTask
 
 
 def _manifest(tmp_path: Path) -> dict:
@@ -71,6 +74,202 @@ def test_manifest_loads_and_enumerates_deterministic_jobs(tmp_path):
     jobs = list(manifest.jobs())
     assert len(jobs) == 2
     assert [job[1] for job in jobs] == ["es", "fr"]
+
+
+def test_parallel_runner_verifies_only_its_assigned_shard_paths(tmp_path, monkeypatch):
+    raw = _manifest(tmp_path)
+    raw["commit_policy"]["max_outputs_per_commit"] = 1
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    manifest = CampaignManifest.load(path)
+    shard = list(manifest.shards(max_outputs=1))[0]
+    captured = {}
+
+    def capture_verify_environment(_manifest, **kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(CampaignManifest, "verify_environment", capture_verify_environment)
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=SimpleNamespace(campaign_context={}),
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(runner, "_validated_resume_receipts", lambda: {})
+
+    runner.verify(resume=True, shard_ids=frozenset({str(shard["shard_id"])}))
+
+    expected_sources = {source.source_path for source, _locale, _output in shard["jobs"]}
+    expected_outputs = {output for _source, _locale, output in shard["jobs"]}
+    assert captured["scope_sources"] == expected_sources
+    assert captured["scope_outputs"] == expected_outputs
+    assert captured["allow_campaign_tm_drift"] is True
+
+
+def test_parallel_runner_refuses_unknown_shard_before_environment_check(tmp_path, monkeypatch):
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(_manifest(tmp_path)), encoding="utf-8")
+    manifest = CampaignManifest.load(path)
+    monkeypatch.setattr(
+        CampaignManifest,
+        "verify_environment",
+        lambda _manifest, **_kwargs: pytest.fail(
+            "environment check must not run for an unknown shard"
+        ),
+    )
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=SimpleNamespace(campaign_context={}),
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(runner, "_validated_resume_receipts", lambda: {})
+
+    with pytest.raises(CampaignManifestError, match="unknown or already complete"):
+        runner.verify(resume=True, shard_ids=frozenset({"not-a-real-shard"}))
+
+
+def test_manifest_accepts_professionalize_llm_as_primary(tmp_path):
+    """TC-APT-039 (plan revision 8, §6.1): the primary/escalation pair may run in
+    either direction, chosen from TC-APT-006's per-language measurement."""
+    raw = _manifest(tmp_path)
+    raw["retry_policy"]["primary_model"] = "professionalize_llm"
+    raw["retry_policy"]["llm_model"] = "m2m100_418m"
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    manifest = CampaignManifest.load(path)
+    assert manifest.retry_policy["primary_model"] == "professionalize_llm"
+    assert manifest.retry_policy["llm_model"] == "m2m100_418m"
+
+
+def test_manifest_accepts_professionalize_only_policy(tmp_path):
+    raw = _manifest(tmp_path)
+    raw["retry_policy"].update(
+        primary_model="professionalize_llm",
+        llm_model="professionalize_llm",
+        llm_escalation_mode="professionalize_only",
+        llm_escalation_attempts=0,
+        professionalize_only=True,
+    )
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    manifest = CampaignManifest.load(path)
+    assert manifest.retry_policy["professionalize_only"] is True
+
+
+def test_professionalize_only_rejects_m2m_fallback(tmp_path):
+    raw = _manifest(tmp_path)
+    raw["retry_policy"].update(
+        primary_model="professionalize_llm",
+        llm_model="m2m100_418m",
+        llm_escalation_mode="professionalize_only",
+        llm_escalation_attempts=0,
+        professionalize_only=True,
+    )
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(CampaignManifestError, match="professionalize_only"):
+        CampaignManifest.load(path)
+
+
+def test_manifest_accepts_deferred_professionalize_queue(tmp_path):
+    raw = _manifest(tmp_path)
+    raw["retry_policy"]["llm_escalation_mode"] = "deferred"
+    raw["retry_policy"]["llm_escalation_attempts"] = 0
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    manifest = CampaignManifest.load(path)
+    assert manifest.retry_policy["llm_escalation_mode"] == "deferred"
+
+
+def test_llm_call_outcomes_are_category_scoped_and_payload_free(tmp_path):
+    ledger = CampaignLedger(tmp_path / "ledger", "pilot")
+    for category, outcome in (("identity", "completed"), ("repair", "deferred"), ("retry", "failed")):
+        ledger._append(
+            ledger.root / "llm_calls.jsonl",
+            {"category": category, "outcome": outcome, "candidate": "must not be surfaced"},
+        )
+
+    assert ledger.llm_call_outcomes() == {
+        "identity": {"completed": 1},
+        "repair": {"deferred": 1},
+        "retry": {"failed": 1},
+    }
+
+
+def test_deferred_campaign_skips_identity_provider_call(tmp_path):
+    payload = _manifest(tmp_path)
+    payload["retry_policy"]["llm_escalation_mode"] = "deferred"
+    payload["retry_policy"]["llm_escalation_attempts"] = 0
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=SimpleNamespace(campaign_context={}),
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+
+    assert runner._llm_identity_gate() == {
+        "status": "SKIPPED",
+        "reason": "llm_escalation_mode=deferred",
+        "cadence": "deferred",
+    }
+
+
+def test_verify_only_summary_has_outcomes_without_provider_or_translation(tmp_path, monkeypatch):
+    payload = _manifest(tmp_path)
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    engine = SimpleNamespace(campaign_context={})
+    runner = CampaignRunner(
+        manifest=CampaignManifest.load(manifest_path),
+        translation_engine=engine,
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(
+        runner, "verify", lambda **_kwargs: {"campaign_id": "pilot", "accepted": 0, "remaining": 2}
+    )
+
+    summary = runner.run(verify_only=True)
+
+    assert summary == {"campaign_id": "pilot", "accepted": 0, "remaining": 2}
+    artifact = json.loads(runner.ledger.summary_path.read_text(encoding="utf-8"))
+    assert artifact["status"] == "VERIFIED"
+    assert artifact["model_outcomes"] == {}
+    assert artifact["attempt_model_outcomes"] == {}
+    assert artifact["llm_call_outcomes"] == {}
+
+
+def test_manifest_accepts_1_2b_m2m_for_deferred_queue(tmp_path):
+    raw = _manifest(tmp_path)
+    raw["retry_policy"].update(
+        primary_model="m2m100_1.2b", llm_escalation_mode="deferred", llm_escalation_attempts=0
+    )
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    assert CampaignManifest.load(path).retry_policy["primary_model"] == "m2m100_1.2b"
+
+
+@pytest.mark.parametrize(
+    "primary_model,llm_model",
+    [
+        ("m2m100_418m", "m2m100_418m"),
+        ("professionalize_llm", "professionalize_llm"),
+        ("m2m100_418m", "some_other_model"),
+        ("some_other_model", "professionalize_llm"),
+    ],
+)
+def test_manifest_rejects_invalid_primary_escalation_pairs(tmp_path, primary_model, llm_model):
+    raw = _manifest(tmp_path)
+    raw["retry_policy"]["primary_model"] = primary_model
+    raw["retry_policy"]["llm_model"] = llm_model
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(CampaignManifestError):
+        CampaignManifest.load(path)
 
 
 def test_manifest_rejects_path_traversal(tmp_path):
@@ -195,6 +394,106 @@ def test_verify_environment_preserves_frozen_dirty_destination(tmp_path):
         )
 
 
+def _campaign_scoped_env(tmp_path: Path):
+    """Shared git/manifest setup for the TC-APT-075 declared-replacement tests below."""
+    content_repo = tmp_path / "content"
+    translator_repo = tmp_path / "translator"
+    for repo in (content_repo, translator_repo):
+        repo.mkdir()
+        subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True
+        )
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+
+    source = content_repo / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    # fr's output file is deliberately never created here: verify_environment's
+    # per-source loop only checks a target that actually exists on disk, and
+    # these tests only care about the es target. A test that needs an
+    # undeclared dirty output creates fr_output itself.
+    es_output = content_repo / "content/docs.aspose.org/es/words/net/page.md"
+    fr_output = content_repo / "content/docs.aspose.org/fr/words/net/page.md"
+    es_output.parent.mkdir(parents=True)
+    fr_output.parent.mkdir(parents=True)
+    es_output.write_text("committed es", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=content_repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=content_repo, check=True)
+
+    registry = translator_repo / "config/model_registry.yaml"
+    registry.parent.mkdir(parents=True)
+    registry.write_text("models: []\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=translator_repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=translator_repo, check=True)
+
+    payload = _manifest(content_repo)
+    payload["execution_policy"] = {"dirty_scope": "campaign_paths"}
+    payload["content_repo_sha"] = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=content_repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    payload["translator_repo_sha"] = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=translator_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    payload["model_fingerprints"] = {"model_registry": sha256_file(registry)}
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    return content_repo, translator_repo, payload, es_output, fr_output
+
+
+def test_declared_replacement_target_being_dirty_does_not_block_relaunch(tmp_path):
+    """TC-APT-075: a review-rejected page's own uncommitted (dirty) output must not
+    permanently block relaunching it -- mirrors the SHA-drift branch above (~line 393),
+    which already excludes `declared` replacement targets from its own equivalent check.
+    Reproduced the real blocker first: before this fix, this exact scenario raised
+    "unreceipted campaign output is dirty" and there was no way to retrigger a
+    review-rejected page at all (plan TC-APT-075, field notes 2026-09-05).
+    """
+    content_repo, translator_repo, payload, es_output, _fr_output = _campaign_scoped_env(tmp_path)
+
+    # Simulate a prior review-rejected (uncommitted) draft still sitting on disk.
+    es_output.write_text("rejected draft", encoding="utf-8")
+    payload["sources"][0]["replace_existing"] = {
+        "es": {"expected_sha256": sha256_file(es_output), "reason_code": "review_rejected_retry"}
+    }
+
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+
+    # Non-empty but unrelated to es/fr: only present so the (irrelevant to this
+    # test) TM-fingerprint check, gated on `not allow_existing_accepted`, is skipped.
+    manifest.verify_environment(
+        translator_repo=translator_repo,
+        require_clean=True,
+        allow_existing_accepted={"__unused_placeholder__"},
+    )
+
+
+def test_undeclared_dirty_output_still_blocks_relaunch_under_campaign_scope(tmp_path):
+    """Regression guard for the fix above: an output that is dirty but NOT declared
+    for replacement must still block the launch -- the fix narrows the exclusion to
+    exactly the campaign's own declared targets, it does not disable the check."""
+    content_repo, translator_repo, payload, es_output, fr_output = _campaign_scoped_env(tmp_path)
+
+    # es is declared and dirty (allowed); fr is dirty but undeclared (must still block).
+    es_output.write_text("rejected draft", encoding="utf-8")
+    fr_output.write_text("stray uncommitted edit", encoding="utf-8")
+    payload["sources"][0]["replace_existing"] = {
+        "es": {"expected_sha256": sha256_file(es_output), "reason_code": "review_rejected_retry"}
+    }
+
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+
+    with pytest.raises(CampaignManifestError, match="unreceipted campaign output is dirty"):
+        manifest.verify_environment(translator_repo=translator_repo, require_clean=True)
+
+
 def test_ledger_never_accepts_candidate_text(tmp_path):
     ledger = CampaignLedger(tmp_path, "pilot")
     with pytest.raises(ValueError, match="candidate text"):
@@ -232,6 +531,143 @@ def test_failure_ledger_contains_metadata_only(tmp_path):
     assert row["gate"] == "pipeline"
     assert row["job_id"]
     assert "content" not in row
+
+
+def test_model_outcomes_are_campaign_scoped_and_candidate_free(tmp_path):
+    ledger = CampaignLedger(tmp_path, "active")
+    ledger.append_receipt({"output_path": "de/page.md", "model_fingerprint": "m2m100_418m"})
+    ledger.append_failure(
+        source_path="source.md",
+        output_path="de/page.md",
+        target_lang="de",
+        error="gate failed",
+        gate="StructureValidator",
+        model_id="m2m100_418m",
+    )
+    ledger._append(
+        tmp_path / "heal_queue.jsonl",
+        {"campaign_id": "active", "processing_model": "professionalize_llm", "status": "QUEUED"},
+    )
+    ledger._append(
+        tmp_path / "heal_queue.jsonl",
+        {"campaign_id": "old", "processing_model": "professionalize_llm", "status": "QUEUED"},
+    )
+    CampaignLedger(tmp_path, "historical").append_receipt(
+        {"output_path": "fr/old-page.md", "model_fingerprint": "professionalize_llm"}
+    )
+    retry_queue = RejectedTaskQueue(tmp_path / "rejected_tasks.sqlite3")
+    deferred = RejectedTranslationTask.from_mapping(
+        {
+            "campaign_id": "active", "site_id": "docs.aspose.org",
+            "source_path": "content/en/page.md", "output_path": "content/de/page.md",
+            "source_sha256": "a" * 64, "target_lang": "de",
+            "failure_category": "structure", "failure_fingerprint": "fingerprint",
+            "retry_budget": 2, "model_target": "professionalize_llm",
+        }
+    )
+    task_id = retry_queue.enqueue(deferred)
+    retry_queue.claim("consumer")
+    retry_queue.accepted(task_id, "consumer", {"receipt_id": "retry-receipt"})
+
+    outcomes = ledger.model_outcomes()
+
+    assert outcomes["m2m100_418m"] == {
+        "accepted": 1,
+        "rejected": 1,
+        "provider_error": 0,
+        "queued": 0,
+    }
+    # The canonical SQLite task supersedes the human-facing heal-ticket row;
+    # an accepted deferred retry must not remain falsely counted as queued.
+    assert outcomes["professionalize_llm"]["queued"] == 0
+    assert outcomes["professionalize_llm"]["accepted"] == 1
+    assert ledger.retry_queue_outcomes() == [
+        {
+            "task_id": task_id,
+            "state": "ACCEPTED",
+            "attempts": 1,
+            "error_code": None,
+            "model_target": "professionalize_llm",
+            "receipt_id": "retry-receipt",
+        }
+    ]
+
+
+def test_attempt_model_outcomes_deduplicate_terminal_failure_rows_and_warn(tmp_path):
+    ledger = CampaignLedger(tmp_path, "active")
+    ledger.append_failure(
+        source_path="source.md",
+        output_path="de/page.md",
+        target_lang="de",
+        error="gate failed",
+        attempt=1,
+        job_id="shard::source.md::de",
+        model_id="m2m100_418m",
+        gate="StructureValidator",
+    )
+    # Audit-only duplicate suppression must not count as a second paid/model attempt.
+    ledger.append_failure(
+        source_path="source.md",
+        output_path="de/page.md",
+        target_lang="de",
+        error="duplicate fingerprint",
+        attempt=1,
+        job_id="shard::source.md::de",
+        model_id="m2m100_418m",
+        gate="duplicate_retry_suppressed",
+    )
+    ledger.append_receipt(
+        {
+            "output_path": "fr/page.md",
+            "model_fingerprint": "professionalize_llm",
+            "attempt_model_id": "professionalize_llm",
+            "campaign_attempt": 4,
+        }
+    )
+
+    expected = {
+        "m2m100_418m": {
+            "1": {"attempted": 1, "accepted": 0, "rejected": 1, "provider_error": 0}
+        },
+        "professionalize_llm": {
+            "4": {"attempted": 1, "accepted": 1, "rejected": 0, "provider_error": 0}
+        },
+    }
+    assert ledger.attempt_model_outcomes() == expected
+    # Re-opening the durable ledger is the resumed-campaign aggregation path.
+    assert CampaignLedger(tmp_path, "active").attempt_model_outcomes() == expected
+    assert ledger.zero_acceptance_recommendations(
+        warning_after_attempts=1, stop_recommendation_after_attempts=2
+    )["recommendations"] == [
+        {
+            "model_id": "m2m100_418m",
+            "attempted": 1,
+            "accepted": 0,
+            "recommendation": "warn_and_continue",
+        }
+    ]
+
+
+def test_attempt_model_outcomes_recommends_investigation_without_stopping(tmp_path):
+    ledger = CampaignLedger(tmp_path, "active")
+    for attempt in (1, 2, 3):
+        ledger.append_failure(
+            source_path="source.md",
+            output_path=f"de/page-{attempt}.md",
+            target_lang="de",
+            error="provider error",
+            attempt=attempt,
+            job_id=f"shard::{attempt}",
+            model_id="m2m100_418m",
+            gate="campaign_job_exception",
+        )
+
+    report = ledger.zero_acceptance_recommendations(
+        warning_after_attempts=1, stop_recommendation_after_attempts=3
+    )
+
+    assert report["recommendations"][0]["recommendation"] == "recommend_pause_and_investigate"
+    assert report["recommendations"][0]["accepted"] == 0
 
 
 def test_campaign_failure_metadata_uses_validator_names_without_messages():
@@ -277,7 +713,27 @@ def test_failure_metadata_records_payload_free_repetition_fingerprint():
 
     gate, reason = CampaignRunner._failure_metadata(result)
 
-    assert gate == "RepetitionDetectorValidator"
+    # VA-01 (TC-APT-105 audit): a WARNING-only validator must not be named in
+    # `validators=` as the CAUSE of a reject.  That still holds -- see the
+    # warning_only_validators= assertion below.
+    #
+    # Corrected 2026-09-11: VA-01's stated premise ("a WARNING-only validator
+    # never actually causes a REJECT decision, Rule 1/2/5 are ERROR-driven")
+    # is false under this portfolio's own configuration.  decision_engine's
+    # Rule 5 reads `accept_after_max_retries` (config/validation.yaml: false)
+    # and its else-branch REJECTs on exhausted retries regardless of issue
+    # severity, so a warning-only result IS terminal under
+    # `validation_policy: zero-defect`.  Live proof: fr and vi of
+    # wave-pdftypescript-coreapi-20260911, three attempts each across both
+    # models, every failure row `validators=unknown;
+    # warning_only_validators=RepetitionDetectorValidator`.  Falling through to
+    # the literal "pipeline" therefore threw away the only actionable signal
+    # the ticket had.  The gate now names the warning validator with an
+    # explicit `warning:` prefix -- distinguishable from error attribution at a
+    # glance and in every root_cause_class derived from it, so VA-01's
+    # anti-misattribution intent survives without the information loss.
+    assert gate == "warning:RepetitionDetectorValidator"
+    assert "warning_only_validators=RepetitionDetectorValidator;" in reason
     assert "RepetitionDetectorValidator:warning:word_frequency:" in reason
     assert "count=4" in reason
     assert "threshold=0.2" in reason
@@ -658,6 +1114,14 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
         def __init__(self):
             self.campaign_context = {}
             self.calls = []
+            class Provider(BaseLLMProvider):
+                def initialize(self, config):
+                    self._config = config
+
+                def _generate_impl(self, system_prompt, user_text):
+                    return "fixture", 2, 1
+
+            self.provider = Provider()
             self.decision_engine = SimpleNamespace(max_retry_attempts=99)
             self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
 
@@ -681,9 +1145,13 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
                     escalated,
                     _kwargs.get("retry_budget_override"),
                     feedback,
-                    self.model_id_override,
+                    # TC-APT-045: the model pin arrives call-scoped, never via
+                    # a shared engine attribute.
+                    _kwargs.get("model_id"),
                 )
             )
+            if _kwargs.get("model_id") == "professionalize_llm":
+                self.provider.generate("system", "source")
             if len(self.calls) < 3:
                 return SimpleNamespace(
                     success=False,
@@ -730,6 +1198,15 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     summary = runner.run()
 
     assert summary["status"] == "COMPLETE"
+    assert summary["llm_call_outcomes"] == {"retry": {"completed": 2, "started": 2}}
+    assert summary["attempt_model_outcomes"]["professionalize_llm"]["5"] == {
+        "attempted": 1,
+        "accepted": 1,
+        "rejected": 0,
+        "provider_error": 0,
+    }
+    assert runner.ledger.receipts()[output_relative]["campaign_attempt"] == 5
+    assert runner.ledger.receipts()[output_relative]["attempt_model_id"] == "professionalize_llm"
     assert engine.calls[0] == (False, 2, None, "m2m100_418m")
     assert engine.calls[1][0:2] == (True, 0)
     assert "Regenerate the complete translation" in engine.calls[1][2]
@@ -737,12 +1214,98 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     assert engine.calls[2][0:2] == (True, 0)
     assert "Regenerate the complete translation" in engine.calls[2][2]
     assert engine.calls[2][3] == "professionalize_llm"
-    assert engine.model_id_override is None
+    # TC-APT-045: the campaign must never create/mutate shared model state.
+    assert not hasattr(engine, "model_id_override")
     assert engine.decision_engine.max_retry_attempts == 99
     failure_log = runner.ledger.failures_path.read_text(encoding="utf-8")
     assert failure_log.count("\n") == 2
     assert "SECRET REJECTED CANDIDATE TEXT" not in failure_log
     assert "translation_rejected" in failure_log
+
+
+def test_campaign_suppresses_second_paid_retry_for_duplicate_candidate(tmp_path):
+    """A source-based retry is audited once, then deduplicated by hash+gate."""
+    source = tmp_path / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    payload = _manifest(tmp_path)
+    payload["target_locales"] = ["es"]
+    payload["expected_output_count"] = 1
+    payload["sources"][0]["outputs"] = {"es": payload["sources"][0]["outputs"]["es"]}
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    output = tmp_path / payload["sources"][0]["outputs"]["es"]
+
+    class Engine:
+        def __init__(self):
+            self.campaign_context = {}
+            self.calls = []
+            self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
+
+        def _get_output_path(self, *_args):
+            return output
+
+        def translate_file(self, _site, _source, target_langs, **kwargs):
+            self.calls.append(kwargs["model_id"])
+            return SimpleNamespace(
+                success=False,
+                acceptance_receipts={},
+                errors=["rejected"],
+                retry_attempts=0,
+                candidate_sha256={target_langs[0]: "a" * 64},
+            )
+
+    engine = Engine()
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    shard = next(manifest.shards(resume_receipts=set(), max_outputs=1))
+    accepted, _output = runner._run_campaign_job(
+        shard=shard,
+        source=manifest.sources[0],
+        locale="es",
+        expected_output=payload["sources"][0]["outputs"]["es"],
+    )
+
+    assert not accepted
+    assert engine.calls == ["m2m100_418m", "professionalize_llm"]
+    rows = CampaignLedger(tmp_path / "ledger", "pilot")._read_jsonl(runner.ledger.failures_path)
+    assert [row["model_id"] for row in rows] == [
+        "m2m100_418m",
+        "professionalize_llm",
+        "professionalize_llm",
+    ]
+    assert rows[-1]["gate"] == "duplicate_retry_suppressed"
+    assert rows[-1]["candidate_sha256"] == "a" * 64
+
+
+def test_read_jsonl_streams_instead_of_loading_the_whole_file(tmp_path, monkeypatch):
+    """A large ticket/receipt file must not be read into memory in one string.
+
+    A real 4-worker run against the full-portfolio manifest hit a genuine
+    MemoryError inside model_outcomes() -> _read_jsonl(heal_queue.jsonl) once
+    that file grew past 10k lines (2026-09-17). path.read_text().splitlines()
+    held the whole file plus its split lines in memory at once; streaming
+    line-by-line avoids that peak.
+    """
+    path = tmp_path / "heal_queue.jsonl"
+    path.write_text(
+        "\n".join(json.dumps({"i": i}) for i in range(50)) + "\n",
+        encoding="utf-8",
+    )
+
+    def _forbidden_read_text(self, *args, **kwargs):
+        raise AssertionError("_read_jsonl must not load the whole file via read_text()")
+
+    monkeypatch.setattr(Path, "read_text", _forbidden_read_text)
+
+    rows = CampaignLedger._read_jsonl(path)
+    assert [row["i"] for row in rows] == list(range(50))
 
 
 def test_campaign_parallel_jobs_share_engine_without_cross_job_state(tmp_path, monkeypatch):
@@ -830,6 +1393,11 @@ def test_campaign_parallel_jobs_share_engine_without_cross_job_state(tmp_path, m
         lambda **_kwargs: {**manifest.to_summary(), "accepted": 0, "remaining": 2},
     )
     monkeypatch.setattr(runner, "_commit_verified_outputs", lambda _shard: None)
+    # TC-APT-046: this test's subject is job overlap, so it must state which side of
+    # the rollback switch it exercises rather than inherit a default. The shipped
+    # default is the serialized (pre-TC-APT-044) behaviour until a canary at
+    # max_parallel_jobs > 1 has been reviewed.
+    monkeypatch.setattr(runner, "_force_serialize", False)
 
     summary = runner.run()
 
@@ -837,6 +1405,209 @@ def test_campaign_parallel_jobs_share_engine_without_cross_job_state(tmp_path, m
     assert engine.peak == 2
     receipts = runner.ledger.receipts()
     assert set(receipts) == {item["outputs"]["es"] for item in payload["sources"]}
+
+
+def test_shard_failure_does_not_block_later_shard_commits(tmp_path, monkeypatch):
+    """TC-APT-041: a shard whose job(s) exhaust every retry no longer aborts
+    the whole run -- it commits whatever it did receipt (nothing here, since a
+    failed job never produces one) and the loop still reaches later shards,
+    which commit normally. The run still ends non-zero, but the raised error
+    carries the full summary (including which shard(s) failed) instead of
+    hiding it behind a mid-run traceback."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "campaign@example.invalid"], cwd=repo, check=True
+    )
+    subprocess.run(["git", "config", "user.name", "Campaign Test"], cwd=repo, check=True)
+    marker = repo / "baseline.txt"
+    marker.write_text("baseline", encoding="utf-8")
+    source = repo / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    # Commit the source alongside the baseline marker so only the campaign's
+    # own generated outputs show up as dirty later -- the source itself must
+    # already be tracked, or _commit_verified_outputs's dirty-scope check
+    # (rightly) refuses to commit anything at all.
+    subprocess.run(
+        ["git", "add", "baseline.txt", str(source.relative_to(repo))], cwd=repo, check=True
+    )
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=repo, check=True)
+
+    payload = _manifest(repo)
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    payload["commit_policy"]["max_outputs_per_commit"] = 1  # force es and fr into separate shards
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    outputs = {locale: repo / payload["sources"][0]["outputs"][locale] for locale in ("es", "fr")}
+
+    class Engine:
+        def __init__(self):
+            self.campaign_context = {}
+            self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
+            self.decision_engine = SimpleNamespace(max_retry_attempts=99)
+            self.calls = []
+
+        def _get_output_path(self, _source, locale, _profile):
+            return outputs[locale]
+
+        def translate_file(self, _site, _source, target_langs, **_kwargs):
+            locale = target_langs[0]
+            self.calls.append(locale)
+            if locale == "es":
+                return SimpleNamespace(
+                    success=False,
+                    acceptance_receipts={},
+                    errors=["es rejected"],
+                    retry_attempts=0,
+                )
+            output = outputs[locale]
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(f"accepted-{locale}", encoding="utf-8")
+            receipt = {
+                "campaign_id": "pilot",
+                "source_path": str(source.resolve()),
+                "output_path": str(output.resolve()),
+                "source_sha256": sha256_file(source),
+                "output_sha256": sha256_file(output),
+                "target_lang": locale,
+                "validation_policy": "zero-defect",
+                "config_fingerprint": payload["config_fingerprint"],
+                "model_fingerprint": "fixture",
+                "gate_results": {index: {"passed": True} for index in range(1, 45)},
+            }
+            self.campaign_context["receipt_sink"](receipt)
+            return SimpleNamespace(
+                success=True,
+                acceptance_receipts={locale: receipt},
+                errors=[],
+                retry_attempts=0,
+            )
+
+    engine = Engine()
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=repo,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(
+        runner,
+        "verify",
+        lambda **_kwargs: {**manifest.to_summary(), "accepted": 0, "remaining": 2},
+    )
+
+    summary = runner.run()
+
+    assert summary["status"] == "PARTIAL_WITH_TICKETS"
+    assert summary["accepted"] == 1
+    assert summary["failed"] == 1
+    assert len(summary["failed_shard_ids"]) == 1
+    assert "es" in summary["failed_shard_ids"][0]
+
+    heal_queue_path = tmp_path / "ledger" / "heal_queue.jsonl"
+    tickets = [
+        json.loads(line) for line in heal_queue_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(tickets) == 1
+    assert tickets[0]["target_lang"] == "es"
+    assert tickets[0]["status"] == "OPEN"
+    assert tickets[0]["source_path"] == payload["sources"][0]["source_path"]
+
+    # es never produced a receipt, so nothing es-shaped was ever committed --
+    # but fr's shard still ran and still committed, proving the es failure
+    # didn't abort the outer shard loop.
+    assert not outputs["es"].exists()
+    assert outputs["fr"].read_text(encoding="utf-8") == "accepted-fr"
+    changed = subprocess.run(
+        ["git", "log", "--all", "--pretty=", "--name-only"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    assert payload["sources"][0]["outputs"]["fr"] in changed
+    assert payload["sources"][0]["outputs"]["es"] not in changed
+
+
+def test_deferred_terminal_heal_ticket_enqueues_rejected_retry_task(tmp_path):
+    """TC-APT-046: a deferred campaign's terminal heal ticket must also reach
+    the dedicated Professionalize retry consumer's queue -- otherwise the
+    consumer built in 64bb3bab has nothing feeding it in production."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "campaign@example.invalid"], cwd=repo, check=True
+    )
+    subprocess.run(["git", "config", "user.name", "Campaign Test"], cwd=repo, check=True)
+    source = repo / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    subprocess.run(["git", "add", str(source.relative_to(repo))], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=repo, check=True)
+
+    payload = _manifest(repo)
+    payload["target_locales"] = ["es"]
+    payload["expected_output_count"] = 1
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    payload["sources"][0]["outputs"] = {"es": "content/docs.aspose.org/es/words/net/page.md"}
+    payload["retry_policy"]["llm_escalation_mode"] = "deferred"
+    payload["retry_policy"]["llm_escalation_attempts"] = 0
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    output = repo / payload["sources"][0]["outputs"]["es"]
+
+    class Engine:
+        def __init__(self):
+            self.campaign_context = {}
+            self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
+            self.decision_engine = SimpleNamespace(max_retry_attempts=99)
+
+        def _get_output_path(self, _source, _locale, _profile):
+            return output
+
+        def translate_file(self, _site, _source, target_langs, **_kwargs):
+            return SimpleNamespace(
+                success=False,
+                acceptance_receipts={},
+                errors=["es rejected"],
+                retry_attempts=0,
+            )
+
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=Engine(),
+        translator_repo=repo,
+        ledger_root=tmp_path / "ledger",
+    )
+    def monkeypatch_verify(**_kwargs):
+        return {**manifest.to_summary(), "accepted": 0, "remaining": 1}
+
+    runner.verify = monkeypatch_verify
+
+    summary = runner.run()
+
+    assert summary["status"] == "PARTIAL_WITH_TICKETS"
+    heal_queue_path = tmp_path / "ledger" / "heal_queue.jsonl"
+    tickets = [
+        json.loads(line) for line in heal_queue_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(tickets) == 1
+    assert tickets[0]["status"] == "QUEUED"
+
+    queue = RejectedTaskQueue(tmp_path / "ledger" / "rejected_tasks.sqlite3")
+    claimed = queue.claim("test-consumer")
+    assert len(claimed) == 1
+    _, task, _ = claimed[0]
+    assert task.campaign_id == "pilot"
+    assert task.source_path == payload["sources"][0]["source_path"]
+    assert task.target_lang == "es"
+    assert task.model_target == "professionalize_llm"
+    assert task.source_sha256 == sha256_file(source)
 
 
 def test_campaign_retry_feedback_accumulates_distinct_gate_instructions():
@@ -1478,6 +2249,79 @@ def test_failure_metadata_promotes_rejected_write_gate_without_error_text():
     assert "SECRET" not in reason
 
 
+def test_gate_five_retry_feedback_requires_translated_markdown_labels():
+    result = SimpleNamespace(
+        validation_result=None,
+        verification_result=None,
+        error="GATE5: rejected candidate",
+    )
+
+    feedback = CampaignRunner._retry_feedback(result, "it")
+
+    assert "Markdown link labels" in feedback
+    assert "Italian (it)" in feedback
+    assert "Preserve URLs" in feedback
+
+
+def test_gate_fourteen_retry_feedback_translates_prose_preserving_code():
+    result = SimpleNamespace(
+        validation_result=None,
+        verification_result=None,
+        error="Gate 14 mixed language: 5 untranslated English lines",
+    )
+    feedback = CampaignRunner._retry_feedback(result, "ko")
+    assert "every ordinary prose line" in feedback
+    assert "code fences" in feedback
+    assert "English prose" in feedback
+
+
+def test_gate_21_retry_feedback_names_the_exact_span_that_was_translated():
+    """A real, reproduced defect (2026-09-17): professionalize_llm translated
+    the protected API identifier `Page.Annotations()` into the target
+    language, identically across two different locales, with zero corrective
+    feedback between attempts because GATE21 (unlike GATE5/GATE36/TC-SAS-01)
+    never fed anything back into the retry prompt.
+    """
+    result = SimpleNamespace(
+        validation_result=None,
+        verification_result=None,
+        error="Gate 21 inline code translated: `Page.Annotations()` → `Page.Adnotări()`",
+    )
+
+    feedback = CampaignRunner._retry_feedback(result, "ro")
+
+    assert "Page.Annotations()" in feedback
+    assert "Adnotări" not in feedback  # never echo the wrong candidate text back
+    assert "must never be translated" in feedback
+
+
+def test_gate_21_retry_feedback_falls_back_when_span_cannot_be_parsed():
+    result = SimpleNamespace(
+        validation_result=None,
+        verification_result=None,
+        error="Gate 21 inline code translated: unparseable legacy format",
+    )
+
+    feedback = CampaignRunner._retry_feedback(result, "ro")
+
+    assert "Inline code is never translated" in feedback
+
+
+def test_failure_metadata_preserves_final_acceptance_diagnostic_code():
+    result = SimpleNamespace(
+        validation_result=None,
+        verification_result=None,
+        rejection_gate_results={},
+        rejection_diagnostic_code="TC-ACCEPTANCE-RECEIPT",
+        error="candidate lacks an all-pass 43-gate write receipt",
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "TC-ACCEPTANCE-RECEIPT"
+    assert "codes=TC-ACCEPTANCE-RECEIPT" in reason
+
+
 def test_failure_metadata_preserves_only_safe_sas_unit_fingerprints():
     result = SimpleNamespace(
         errors=[],
@@ -1490,3 +2334,66 @@ def test_failure_metadata_preserves_only_safe_sas_unit_fingerprints():
 
     assert gate == "TC-SAS-01"
     assert "unit_fingerprints=link_text:0123456789abcdef:13" in reason
+
+
+def test_failure_metadata_attributes_a_warning_only_reject_to_its_validator():
+    """VA-01 closed over-attribution; this closes the under-attribution half.
+
+    Under `validation_policy: zero-defect` the decision engine's Rule 5 has
+    `accept_after_max_retries=False`, so it REJECTs a candidate whose only
+    remaining issues are WARNING severity.  `validators` is then empty by
+    design (it is ERROR-only), and the gate used to fall all the way through
+    to the literal "pipeline" -- the heal ticket landed as `auto:pipeline`,
+    naming nothing, even though `warning_only_validators` recorded exactly
+    which validator blocked the cell.  Live cases: fr and vi of
+    wave-pdftypescript-coreapi-20260911 (RepetitionDetectorValidator warning,
+    count=6, threshold=5, identical error_sha256 on both).
+    """
+    issue = SimpleNamespace(
+        validator="RepetitionDetectorValidator",
+        severity=SimpleNamespace(value="warning"),
+        message="SECRET REJECTED CANDIDATE",
+        details={"ngram": "x", "count": 6, "threshold": 5},
+        location="body",
+    )
+    result = SimpleNamespace(
+        errors=["rejected"],
+        retry_attempts=2,
+        validation_result=SimpleNamespace(issues=[issue]),
+        error="Translation rejected: Failed after 2 retries",
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "warning:RepetitionDetectorValidator"
+    assert "validators=unknown" in reason
+    assert "warning_only_validators=RepetitionDetectorValidator" in reason
+    assert "SECRET REJECTED CANDIDATE" not in reason
+
+
+def test_failure_metadata_still_prefers_an_error_validator_over_a_warning_one():
+    """The warning fallback must never outrank real error attribution."""
+    error_issue = SimpleNamespace(
+        validator="StructureValidator",
+        severity=SimpleNamespace(value="error"),
+        message="x",
+        details={"source_count": 2, "translation_count": 13},
+        location="body",
+    )
+    warning_issue = SimpleNamespace(
+        validator="LinkValidator",
+        severity=SimpleNamespace(value="warning"),
+        message="x",
+        details={},
+        location="body",
+    )
+    result = SimpleNamespace(
+        errors=["rejected"],
+        retry_attempts=0,
+        validation_result=SimpleNamespace(issues=[error_issue, warning_issue]),
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "StructureValidator"
+    assert "warning_only_validators=LinkValidator" in reason

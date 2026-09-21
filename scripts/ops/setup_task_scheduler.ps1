@@ -1,4 +1,4 @@
-# PowerShell Script to Configure Windows Task Scheduler for Autonomous Workers
+﻿# PowerShell Script to Configure Windows Task Scheduler for Autonomous Workers
 # Run this script as Administrator to set up automatic worker startup
 #
 # HARDENED 2026-02-06: Fixed 3 critical issues:

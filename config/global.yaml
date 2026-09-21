@@ -47,11 +47,23 @@ execution:
 
 # Default TM preferences (overridable per site)
 tm_defaults:
+  # Canonical active L2 storage is data/tm/l2.lmdb. data/tm/l2_lmdb is an
+  # inactive legacy/test-compatibility directory and is never a campaign store.
   use_semantic_tm: true
   semantic_threshold: 0.80
   fallback_exact_only: false
   l1_cache_size: 10000
-  l2_max_size_mb: 1536  # 2026-04-17: 696K entries @ 878 MB used; 1536 MiB = 658 MiB headroom. Run scripts/compact_l2_lmdb.py with workers stopped to reclaim 2 GB pre-alloc.
+  # 2026-09-05: raised 1536 -> 4096 to match the on-disk mapping. A TM purge run
+  # through L2PersistentTM's DEFAULT max_size_mb (4096) grew data/tm/l2.lmdb/data.mdb
+  # to 4 GB; LMDB does not shrink, so every campaign opening at 1536 MB then failed
+  # with "cannot be performed on a file with a user-mapped section open" while a live
+  # campaign held the 4 GB mapping. Aligning the config with reality is the fix --
+  # lowering the file is not possible without stopping every worker and compacting.
+  # To go back to 1536: stop all workers, run scripts/compact_l2_lmdb.py, then lower
+  # this value and L2PersistentTM's default together so they cannot diverge again.
+  # See data/summaries/fp-lmdb-mapsize-mismatch-20260905.json.
+  # 2026-04-17 (historical): 696K entries @ 878 MB used; 1536 MiB = 658 MiB headroom.
+  l2_max_size_mb: 4096
   # Zero-defect semantic validation model. Qualified across all 25 campaign
   # locales (minimum good-pair cosine 0.634719) and available from the pinned
   # local Hugging Face snapshot; do not substitute the English-only L3 index
@@ -67,6 +79,15 @@ tm_defaults:
   l3_context_similarity_threshold: 0.50
 
 # Default model preferences
+# Model licensing gates (TC-APT-005, mission aspose-org-full-portfolio-translation-20260901).
+# Read by src/utils/model_licensing.py: ConfigService refuses NLLB routing rules and
+# ModelLoader refuses to instantiate an NLLB checkpoint while production_approved is not true.
+model_licensing:
+  nllb_200:
+    license: CC-BY-NC-4.0
+    production_approved: false   # DECIDED 2026-09-02: permanent non-use (plan section 6 / G-02)
+    decision_record: .supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-005.yaml
+
 model_defaults:
   fallback_model: "m2m100_418m"
   device: "cuda"  # Require CUDA GPU
@@ -274,6 +295,52 @@ body:
   # production audit data as the majority cause of false positives in the
   # equivalent detector logic (audit_all_content.py, write_gate.py Gate 22).
   - '`[^`\n]+`'
+  # TC-APT-103: protect bare (non-backtick) PascalCase COMPOUND identifiers --
+  # two or more capitalized word-parts run together with no space, e.g.
+  # "AnnotationCollection", "TextAnnotation", "PageLabelCollection" -- from
+  # MT/LLM translation. Reproduced directly on pdf-annotations-in-cpp: the
+  # heading "### Annotation and AnnotationCollection" has no backticks (a
+  # heading, not a code span), so the existing backtick-only protection above
+  # never reaches it; hi mistranslated it into a garbled phonetic mash
+  # "एनोटेशनकलेक्शन" TWICE across two independent retries (once via the
+  # frontmatter summary field, then again at this exact heading once the
+  # summary instance was fixed), and ar's first attempt separately translated
+  # both class names into generic Arabic nouns. A single capitalized word
+  # ("Annotation" alone) is excluded on purpose -- that's ordinary English
+  # text a language may legitimately translate (RB-006's own carve-out) --
+  # only a run of 2+ camel-case humps with no internal space is protected,
+  # which in practice is always an API/class/brand identifier, never natural
+  # prose (confirmed: also subsumes the narrower TypeScript-only fix from
+  # eca736e, since "TypeScript" is itself a 2-hump PascalCase compound).
+  - '\b[A-Z][a-z]+(?:[A-Z][a-z0-9]*)+\b'
+  # RB-011/GluedIdentifierValidator investigation, wave-pdfgeneratedpython-
+  # 20260911, 2026-09-11: bare (non-backtick) snake_case/dotted module-style
+  # identifiers in frontmatter fields -- "aspose_pdf.generated", "aspose_pdf"
+  # in the description field of pdf-generated-in-python/index.md -- reached
+  # the model as unprotected plain text and correlated with 3 distinct-locale
+  # GluedIdentifierValidator rejections (es, fa, de) on the same field,
+  # tripping heal_queue.py's QU-02 per-file quarantine (>=3 locales) and
+  # halting the rest of that page's campaign. The two existing patterns above
+  # don't reach this shape: it is neither backtick-wrapped (source markdown
+  # frontmatter strings carry no code-span syntax) nor PascalCase (Python
+  # module identifiers are lower_snake_case). Requires an underscore segment
+  # specifically -- unlike a bare dot, natural-language prose in every
+  # portfolio target language never contains an underscore, so this cannot
+  # false-positive on ordinary abbreviations ("e.g.", "U.S.") the way a
+  # dot-only pattern would; it also does not attempt to cover the pure-dot
+  # identifier shape ("Workbook.save") documented in
+  # glued_identifier_validator.py's own docstring as gate-only-catchable
+  # model stochasticity, not a producer bug -- that shape stays out of scope
+  # here on purpose. See data/summaries/fp-glued-identifier-recurrence-
+  # pdfgeneratedpython-20260911.json.
+  # The negative lookahead excludes PlaceholderManager's own reserved
+  # "PLACEHOLDER_<N>" token name: protect() applies preserve_patterns
+  # sequentially against its own cascading output (not the original text in
+  # isolation), so without this guard this pattern re-matches an
+  # already-inserted {PLACEHOLDER_0} token from an earlier pattern in the
+  # same call and double-wraps it into {{PLACEHOLDER_1}} -- caught by the
+  # existing test_pascal_compound_identifier_protection.py regression suite.
+  - '\b(?!PLACEHOLDER_)[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+(?:\.[A-Za-z0-9_]+)*\b'
 
 # Security settings
 security:
@@ -609,6 +676,48 @@ tm_improvement:
     preflight_check: true  # Check GPU usage before starting run
     abort_on_high_usage: true  # Abort run if GPU already >=50% at start
 
+# Claim-safe Professionalize consumer for rejected M2M output.  It does not
+# load CUDA models, so configured live retries can overlap M2M translation.
+# Keep live_mode false until the worker is registered and monitored.
+professionalize_retry:
+  enabled: false
+  live_mode: false
+  queue_path: "data/campaigns/rejected_tasks.sqlite3"
+  intent_spool_path: "data/tm/intent_spool.sqlite3"
+  model_id: "professionalize_llm"
+  concurrency: 1
+  limit: 1
+  lease_seconds: 300
+  heartbeat_path: "data/logs/professionalize_retry_worker.heartbeat"
+  heartbeat_interval_seconds: 30
+
+# Single-writer TM boundary.  Keep disabled until the writer process is
+# deployed; when enabled, reader workers enqueue validated intents and never
+# mutate canonical L2/L3 directly.
+tm_writer:
+  enabled: false
+  intent_spool_path: "data/tm/intent_spool.sqlite3"
+  l3_enabled: true
+  batch_limit: 50
+  lease_seconds: 300
+
+# Campaign summaries remain advisory: systemic zero acceptance never stops
+# other shards.  These bounded thresholds only emit a machine-readable
+# recommendation for operators to investigate the affected model.
+campaign_quality:
+  zero_acceptance_warning_after_attempts: 1
+  zero_acceptance_stop_recommendation_after_attempts: 3
+
+# OP-01: durable CampaignSupervisor lifecycle (heartbeat + restart-safe
+# adoption/commit reconciliation) around one CampaignRunner. adoption_check_command
+# is left unset by default -- the content repo's session_ledger.py candidates check
+# is a manual runbook step this repository never shells out to on its own.
+campaign_supervisor:
+  heartbeat_path: "data/logs/campaign_supervisor.heartbeat"
+  state_path: "data/logs/campaign_supervisor.state.json"
+  heartbeat_interval_seconds: 30
+  adoption_check_command: null
+
 # Validation defaults
 validation_defaults:
   mode: "normal"  # Validation mode: strict, normal, lenient
@@ -645,6 +754,50 @@ validation_defaults:
 # Mandatory validation settings to prevent corrupted/wrong-language translations in production
 # WARNING: Disabling these settings in production will result in quality degradation
 translation_engine:
+  # TC-APT-046 step 1: instant, code-free rollback of TC-APT-044's lock narrowing.
+  # true  = campaign translate_file calls are serialized process-wide (pre-044 behaviour).
+  # false = only the per-backend generation locks apply (LLM/API calls run concurrently).
+  # Stays true until a real canary at max_parallel_jobs > 1 has been run and reviewed;
+  # inert while max_parallel_jobs is 1, since only one job is ever in flight.
+  concurrency:
+    force_serialize_all_backends: true
+  # TC-APT-004 LLM-HARDEN-001 (mission aspose-org-full-portfolio-translation-20260901).
+  # Thresholds per TC-APT-028 calibration (2026-09-02): healthy endpoint showed 0 failures in
+  # calibration; trip stays at 5 consecutive / 50% of last 20 calls; 60 s cooldown doubling to 10 min.
+  llm_retry:
+    attempts: 3
+    backoff_seconds: [2, 4, 8]
+    jitter: 0.2
+  llm_circuit_breaker:
+    enabled: true
+    state_dir: data/runtime/circuit_breaker   # <model_id>.json, read by mission_supervisor
+    consecutive_failure_trip: 5
+    window_calls: 20
+    window_failure_ratio_trip: 0.5
+    min_window_calls: 10
+    cooldown_seconds: 60
+    cooldown_cap_seconds: 600
+  # TC-APT-094: cross-process cap on in-flight LLM API calls across the whole K-launcher
+  # fleet (plan SS0.10) -- a per-process limit alone multiplies with launcher count into
+  # an uncapped fleet-wide burst. capacity raised 8 -> 64 on TC-APT-064's sustained-load
+  # evidence (data/benchmark_corpus/results/professionalize_llm_calibration_tc064_
+  # sustained_20260906.json): 16/32/48/64 concurrent held 450s each, 3611 calls total,
+  # 0 errors and 0 rate-limited at every level -- a floor, not a measured max (the probe
+  # did not find a ceiling within the tested range).
+  llm_slot_semaphore:
+    capacity: 64
+    ttl_seconds: 120
+  llm_fallback_model: m2m100_418m             # automatic reroute target when the LLM breaker is open (plan 6.1)
+  llm_health_log_dir: data/runtime/llm_health  # redacted per-call telemetry (never the key value)
+  # TC-APT-021: model-identity drift detector (the endpoint exposes no version-locked id, so
+  # detection replaces pinning). Checked before new LLM campaign work when the interval elapsed;
+  # DRIFT records a review item and quarantines the model (breaker force-open -> fallback reroute).
+  llm_identity_check:
+    enabled: true
+    interval_hours: 6
+    quarantine_on_drift: true
+    quarantine_seconds: 21600
+    identity_dir: data/runtime/llm_identity
   # Quality gates (mandatory for production)
   enable_validation: true  # NEVER set to false in production - enables all quality checks
 
@@ -654,21 +807,13 @@ translation_engine:
   # known short-field detector failure. This is profile/field scoped and never
   # replaces the campaign-pinned M2M primary on a first attempt.
   zero_defect_frontmatter_retry_models:
+    # TC-APT-005: the nllb_200_1.3b title/seoTitle retry entries (blog, plus de/cs/id/pl/uk
+    # locale overrides) were removed -- NLLB is permanent non-use (plan G-02). Blocked short
+    # fields now fall through to the governed professionalize_llm escalation ladder and,
+    # under zero-defect, to Claude review rather than to an unlicensed local model.
     blog.aspose.org:
-      title: nllb_200_1.3b
-      seoTitle: nllb_200_1.3b
       description: m2m100_418m
       summary: m2m100_418m
-      de:
-        title: nllb_200_1.3b
-      cs:
-        title: nllb_200_1.3b
-      id:
-        title: nllb_200_1.3b
-      pl:
-        seoTitle: nllb_200_1.3b
-      uk:
-        title: nllb_200_1.3b
 
   max_batch_purity_failure_rate: 0.10  # Block write if >10% of batches fail language purity checks
 
@@ -733,12 +878,11 @@ translation_engine:
   # accepted via SCRIPT_SIMILAR_LANGUAGES sr→{hr,bs} (Serbian Latin ≈ Croatian at text level).
   language_routing_overrides:
     lv: "professionalize_llm"   # Latvian: M2M100 produces Hungarian (83.1% purity failures). LLM verified 3/3 lv-detected.
-    ko: "nllb_200_1.3b"         # Korean: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
-    de: "nllb_200_1.3b"         # German: M2M/LLM ladder left a required link-text unit untranslated.
-    fr: "nllb_200_1.3b"         # French: this canary source failed independent fidelity after the M2M/LLM ladder.
-    th: "nllb_200_1.3b"         # Thai: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
-    tr: "nllb_200_1.3b"         # Turkish: M2M/LLM ladder left a required link-text unit untranslated.
-    vi: "nllb_200_1.3b"         # Vietnamese: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
+    # TC-APT-005 (2026-09-02, mission aspose-org-full-portfolio-translation-20260901, plan G-02):
+    # the former ko/de/fr/th/tr/vi -> nllb_200_1.3b overrides were REMOVED. NLLB-200 (CC-BY-NC-4.0)
+    # is permanent non-use (see model_licensing below); ConfigService refuses to load any NLLB
+    # routing rule while model_licensing.nllb_200.production_approved is not true. Persistent
+    # short-field failures now escalate through the governed professionalize_llm ladder instead.
   #   sr: "professionalize_llm"   # Serbian: M2M100 produces mixed-language (67.7% failures). LLM produces Latin Serbian (hr-detected → accepted via script_similar_languages). TEMPORARILY DISABLED for heal run (NLLB used instead).
   #   fa: "professionalize_llm"   # Persian: RTL + systematic M2M100 failures (not yet verified)
   #   he: "professionalize_llm"   # Hebrew: RTL + systematic M2M100 failures (not yet verified)
@@ -768,7 +912,11 @@ translation_engine:
   # has been measured (shadow mode) -- flip to true only after that canary.
   fidelity_judge:
     enabled: true
-    enforce: false  # shadow mode -- logs/writes verdict, never blocks. See Part 6 item 3.
+    enforce: true  # TC-APT-010 (2026-09-02): promoted out of shadow mode -- ~276
+    # unique high-risk-tier files got a real FAIL verdict during the gate-promotion
+    # sample run (exceeds the >=200-file shadow target); spot-checked FAILs against
+    # real source/target text were all genuine, well under the 5% false-fail bar.
+    # See data/quality/gate_promotion_log.jsonl and TC-APT-010.yaml.
     model_id: "professionalize_llm"
     warn_threshold: 0.7   # score below this (0-1) -> verdict "warn"
     block_threshold: 0.5  # score below this (0-1) -> verdict "fail" (blocks only if enforce: true)
@@ -1152,3 +1300,50 @@ resource_governance:
   temperature_recover_celsius: 70    # restart killed process when cooled
   temperature_poll_interval_sec: 30  # nvidia-smi sampling interval
   temperature_auto_restart: true     # restart killed process when temp recovers
+
+# VR-01 (gap CO-04): GPUAdmissionController (src/hardware/gpu_admission.py) --
+# a SIBLING to resource_governance above, not a replacement. resource_governance
+# gates on hand-tuned static SM% weight estimates; this block gates on REAL
+# measured VRAM (nvidia-smi, per-process MiB reservation) + real GPU temperature.
+# See data/summaries/vr-01-concurrency-measurement-*.json for the raw measurement
+# evidence and docs/operations/vr-01-concurrency-measurement.md for the writeup.
+#
+# NOT WIRED into any production launcher yet -- `enabled` is advisory only
+# (make_admission_controller()/GPUAdmissionController do not check it; no
+# campaign worker currently calls this module). Wiring it into
+# scripts/campaign/launch_parallel_campaign_shards.py, and any change to
+# max_parallel_jobs or concurrency.force_serialize_all_backends, is an explicit
+# follow-up decision for the orchestrating session after reviewing the measured
+# evidence -- deliberately left undone by VR-01's own scope boundary.
+#
+# ENABLED 2026-09-09 (orchestrating session, TC-APT-047/094 wiring landed in
+# scripts/campaign/launch_parallel_campaign_shards.py): the launcher's
+# try_acquire_gpu_admission() path now reads this flag and, when true,
+# replaces the old one-GPU-shard-fleet-wide-at-a-time gpu_lane.lock mutex
+# with this real-telemetry admission controller -- up to 6 concurrent
+# m2m100_418m processes (hu/ja/ro locales only) instead of exactly 1,
+# fail-closed to deny on any VRAM/thermal/telemetry error. Safe to flip live:
+# GPU was idle (0%, 0 MiB) at the moment of this change, and the disabled
+# path is unit-tested as byte-identical to today's behavior, so this is a
+# pure widening, never a narrowing, of what the launcher already does.
+gpu_admission:
+  enabled: true
+  # 45% caps the reservation ledger at exactly 6 concurrent m2m100_418m
+  # admissions (6 x 1100 MiB = 6600 MiB <= 45% of 16376 MiB; the 7th would
+  # need 7700 MiB > that budget). N=6 is the highest concurrency VR-01 proved
+  # clean (1/2/3/4/6 all clean; 5 and 7 untested). The naive 80%-of-VRAM
+  # figure was NOT tightened to this before: VRAM alone would admit ~10
+  # processes, well past N=6 and into the zone of VR-01's one real failure
+  # at N=8 -- a Windows pagefile/system-RAM exhaustion during simultaneous
+  # cold-start model loads, NOT a VRAM or thermal event this controller
+  # measures. 45% is therefore a deliberate proxy cap at the tested-safe
+  # ceiling, not a true model of the pagefile constraint -- raising this
+  # again requires either re-testing N=5/7/8 in isolation (no concurrent
+  # peer-fleet load) or adding real system-RAM/pagefile telemetry.
+  vram_budget_percent: 45
+  thermal_ceiling_celsius: 80    # deny admission at/above this GPU temp (measured peak at 8 concurrent: 67C -- well under)
+  per_process_vram_mib:
+    m2m100_418m: 1100            # measured ~927-1273MiB/process across 1..8 concurrent; rounded up for headroom
+    default: 1500
+  wait_interval_sec: 60
+  max_wait_attempts: 10

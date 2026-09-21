@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Import after path setup
-from scripts.rollback import (
+from scripts.ops.rollback import (
     BackupCreator,
     GitManager,
     RollbackExecutor,

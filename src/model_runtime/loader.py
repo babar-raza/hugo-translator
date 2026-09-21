@@ -7,6 +7,7 @@ Manages loading, caching, and lifecycle of translation models across different b
 import gc
 import logging
 import re
+import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -33,32 +34,32 @@ logger = logging.getLogger(__name__)
 # Applied post-decode to ALL model output (NLLB, m2m100, LLM).
 _MOJIBAKE_MAP: dict[int, str] = {
     # em-dash and en-dash
-    ord("\u00e2"): None,   # â — start of multi-char sequence; handled by str.translate below
+    ord("\u00e2"): None,  # â — start of multi-char sequence; handled by str.translate below
 }
 
 # Use str.replace() chain for multi-char sequences (str.translate is single-char only)
 _MOJIBAKE_PAIRS: list[tuple[str, str]] = [
-    ("\u00e2\u20ac\u2014", "\u2014"),   # â€" → — (em-dash)
-    ("\u00e2\u20ac\u2013", "\u2013"),   # â€" → – (en-dash)
-    ("\u00e2\u20ac\u2122", "\u2019"),   # â€™ → ' (right single quote)
-    ("\u00e2\u20ac\u0153", "\u201c"),   # â€œ → " (left double quote)
-    ("\u00e2\u20ac\u009d", "\u201d"),   # â€ → " (right double quote)
-    ("\u00e2\u20ac\u0161", "\u2018"),   # â€˜ → ' (left single quote)
-    ("\u00e2\u20ac\u00a6", "\u2026"),   # â€¦ → … (ellipsis)
-    ("\u00c3\u00a9", "\u00e9"),         # Ã© → é
-    ("\u00c3\u00a8", "\u00e8"),         # Ã¨ → è
-    ("\u00c3\u00aa", "\u00ea"),         # Ãª → ê
-    ("\u00c3\u00ab", "\u00eb"),         # Ã« → ë
-    ("\u00c3\u00a0", "\u00e0"),         # Ã  → à
-    ("\u00c3\u00a2", "\u00e2"),         # Ã¢ → â
-    ("\u00c3\u00bc", "\u00fc"),         # Ã¼ → ü
-    ("\u00c3\u00b6", "\u00f6"),         # Ã¶ → ö
-    ("\u00c3\u00a4", "\u00e4"),         # Ã¤ → ä
-    ("\u00c3\u009f", "\u00df"),         # ÃŸ → ß
-    ("\u00c3\u00b1", "\u00f1"),         # Ã± → ñ
-    ("\u00c3\u00ad", "\u00ed"),         # Ã­ → í
-    ("\u00c3\u00b3", "\u00f3"),         # Ã³ → ó
-    ("\u00c3\u00ba", "\u00fa"),         # Ãº → ú
+    ("\u00e2\u20ac\u2014", "\u2014"),  # â€" → — (em-dash)
+    ("\u00e2\u20ac\u2013", "\u2013"),  # â€" → – (en-dash)
+    ("\u00e2\u20ac\u2122", "\u2019"),  # â€™ → ' (right single quote)
+    ("\u00e2\u20ac\u0153", "\u201c"),  # â€œ → " (left double quote)
+    ("\u00e2\u20ac\u009d", "\u201d"),  # â€ → " (right double quote)
+    ("\u00e2\u20ac\u0161", "\u2018"),  # â€˜ → ' (left single quote)
+    ("\u00e2\u20ac\u00a6", "\u2026"),  # â€¦ → … (ellipsis)
+    ("\u00c3\u00a9", "\u00e9"),  # Ã© → é
+    ("\u00c3\u00a8", "\u00e8"),  # Ã¨ → è
+    ("\u00c3\u00aa", "\u00ea"),  # Ãª → ê
+    ("\u00c3\u00ab", "\u00eb"),  # Ã« → ë
+    ("\u00c3\u00a0", "\u00e0"),  # Ã  → à
+    ("\u00c3\u00a2", "\u00e2"),  # Ã¢ → â
+    ("\u00c3\u00bc", "\u00fc"),  # Ã¼ → ü
+    ("\u00c3\u00b6", "\u00f6"),  # Ã¶ → ö
+    ("\u00c3\u00a4", "\u00e4"),  # Ã¤ → ä
+    ("\u00c3\u009f", "\u00df"),  # ÃŸ → ß
+    ("\u00c3\u00b1", "\u00f1"),  # Ã± → ñ
+    ("\u00c3\u00ad", "\u00ed"),  # Ã­ → í
+    ("\u00c3\u00b3", "\u00f3"),  # Ã³ → ó
+    ("\u00c3\u00ba", "\u00fa"),  # Ãº → ú
 ]
 
 
@@ -204,6 +205,14 @@ class HuggingFaceBackend(ModelBackend):
         # Truncation detection (TR-02)
         self.last_truncation_detected = False
         self.truncation_count = 0
+        # TC-APT-044: GPU generation on one shared model instance genuinely
+        # needs serialization, but the lock belongs on this backend instance,
+        # not engine-wide in campaign_runner (which also serialized pure-I/O
+        # LLM API calls). Scope: the whole translate body, not just
+        # .generate() — the shared tokenizer's src_lang/tgt_lang mutation and
+        # the last_*_tokens/truncation counters are part of the same
+        # non-thread-safe shared state.
+        self._generation_lock = threading.RLock()
 
     def load(self) -> None:
         """Load HuggingFace model and tokenizer."""
@@ -354,6 +363,21 @@ class HuggingFaceBackend(ModelBackend):
         return translations
 
     def translate_with_token_counts(
+        self,
+        texts: list[str],
+        src_lang: str,
+        tgt_lang: str,
+        max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None,
+    ) -> tuple[list[str], int, int]:
+        # TC-APT-044: serialize on this backend instance (tokenizer language
+        # state, CUDA generation, and last_* counters are shared per-instance).
+        with self._generation_lock:
+            return self._translate_with_token_counts_impl(
+                texts, src_lang, tgt_lang, max_new_tokens, generation_params
+            )
+
+    def _translate_with_token_counts_impl(
         self,
         texts: list[str],
         src_lang: str,
@@ -574,15 +598,11 @@ class HuggingFaceBackend(ModelBackend):
             # NLLB-200 is trained on subtitle corpora (OpenSubtitles/OPUS) and generates
             # SSA subtitle position markers like {\pos (190,230) } appended to translations.
             # Strip these unconditionally — they are never valid translation content.
-            _NLLB_SSA_ARTIFACT_RE = re.compile(
-                r"\{\\?pos\s+\(\d+,\s*\d+\)\s*\}", re.UNICODE
-            )
+            _NLLB_SSA_ARTIFACT_RE = re.compile(r"\{\\?pos\s+\(\d+,\s*\d+\)\s*\}", re.UNICODE)
             for i, t in enumerate(translations):
                 cleaned = _NLLB_SSA_ARTIFACT_RE.sub("", t).strip()
                 if cleaned != t.strip():
-                    logger.debug(
-                        f"Stripped NLLB SSA artifact from translation[{i}]: {t[:80]!r}"
-                    )
+                    logger.debug(f"Stripped NLLB SSA artifact from translation[{i}]: {t[:80]!r}")
                 cleaned = repair_mojibake(cleaned)
                 translations[i] = cleaned
 
@@ -906,6 +926,9 @@ class CTranslate2Backend(ModelBackend):
         self.translator = None
         self.tokenizer = None
         self.max_memory_mb = max_memory_mb
+        # TC-APT-044: same per-instance serialization as HuggingFaceBackend —
+        # translate() mutates the shared tokenizer's src_lang before encoding.
+        self._generation_lock = threading.RLock()
 
     def load(self) -> None:
         """Load CTranslate2 model."""
@@ -1010,6 +1033,20 @@ class CTranslate2Backend(ModelBackend):
         return nllb_map.get(lang_code, f"{lang_code}_Latn")
 
     def translate(
+        self,
+        texts: list[str],
+        src_lang: str,
+        tgt_lang: str,
+        max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None,
+    ) -> list[str]:
+        # TC-APT-044: serialize on this backend instance (see HuggingFaceBackend).
+        with self._generation_lock:
+            return self._translate_impl(
+                texts, src_lang, tgt_lang, max_new_tokens, generation_params
+            )
+
+    def _translate_impl(
         self,
         texts: list[str],
         src_lang: str,
@@ -1212,6 +1249,8 @@ class ModelLoader:
             config: Optional config dict for hardware settings (D5)
         """
         self.registry = registry
+        # TC-APT-004: last automatic LLM->fallback reroute performed by load_model()
+        self.last_reroute: dict[str, str] | None = None
         self.device = device
         self.max_memory_mb = max_memory_mb
         self.load_mode = load_mode
@@ -1239,12 +1278,46 @@ class ModelLoader:
         Returns:
             Loaded ModelBackend instance
         """
-        # Check if already loaded
-        if model_id in self.loaded_models:
-            return self.loaded_models[model_id]
+        # TC-APT-005 (plan G-02): NLLB-200 is licensing-blocked (CC-BY-NC-4.0) and closed as
+        # permanent non-use; refuse before touching the registry unless explicitly approved.
+        from src.utils.model_licensing import assert_model_selectable
+
+        assert_model_selectable(model_id, self.config)
 
         # Get model info
         model_info = self.registry.get_model(model_id)
+
+        # TC-APT-004 (plan 6.1): an LLM whose circuit breaker is OPEN is rerouted to the
+        # automatic fallback (m2m100_418m) instead of stalling the campaign. Half-open
+        # breakers are NOT rerouted: the next call is the probe that may close them.
+        self.last_reroute = None
+        if getattr(model_info, "backend", None) == "llm":
+            from .campaign_llm_policy import professionalize_only_active
+            from .circuit_breaker import breaker_for, fallback_model_for, health_log
+            from .llm_errors import LLMCircuitOpenError
+
+            breaker = breaker_for(model_id)
+            fallback = fallback_model_for(model_id)
+            if breaker is not None and fallback and breaker.is_open():
+                if professionalize_only_active():
+                    health_log(model_id, event="refused", ok=False, reason="campaign_professionalize_only")
+                    raise LLMCircuitOpenError(
+                        f"circuit breaker open for {model_id!r}; Professionalize-only campaign refuses fallback"
+                    )
+                logger.warning(
+                    "Circuit breaker OPEN for %s -> automatically rerouting to fallback %s",
+                    model_id,
+                    fallback,
+                )
+                reroute = {"from": model_id, "to": fallback, "reason": "circuit_open"}
+                health_log(model_id, event="rerouted", ok=False, to=fallback, reason="circuit_open")
+                backend = self.load_model(fallback, device)
+                self.last_reroute = reroute  # set AFTER the recursive load, which resets it
+                return backend
+
+        # Check if already loaded
+        if model_id in self.loaded_models:
+            return self.loaded_models[model_id]
 
         # Determine device
         target_device = device or self.device

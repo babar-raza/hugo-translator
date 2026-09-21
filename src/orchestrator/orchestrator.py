@@ -32,7 +32,7 @@ class TranslationOrchestrator:
         self,
         config_service: ConfigService = None,
         enable_file_watcher: bool = True,
-        enable_sweep_scheduler: bool = True,
+        enable_sweep_scheduler: bool = False,
         sweep_interval_minutes: int = 60,
         queue: JobQueue | None = None,
         engines: Optional["SharedEngines"] = None,  # NEW: SharedEngines support
@@ -43,7 +43,9 @@ class TranslationOrchestrator:
         Args:
             config_service: Configuration service (ignored if engines provided)
             enable_file_watcher: Whether to enable file watching
-            enable_sweep_scheduler: Whether to enable periodic sweeps
+            enable_sweep_scheduler: Whether to enable periodic sweeps. RETIRED (TC-APT-030):
+                defaults to False; enabling it constructs SweepScheduler, which refuses
+                without HT_ALLOW_DEPRECATED_EXECUTION_PATH=sweep_scheduler.
             sweep_interval_minutes: Interval between sweeps
             queue: Optional job queue (ignored if engines provided)
             engines: SharedEngines container (NEW - Phase 5.2 migration)

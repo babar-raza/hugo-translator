@@ -4,11 +4,12 @@ Link validity validator.
 Ensures that links in translations are valid and properly formed.
 """
 
-import re
+from collections import Counter
 from typing import Any
 from urllib.parse import urlparse
 
 from .base import ValidationResult, ValidationSeverity, Validator
+from .link_utils import extract_markdown_links
 
 
 class LinkValidator(Validator):
@@ -74,6 +75,50 @@ class LinkValidator(Validator):
                 )
             )
 
+        # VA-04 (TC-APT-105): a URL appearing MORE times in the translation
+        # than in the source is unambiguously a defect -- unlike a
+        # missing/added link (which has documented false-positive history
+        # elsewhere in this codebase and correctly stays a WARNING), there is
+        # no legitimate reason a correct translation would introduce EXTRA
+        # copies of a URL the source didn't repeat that many times. Keyed on
+        # URL alone, not (text, url): keying on the full pair would flag
+        # every ordinarily-translated anchor text (e.g. "Link" -> "Lien",
+        # same URL) as a false "duplicate", since the translated-text pair
+        # never existed in source at all -- that is the overwhelmingly
+        # common, correct case, not a defect. Escalated to ERROR so it drives
+        # decision_engine's critical-failure path on its own, without
+        # depending on the generic count-mismatch WARNING above (which the
+        # live TC-APT-105 incident showed can be silently defeated by a
+        # retry-budget/policy interaction -- see VA-01).
+        source_url_counts = Counter(url for _, url in source_links)
+        translation_url_counts = Counter(url for _, url in translation_links)
+        for url, translation_count in translation_url_counts.items():
+            source_count = source_url_counts.get(url, 0)
+            # A URL with ZERO source occurrences is a NEW link, not a
+            # duplicate of an existing one -- that is the softer, deliberately
+            # non-ERROR `extra_urls` case _check_url_preservation already
+            # handles (localization can legitimately introduce a new URL).
+            # Only escalate when the source already had this URL and the
+            # translation has strictly more copies of it.
+            if source_count == 0 or translation_count <= source_count:
+                continue
+            extra_count = translation_count - source_count
+            result.issues.append(
+                self.create_issue(
+                    ValidationSeverity.ERROR,
+                    f"URL {url!r} appears {extra_count} extra time(s) in the "
+                    f"translation beyond its {source_count} source occurrence(s)",
+                    location="links",
+                    details={
+                        "duplicated_url": url,
+                        "source_occurrences": source_count,
+                        "translation_occurrences": translation_count,
+                        "extra_occurrences": extra_count,
+                    },
+                )
+            )
+            result.success = False
+
         # Check each translation link
         for text, url in translation_links:
             self._check_link_syntax(url, result)
@@ -94,10 +139,7 @@ class LinkValidator(Validator):
         Returns:
             List of (link_text, url) tuples
         """
-        # Pattern for [text](url) and ![alt](url) - Allow empty URLs with *
-        pattern = r"!?\[([^\]]*)\]\(([^)]*)\)"
-        matches = re.findall(pattern, text)
-        return [(text.strip(), url.strip()) for text, url in matches]
+        return extract_markdown_links(text)
 
     def _check_link_syntax(self, url: str, result: ValidationResult) -> None:
         """

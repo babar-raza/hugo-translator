@@ -1,0 +1,216 @@
+{
+  "taskcard": "TC-APT-028",
+  "model_id": "professionalize_llm",
+  "started_at": "2026-09-06T06:35:44.577126+00:00",
+  "finished_at": "2026-09-06T07:14:43.581160+00:00",
+  "hard_stops": [],
+  "preflight": {
+    "api_key_env": "litellm_key",
+    "api_key_resolved": true,
+    "health_check": {
+      "ok": true,
+      "seconds": 4.225
+    },
+    "canary": {
+      "ok": true,
+      "response_sha256": "539e20d356f59cd7132bdd8ab90b8511128f5edab73d6e88df28aab413ffd17d",
+      "echo_exact": true,
+      "seconds": 2.063,
+      "error": null
+    },
+    "models_probe": {
+      "supported": true,
+      "model_ids": [
+        "Qwen2.5-VL-7B",
+        "experimental",
+        "gpt-oss",
+        "qwen3-embedding-8b",
+        "qwen3-next",
+        "recommended",
+        "stable-diffusion-3.5-large"
+      ],
+      "count": 7,
+      "configured_alias": "recommended",
+      "alias_listed": true,
+      "version_locked_candidates": [
+        "Qwen2.5-VL-7B",
+        "qwen3-embedding-8b",
+        "qwen3-next",
+        "stable-diffusion-3.5-large"
+      ]
+    },
+    "representative_segments": {
+      "placeholder_tokens": {
+        "ok": true,
+        "non_empty": true,
+        "placeholders_preserved": true,
+        "seconds": 3.774,
+        "input_tokens": 358,
+        "output_tokens": 261,
+        "error": null
+      },
+      "rtl_arabic": {
+        "ok": true,
+        "non_empty": true,
+        "has_arabic_script": true,
+        "identifier_kept": true,
+        "seconds": 2.616,
+        "input_tokens": 343,
+        "output_tokens": 145,
+        "error": null
+      },
+      "fenced_code": {
+        "ok": true,
+        "non_empty": true,
+        "fence_preserved": true,
+        "code_line_intact": true,
+        "seconds": 4.206,
+        "input_tokens": 360,
+        "output_tokens": 298,
+        "error": null
+      },
+      "long_technical_paragraph": {
+        "ok": true,
+        "non_empty": true,
+        "not_truncated": true,
+        "length_ratio": 1.555,
+        "hit_max_tokens_info": "no",
+        "seconds": 49.145,
+        "input_tokens": 1183,
+        "output_tokens": 3944,
+        "error": null
+      }
+    },
+    "long_input_sweep": {
+      "probes": [
+        {
+          "words": 300,
+          "ok": true,
+          "seconds": 18.055,
+          "input_tokens": 679,
+          "output_tokens": 1401,
+          "length_ratio": 1.202,
+          "hit_max_tokens": false,
+          "healthy": true,
+          "error": null
+        },
+        {
+          "words": 600,
+          "ok": true,
+          "seconds": 38.294,
+          "input_tokens": 1021,
+          "output_tokens": 2746,
+          "length_ratio": 1.313,
+          "hit_max_tokens": false,
+          "healthy": true,
+          "error": null
+        },
+        {
+          "words": 900,
+          "ok": true,
+          "seconds": 104.002,
+          "input_tokens": 1375,
+          "output_tokens": 3784,
+          "length_ratio": 1.722,
+          "hit_max_tokens": false,
+          "healthy": true,
+          "error": null
+        },
+        {
+          "words": 1200,
+          "ok": true,
+          "seconds": 211.825,
+          "input_tokens": 1716,
+          "output_tokens": 6000,
+          "length_ratio": 2.132,
+          "hit_max_tokens": true,
+          "healthy": false,
+          "error": null
+        }
+      ],
+      "max_safe_words": 900
+    },
+    "determinism": {
+      "n": 10,
+      "successful": 10,
+      "errors": 0,
+      "distinct_outputs": 2,
+      "byte_identical_rate": 0.9,
+      "is_deterministic": false
+    }
+  },
+  "calibration": {
+    "sustained_ramp": [
+      {
+        "level": 16,
+        "seconds_held": 450.0,
+        "calls_attempted": 410,
+        "calls_ok": 410,
+        "calls_failed": 0,
+        "rate_limited": 0,
+        "error_rate": 0.0,
+        "rate_limited_rate": 0.0,
+        "p50": 17.124,
+        "p95": 26.165,
+        "p99": 28.768,
+        "n": 410,
+        "mean": 17.873,
+        "sample_errors": []
+      },
+      {
+        "level": 32,
+        "seconds_held": 450.0,
+        "calls_attempted": 747,
+        "calls_ok": 747,
+        "calls_failed": 0,
+        "rate_limited": 0,
+        "error_rate": 0.0,
+        "rate_limited_rate": 0.0,
+        "p50": 19.821,
+        "p95": 27.888,
+        "p99": 30.813,
+        "n": 747,
+        "mean": 19.656,
+        "sample_errors": []
+      },
+      {
+        "level": 48,
+        "seconds_held": 450.0,
+        "calls_attempted": 1163,
+        "calls_ok": 1163,
+        "calls_failed": 0,
+        "rate_limited": 0,
+        "error_rate": 0.0,
+        "rate_limited_rate": 0.0,
+        "p50": 17.852,
+        "p95": 26.883,
+        "p99": 31.296,
+        "n": 1163,
+        "mean": 18.92,
+        "sample_errors": []
+      },
+      {
+        "level": 64,
+        "seconds_held": 450.0,
+        "calls_attempted": 1291,
+        "calls_ok": 1291,
+        "calls_failed": 0,
+        "rate_limited": 0,
+        "error_rate": 0.0,
+        "rate_limited_rate": 0.0,
+        "p50": 22.212,
+        "p95": 28.67,
+        "p99": 33.756,
+        "n": 1291,
+        "mean": 22.885,
+        "sample_errors": []
+      }
+    ],
+    "sustained_safe_ceiling": 64,
+    "sustained_stop_reason": null
+  },
+  "recommendations": {
+    "manifest_max_parallel_jobs_for_llm": 64,
+    "manifest_max_parallel_jobs_for_llm_basis": "sustained_ramp"
+  }
+}

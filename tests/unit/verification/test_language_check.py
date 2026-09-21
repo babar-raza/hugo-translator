@@ -231,6 +231,92 @@ class TestLanguageDetectionCheck:
 
         assert issues == []
 
+    def test_protected_provenance_and_graded_hash_are_skipped(self, check):
+        """TC-APT-004b: provenance.content_hash and the content repo's own
+        graded_content_hash are hash/ID metadata, never prose -- confirmed
+        via a live qualification run where both fired as false positives on
+        real content (19/25 verification failures before this fix)."""
+        translated = {
+            "frontmatter": {
+                "title": "Das ist ein ausreichend langer deutscher Titel",
+                "provenance": {
+                    "content_origin": "skill-generated",
+                    "last_mechanism": "metadata-fixer",
+                    "content_hash": "b2281ef38da5fc24e8fcdf01782a548f",
+                },
+                "graded_content_hash": "b2281ef38da5fc24e8fcdf01782a548f",
+            }
+        }
+
+        issues = check.run({}, translated, "de")
+
+        assert issues == []
+
+    def test_linktitle_untranslated_navmenu_label_is_skipped(self, check):
+        """2026-09-11: linktitle is a structural nav-menu label, already classified
+        non-translatable in frontmatter_integrity_validator.py -- confirmed live via
+        5 already-shipped locales (cs/fr/es/pt/ru) of a real docs.aspose.org page
+        that all kept linktitle verbatim in English and were accepted fine. Before
+        this fix, any page whose linktitle string was long/distinct enough to cross
+        langdetect's confidence threshold (e.g. "Compound File Support") failed
+        language_detection on every locale unconditionally, confirmed live on
+        email/net+python developer-guide/compound-file-support.md during
+        wave-tier1b-batch1-20260911."""
+        translated = {
+            "frontmatter": {
+                "title": "Das ist ein ausreichend langer deutscher Titel",
+                "linktitle": "Compound File Support",
+            }
+        }
+
+        issues = check.run({}, translated, "de")
+
+        assert issues == []
+
+    def test_aliases_are_structural_routes_and_are_skipped(self, check):
+        """Hugo aliases are preserved URL routing metadata, never prose."""
+        translated = {
+            "frontmatter": {
+                "title": "Das ist ein ausreichend langer deutscher Titel",
+                "aliases": ["/3d/python/scene-management-in-python/"],
+            }
+        }
+
+        assert check.run({}, translated, "de") == []
+
+    def test_alias_exemption_does_not_skip_translatable_frontmatter(self, check):
+        translated = {
+            "frontmatter": {
+                "aliases": ["/3d/python/scene-management-in-python/"],
+                "description": "This English description must still fail language detection",
+            }
+        }
+
+        assert [issue.location for issue in check.run({}, translated, "de")] == [
+            "frontmatter.description"
+        ]
+
+    def test_keywords_short_technical_phrases_are_skipped(self, check):
+        """TC-APT-004b (2026-09-03): a hand-written, unambiguously CORRECT German
+        translation of a real kb.aspose.org keyword -- confirmed via direct
+        classifier probe to be detected as English at confidence 0.9999967799308401.
+        keywords ARE meant to be translated (unlike evidence/provenance above); this
+        specific classifier is just unreliable on short, product/platform-token-dense
+        SEO slugs, confirmed independent of translation quality."""
+        translated = {
+            "frontmatter": {
+                "title": "Diagramm zu einem Word-Dokument in dotnet hinzufuegen",
+                "keywords": [
+                    "Diagrammformat Word-Dokument csharp",
+                    "Diagrammlegende ausblenden dotnet",
+                ],
+            }
+        }
+
+        issues = check.run({}, translated, "de")
+
+        assert issues == []
+
     def test_translatable_frontmatter_remains_checked_with_evidence(self, check):
         translated = {
             "frontmatter": {
@@ -427,6 +513,40 @@ class TestLanguageDetectionCheck:
         }
 
         issues = check.run({}, translated, "ko")
+
+        assert len(issues) == 1
+        assert issues[0].metadata["detected_lang"] == "en"
+
+
+class TestShortSignalFloorTCAPT052:
+    """TC-APT-052: a bare `_index.md` title like "Aspose.Note FOSS for Python"
+    strips down to just the connector word ("dla"/"pro"/"para"/"per", 3-4
+    chars) after governed technical tokens are removed. The prior 2-char
+    floor let langdetect run on that single short word, which is unreliable
+    and frequently misclassifies it -- confirmed live on
+    blog.aspose.org/note/python/_index.md (cs/es/it/pl/uk all WRITE BLOCKED)
+    and previously on introducing-cells-foss-go/cs. Raised to a 6-char floor,
+    matching the same fix already proven for engine.py's
+    FrontmatterLanguageCheck (TC-APT-040).
+    """
+
+    def test_bare_index_title_below_signal_floor_is_not_flagged(self):
+        check = LanguageDetectionCheck()
+        translated = {"frontmatter": {"title": "Aspose.Note FOSS dla Python"}}
+
+        assert check.run({}, translated, "pl") == []
+
+    def test_introducing_prefixed_title_above_floor_still_flags_untranslated(self):
+        """The exemption must be narrow: titles with enough real prose (the
+        "Introducing" prefix supplies 11 signal chars) must still correctly
+        catch genuinely untranslated English -- this is not a blanket disable.
+        """
+        check = LanguageDetectionCheck()
+        translated = {
+            "frontmatter": {"title": "Introducing Aspose.Words FOSS for .NET"}
+        }
+
+        issues = check.run({}, translated, "pl")
 
         assert len(issues) == 1
         assert issues[0].metadata["detected_lang"] == "en"

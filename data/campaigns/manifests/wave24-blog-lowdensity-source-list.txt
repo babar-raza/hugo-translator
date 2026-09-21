@@ -1,0 +1,4 @@
+content/blog.aspose.org/tex/python/_index.md
+content/blog.aspose.org/font/python/_index.md
+content/blog.aspose.org/page/python/_index.md
+content/blog.aspose.org/words/python/_index.md

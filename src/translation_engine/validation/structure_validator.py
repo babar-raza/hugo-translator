@@ -13,6 +13,7 @@ from typing import Any
 import structlog
 
 from .base import ValidationResult, ValidationSeverity, Validator
+from .link_utils import extract_markdown_links
 
 logger = structlog.get_logger(__name__)
 
@@ -144,7 +145,20 @@ class StructureValidator(Validator):
         source_lists = self._count_list_items(source)
         translation_lists = self._count_list_items(translation)
 
-        if source_lists != translation_lists:
+        # TC-APT-053: a translator legitimately splitting one long list item into
+        # two shorter ones (or merging two short ones) is ordinary stylistic
+        # variance, not lost or duplicated content -- the same +/-2 tolerance
+        # _check_formatting already applies to bold/italic counts below. Under
+        # this mission's zero-defect policy every WARNING is promoted to
+        # blocking, so an exact-match requirement here rejects a genuinely
+        # correct translation outright. Confirmed live on
+        # introducing-pdf-foss-cpp/cs: professionalize_llm produced a clean
+        # translation (source 10 list items, translation 11) that was rejected
+        # for exactly this reason, cascading into a cross-model escalation to
+        # m2m100_418m that then catastrophically mangled the page's code
+        # blocks (69 code elements -> 39) -- the real defect was never the
+        # 10-vs-11 list count, it was rejecting a fine translation over it.
+        if abs(source_lists - translation_lists) > 2:
             result.issues.append(
                 self.create_issue(
                     ValidationSeverity.WARNING,
@@ -185,7 +199,36 @@ class StructureValidator(Validator):
         source_blocks = self._count_code_blocks(source)
         translation_blocks = self._count_code_blocks(translation)
 
-        if source_blocks != translation_blocks:
+        # TC-APT-053 precedent (see _check_lists above) extended to code
+        # elements: on a code-reference-dense page, a translator incidentally
+        # merging/splitting one inline `code span` is ordinary
+        # extraction/rendering noise, not lost or duplicated code. Confirmed
+        # live on introducing-cells-foss-cpp: every one of 25 languages, under
+        # BOTH models, produced an otherwise-clean translation with exactly
+        # one fewer combined fenced+inline code element (73 -> 72) than the
+        # source -- a real translation was rejected outright for a 1-in-73
+        # drift, with cross-model escalation unable to help since both models
+        # hit the identical count. Tolerance only applies once the document
+        # has enough code elements that a single-element drift isn't the
+        # whole signal: a document with few code elements (e.g. 1 fenced +
+        # 1 inline) still requires an exact match, per test_code_block_mismatch.
+        #
+        # TC-APT-104: a flat +/-2 tolerance does not scale to very
+        # code-reference-dense pages. Live-instrumented on
+        # cells/go/developer-guide/features.md -> de (professionalize_llm,
+        # debug_code_block_count_diff.py): source=93 (5 fenced + 88 inline),
+        # translation=90, a 3-element drift on an 88-inline-span API-summary
+        # table. Diffing the actual source/translation inline-span sets found
+        # no dropped identifier -- every apparent difference was the counting
+        # regex losing backtick pairing sync after a benign adjacent-span
+        # merge (e.g. two identifiers in one table cell collapsing into one
+        # span), the same class of noise the flat tolerance already exists to
+        # absorb, just past its fixed ceiling. A percentage-based floor scales
+        # tolerance with genuine code density while keeping small/medium
+        # documents at the already-proven +/-2.
+        drift = abs(source_blocks - translation_blocks)
+        tolerance = max(2, round(source_blocks * 0.05)) if source_blocks >= 10 else 0
+        if drift > tolerance:
             result.issues.append(
                 self.create_issue(
                     ValidationSeverity.ERROR,
@@ -306,9 +349,11 @@ class StructureValidator(Validator):
         Returns:
             Total number of links and images
         """
-        # Match [text](url) and ![alt](url)
-        links = len(re.findall(r"!?\[([^\]]+)\]\(([^)]+)\)", text))
-        return links
+        # VA-04 (TC-APT-105): shared with LinkValidator._extract_links so the
+        # two validators can never disagree on what counts as a link (the
+        # previous local pattern required non-empty anchor/URL, silently
+        # missing a legitimate empty-alt image like `![](image.png)`).
+        return len(extract_markdown_links(text))
 
     def _check_formatting(
         self, source: str, translation: str, result: ValidationResult

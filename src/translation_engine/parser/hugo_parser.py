@@ -29,15 +29,26 @@ from .ast_nodes import (
     text_node,
 )
 
-# Module-level ruamel.yaml instance for comment/quote preservation
-_yaml_parser = YAML()
-
 # Pattern to detect and split Hugo shortcodes from surrounding text.
 # Matches {{< ... >}} (regular) and {{% ... %}} (markdown) shortcode forms.
 _SHORTCODE_RE = re.compile(r'({{[<%].*?[>%]}})', re.DOTALL)
-_yaml_parser.preserve_quotes = True
-_yaml_parser.width = 4096  # Prevent line wrapping
-_yaml_parser.allow_duplicate_keys = True  # Hugo files may have duplicate keys across sections
+
+
+def _build_yaml_parser() -> YAML:
+    """One ruamel.yaml instance per HugoParser (TC-APT-043).
+
+    ruamel's YAML object rewires its shared reader/scanner to each stream it
+    loads; a second thread wiring the same object mid-parse corrupts or blanks
+    the first thread's frontmatter. A module-level singleton here was the root
+    cause of the historical intermittent empty-frontmatter crash under
+    concurrency=2 (reproduced by tests/regression/
+    test_concurrent_translate_file_thread_safety.py on the pre-fix code).
+    """
+    yaml_parser = YAML()
+    yaml_parser.preserve_quotes = True
+    yaml_parser.width = 4096  # Prevent line wrapping
+    yaml_parser.allow_duplicate_keys = True  # Hugo files may have duplicate keys across sections
+    return yaml_parser
 
 
 def normalize_table_cells(text: str) -> str:
@@ -140,6 +151,7 @@ class HugoParser:
             self.md.enable("table")
 
         self._node_counter = 0
+        self._yaml_parser = _build_yaml_parser()
 
     def _generate_node_id(self) -> str:
         """Generate unique node ID."""
@@ -227,7 +239,7 @@ class HugoParser:
     def _parse_yaml_content(self, yaml_content: str) -> CommentedMap | dict[str, Any] | None:
         """Parse a YAML frontmatter payload using ruamel.yaml."""
         try:
-            result = _yaml_parser.load(StringIO(yaml_content))
+            result = self._yaml_parser.load(StringIO(yaml_content))
             return result if result is not None else CommentedMap()
         except Exception:
             return None
@@ -320,7 +332,62 @@ class HugoParser:
         if not inline_token.children:
             return [text_node(inline_token.content, self._generate_node_id())]
 
-        return self._parse_inline_tokens(inline_token.children, 0, None)[0]
+        return self._merge_soft_breaks(
+            self._parse_inline_tokens(inline_token.children, 0, None)[0]
+        )
+
+    def _merge_soft_breaks(self, nodes: list[ASTNode]) -> list[ASTNode]:
+        """Fold a soft line wrap into the surrounding text instead of a separate node.
+
+        TC-APT-042: a source paragraph wrapped mid-sentence produced one TEXT node per
+        source line with a SOFT_BREAK between them. When the paragraph also contains a
+        link/bold/emphasis, `_should_extract_full_sentence()` sends it down the
+        leaf-level path, which makes each TEXT sibling its own translation unit -- so
+        "There are no usage" and "restrictions, no runtime fees..." were translated
+        with no knowledge of each other. That produced split noun phrases, duplicated
+        tokens, spurious copulas and outright meaning inversion across 16/16 reviewed
+        locales of cells/go/introducing-cells-foss-go
+        (data/summaries/fp-softwrap-sentence-splitting-20260905.json).
+
+        Folding the break into the text is output-neutral: both ASTRenderer and the
+        extractor's `_collect_text_from_node` already render SOFT_BREAK as a single
+        space, and translated pages already emit each paragraph on one line. Only what
+        the model receives changes -- a whole sentence rather than fragments.
+
+        Deliberately conservative: TEXT nodes are joined ONLY across a SOFT_BREAK, never
+        merely because they are adjacent, and a break that does not sit between two TEXT
+        nodes leaves a trailing space on the preceding text (or the original node) so
+        rendering is byte-identical either way.
+        """
+        merged: list[ASTNode] = []
+        pending_space = False
+
+        for node in nodes:
+            if node.children:
+                node.children = self._merge_soft_breaks(node.children)
+
+            if node.type == NodeType.SOFT_BREAK:
+                if merged and merged[-1].type == NodeType.TEXT:
+                    pending_space = True
+                    continue
+                merged.append(node)
+                continue
+
+            if pending_space:
+                pending_space = False
+                if node.type == NodeType.TEXT:
+                    merged[-1].raw = f"{merged[-1].raw or ''} {node.raw or ''}"
+                    continue
+                # Next node is not text (e.g. a link): keep the space the soft break
+                # would have rendered, on the text that precedes it.
+                merged[-1].raw = f"{merged[-1].raw or ''} "
+
+            merged.append(node)
+
+        if pending_space and merged and merged[-1].type == NodeType.TEXT:
+            merged[-1].raw = f"{merged[-1].raw or ''} "
+
+        return merged
 
     def _parse_inline_tokens(
         self, tokens: list, start: int, close_type: str | None

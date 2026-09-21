@@ -1,0 +1,229 @@
+taskcard: TC-APT-004b
+title: "professionalize_llm production qualification as portfolio-wide primary"
+status: IN_PROGRESS
+started_at: "2026-09-02"
+wake: 2
+design:
+  qualification_sample: "scripts/campaign/build_qualification_sample.py -> data/benchmark_corpus/qualification_sample.json"
+  sample_shape: "51 distinct source files (the full TC-APT-006 benchmark corpus), 155 (file, locale) cells; every one of the 25 approved locales covered (min 3, max 13 per locale); every one of the 9 content classes covered; every site's script-group breadth (rtl/cjk/cyrillic/greek/indic_thai/latin) covered"
+  harness: "scripts/campaign/run_llm_qualification.py -- builds the REAL production TranslationEngine (validation_policy=zero-defect, enable_verification/enable_verification_fix=true) against a SANDBOX content root (never the real content repo), pins model_id_override to professionalize_llm for every phase (not just escalation), forces force=True so the TM can never answer for the model, and asserts every accepted receipt's model_fingerprint actually names professionalize_llm (a circuit-breaker reroute to m2m100_418m would be a qualification FAILURE, not a silent substitution)"
+defects_found_and_fixed_during_harness_construction:
+  - finding: "content/blog.aspose.org/3d/java/3d-scene-management-java/index.md's link text 'Aspose.3D-FOSS-for-Java' (a GitHub repo slug) matched none of _is_technical_identifier's CamelCase/snake_case/version-number patterns, so under zero-defect's zero-tolerance same-as-source gate (TC-SAS-01), the model correctly leaving it untranslated was raising TranslationIncomplete on every retry -- a real defect in the extractor, not the model, that would have blocked this exact file in ANY real zero-defect campaign regardless of which backend translates it"
+    fix: "src/translation_engine/extractor/text_unit_extractor.py: new _link_text_matches_url_slug(text, url) helper -- a link's visible text that is literally the URL's own final path segment is an identifier, not prose. Narrow and self-justifying (the text IS the slug) rather than a broad hyphen-tolerant heuristic, which would have wrongly protected ordinary hyphenated English ('state-of-the-art')"
+    regression_tests: "tests/unit/translation_engine/extractor/test_text_unit_extraction.py: test_link_text_matching_url_slug_is_protected, test_link_text_not_matching_url_slug_stays_translatable, test_link_text_matches_url_slug_helper -- 59/59 passed in that file; full tests/unit/translation_engine + test_preservation_contracts.py: 1339 passed, 1 pre-existing unrelated failure (test_content_type_router_frontmatter_wiring, already routed to TC-APT-011), 4 skipped"
+  - finding: "run_llm_qualification.py's own ThreadPoolExecutor called engine.translate_file() directly from concurrent threads with no serialization -- reproduced an intermittent empty-frontmatter crash ('Frontmatter key integrity: missing YAML frontmatter delimiters') at concurrency=2 that did NOT reproduce standalone (concurrency=1). This was a harness bug, not a new production defect: src/workers/campaign_runner.py already serializes every translate_file() call behind self._model_execution_lock specifically because a real model_loader's generation call is not proven thread-safe across concurrent files"
+    fix: "run_llm_qualification.py: added the identical model_lock discipline CampaignRunner already uses, wrapping every engine.translate_file() call. Re-ran the same 2-cell case 3x after the fix with zero recurrence"
+    architecture_note_not_fixed_here: "CampaignRunner's lock fully serializes ALL translate_file calls whenever engine.model_loader is set, REGARDLESS of manifest max_parallel_jobs or TC-APT-028's measured 16-concurrency ceiling (that ceiling was measured at the raw backend/API level, bypassing the full engine pipeline). Real campaigns therefore cannot currently exploit that ceiling for file-level throughput -- worth a future taskcard (splitting the lock by phase/model, auditing extractor/renderer thread-safety), explicitly OUT OF SCOPE for TC-APT-004b (a throughput question, not a qualification-correctness one)."
+critical_finding_reordering_this_taskcard_relative_to_TC-APT-010: >
+  Direct read of write_gate.py's _run_content_gates (the REAL production dispatch
+  evaluate()/evaluate_zero_defect() use, not the offline audit-only
+  run_all_content_gates()) confirms: under validation_policy=zero-defect, warn-tier
+  gates 31-35/37-44 run against their OWN independent result object
+  (gate_result = WriteGateResult(passed=True) if self._zero_defect else result) and
+  ANY of them failing already flips the overall write to failed
+  (if not gate_result.passed: result.passed = False), REGARDLESS of the registry's
+  literal "warn" action string. This matches the plan's own framing exactly (the
+  parenthetical in TC-APT-010's plan text: "campaigns already enforce via
+  zero-defect, §2.3") -- it is confirmed, not assumed. Consequence: EVERY zero-defect
+  campaign write today, including this qualification run, is ALREADY silently gated
+  by all 13 unvalidated detectors. A false positive in any of them would misattribute
+  a gate bug as an LLM quality failure in this qualification's own results. TC-APT-010
+  was therefore started in parallel with this taskcard's live run rather than after it.
+live_run:
+  run_id_aborted: gate1-full
+  aborted_at: "wake 3, 30/155 cells done (8 accepted, ~27%), ~2h45m elapsed, TaskStop'd deliberately"
+  aborted_why: >
+    Found a second real defect while checking on this run mid-flight:
+    src/verification/checks/language_check.py's LanguageDetectionCheck ran langdetect
+    against frontmatter.provenance.content_hash and the content repo's own
+    graded_content_hash -- both hex digests, never prose. 19 of the run's 25
+    "Verification failed" events (76%) were exactly this false positive, not an LLM
+    quality issue. Fixed (PROTECTED_FRONTMATTER_TREES now includes "provenance" and
+    "graded_content_hash"; tests/unit/verification/test_language_check.py: 32/32
+    passed including the new regression test; commit 68b9119). Continuing the
+    already-running qualification against the stale, pre-fix engine build for another
+    ~10 hours would have produced an acceptance_rate corrupted by a known, already-fixed
+    bug -- for a decision this consequential (portfolio-wide primary-model promotion),
+    that is worse than the ~2h45m sunk cost of restarting clean. TC-APT-010's parallel
+    gate_promotion_run.py job was NOT affected (it calls write_gate.py's
+    run_all_content_gates() directly, which never touches LanguageDetectionCheck --
+    confirmed by grep before deciding not to restart it) and was left running.
+  run_id_lost_to_reboot: gate1-full-v2
+  status_at_loss: "50/155 cells done, 20 accepted (40%), ~3h35m elapsed (background task b3plm3ie4), then exited with bare code 4 and no Python traceback around 2026-09-02 21:52"
+  root_cause_of_loss: >
+    Confirmed via `Get-CimInstance Win32_OperatingSystem | LastBootUpTime`: the host
+    machine rebooted at 2026-09-03 09:18 -- overnight, ~11.5 hours after the process
+    died and well after the wake-3 ScheduleWakeup (21:02) should have fired. The whole
+    OS went away, which explains both the process death AND why the scheduled wakeup
+    never re-invoked this session (there was no session to re-invoke). Not a bug in
+    the qualification harness or this mission's own code; a genuine environment
+    interruption outside session control. All 50 completed cells' results were lost --
+    the harness only wrote results.jsonl at the very end, with no incremental
+    persistence.
+  reliability_fix: >
+    scripts/campaign/run_llm_qualification.py (commit 175b245): each job's record is
+    now appended to data/qualification/<run-id>/checkpoint.jsonl as soon as it
+    completes; a new --resume flag loads that file and skips any (source,locale) cell
+    already recorded. Verified end-to-end: a 2-cell run killed mid-second-cell left one
+    checkpointed record; --resume correctly identified it and would only re-run the
+    remaining cell. This mission has now lost a multi-hour run to interruption twice
+    (once a deliberate restart, once this reboot) -- checkpointing is a demonstrated
+    necessity, not speculative hardening.
+  run_id: gate1-full-v3
+  command: "python -m scripts.campaign.run_llm_qualification --content-root D:/onedrive/Documents/GitHub/aspose.org --run-id gate1-full-v3 --concurrency 4"
+  status: "RESTARTED clean at wake 4 (background task bdf7qvrbj), checkpointed this time -- if interrupted again, resume with the same run-id + --resume rather than starting over"
+  parallelized_at_operator_request: >
+    Operator flagged the ~10-13h single-process wall-clock as too slow and asked to speed
+    it up (2026-09-03). Per plan 21's autonomous-resolution authority this was a real
+    tradeoff decision (skip qualification vs. shrink the sample vs. parallelize safely),
+    so it was put to the operator via AskUserQuestion rather than decided unilaterally --
+    chose "parallelize" (full validation kept, no sample-size cut, no skipping ahead to
+    real content). Implemented as N independent OS processes (commit a9c516a,
+    --shard-count/--shard-index) rather than raising in-process concurrency, since an
+    earlier finding in this same taskcard already proved the shared engine pipeline isn't
+    thread-safe across concurrent files. Ownership is a stable sha256 hash of each job's
+    own key, verified disjoint+complete across all 155 real sample cells before use.
+    Single-process run stopped at 37/155 cells (checkpoint preserved); resumed as 4
+    shards (background tasks bg0fe9ft3/bl5vexz14/bhwfgnjzz/bi1ui0v20), each --resume
+    against the same shared checkpoint file, expected ~4x wall-clock reduction (~2.5-3h
+    for the remaining 118 cells instead of ~10h).
+run_gate1-full-v3_complete_and_third_defect_found:
+  result: "155/155 checkpointed, 0 duplicate/collision cells across shards (sharding
+    correctness verified), total wall-clock ~1h54m (12:47-14:41) vs the original
+    ~10-13h single-process estimate. Raw aggregate: 51/155 accepted (32.9%),
+    104/155 rejected (67.1%) -- far short of the plan's 'zero unresolved gate
+    failures' bar."
+  root_cause_investigation: >
+    Before accepting 32.9% as the real number, checked WHY: aggregated all 4 shard
+    logs (779 lines) and found 734 occurrences of `'check': 'language_detection'`
+    in verification-error metadata across only 51 verification-failure events, almost
+    all on `frontmatter.keywords[N]`. The locale breakdown was the tell before I even
+    looked at logs: Latin-script targets catastrophic (es/nl/th: 0% accepted; it 25%,
+    ro 17%, sv 25%, pl 20%) vs. much better non-Latin-script results (he 54%, ko 54%,
+    ar 33%) -- exactly the pattern a script-based false positive produces, since
+    correctly-translated non-Latin text is unambiguous evidence to a classifier
+    regardless of embedded Latin technical tokens, while a Latin-script translation
+    has to compete character-by-character against the embedded technical tokens.
+    CONFIRMED, not inferred: ran a hand-written, unambiguously CORRECT German
+    translation of a real kb.aspose.org keyword ("Diagrammformat Word-Dokument
+    csharp") directly through LanguageDetectionCheck -- classified as English at
+    confidence 0.9999967799308401. TECHNICAL_SIGNAL_RE stripping doesn't even touch
+    that string; this is langdetect itself failing on short, product/platform-token
+    -dense SEO slugs, independent of what the model actually produced.
+  fix: "src/verification/checks/language_check.py (commit 45c4f9e): added
+    'keywords' to PROTECTED_FRONTMATTER_TREES, third field added to that set this
+    taskcard (after provenance, graded_content_hash). Unlike those two, keywords ARE
+    meant to be translated -- this is a disclosed classifier-reliability gap for
+    this field's shape, not a 'never check it' decision; no write gate (9-44)
+    independently covers keyword translation, recorded honestly as open rather than
+    silently accepted. Regression test uses the exact hand-verified false-positive
+    string. tests/unit/verification: 83/83 passed."
+  restart_decision: >
+    Given the fix's dominant apparent contribution (734 flags vs. 104 total
+    rejections) and that a parallelized restart now costs ~2h not ~10h, restarted
+    clean as gate1-full-v4 (4 shards: bdfyqhx04/b72nfaqx7/bzcnpaa79/bgm1asy9b) rather
+    than report a number known to be contaminated by a fixed false positive. This is
+    the third restart of this taskcard's qualification run (v2: verification
+    content_hash bug; v3->v4: this keywords bug) -- each was driven by a real,
+    confirmed defect found DURING qualification, which is qualification doing
+    exactly its job: this taskcard exists to find defects before they reach real
+    content, not just to produce a number.
+  not_yet_investigated: >
+    "frontmatter_segment_not_applied" ValueError seen on reference.aspose.org/en/
+    html/python/DoctypeToken.md for both nl and ro (2 occurrences, same file) --
+    lower apparent volume than the keywords bug, not chased further this wake;
+    worth a look if it recurs in gate1-full-v4's results.
+run_gate1-full-v4_complete_and_fourth_defect_found:
+  result: >
+    155/155 checkpointed, 0 duplicates, ~2h13m wall-clock (14:46-16:59). Raw:
+    52/155 accepted (33.6%) -- essentially UNCHANGED from v3's 32.9% despite the
+    keywords fix, which was the signal to keep digging rather than conclude the
+    fix "didn't matter" or that this is simply the model's true ceiling.
+  investigation: >
+    Per-content-class breakdown (not visible in the flat accept/reject numbers)
+    showed the real story: marketing 0/20 (0%), short_metadata 3/38 (8%),
+    long_form 1/18 (6%) vs. 30-44% everywhere else -- too stark to be model
+    variance. Re-aggregated all 4 shard logs (1139 lines): language_detection
+    flags barely dropped (734 -> 666) but moved almost entirely to a NEW field --
+    frontmatter.products.list[N].text (630/666, ~95%) -- a nested marketing-page
+    structure (websites.aspose.org's `products: [{name, list: [{text, link}]}]`),
+    real content example: "AI Paraphrasing Tool - Document Paraphraser". Checked
+    with the same rigor as keywords (hand-crafted correct translations run
+    directly through the checker) but did NOT reproduce a clean false positive
+    this time -- so, unlike keywords, this was NOT fixed; recorded as open,
+    possibly a genuine model-quality issue on this content class, not blanket-
+    protected without real evidence.
+    Separately, frontmatter_segment_not_applied jumped 2 -> 44 occurrences (22
+    raised ValueErrors) -- traced to a genuine bug in THIS HARNESS, not the
+    engine: engine.model_id_override alone doesn't reach
+    segment_translator.py's _retry_original_frontmatter_value() check, which
+    reads a SEPARATE parameter derived from engine._rtq_llm_output_paths (the
+    WS-COMP-4 LLM-escalation queue CampaignRunner populates for its own use_llm
+    phases). This harness never populated that queue, so the check treated
+    every job's stale legacy-segment map as authoritative even though every job
+    ran professionalize_llm -- a harness gap a real professionalize_llm-primary
+    campaign (which wires the queue correctly) would not actually hit.
+  fix: "scripts/campaign/run_llm_qualification.py (commit f6265aa):
+    _register_llm_escalation_path() populates engine._rtq_llm_output_paths with
+    each job's expected output path before every translate_file() call, the
+    same way CampaignRunner does. Smoke-tested directly on the exact previously
+    -failing file (reference.aspose.org/en/html/python/DoctypeToken.md, nl):
+    was frontmatter_segment_not_applied, now accepts cleanly."
+  restart: "Restarted clean as gate1-full-v5 (4 shards: bbfg25ldo/bkpmcu66f/
+    bw62k4a9s/bq2dm101a) with both this fix and the keywords fix in place --
+    fourth restart of this taskcard's qualification run, each driven by a
+    real, confirmed, distinct defect."
+first_principles_pass_and_final_restart:
+  trigger: >
+    Operator flagged the risk explicitly: "do you think the machinery is
+    consuming the product" -- fair critique, since two of four fixes so far
+    were in this taskcard's OWN harness code, and the accept rate had barely
+    moved (32.9% -> 33.6%) across two confirmed-real verification fixes.
+    Operator then asked for first-principles thinking before any further
+    restart, not more reactive bug-hunting.
+  method: >
+    Instead of restarting v5 again to re-read an aggregate percentage,
+    extracted every recurring TC-SAS-01 unit_fingerprint (kind:sha256[:16]:len)
+    from the accumulated shard logs and matched each hash back to its actual
+    real source text (the hash+length pair is reversible against a known
+    corpus -- computed sha256(candidate)[:16] for every link/heading/paragraph
+    in the 51 sample files and matched on hash+length). This is the concrete
+    difference between "guess and restart" and "diagnose then fix": every
+    claim below is checked against real content, not inferred from behavior.
+  findings: >
+    Two structural, portfolio-scale patterns, not isolated cells: (1) link
+    text that IS its own href (no natural-language content at all -- matched
+    zero existing non-translatable strategies); (2) brand-navigation labels
+    ("Aspose.3D KB", "Aspose.3D API Reference", "Aspose.3D -- Enterprise
+    Blog"). For (2), CONFIRMED against real, already-shipped content, not
+    guessed: blog.aspose.org/3d/net/introducing-3d-foss-dotnet's own French
+    and German translations both leave "[Aspose.3D KB]" completely
+    untranslated while translating the surrounding prose -- the model
+    matching this IS the established site convention, and TC-SAS-01 was
+    penalizing it for being correct. `grep -c` across just blog.aspose.org
+    found 128+ links using this exact shape (153 files) -- this protects a
+    meaningful slice of the REAL 229,650-cell portfolio once execution
+    starts, not just this qualification sample.
+  fix: "src/translation_engine/extractor/text_unit_extractor.py (commit
+    5412dc7): _link_text_is_brand_navigation_label() (deliberately narrow --
+    only fires when every word after the Aspose.X token is Title-Case/
+    ALL-CAPS, so real prose mentioning a product with lowercase connector
+    words stays translatable) plus a bare-URL-as-link-text check. Broader
+    sweep re-run for safety: tests/unit/translation_engine +
+    test_preservation_contracts.py -> 1342 passed, 1 pre-existing unrelated
+    failure (already routed to TC-APT-011)."
+  restart_and_commitment: >
+    Stopped v5 at 46/155 (~30%) and restarted clean as gate1-full-v6 (4
+    shards: b3jearjny/bnc0rtpkw/b49epjptc/b05hsoqax) -- the fifth restart of
+    this taskcard's qualification run. Per the operator's own concern about
+    the machinery consuming the product: this is the LAST restart planned.
+    v6's result gets analyzed and reported as-is, including honest treatment
+    of the same-as-source zero-tolerance POLICY (not just remaining bugs) as
+    a first-class candidate explanation if the accept rate still doesn't
+    clear the plan's bar after this fix -- not chased with a sixth run.
+  observed_pre_loss: "0 occurrences of GATE31..GATE44 marker strings in gate1-full-v2's log through 50 cells -- no unvalidated-write-gate false-positive signal, consistent with TC-APT-023's finding that content-level defects are rare, but the sample was still small. gate1-full-v2's 40% acceptance rate at 20 cells (vs 27% pre-verification-fix) is superseded by whatever gate1-full-v3 measures fresh, but is consistent directional evidence the language_check.py fix mattered."
+acceptance_bar_from_plan_6.1: "zero unresolved gate failures and zero Claude REJECT_* verdicts across the full qualification sample, reproduced on a second independent run of the same sample -- per TC-APT-023's measured 0.75 byte-identical / 0.8125 semantic-equivalence rerun rates, 'reproduced' means the SEMANTIC contract (all 44 gates pass + similarity >= threshold on both runs), not byte-identical output"
+next_steps:
+  - "let gate1-full finish; evaluate acceptance_rate, gate_failure_histogram, unexpected_model_fingerprints"
+  - "100% Claude review of the qualification sample (self-review against the plan 9.2 bundle: source+target text, structural diff, full gate_results dict, provenance) once outputs exist"
+  - "run a second independent pass over the same 155-cell sample for the reproduction requirement"

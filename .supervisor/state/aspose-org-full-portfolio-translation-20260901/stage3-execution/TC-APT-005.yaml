@@ -1,0 +1,19 @@
+taskcard: TC-APT-005
+title: Close the NLLB licensing question as permanent non-use (G-02)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+decision: PERMANENT_NON_USE (operator model strategy, plan section 6 - professionalize_llm primary, m2m100_418m fallback; NLLB-200 CC-BY-NC-4.0 has no role)
+changes:
+  - "config/global.yaml: new top-level model_licensing.nllb_200 {license CC-BY-NC-4.0, production_approved false, decision_record -> this file}"
+  - "config/global.yaml: removed the six language_routing_overrides (ko/de/fr/th/tr/vi -> nllb_200_1.3b); lv -> professionalize_llm retained (lv is a profile-excluded locale anyway)"
+  - "config/global.yaml: removed nllb_200_1.3b entries from translation_engine.zero_defect_frontmatter_retry_models (blog title/seoTitle + de/cs/id/pl/uk); m2m100 description/summary entries retained"
+  - "src/utils/model_licensing.py (new): is_nllb, nllb_production_approved, routing_violations (scans language_routing_overrides, zero_defect_frontmatter_retry_models, llm_escalation_model, model_defaults), assert_model_selectable"
+  - "src/utils/config_loader.py: ConfigService refuses to load a global config whose routing surfaces select an NLLB model while unapproved (ConfigLoadError)"
+  - "src/model_runtime/loader.py: ModelLoader.load_model refuses NLLB checkpoints while unapproved (ModelLicensingError) before touching the registry"
+  - "config/model_registry.yaml: NLLB entries left registered (license field already CC-BY-NC-4.0) - registration is not selection; the gates above make selection impossible"
+verification:
+  - "pytest tests/regression/test_nllb_permanent_non_use.py -> 7 passed (routing scan, ConfigService refusal + explicit-approval path, loader refusal + approval path, manifest rejects nllb primary, nested retry-model scan)"
+  - "pytest tests/unit/phase-4/test_loader.py tests/unit/model_runtime/test_model_store.py tests/unit/translation_engine/test_zero_defect_frontmatter_retry.py tests/unit/translation_engine/test_retry_feedback_guard.py tests/unit/translation_engine/test_content_type_router_frontmatter_wiring.py tests/unit/config/ tests/smoke/test_default_model_e2e.py -> 139 passed, 3 failed"
+  - "the 3 failures (test_loader::TestHuggingFaceBackend::test_translate, test_loader::TestModelLoaderLoadMode::test_create_backend_translates_load_mode_none, test_content_type_router_frontmatter_wiring::...reaches_final_translations_dict) reproduce identically with this taskcard's three files stashed (HEAD versions) -> PRE-EXISTING, unrelated to TC-APT-005; routed to TC-APT-011 (G-12 test-gap closure)"
+acceptance: "no manifest (validate_schema pins m2m100_418m/professionalize_llm) or routing rule (ConfigService gate) can select an NLLB model; loader refuses instantiation; decision recorded -> MET"

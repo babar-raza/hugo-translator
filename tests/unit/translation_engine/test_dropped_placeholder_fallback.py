@@ -25,6 +25,11 @@ def _make_segment(source_text: str, placeholder_map: dict[str, str]):
 def _make_engine():
     engine = MagicMock()
     engine.placeholder_manager = PlaceholderManager()  # real instance, not a mock
+    # A bare MagicMock auto-vivifies campaign_context, and its .get(...) call
+    # returns another (truthy) MagicMock -- which would spuriously trip the
+    # method's defer_llm_fallbacks early-return and skip load_model entirely.
+    # Real engines always set this to a genuine dict (engine_builder.py).
+    engine.campaign_context = {}
     return engine
 
 

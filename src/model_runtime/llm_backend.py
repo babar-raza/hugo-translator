@@ -17,9 +17,18 @@ from pathlib import Path
 from typing import Any
 
 from .contracts import LLMProviderConfig
+from .llm_errors import LLMCircuitOpenError, LLMSegmentFailure, SegmentOutcome
+
+# TC-APT-004: per-call segment outcomes live in a ContextVar so concurrent calls on one
+# shared backend instance never see each other's outcomes (same pattern as _ctx_hint_var).
+_outcomes_var: contextvars.ContextVar[list | None] = contextvars.ContextVar(
+    "llm_segment_outcomes", default=None
+)
 from .llm_providers import BaseLLMProvider, create_provider
 from .loader import repair_mojibake
 from .registry import ModelInfo
+
+from src.workers.llm_slot_semaphore import DEFAULT_CAPACITY, DEFAULT_TTL_SECONDS, LLMSlot
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +178,8 @@ class LLMModelBackend:
         # TC-HT-003: prompt-echo/refusal rejects from the most recent
         # translate_with_token_counts() call, keyed by index into `texts`.
         self.last_reject_reasons: dict[int, str] = {}
+        # TC-APT-004: truthful per-segment outcomes of the most recent call.
+        self.last_segment_outcomes: list[SegmentOutcome] = []
 
         # TC-AST-02: Configurable hallucination cap (default 4.0× input length).
         # Read from global config so it survives model reloads without restarts.
@@ -187,6 +198,41 @@ class LLMModelBackend:
         except Exception:
             self._max_hallucination_ratio = 4.0
             self._hallucination_ratio_overrides = {}
+
+        # TC-APT-094: cross-process cap on in-flight LLM API calls across the
+        # whole K-launcher fleet (plan SS0.10) -- a per-process limit alone
+        # multiplies with launcher count into an uncapped fleet-wide burst.
+        try:
+            from src.utils.config_loader import get_global_config
+
+            _slot_cfg = get_global_config().get("translation_engine", {}).get(
+                "llm_slot_semaphore", {}
+            )
+            self._llm_slot_capacity: int = int(_slot_cfg.get("capacity", DEFAULT_CAPACITY))
+            self._llm_slot_ttl_seconds: float = float(
+                _slot_cfg.get("ttl_seconds", DEFAULT_TTL_SECONDS)
+            )
+        except Exception:
+            self._llm_slot_capacity = DEFAULT_CAPACITY
+            self._llm_slot_ttl_seconds = DEFAULT_TTL_SECONDS
+
+    def _llm_slot(self) -> LLMSlot:
+        # getattr-defaulted: several existing tests construct this class via
+        # __new__ (bypassing __init__) and set only the attributes they need.
+        capacity = getattr(self, "_llm_slot_capacity", DEFAULT_CAPACITY)
+        ttl_seconds = getattr(self, "_llm_slot_ttl_seconds", DEFAULT_TTL_SECONDS)
+        return LLMSlot(capacity=capacity, ttl_seconds=ttl_seconds)
+
+    def _model_id_str(self) -> str | None:
+        return getattr(self.model_info, "model_id", None) if self.model_info is not None else None
+
+    def _record_outcome(self, idx: int, text: str, failed: bool, reason: str | None) -> None:
+        outcome = SegmentOutcome(idx, text, failed, reason, model_id=self._model_id_str())
+        bucket = _outcomes_var.get()
+        if bucket is None:
+            self.last_segment_outcomes.append(outcome)
+        else:
+            bucket.append(outcome)
 
     @property
     def _term_manager(self):
@@ -419,6 +465,8 @@ class LLMModelBackend:
         start_time = time.perf_counter()
         tm = self._term_manager
         self.last_reject_reasons = {}
+        self.last_segment_outcomes = []
+        _outcomes_token = _outcomes_var.set([])
 
         # Separate empty/whitespace-only texts (no API call needed)
         non_empty_indices = [i for i, t in enumerate(texts) if t.strip()]
@@ -459,6 +507,20 @@ class LLMModelBackend:
             total_output,
             elapsed,
         )
+
+        # TC-APT-004 / G-03: a provider failure is never a silent passthrough. Any segment
+        # that failed after retries fails the whole call loudly; the caller (retry ladder,
+        # campaign runner) sees a FAILED job, never a shipped same-as-source file.
+        outcomes = _outcomes_var.get() or []
+        _outcomes_var.reset(_outcomes_token)
+        self.last_segment_outcomes = list(outcomes)
+        failed = [o for o in self.last_segment_outcomes if o.failed]
+        if failed:
+            raise LLMSegmentFailure(
+                self.last_segment_outcomes,
+                total=len(texts),
+                circuit_open=any("LLMCircuitOpenError" in (o.reason or "") for o in failed),
+            )
 
         return translations, total_input, total_output
 
@@ -573,10 +635,11 @@ class LLMModelBackend:
             protected = tm.protect(text) if tm else None
             input_text = protected.protected_text if protected else text
 
-            result, inp_tokens, out_tokens = self._provider.generate(
-                system_prompt=system_prompt,
-                user_text=input_text,
-            )
+            with self._llm_slot():
+                result, inp_tokens, out_tokens = self._provider.generate(
+                    system_prompt=system_prompt,
+                    user_text=input_text,
+                )
 
             # TC-HT-003: reject prompt-echo/refusal responses before any
             # other processing — a rule-echo must never reach output, even
@@ -592,6 +655,7 @@ class LLMModelBackend:
                 )
                 self.last_reject_reasons[idx] = reject_reason
                 translations[idx] = text
+                self._record_outcome(idx, text, False, f"reject:{reject_reason}")
                 return inp_tokens, out_tokens
 
             # TC-AST-02 / TC-H2: Configurable hallucination cap with per-language overrides.
@@ -619,6 +683,9 @@ class LLMModelBackend:
                     )
                     self.last_reject_reasons[idx] = "hallucination_list_marker_reject"
                     translations[idx] = text
+                    self._record_outcome(
+                        idx, text, False, "reject:hallucination_list_marker_reject"
+                    )
                     return inp_tokens, out_tokens
                 logger.error(
                     "LLM hallucination detected: segment %d/%d output is %.1fx input "
@@ -657,11 +724,18 @@ class LLMModelBackend:
                 result = tm.restore(protected)
 
             translations[idx] = repair_mojibake(result)
+            self._record_outcome(idx, translations[idx], False, None)
             return inp_tokens, out_tokens
 
         except Exception as e:
-            logger.error("LLM translation failed for segment %d/%d: %s", idx + 1, total, e)
-            translations[idx] = text  # fallback to source
+            # TC-APT-004 / G-03: NO silent passthrough. The provider wrapper already retried
+            # transient errors; record a failed outcome with an EMPTY text (never the source)
+            # and let translate_with_token_counts() raise LLMSegmentFailure for the batch.
+            logger.error("LLM translation FAILED for segment %d/%d: %s", idx + 1, total, e)
+            translations[idx] = ""
+            self._record_outcome(idx, "", True, f"{type(e).__name__}: {e}"[:200])
+            if isinstance(e, LLMCircuitOpenError):
+                raise
             return 0, 0
 
     def _translate_packed_batch(
@@ -677,40 +751,74 @@ class LLMModelBackend:
 
         Falls back to per-segment calls if output parsing fails.
         Returns (total_input_tokens, total_output_tokens).
-        """
-        system_prompt = self._apply_retry_feedback(
-            self._build_batch_system_prompt(src_lang, tgt_lang, len(indices))
-        )
 
-        # Protect terms and build packed input
+        Recurrence 2026-09-08: a byte-identical short segment (e.g. a table's
+        repeated "Yes" cell) appearing more than once in the SAME packed
+        prompt reliably corrupted every occurrence after the first --
+        confirmed on 17 cells across 2 pages, always the second-or-later
+        "Yes" in one prompt, always rendering as a politeness/question
+        phrase ("Could you", "Please provide...") instead of a translation.
+        Fix: dedupe identical source text to ONE line per packed prompt and
+        broadcast its single translation back to every index that shared it
+        -- the model is never shown the same short string twice in one call.
+        """
+        # Protect terms per index as before (pure function of the text, safe
+        # to compute independently for every index, duplicates included).
+        # But emit only ONE prompt line per unique source text (see the
+        # recurrence note above) -- seq_for_idx maps every index, including
+        # duplicates, to the seq number of its text's single prompt line.
         protected_map = {}  # idx -> ProtectedResult
         lines = []
-        for seq, idx in enumerate(indices, 1):
+        seq_for_idx: dict[int, int] = {}
+        seq_for_text: dict[str, int] = {}
+        for idx in indices:
+            text = texts[idx]
             if tm:
-                p = tm.protect(texts[idx])
+                p = tm.protect(text)
                 if p:
                     protected_map[idx] = p
-                    lines.append(f"<<<SEG_{seq}>>> {p.protected_text}")
+                    line_text = p.protected_text
                 else:
-                    lines.append(f"<<<SEG_{seq}>>> {texts[idx]}")
+                    line_text = text
             else:
-                lines.append(f"<<<SEG_{seq}>>> {texts[idx]}")
+                line_text = text
+
+            existing_seq = seq_for_text.get(text)
+            if existing_seq is not None:
+                seq_for_idx[idx] = existing_seq
+                continue
+            seq = len(seq_for_text) + 1
+            seq_for_text[text] = seq
+            seq_for_idx[idx] = seq
+            lines.append(f"<<<SEG_{seq}>>> {line_text}")
 
         packed_input = "\n".join(lines)
 
-        try:
-            result, inp_tokens, out_tokens = self._provider.generate(
-                system_prompt=system_prompt,
-                user_text=packed_input,
-            )
+        # The prompt's own stated segment count must match the number of
+        # lines actually sent (len(seq_for_text)), not len(indices) -- telling
+        # the model to expect N segments while sending fewer unique lines is
+        # exactly the kind of count mismatch this fix exists to avoid.
+        system_prompt = self._apply_retry_feedback(
+            self._build_batch_system_prompt(src_lang, tgt_lang, len(seq_for_text))
+        )
 
-            # Parse numbered outputs
-            parsed = self._parse_packed_output(result, len(indices))
+        try:
+            with self._llm_slot():
+                result, inp_tokens, out_tokens = self._provider.generate(
+                    system_prompt=system_prompt,
+                    user_text=packed_input,
+                )
+
+            # Parse numbered outputs -- expected count is the number of
+            # UNIQUE lines actually sent (len(seq_for_text)), not len(indices):
+            # duplicate-text indices share a line and never got their own SEG.
+            parsed = self._parse_packed_output(result, len(seq_for_text))
 
             if parsed is not None:
-                # Successfully parsed — assign translations
-                for seq, idx in enumerate(indices):
-                    trans = parsed[seq]
+                # Successfully parsed — assign translations (duplicates reuse
+                # their shared text's single parsed result via seq_for_idx).
+                for idx in indices:
+                    trans = parsed[seq_for_idx[idx] - 1]
 
                     # TC-HT-003: reject prompt-echo/refusal per-item before
                     # term restore, same guard as the single-segment path.
@@ -724,12 +832,14 @@ class LLMModelBackend:
                         )
                         self.last_reject_reasons[idx] = reject_reason
                         translations[idx] = texts[idx]
+                        self._record_outcome(idx, texts[idx], False, f"reject:{reject_reason}")
                         continue
 
                     if idx in protected_map:
                         protected_map[idx].protected_text = trans
                         trans = tm.restore(protected_map[idx])
                     translations[idx] = trans
+                    self._record_outcome(idx, trans, False, None)
                 return inp_tokens, out_tokens
             else:
                 # Parsing failed — fall back to per-segment calls
@@ -748,6 +858,8 @@ class LLMModelBackend:
                 return total_in, total_out
 
         except Exception as e:
+            if isinstance(e, LLMCircuitOpenError):
+                raise
             logger.error("Packed batch LLM call failed: %s. Falling back to per-segment.", e)
             total_in, total_out = 0, 0
             for idx in indices:
@@ -822,6 +934,43 @@ class LLMModelBackend:
                 f"- Property names, class names, and code identifiers MUST NOT be translated\n"
                 f"- Keep the exact tense and voice of each description\n"
                 f"- Preserve backtick spans and markdown formatting"
+            )
+
+        if hint and hint.startswith("frontmatter_"):
+            # RB-012 (config/review_rubric.yaml, 2026-09-11): the generic prompt
+            # below tells the model to "preserve all formatting: markdown" --
+            # correct for body text, but frontmatter string fields (title,
+            # seoTitle, description, summary) are plain text consumed by HTML
+            # meta tags / RSS / search snippets, which do not render markdown.
+            # Reproduced on blog.aspose.org/pdf/python/pdf-generated-in-python:
+            # 2 of 8 accepted description-field translations (nl via
+            # m2m100_418m, th via professionalize_llm's first attempt) came
+            # back with technical terms wrapped in bold ("**aspose_pdf**") that
+            # were plain in the source -- the ambiguous "preserve formatting"
+            # instruction left room for the model to add emphasis it judged
+            # helpful. This hint was already wired end to end (segment_
+            # translator.py sets context_hint=f"frontmatter_{field_name}" and
+            # this method's own docstring names "frontmatter_description" as
+            # an example) but had no branch here, so it silently fell through
+            # to the generic (markdown-preserving) prompt every time.
+            return (
+                f"You are a professional translator. Translate each numbered "
+                f"segment from {src_name} to {tgt_name}.\n\n"
+                f"Input: {segment_count} numbered segments, each prefixed with <<<SEG_N>>>.\n"
+                f"Output: {segment_count} translated segments, each on its own line "
+                f"prefixed with the SAME tag <<<SEG_N>>>.\n\n"
+                f"Rules:\n"
+                f"- Output ONLY the translations with their numbers, nothing else\n"
+                f"- This is a PLAIN TEXT field (used in HTML meta tags, RSS feeds, "
+                f"search snippets) -- output plain text ONLY: no markdown formatting "
+                f"of any kind (no **bold**, no _italics_, no backticks, no headers), "
+                f"even to emphasize a technical term\n"
+                f"- Keep technical terms, brand names, and API identifiers unchanged, "
+                f"written exactly as they appear in the source, with no added markup\n"
+                f"- Translate every other word and phrase into {tgt_name}; do not copy "
+                f"English prose such as adjectives, prepositions, or explanatory text, "
+                f"even when it appears next to an API identifier\n"
+                f"- Maintain the same tone and register as the source"
             )
 
         return (
@@ -901,6 +1050,8 @@ class LLMModelBackend:
                 f"Translate this API class description from {src_name} to {tgt_name}.\n\n"
                 "Rules:\n"
                 "- Keep class names, method names, and identifiers in English\n"
+                f"- Translate every other word and phrase into {tgt_name}; do not leave "
+                "ordinary English prose unchanged\n"
                 "- Output ONLY the translation, nothing else\n"
                 "- Keep the same concise register as the source"
             )

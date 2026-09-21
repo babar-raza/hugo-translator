@@ -7,6 +7,18 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 13622
     corpus_agreement: override
+  heading.installation:
+    value: Installatie
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
+  heading.quickstart:
+    value: Snelstart
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 507
+    corpus_agreement: agree
     rejected_variants:
     - Methods
   heading.see_also:
@@ -180,6 +192,30 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 715
     corpus_agreement: override
+  table.header.component:
+    value: Component
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 7
+    corpus_agreement: agree
+  table.header.role:
+    value: Rol
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
+  table.header.renderer:
+    value: Renderer
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 11
+    corpus_agreement: agree
+  table.header.handles:
+    value: Verwerkt
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 11
+    corpus_agreement: agree
     rejected_variants:
     - Example
     - ImageRenderOptions
@@ -295,3 +331,15 @@ translations:
     rejected_variants:
     - Alle openbare leden zijn toegankelijk voor elke {platform}‑applicatie na het
       installeren van het Aspose.{family} FOSS for {platform}‑pakket.
+  table.header.issue:
+    value: Probleem
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.header.cause:
+    value: Oorzaak
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence

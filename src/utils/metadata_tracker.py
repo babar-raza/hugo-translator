@@ -22,27 +22,40 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SourceFileMetadata:
     """Metadata for source file."""
+
     path: str
     hash: str
     last_modified: str  # ISO 8601
     size_bytes: int
     hash_computed_at: str  # ISO 8601
+    # TC-APT-003 (plan 7.1/7.3): explicit SHA256 (regardless of the configured fast hash)
+    # and the per-site fingerprints in force when this source was last hashed.
+    sha256: str | None = None
+    profile_fingerprint: str | None = None
+    protection_fingerprint: str | None = None
 
 
 @dataclass
 class OutputFileMetadata:
     """Metadata for translated output file."""
+
     path: str
     hash: str
     translated_at: str  # ISO 8601
     source_hash_at_translation: str  # Source hash when this translation was created
     size_bytes: int
-    status: str  # "success" | "failed"
+    status: str  # "success" | "failed" | "unknown_provenance"
+    # TC-APT-003: SHA256 of the output bytes and the fingerprints the translation was
+    # produced under (None for pre-mission outputs registered by the provenance backfill).
+    sha256: str | None = None
+    profile_fingerprint: str | None = None
+    protection_fingerprint: str | None = None
 
 
 @dataclass
 class FileMetadata:
     """Complete metadata for source file + all translations."""
+
     source: SourceFileMetadata
     outputs: dict[str, OutputFileMetadata]  # {lang_code: metadata}
 
@@ -65,16 +78,39 @@ class MetadataTracker:
         lock_timeout: int = 30,
         metrics: Optional["MetricsCollector"] = None,
         auto_cleanup_config: dict | None = None,
+        root: Path | None = None,
     ):
         self.metadata_file = metadata_file
         self.hash_algorithm = hash_algorithm
         self.site_id = site_id
+        # TC-APT-003: when set, entries are keyed by POSIX paths relative to ``root`` so the
+        # per-site JSON is portable across machines/checkouts (the engine passes None and
+        # keeps its historical absolute-string keys).
+        self.root = Path(root).resolve() if root is not None else None
         self.redis_client = redis_client
         self.lock_timeout = lock_timeout
         self.metrics = metrics  # CHH-04: Metrics collector
         self.auto_cleanup_config = auto_cleanup_config or {}  # CHH-05: Automatic cleanup config
         self._data: dict[str, FileMetadata] = {}
         self._loaded = False
+
+    def key_for(self, path: Path) -> str:
+        """Entry key for ``path`` (relative POSIX under ``root`` when configured)."""
+        if self.root is not None:
+            try:
+                return Path(path).resolve().relative_to(self.root).as_posix()
+            except ValueError:
+                return Path(path).as_posix()
+        return str(path)
+
+    def _sha256(
+        self, path: Path, precomputed: str | None = None, fast_hash: str | None = None
+    ) -> str:
+        if precomputed:
+            return precomputed
+        if self.hash_algorithm == "sha256" and fast_hash:
+            return fast_hash
+        return compute_file_hash(path, "sha256", metrics=self.metrics)
 
     def load(self) -> None:
         """Load metadata from disk (with corruption recovery)."""
@@ -110,7 +146,9 @@ class MetadataTracker:
             self._loaded = True
 
         # CHH-05: Automatic cleanup on load
-        if self.auto_cleanup_config.get("enabled", False) and self.auto_cleanup_config.get("cleanup_on_load", False):
+        if self.auto_cleanup_config.get("enabled", False) and self.auto_cleanup_config.get(
+            "cleanup_on_load", False
+        ):
             max_age = self.auto_cleanup_config.get("max_age_days", 30)
             logger.debug(f"Running automatic cleanup on load (max_age={max_age} days)")
             self.cleanup_old_entries(max_age_days=max_age)
@@ -137,7 +175,9 @@ class MetadataTracker:
                     # CHH-04: Record lock acquisition time
                     if self.metrics:
                         lock_duration = time.time() - lock_start
-                        self.metrics.observe("metadata_lock_acquire_duration_seconds", lock_duration)
+                        self.metrics.observe(
+                            "metadata_lock_acquire_duration_seconds", lock_duration
+                        )
 
                     logger.debug(f"Acquired Redis lock for metadata save: {lock_key}")
                     self._save_to_disk()
@@ -169,7 +209,9 @@ class MetadataTracker:
             self.metrics.set_gauge("metadata_tracked_files", len(self._data))
 
         # CHH-05: Automatic cleanup on save
-        if self.auto_cleanup_config.get("enabled", False) and self.auto_cleanup_config.get("cleanup_on_save", False):
+        if self.auto_cleanup_config.get("enabled", False) and self.auto_cleanup_config.get(
+            "cleanup_on_save", False
+        ):
             max_age = self.auto_cleanup_config.get("max_age_days", 30)
             logger.debug(f"Running automatic cleanup on save (max_age={max_age} days)")
             self.cleanup_old_entries(max_age_days=max_age)
@@ -182,9 +224,8 @@ class MetadataTracker:
             files_dict[file_path] = {
                 "source": asdict(metadata.source),
                 "outputs": {
-                    lang: asdict(output_meta)
-                    for lang, output_meta in metadata.outputs.items()
-                }
+                    lang: asdict(output_meta) for lang, output_meta in metadata.outputs.items()
+                },
             }
 
         output = {
@@ -197,11 +238,9 @@ class MetadataTracker:
             "files": files_dict,
             "statistics": {
                 "total_files_tracked": len(self._data),
-                "total_translations": sum(
-                    len(meta.outputs) for meta in self._data.values()
-                ),
+                "total_translations": sum(len(meta.outputs) for meta in self._data.values()),
                 "last_updated": datetime.now(timezone.utc).isoformat(),
-            }
+            },
         }
 
         # Atomic write with fsync.
@@ -223,11 +262,37 @@ class MetadataTracker:
         if not self._loaded:
             self.load()
 
-        metadata = self._data.get(str(source_path))
+        metadata = self._data.get(self.key_for(source_path))
         return metadata.source.hash if metadata else None
 
-    def update_source(self, source_path: Path) -> str:
-        """Compute and store hash for source file."""
+    def get_source_sha256(self, source_path: Path) -> str | None:
+        """Stored SHA256 for a source (None when the entry predates TC-APT-003)."""
+        if not self._loaded:
+            self.load()
+        metadata = self._data.get(self.key_for(source_path))
+        return metadata.source.sha256 if metadata else None
+
+    def get_output(self, source_path: Path, target_lang: str) -> OutputFileMetadata | None:
+        if not self._loaded:
+            self.load()
+        metadata = self._data.get(self.key_for(source_path))
+        return metadata.outputs.get(target_lang) if metadata else None
+
+    def entries(self) -> dict[str, FileMetadata]:
+        """Read-only view of every tracked entry (TC-APT-003 ledger aggregation)."""
+        if not self._loaded:
+            self.load()
+        return dict(self._data)
+
+    def update_source(
+        self,
+        source_path: Path,
+        *,
+        profile_fingerprint: str | None = None,
+        protection_fingerprint: str | None = None,
+        sha256: str | None = None,
+    ) -> str:
+        """Compute and store hash (+ SHA256 and fingerprints) for source file."""
         if not self._loaded:
             self.load()
 
@@ -237,14 +302,17 @@ class MetadataTracker:
 
         # Create/update metadata
         source_meta = SourceFileMetadata(
-            path=str(source_path),
+            path=self.key_for(source_path),
             hash=file_hash,
             last_modified=datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
             size_bytes=stat.st_size,
             hash_computed_at=datetime.now(timezone.utc).isoformat(),
+            sha256=self._sha256(source_path, sha256, file_hash),
+            profile_fingerprint=profile_fingerprint,
+            protection_fingerprint=protection_fingerprint,
         )
 
-        file_path_str = str(source_path)
+        file_path_str = self.key_for(source_path)
         if file_path_str in self._data:
             self._data[file_path_str].source = source_meta
         else:
@@ -259,8 +327,13 @@ class MetadataTracker:
         target_lang: str,
         source_hash: str,
         status: str = "success",
+        *,
+        profile_fingerprint: str | None = None,
+        protection_fingerprint: str | None = None,
+        sha256: str | None = None,
+        translated_at: str | None = None,
     ) -> None:
-        """Record translation output metadata."""
+        """Record translation output metadata (+ SHA256 and producing fingerprints)."""
         if not self._loaded:
             self.load()
 
@@ -269,16 +342,23 @@ class MetadataTracker:
         stat = output_path.stat()
 
         output_meta = OutputFileMetadata(
-            path=str(output_path),
+            path=self.key_for(output_path),
             hash=output_hash,
-            translated_at=datetime.now(timezone.utc).isoformat(),
+            translated_at=(
+                translated_at
+                if translated_at is not None
+                else datetime.now(timezone.utc).isoformat()
+            ),
             source_hash_at_translation=source_hash,
             size_bytes=stat.st_size,
             status=status,
+            sha256=self._sha256(output_path, sha256, output_hash),
+            profile_fingerprint=profile_fingerprint,
+            protection_fingerprint=protection_fingerprint,
         )
 
         # Ensure source entry exists
-        file_path_str = str(source_path)
+        file_path_str = self.key_for(source_path)
         if file_path_str not in self._data:
             # Create stub (will be populated next time source is checked)
             self._data[file_path_str] = FileMetadata(
@@ -289,19 +369,54 @@ class MetadataTracker:
                     size_bytes=0,
                     hash_computed_at="",
                 ),
-                outputs={}
+                outputs={},
             )
 
         # Update output
         self._data[file_path_str].outputs[target_lang] = output_meta
 
-    def check_source_changed(self, source_path: Path, fast_path_mtime: bool = True) -> tuple[bool, str]:
+    def record_existing_output(
+        self,
+        source_path: Path,
+        output_path: Path,
+        target_lang: str,
+        *,
+        sha256: str | None = None,
+    ) -> OutputFileMetadata:
+        """Register a pre-existing target with no trustworthy provenance (TC-APT-003 backfill).
+
+        ``source_hash_at_translation`` is left empty and ``status`` is ``unknown_provenance``:
+        the file's bytes are tracked, but nothing here claims it was produced from the
+        current source (plan 7.4 -- never assume current).
+        """
+        if not self._loaded:
+            self.load()
+        if self.key_for(source_path) not in self._data:
+            self.update_source(source_path)
+        self.update_output(
+            source_path,
+            output_path,
+            target_lang,
+            source_hash="",
+            status="unknown_provenance",
+            sha256=sha256,
+            translated_at="",
+        )
+        return self._data[self.key_for(source_path)].outputs[target_lang]
+
+    def check_source_changed(
+        self, source_path: Path, fast_path_mtime: bool = False
+    ) -> tuple[bool, str]:
         """
         Check if source file content has changed.
 
+        TC-APT-003 (plan 2.7/7.1): SHA256 comparison is PRIMARY. ``fast_path_mtime`` now
+        defaults to False -- an unchanged mtime is no longer treated as proof of unchanged
+        content; callers must opt in to the mtime shortcut explicitly.
+
         Args:
             source_path: Path to source file
-            fast_path_mtime: If True, skip hash computation if mtime unchanged
+            fast_path_mtime: If True, skip hash computation if mtime unchanged (opt-in)
 
         Returns:
             (changed: bool, reason: str)
@@ -313,9 +428,24 @@ class MetadataTracker:
         if not stored_hash:
             return (True, "no stored hash (first run)")
 
-        # Fast path: Check mtime first
+        # Primary: SHA256 comparison when the entry carries one.
+        stored_sha = self.get_source_sha256(source_path)
+        if stored_sha and not fast_path_mtime:
+            current_sha = compute_file_hash(source_path, "sha256", metrics=self.metrics)
+            if current_sha == stored_sha:
+                if self.metrics:
+                    self.metrics.increment("content_hash_no_change")
+                return (False, f"content unchanged (sha256 match: {current_sha[:8]}...)")
+            if self.metrics:
+                self.metrics.increment("content_hash_changes_detected")
+            return (
+                True,
+                f"content changed (sha256 {stored_sha[:8]}... -> {current_sha[:8]}...)",
+            )
+
+        # Opt-in fast path: Check mtime first
         if fast_path_mtime:
-            metadata = self._data.get(str(source_path))
+            metadata = self._data.get(self.key_for(source_path))
             if metadata and metadata.source.last_modified:
                 try:
                     stored_mtime = datetime.fromisoformat(metadata.source.last_modified)
@@ -387,16 +517,14 @@ class MetadataTracker:
                 del self._data[file_path]
                 removed.append(file_path)
                 logger.debug(
-                    f"Removed stale metadata for {file_path} "
-                    f"(last seen: {last_seen.isoformat()})"
+                    f"Removed stale metadata for {file_path} (last seen: {last_seen.isoformat()})"
                 )
 
         # Save if anything removed
         if removed:
             self.save()
             logger.info(
-                f"Cleaned up {len(removed)} stale metadata entries "
-                f"(older than {max_age_days} days)"
+                f"Cleaned up {len(removed)} stale metadata entries (older than {max_age_days} days)"
             )
 
         return removed

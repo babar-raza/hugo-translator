@@ -19,12 +19,17 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from src.model_runtime.campaign_llm_policy import llm_category
+
 from ..observability.progress import get_progress_tracker
+from ..utils.log_sanitizer import sanitize_for_log
 from .engine import estimate_token_count
 from .exceptions import TranslationRetryableError
 from .extractor import SegmentExtractor, TextUnitKind
+from .extractor.leaf_inventory import LeafClassification, classify_sole_leaf
 from .models import TranslationStats, ValidationIssue, ValidationResult
 from .reconstructor import MarkdownReconstructor
+from .terminology.classification import get_default_protected_terms
 
 if TYPE_CHECKING:
     from .engine import TranslationEngine
@@ -40,31 +45,38 @@ class _RetryFeedbackModel:
         self._feedback = feedback
 
     def translate(self, texts, src_lang: str, tgt_lang: str, **kwargs):
+        kwargs.setdefault("retry_feedback", self._feedback)
         return self._backend.translate_with_retry_feedback(
             texts,
             src_lang,
             tgt_lang,
-            retry_feedback=self._feedback,
             **kwargs,
         )
 
     def translate_with_token_counts(self, texts, src_lang: str, tgt_lang: str, **kwargs):
+        kwargs.setdefault("retry_feedback", self._feedback)
         return self._backend.translate_with_token_counts_and_retry_feedback(
             texts,
             src_lang,
             tgt_lang,
-            retry_feedback=self._feedback,
             **kwargs,
         )
 
     def translate_with_context(self, texts, src_lang: str, tgt_lang: str, **kwargs):
         # Keep campaign retry guidance attached to the field-aware LLM path
         # used for frontmatter escalation as well as to ordinary batches.
+        # setdefault (not an unconditional override): a caller that already
+        # built its own more specific retry_feedback -- e.g. TC-APT-042's
+        # cross-field frontmatter repair, which names the exact residual
+        # phrase and the sibling field's translation -- must win, not crash
+        # with "got multiple values for keyword argument 'retry_feedback'"
+        # (found live 2026-09-07, wave8: every retry pass silently ate the
+        # TypeError and burned ~2 minutes re-hitting it).
+        kwargs.setdefault("retry_feedback", self._feedback)
         return self._backend.translate_with_context(
             texts,
             src_lang,
             tgt_lang,
-            retry_feedback=self._feedback,
             **kwargs,
         )
 
@@ -161,7 +173,11 @@ def _restore_required_seo_separator(
         return translated_value
     separator = source_separator.group()
     rendered_separator = separator if separator == " - " else f" {separator} "
-    return translated_value[: product.start()].rstrip() + rendered_separator + translated_value[product.start() :]
+    return (
+        translated_value[: product.start()].rstrip()
+        + rendered_separator
+        + translated_value[product.start() :]
+    )
 
 
 _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
@@ -173,6 +189,11 @@ _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
             # AST text unit following the protected FilterOperatorType name;
             # French uses the same noun and punctuation.
             "conditions.",
+            # "Annotations" is spelled identically in English and French
+            # (confirmed cognate; TC-SAS-01 hard-failed the identical heading
+            # on two independent source pages: introducing-pdf-foss-typescript
+            # and introducing-pdf-foss-cpp).
+            "annotations",
         }
     ),
 }
@@ -182,6 +203,57 @@ def _is_reviewed_identical_translation(source_text: str, target_lang: str) -> bo
     """Return whether an exact same-as-source value is valid for this locale."""
     normalized = re.sub(r"\s+", " ", source_text).strip().casefold()
     return normalized in _REVIEWED_IDENTICAL_TRANSLATIONS.get(target_lang.lower(), frozenset())
+
+
+def _has_translatable_residue(
+    source_text: str, preserve_patterns: list[str] | None, min_word_len: int = 4
+) -> bool:
+    """Whether a unit still contains a real translatable word once protected spans are masked.
+
+    TC-SAS-01 counts a unit as "unchanged" when the model returns it byte-identical.
+    That is only evidence of a failure to translate if there was something translatable
+    in the first place. Measured on words-document-net: the link text
+    "Aspose.Words for .NET" masks to "{PH} for .NET", whose entire translatable residue
+    is the preposition "for" -- so a model that leaves those three characters alone made
+    a whole 54-unit cell fail a 0%-tolerance gate. The ar cell of the same page did
+    localise it, so this is variance on three characters, not a quality signal.
+
+    Deliberately conservative, so it cannot mask a genuine miss: a unit counts as
+    judgeable if the masked residue holds ANY token of >= min_word_len alphabetic
+    characters that is not ALL-CAPS (i.e. plausibly a word rather than an identifier or
+    acronym). "The source code is available at" stays judgeable; "for .NET" does not.
+    This is the same reasoning as TC-APT-040's short-signal floor, applied to a
+    different gate, and it joins the exclusions this filter already carries for short
+    units, reviewed cognates and table cells.
+    """
+    residue = source_text or ""
+    for pattern in preserve_patterns or []:
+        try:
+            residue = re.sub(pattern, " ", residue)
+        except re.error:
+            continue
+    # Preserve patterns are not the only governed source-language spans.  The
+    # terminology registry is also the canonical protection source for file
+    # formats, API identifiers, and product names.  A malformed Markdown row
+    # can be parsed as ordinary text (for example ``| — | | glTF |``); without
+    # masking the registered term, TC-SAS-01 mistakes that structural fragment
+    # for untranslated prose and retries it forever.  Exact terms are escaped
+    # deliberately: terminology is configuration, not executable regex.
+    for term in get_default_protected_terms().terms:
+        if term:
+            residue = re.sub(re.escape(term), " ", residue, flags=re.IGNORECASE)
+    for token in re.findall(r"[^\W\d_]+", residue, flags=re.UNICODE):
+        if len(token) >= min_word_len and not token.isupper():
+            return True
+    return False
+
+
+# TC-APT-073: the normalizer now lives in text_fidelity so the AST path can
+# share it (see that module's docstring for the measurement and for why the
+# AST renderer needs it too -- _translate_body_ast never reaches
+# _restore_placeholders below). Re-exported here because callers and tests
+# already import it from this module.
+from .text_fidelity import normalize_injected_invisibles  # noqa: F401
 
 
 def _same_as_source_fingerprints(units: list) -> str:
@@ -603,6 +675,211 @@ class SegmentTranslator:
                 return chunk_candidate
         return translated_text
 
+    @llm_category("repair")
+    def _repair_cross_field_frontmatter_residuals(
+        self,
+        engine,
+        units: list,
+        primary_model,
+        source_lang: str,
+        target_lang: str,
+        stats: TranslationStats,
+    ) -> int:
+        """TC-APT-042: repair near-duplicate frontmatter fields that left a shared
+        phrase untranslated while a sibling field translated the same phrase.
+
+        The sibling's successful translation proves the phrase is translatable, so
+        the asymmetric English fragment is retried with corrective feedback naming
+        the fragment and the sibling's rendering for terminology consistency.  The
+        repaired bytes still traverse every downstream gate before acceptance.
+        """
+        from .frontmatter_consistency import _normalize, find_cross_field_residuals
+
+        residuals = find_cross_field_residuals(units)
+        if not residuals:
+            return 0
+        if (getattr(engine, "campaign_context", {}) or {}).get("defer_llm_fallbacks"):
+            logger.info(
+                "TC-APT-042: deferred campaign leaves %d cross-field residual(s) "
+                "for page-level retry handling",
+                len(residuals),
+            )
+            return 0
+        backend = primary_model if hasattr(primary_model, "translate_with_context") else None
+        if backend is None:
+            try:
+                with engine._model_lock:
+                    backend = engine.model_loader.load_model("professionalize_llm")
+            except Exception as load_error:
+                logger.warning(
+                    "TC-APT-042: %d cross-field frontmatter residual(s) found but no "
+                    "context-capable backend is available (%s); leaving for gate review",
+                    len(residuals),
+                    type(load_error).__name__,
+                )
+                return 0
+            if not hasattr(backend, "translate_with_context"):
+                return 0
+        repaired = 0
+        for residual in residuals[:4]:
+            unit = residual.unit
+            meta = unit.metadata or {}
+            original = meta.get("original_text") or unit.source_text
+            feedback = (
+                f"A previous attempt left the English phrase '{residual.phrase}' "
+                "untranslated. Translate the entire text into the target language, "
+                "including that phrase. For consistent terminology, the sibling "
+                f"frontmatter field '{residual.sibling_field}' translated "
+                f"'{residual.sibling_source[:200]}' as "
+                f"'{residual.sibling_translation[:200]}'."
+            )
+            try:
+                result = backend.translate_with_context(
+                    [str(original)],
+                    source_lang,
+                    target_lang,
+                    context_hint=f"frontmatter_{residual.field_name}",
+                    file_context=None,
+                    retry_feedback=feedback,
+                )
+            except Exception as repair_error:
+                logger.warning(
+                    "TC-APT-042: cross-field repair call failed for field '%s' (%s)",
+                    residual.field_name,
+                    type(repair_error).__name__,
+                )
+                continue
+            candidate = str(result[0]) if result and result[0] else ""
+            if (
+                not candidate.strip()
+                or candidate.strip() == str(original).strip()
+                or _normalize(residual.phrase) in _normalize(candidate)
+            ):
+                logger.info(
+                    "TC-APT-042: cross-field repair did not remove residual phrase "
+                    "'%s' from field '%s'; keeping prior candidate for gate review",
+                    sanitize_for_log(residual.phrase, 80),
+                    residual.field_name,
+                )
+                continue
+            unit.translated_text = _restore_required_seo_separator(
+                residual.field_name, str(original), candidate
+            )
+            if unit.metadata is None:
+                unit.metadata = {}
+            unit.metadata["cross_field_repair_phrase"] = residual.phrase
+            unit.metadata["cross_field_repair_sibling"] = residual.sibling_field
+            stats.llm_units_translated += 1
+            repaired += 1
+            logger.info(
+                "TC-APT-042: repaired untranslated shared phrase '%s' in frontmatter "
+                "field '%s' using sibling field '%s' as reference",
+                sanitize_for_log(residual.phrase, 80),
+                residual.field_name,
+                residual.sibling_field,
+            )
+        return repaired
+
+    @llm_category("repair")
+    def _repair_duplicate_heading_translations(
+        self,
+        engine,
+        units: list,
+        primary_model,
+        source_lang: str,
+        target_lang: str,
+        stats: TranslationStats,
+    ) -> int:
+        """Two DIFFERENT English headings translated independently sometimes
+        converge on the identical rendering (confirmed recurring on 2 source
+        pages for ja/zh: "Introduction" and "Getting Started" both render to
+        the same phrase). Retry every losing heading in a collision with
+        feedback naming the sibling's already-used rendering, so it produces
+        a distinct-but-accurate translation instead.
+        """
+        from .heading_uniqueness import _normalize, find_duplicate_heading_translations
+
+        collisions = find_duplicate_heading_translations(units)
+        if not collisions:
+            return 0
+        if (getattr(engine, "campaign_context", {}) or {}).get("defer_llm_fallbacks"):
+            logger.info(
+                "heading-uniqueness: deferred campaign leaves %d collision(s) "
+                "for page-level retry handling",
+                len(collisions),
+            )
+            return 0
+        backend = primary_model if hasattr(primary_model, "translate_with_context") else None
+        if backend is None:
+            try:
+                with engine._model_lock:
+                    backend = engine.model_loader.load_model("professionalize_llm")
+            except Exception as load_error:
+                logger.warning(
+                    "heading-uniqueness: %d collision(s) found but no context-capable "
+                    "backend is available (%s); leaving for gate review",
+                    len(collisions),
+                    type(load_error).__name__,
+                )
+                return 0
+            if not hasattr(backend, "translate_with_context"):
+                return 0
+        repaired = 0
+        retried = 0
+        for collision in collisions:
+            for loser in collision.losers:
+                if retried >= 4:
+                    break
+                retried += 1
+                feedback = (
+                    f"A sibling heading elsewhere in this same document (English: "
+                    f"'{collision.winner.source_text}') already uses the exact "
+                    f"translation '{collision.shared_translation}'. Translate this "
+                    f"DIFFERENT heading with a distinct, still accurate rendering — "
+                    f"do not reuse that exact same translated phrase."
+                )
+                try:
+                    result = backend.translate_with_context(
+                        [str(loser.source_text)],
+                        source_lang,
+                        target_lang,
+                        context_hint="heading_uniqueness",
+                        file_context=None,
+                        retry_feedback=feedback,
+                    )
+                except Exception as repair_error:
+                    logger.warning(
+                        "heading-uniqueness: repair call failed for heading '%s' (%s)",
+                        sanitize_for_log(loser.source_text, 80),
+                        type(repair_error).__name__,
+                    )
+                    continue
+                candidate = str(result[0]) if result and result[0] else ""
+                if (
+                    not candidate.strip()
+                    or candidate.strip() == str(loser.source_text).strip()
+                    or _normalize(candidate) == _normalize(collision.shared_translation)
+                ):
+                    logger.info(
+                        "heading-uniqueness: repair did not produce a distinct rendering "
+                        "for heading '%s'; keeping prior candidate for gate review",
+                        sanitize_for_log(loser.source_text, 80),
+                    )
+                    continue
+                loser.translated_text = candidate
+                if loser.metadata is None:
+                    loser.metadata = {}
+                loser.metadata["heading_uniqueness_repair_sibling"] = collision.winner.source_text
+                stats.llm_units_translated += 1
+                repaired += 1
+                logger.info(
+                    "heading-uniqueness: repaired duplicate heading translation for '%s' "
+                    "(was colliding with sibling '%s')",
+                    sanitize_for_log(loser.source_text, 80),
+                    sanitize_for_log(collision.winner.source_text, 80),
+                )
+        return repaired
+
     def _translate_fenced_code_prose_chunks(
         self,
         backend,
@@ -972,6 +1249,10 @@ class SegmentTranslator:
                         progress.segments_completed(1)
                 else:
                     segments_to_translate.append(segment)
+                    _miss_reason = (tm_result.metadata or {}).get("miss_reason", "unknown")
+                    stats.tm_miss_reasons[_miss_reason] = (
+                        stats.tm_miss_reasons.get(_miss_reason, 0) + 1
+                    )
                     progress = get_progress_tracker()
                     if progress:
                         progress.cache_miss()
@@ -1081,7 +1362,11 @@ class SegmentTranslator:
 
                         for _seg, _hint in zip(_llm_segments, _llm_hints_seg):
                             _seg_translation = None
-                            if _llm_backend_seg is not None:
+                            _seg_via_llm = False
+                            _llm_capable_seg = _llm_backend_seg is not None and hasattr(
+                                _llm_backend_seg, "translate_with_context"
+                            )
+                            if _llm_capable_seg:
                                 try:
                                     _llm_result_seg = _llm_backend_seg.translate_with_context(
                                         [_seg.source_text],
@@ -1093,26 +1378,62 @@ class SegmentTranslator:
                                     )
                                     if _llm_result_seg and _llm_result_seg[0]:
                                         _seg_translation = _llm_result_seg[0]
+                                        _seg_via_llm = True
                                 except Exception as _llm_err_seg:
                                     logger.warning(
                                         f"ContentTypeRouter LLM pre-translate failed for "
                                         f"segment ({type(_llm_err_seg).__name__}): {_llm_err_seg}; "
                                         f"segment marked as passthrough"
                                     )
+                            elif _llm_backend_seg is not None:
+                                # TC-HT-ROUTE-002: the circuit breaker can
+                                # transparently substitute a non-LLM fallback
+                                # (e.g. m2m100) for `_llm_model_id_seg` without
+                                # raising -- it can't do context-aware
+                                # translate_with_context(), but it CAN
+                                # translate via its normal MT path. Reuse the
+                                # same `_translate_with_multiline_support` call
+                                # Step 2 below uses for ordinary segments
+                                # instead of leaving this one as English
+                                # passthrough.
+                                try:
+                                    _mt_fallback_result_seg = self._translate_with_multiline_support(
+                                        backend=_llm_backend_seg,
+                                        segments=[_seg],
+                                        texts=[_seg.source_text],
+                                        source_lang=source_lang,
+                                        target_lang=target_lang,
+                                        stats=stats,
+                                    )
+                                    if _mt_fallback_result_seg and _mt_fallback_result_seg[0]:
+                                        _seg_translation = _mt_fallback_result_seg[0]
+                                except Exception as _mt_fallback_err_seg:
+                                    logger.warning(
+                                        f"ContentTypeRouter MT-fallback translate failed "
+                                        f"for segment "
+                                        f"({type(_mt_fallback_err_seg).__name__}): "
+                                        f"{_mt_fallback_err_seg}; segment marked as "
+                                        f"passthrough"
+                                    )
 
                             if _seg_translation:
                                 _final_translation = self._restore_placeholders(
                                     _seg_translation, _seg
                                 )
-                                # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 4):
-                                # record the per-unit "actually LLM-translated"
-                                # fact (segment-path equivalent of the AST-path
-                                # instrumentation above).
-                                stats.llm_units_translated += 1
+                                if _seg_via_llm:
+                                    # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 4):
+                                    # record the per-unit "actually LLM-translated"
+                                    # fact (segment-path equivalent of the AST-path
+                                    # instrumentation above). Only true when the
+                                    # context-aware LLM call itself produced this
+                                    # text -- not when the MT fallback above did.
+                                    stats.llm_units_translated += 1
                             else:
                                 # TC-LLM-AVAIL-001-style graceful degrade: keep the
-                                # original text rather than sending decontextualized
-                                # short strings to raw MT, which hallucinates worse.
+                                # original text. This is now a true last resort --
+                                # reached only when no backend could be loaded at
+                                # all, the context-aware LLM call itself failed, or
+                                # the MT-fallback attempt above also failed.
                                 _final_translation = self._restore_placeholders(
                                     _seg.source_text, _seg
                                 )
@@ -1184,7 +1505,10 @@ class SegmentTranslator:
 
             with engine._model_lock:
                 backend = engine.model_loader.load_model(model_id)
-            stats.model_used = model_id
+            # TC-APT-004: record the model ACTUALLY used (load_model may have rerouted an open LLM)
+            stats.model_used = (
+                getattr(getattr(backend, "model_info", None), "model_id", None) or model_id
+            )
 
             texts = [seg.source_text for seg in segments_to_translate]
 
@@ -1450,15 +1774,30 @@ class SegmentTranslator:
                             _fm_key = _seg.context.frontmatter_key
                             _expected = translations[_seg.id]
                             _fm_expected_by_key.setdefault(_fm_key, []).append(_expected)
+                    # HT-QUALITY-GATES-001 RC2: a downstream AST-side repair
+                    # (_repair_cross_field_frontmatter_residuals, TC-APT-042)
+                    # may have legitimately overwritten a frontmatter unit's
+                    # translated_text AFTER the legacy-segment snapshot above
+                    # was taken -- the repair mutates the separate AST
+                    # translated_units, never this `translations` dict, so
+                    # the snapshot has no way to know about it on its own.
+                    # `stats.fm_repair_overrides` was populated from this
+                    # same `doc.frontmatter` (the check's own comparison
+                    # target) via the same accessor the check uses, so this
+                    # only widens acceptance for keys a repair actually
+                    # touched -- a key the repair never touched, or a value
+                    # the repair failed to actually fix, is still caught.
+                    for _fm_repair_key, _fm_repair_values in stats.fm_repair_overrides.items():
+                        _fm_expected_by_key.setdefault(_fm_repair_key, []).extend(
+                            _fm_repair_values
+                        )
                 _fm_not_applied = _unapplied_frontmatter_keys(
                     _fm_expected_by_key,
                     translated_frontmatter,
                     yaml_formatter,
                 )
                 if _fm_not_applied:
-                    _fm_error = (
-                        "frontmatter_segment_not_applied: " f"keys={sorted(_fm_not_applied)}"
-                    )
+                    _fm_error = f"frontmatter_segment_not_applied: keys={sorted(_fm_not_applied)}"
                     if getattr(engine, "validation_policy", "standard") == "zero-defect":
                         raise ValueError(_fm_error)
                     logger.warning(_fm_error)
@@ -1629,11 +1968,27 @@ class SegmentTranslator:
 
             force_protected_fields = compute_force_protected_fields(doc, site_profile)
 
+            # Merge the global preserve_patterns baseline the same way SegmentExtractor
+            # does (segment_extractor.py:125-127). Without this, a backtick-quoted
+            # identifier gets placeholder-protected when SegmentExtractor builds
+            # `segments` but stays raw here; the later reuse-match comparison at
+            # ~line 1846 then normalizes two genuinely different strings, "not_matched"
+            # sends the unit to an independent re-translation, and that translation
+            # disagrees with the one already stored in `translations[]` for the same
+            # source -- surfacing as a spurious `frontmatter_segment_not_applied` on
+            # any zero-defect m2m100-primary field containing an inline code span
+            # (found live 2026-09-07 on description/summary, 3/3 langs of one page).
+            from .extractor.segment_extractor import _get_global_body_preserve_patterns
+
+            _merged_preserve_patterns = _get_global_body_preserve_patterns() + (
+                site_profile.body.preserve_patterns or []
+            )
+
             extractor = TextUnitExtractor(
                 segmentation_strategy=site_profile.body.ast_segmentation_strategy,
                 terminology_file=terminology_file if terminology_file.exists() else None,
                 mt_model=mt_model,
-                preserve_patterns=site_profile.body.preserve_patterns,
+                preserve_patterns=_merged_preserve_patterns,
                 site_profile=site_profile,
                 batch_stats_tracker=engine.batch_stats_tracker,
                 fasttext_detector=engine.fasttext_detector,
@@ -1665,60 +2020,145 @@ class SegmentTranslator:
             stats.ast_units_extracted = total_units
             stats.ast_units_translatable = translatable_units
             stats.ast_units_protected = protected_units
+            # HT-QUALITY-GATES-001 RC2: must not leak a previous retry
+            # attempt's repair overrides into this attempt's frontmatter
+            # placement check -- `stats` is the same object reused across
+            # the retry loop in file_pipeline.translate_language().
+            stats.fm_repair_overrides = {}
 
             # E2E FIX: Reuse existing translations if available
+            #
+            # HT-QUALITY-GATES-001 AST-reuse identity fix (2026-09-10): this
+            # used to key `source_to_translation` by re-normalized,
+            # placeholder-protected TEXT -- running `strip_markdown()` +
+            # a FRESH `PlaceholderManager()` per segment/unit. That was
+            # broken two ways:
+            #   1. False match: `PlaceholderManager.protect()` resets its
+            #      counter on every call, so ANY two single-span units
+            #      anywhere on the page (e.g. a lone `.xlsx` code span in a
+            #      table cell and an unrelated single-link nav paragraph)
+            #      reduce to the identical literal key "{PLACEHOLDER_0}" and
+            #      silently collide in the dict -- the wrong one's stored
+            #      translation gets reused.
+            #   2. False miss: the normalization here used only
+            #      `site_profile.body.preserve_patterns`, while the legacy
+            #      `segments` were originally built against the MERGED
+            #      baseline (`_merged_preserve_patterns` above, mirroring
+            #      SegmentExtractor's own `_get_global_body_preserve_patterns()
+            #      + site profile` merge). A unit protected differently by
+            #      the two normalizations missed its real match, fell into
+            #      `unmatched_units`, and got independently retranslated --
+            #      producing a second, different result for the same logical
+            #      content, which then failed the frontmatter placement-
+            #      consistency check under zero-defect policy
+            #      (`frontmatter_segment_not_applied`).
+            #
+            # Fix: key by stable node identity instead of re-derived text.
+            # Both legacy `Segment`s and AST `TextUnit`s are extracted from
+            # the SAME `doc.ast` node instances (this method receives the
+            # identical `doc` used to build `segments` earlier; there is no
+            # reparse in between), so every node already carries a stable
+            # address assigned once at parse time
+            # (`ASTNode.assign_addresses()`). `TextUnit.node_addr` already
+            # exposes this. Frontmatter `Segment`s already carry the matching
+            # key as `context.frontmatter_key` (identical to the
+            # `frontmatter.<key>` / `frontmatter.<key>[i]` addresses
+            # `TextUnitExtractor._extract_frontmatter_units()` assigns).
+            # Body `Segment`s (paragraph/heading/list-item granularity) did
+            # not previously carry their own node's address at all --
+            # `SegmentContext.node_addr` (segment_extractor.py) threads the
+            # already-existing `ASTNode.node_addr` through instead of
+            # inventing a new identity scheme.
+            #
+            # A body Segment's translation covers ALL of that node's
+            # descendant text as one combined string, so reuse is only sound
+            # when the node has EXACTLY ONE AST leaf descendant, period (the
+            # segment truly IS that one leaf -- e.g. a paragraph that is just
+            # a single link), AND that leaf is not do_not_translate. Otherwise
+            # the combined translation cannot be correctly split across
+            # multiple independent TextUnits, and each is left to translate
+            # independently, same as before.
+            #
+            # TC-APT-105: the leaf count below MUST include do_not_translate
+            # leaves. Excluding them (as this used to) makes a container with
+            # one protected leaf + one ordinary leaf look like "exactly one"
+            # leaf -- so the whole legacy flattened translation (markdown
+            # syntax and all) gets assigned to the ordinary sibling, which
+            # then renders adjacent to the protected leaf's own, independently
+            # correct render, duplicating it. Confirmed live and root-caused
+            # on content/docs.aspose.org/en/cells/go/getting-started/
+            # quickstart.md's "Next Steps" list (`**[API Reference](url)**:
+            # Full class and method documentation`): "API Reference" is a
+            # config/terminology.yaml protect-mode term, so its LINK_TEXT leaf
+            # is do_not_translate=True; the sibling ": Full class..." leaf is
+            # not. Counting only the ordinary leaf made this container look
+            # like a single-leaf reuse candidate when it has two.
             reused_count = 0
             not_matched_count = 0
             if segments and translations:
-                import re
+                source_to_translation: dict[str, str] = {}
 
-                def strip_markdown(text: str) -> str:
-                    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
-                    text = re.sub(r"\*(.+?)\*", r"\1", text)
-                    text = re.sub(r"`(.+?)`", r"\1", text)
-                    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
-                    return text
+                _body_units = [
+                    u
+                    for u in plan.units
+                    if u.source_text
+                    and not (u.node_addr or "").startswith("frontmatter.")
+                ]
 
-                from .extractor.placeholder_manager import PlaceholderManager
-
-                pm = PlaceholderManager()
-                preserve_patterns = site_profile.body.preserve_patterns or []
-
-                source_to_translation = {}
                 for segment in segments:
-                    if segment.id in translations and translations[segment.id]:
-                        if not self._can_reuse_ast_translation(
-                            segment, translations[segment.id], model_id_override
-                        ):
-                            continue
-                        normalized_source = strip_markdown(segment.source_text)
-                        protected_source, _ = pm.protect(normalized_source, preserve_patterns)
-                        source_to_translation[protected_source] = translations[segment.id]
+                    if segment.id not in translations or not translations[segment.id]:
+                        continue
+                    translation = translations[segment.id]
+                    if not self._can_reuse_ast_translation(
+                        segment, translation, model_id_override
+                    ):
+                        continue
+
+                    ctx = segment.context
+                    if (
+                        ctx
+                        and str(ctx.context_type) == "SegmentContextType.FRONTMATTER"
+                        and ctx.frontmatter_key
+                    ):
+                        source_to_translation[f"frontmatter.{ctx.frontmatter_key}"] = translation
+                        continue
+
+                    seg_addr = getattr(ctx, "node_addr", None) if ctx else None
+                    if not seg_addr:
+                        continue
+
+                    # TD-02: shared reference implementation of this exact
+                    # check (leaf_inventory.py) -- exactly one leaf total,
+                    # AND that leaf not do_not_translate, or reusing the
+                    # legacy segment's combined translation for it would
+                    # overwrite a protected value with translated (or
+                    # re-rendered) prose. Belt-and-suspenders: the downstream
+                    # apply loop already skips do_not_translate units, but
+                    # making the intent explicit here avoids populating the
+                    # map with an entry that only looks reusable.
+                    leaf_result = classify_sole_leaf(seg_addr, _body_units)
+                    if leaf_result.classification == LeafClassification.ORDINARY_SOLE_LEAF:
+                        source_to_translation[leaf_result.sole_unit.node_addr] = translation
 
                 logger.debug(
                     f"E2E DEBUG: Built mapping with {len(source_to_translation)} segment translations"
                 )
                 logger.debug(
-                    f"E2E DEBUG: First 3 normalized segment source_texts: {list(source_to_translation.keys())[:3]}"
+                    f"E2E DEBUG: First 3 mapped node addresses: {list(source_to_translation.keys())[:3]}"
                 )
 
                 unmatched_units = []
                 for unit in plan.units:
                     if not unit.do_not_translate and unit.source_text:
-                        normalized_unit_source = strip_markdown(unit.source_text)
-                        protected_unit_source, _ = pm.protect(
-                            normalized_unit_source, preserve_patterns
-                        )
-
-                        if protected_unit_source in source_to_translation:
-                            unit.translated_text = source_to_translation[protected_unit_source]
+                        if unit.node_addr in source_to_translation:
+                            unit.translated_text = source_to_translation[unit.node_addr]
                             reused_count += 1
                         else:
                             not_matched_count += 1
                             unmatched_units.append(unit)
                             if not_matched_count <= 5:
                                 logger.debug(
-                                    f"E2E DEBUG: Unmatched unit [{unit.kind}]: normalized={normalized_unit_source[:80]}"
+                                    f"E2E DEBUG: Unmatched unit [{unit.kind}]: node_addr={unit.node_addr}"
                                 )
 
                 logger.info(
@@ -1783,33 +2223,60 @@ class SegmentTranslator:
                                 if _output_path
                                 else {}
                             )
-                            for _llm_unit, _hint in zip(_llm_units, _llm_hints):
-                                _llm_result = _llm_backend.translate_with_context(
-                                    [_llm_unit.source_text],
-                                    site_profile.default_source_lang,
-                                    target_lang,
-                                    context_hint=_hint,
-                                    file_context=_file_ctx,
-                                    retry_feedback=retry_feedback,
+                            if not hasattr(_llm_backend, "translate_with_context"):
+                                # TC-HT-ROUTE-002: the circuit breaker can
+                                # transparently substitute a non-LLM fallback
+                                # (e.g. m2m100) for `_llm_model_id` without
+                                # raising. That fallback can't do context-aware
+                                # translate_with_context() -- calling it
+                                # unconditionally would AttributeError on the
+                                # very first unit and land every unit in this
+                                # batch in the `except` below as English
+                                # passthrough. Instead, leave these units'
+                                # translated_text unset here and let them flow
+                                # into `units_needing_translation` /
+                                # `batch_translate_units()` below, which
+                                # translates via that same fallback's normal
+                                # (non-context-aware) MT path.
+                                logger.info(
+                                    f"ContentTypeRouter: LLM backend for "
+                                    f"{_llm_model_id} was substituted with a "
+                                    f"non-context-capable fallback "
+                                    f"({type(_llm_backend).__name__}); leaving "
+                                    f"{len(_llm_units)} unit(s) for the normal "
+                                    f"MT batch-translate step instead of LLM "
+                                    f"passthrough"
                                 )
-                                if _llm_result and _llm_result[0]:
-                                    _llm_unit.translated_text = _llm_result[0]
-                                    # TC-HT-003: tag units the LLM backend
-                                    # rejected as prompt-echo/refusal and
-                                    # passed through as source text.
-                                    if 0 in getattr(_llm_backend, "last_reject_reasons", {}):
-                                        if _llm_unit.metadata is None:
-                                            _llm_unit.metadata = {}
-                                        _llm_unit.metadata["llm_passthrough_reason"] = (
-                                            "llm_echo_reject"
-                                        )
-                                    else:
-                                        # HT-QUALITY-GATES-001 Part 22 (plan
-                                        # 5.4 item 4): record the per-unit
-                                        # "actually LLM-translated" fact so
-                                        # write-gate tiering can use it
-                                        # directly instead of a locale proxy.
-                                        stats.llm_units_translated += 1
+                            else:
+                                for _llm_unit, _hint in zip(_llm_units, _llm_hints):
+                                    _llm_result = _llm_backend.translate_with_context(
+                                        [_llm_unit.source_text],
+                                        site_profile.default_source_lang,
+                                        target_lang,
+                                        context_hint=_hint,
+                                        file_context=_file_ctx,
+                                        retry_feedback=retry_feedback,
+                                    )
+                                    if _llm_model_id == "professionalize_llm":
+                                        stats.professionalize_calls += 1
+                                    if _llm_result and _llm_result[0]:
+                                        _llm_unit.translated_text = _llm_result[0]
+                                        # TC-HT-003: tag units the LLM backend
+                                        # rejected as prompt-echo/refusal and
+                                        # passed through as source text.
+                                        if 0 in getattr(_llm_backend, "last_reject_reasons", {}):
+                                            if _llm_unit.metadata is None:
+                                                _llm_unit.metadata = {}
+                                            _llm_unit.metadata["llm_passthrough_reason"] = (
+                                                "llm_echo_reject"
+                                            )
+                                        else:
+                                            # HT-QUALITY-GATES-001 Part 22 (plan
+                                            # 5.4 item 4): record the per-unit
+                                            # "actually LLM-translated" fact so
+                                            # write-gate tiering can use it
+                                            # directly instead of a locale proxy.
+                                            stats.llm_units_translated += 1
                         except Exception as _llm_err:
                             logger.warning(
                                 f"ContentTypeRouter LLM pre-translate failed "
@@ -1879,6 +2346,8 @@ class SegmentTranslator:
                                 site_profile.default_source_lang,
                                 target_lang,
                             )
+                        if _field_model_id == "professionalize_llm":
+                            stats.professionalize_calls += 1
                         if _result and _result[0]:
                             _unit.translated_text = _restore_required_seo_separator(
                                 str(_field), str(_original), _result[0]
@@ -1903,8 +2372,11 @@ class SegmentTranslator:
                 f"AST Translation: Translating {len(units_needing_translation)} new units via MT (batch_size: {batch_size}, reused: {reused_count})"
             )
 
-            batch_calls_before = getattr(extractor, "_batch_calls", 0)
-            fallbacks_before = getattr(extractor, "_individual_fallbacks", 0)
+            # TextUnitExtractor records counters in batch_stats.  The former
+            # private attributes never existed, which made every receipt say
+            # ast_batches=0 even when the AST batch path was used.
+            batch_calls_before = int(extractor.batch_stats.get("total_outer_batches", 0))
+            fallbacks_before = int(extractor.batch_stats.get("individual_translations", 0))
 
             translated_units = extractor.batch_translate_units(
                 plan.units,
@@ -1922,6 +2394,44 @@ class SegmentTranslator:
                 f"AST DIAG: After batch translate: {len(_cb_after_batch)} code block units, {len(_cb_with_content)} with content"
             )
 
+            # TC-APT-042: near-duplicate frontmatter fields (description/summary)
+            # are translated as independent units; when one leaves a shared phrase
+            # in English while its sibling translated it, retry with the sibling
+            # as reference before validation sees the asymmetric residual.
+            try:
+                self._repair_cross_field_frontmatter_residuals(
+                    engine,
+                    translated_units,
+                    mt_model,
+                    site_profile.default_source_lang,
+                    target_lang,
+                    stats,
+                )
+            except Exception as _xf_error:
+                logger.warning(
+                    "TC-APT-042: cross-field frontmatter repair pass skipped (%s)",
+                    type(_xf_error).__name__,
+                )
+
+            # Recurrence 2026-09-08: two different English headings sometimes
+            # translate to the identical rendering (confirmed ja/zh, 2 pages) --
+            # retry the losing heading(s) with the sibling's rendering as the
+            # thing to avoid, before validation/review sees the collision.
+            try:
+                self._repair_duplicate_heading_translations(
+                    engine,
+                    translated_units,
+                    mt_model,
+                    site_profile.default_source_lang,
+                    target_lang,
+                    stats,
+                )
+            except Exception as _hu_error:
+                logger.warning(
+                    "heading-uniqueness: repair pass skipped (%s)",
+                    type(_hu_error).__name__,
+                )
+
             # TC-SAS-01: Detect translatable units the model returned unchanged (source-lang leakage).
             # do_not_translate=True units are intentionally excluded — they are preserved YAML
             # passthrough fields, code blocks, and shortcodes that must not be translated.
@@ -1936,6 +2446,11 @@ class SegmentTranslator:
             _te_cfg_sas_site = getattr(site_profile, "translation_engine", None) or {}
             _te_cfg_sas = {**_te_cfg_sas_global, **_te_cfg_sas_site}
             _sas_min_len = int(_te_cfg_sas.get("same_as_source_min_length", 10))
+            # The site profile owns the protected-span patterns, so the residue floor
+            # sees exactly what the model saw after masking.
+            _sas_preserve_patterns = list(
+                getattr(site_profile.body, "preserve_patterns", None) or []
+            )
             _validation_policy_sas = getattr(engine, "validation_policy", "standard")
             _zero_defect_sas = _validation_policy_sas == "zero-defect"
             _sas_tolerance = _effective_same_as_source_tolerance(
@@ -1952,6 +2467,11 @@ class SegmentTranslator:
                 and u.translated_text.strip() == u.source_text.strip()
                 and len(u.source_text.strip()) > _sas_min_len
                 and not _is_reviewed_identical_translation(u.source_text, target_lang)
+                # TC-SAS-01 residue floor: the raw-length floor above measures the unit
+                # before protected spans are masked, so a unit made almost entirely of
+                # governed technical tokens clears it while offering nothing to
+                # translate. Judge only units that still hold a real word.
+                and _has_translatable_residue(u.source_text, _sas_preserve_patterns)
                 # TC-TBL-012 / Layer 2: Exclude table cells from SAS ratio.
                 # A table cell the model fails to translate stays as English text —
                 # bad for quality but handled by Gate 15 / purity check. Counting
@@ -2081,15 +2601,32 @@ class SegmentTranslator:
                         f"for whitespace/short source text"
                     )
 
+                # TC-PORT-LLM-011: record WHICH unit(s) came back empty, not just
+                # that some did.  node_addr is a structural AST address (e.g.
+                # "body.blockquote[0].paragraph[0].text[1]"), not candidate text,
+                # so it's safe to record and lets a heal ticket be grouped/
+                # deduplicated per failing unit instead of colliding on the
+                # whole file's path for every empty-translation reject.
+                _empty_unit_addrs = sorted(
+                    {
+                        str(getattr(u, "node_addr", "") or getattr(u, "unit_id", ""))
+                        for u in empty_units
+                        if getattr(u, "node_addr", "") or getattr(u, "unit_id", "")
+                    }
+                )[:5]
                 issues = [
                     ValidationIssue(
                         severity="error",
                         rule="ASTTranslation",
                         message=f"{len(empty_units)} units with substantial source text returned empty translations",
                         location=(
-                            str(doc.source_path)
-                            if hasattr(doc, "source_path") and doc.source_path
-                            else None
+                            ",".join(_empty_unit_addrs)
+                            if _empty_unit_addrs
+                            else (
+                                str(doc.source_path)
+                                if hasattr(doc, "source_path") and doc.source_path
+                                else None
+                            )
                         ),
                     )
                 ]
@@ -2105,16 +2642,58 @@ class SegmentTranslator:
                     retry_feedback="All translated segments with substantial source text must return non-empty output.",
                 )
 
-            stats.ast_batch_calls = batch_calls_before - batch_calls_before  # intentional reset
-            stats.ast_batch_calls = getattr(extractor, "_batch_calls", 0) - batch_calls_before
-            stats.ast_individual_fallbacks = (
-                getattr(extractor, "_individual_fallbacks", 0) - fallbacks_before
+            stats.ast_batch_calls = (
+                int(extractor.batch_stats.get("total_outer_batches", 0)) - batch_calls_before
             )
+            stats.ast_individual_fallbacks = (
+                int(extractor.batch_stats.get("individual_translations", 0)) - fallbacks_before
+            )
+            if model_id == "professionalize_llm":
+                # Native list batching maps one outer AST batch to one provider
+                # request.  Context-aware single-unit calls are counted above.
+                stats.professionalize_calls += stats.ast_batch_calls
 
             # Step 3: Apply translations to AST and frontmatter
             logger.info("AST Translation: Applying translations to AST and frontmatter")
             renderer = ASTRenderer()
-            renderer.apply_translations(doc.ast, translated_units, frontmatter=doc.frontmatter)
+            renderer.apply_translations(
+                doc.ast, translated_units, frontmatter=doc.frontmatter, target_lang=target_lang
+            )
+
+            # HT-QUALITY-GATES-001 RC2 (follow-up to TC-APT-042/TC-APT-106):
+            # _repair_cross_field_frontmatter_residuals (above) legitimately
+            # mutates a frontmatter unit's translated_text to fix a near-
+            # duplicate field's untranslated shared phrase -- AFTER
+            # translate_to_language's placement-consistency snapshot
+            # (_fm_expected_by_key, sourced from the separate legacy
+            # segments/translations pass) has typically already been taken,
+            # and that snapshot is never updated by this AST-side repair.
+            # Record the ACTUAL rendered value for every frontmatter key a
+            # repair touched, read via the exact accessor
+            # (`YAMLFormatter.get_nested_value`) the placement check itself
+            # uses against this same `doc.frontmatter`, so that check can
+            # accept the legitimate repair as an additional valid expectation
+            # instead of flagging it as frontmatter_segment_not_applied. Keys
+            # the repair never touched are untouched here, so a genuinely
+            # wrong/unapplied frontmatter translation is still caught.
+            _repaired_fm_keys = {
+                str(_u.node_addr)[len("frontmatter.") :]
+                for _u in translated_units
+                if str(getattr(_u, "node_addr", "") or "").startswith("frontmatter.")
+                and "cross_field_repair_phrase" in (getattr(_u, "metadata", None) or {})
+            }
+            if _repaired_fm_keys:
+                from .reconstructor.yaml_formatter import YAMLFormatter as _FmRepairYamlFormatter
+
+                _fm_repair_yaml_formatter = _FmRepairYamlFormatter()
+                for _fm_repair_key in _repaired_fm_keys:
+                    _repaired_value = _fm_repair_yaml_formatter.get_nested_value(
+                        doc.frontmatter, _fm_repair_key
+                    )
+                    if _repaired_value is not None:
+                        stats.fm_repair_overrides.setdefault(_fm_repair_key, []).append(
+                            _repaired_value
+                        )
 
             # P0-D: Placeholder leak = blocking failure
             if renderer.placeholder_leak_count > 0:
@@ -2185,6 +2764,7 @@ class SegmentTranslator:
             logger.error(f"AST-based translation failed: {e}", exc_info=True)
             raise RuntimeError(f"AST-based translation failed: {e}")
 
+    @llm_category("repair")
     def _retry_dropped_placeholders_via_llm(
         self,
         segment,
@@ -2207,6 +2787,12 @@ class SegmentTranslator:
         placeholders under nllb_200_1.3b: it restored all 12 correctly.
         """
         engine = self._engine
+        if (getattr(engine, "campaign_context", {}) or {}).get("defer_llm_fallbacks"):
+            logger.info(
+                "Dropped-placeholder fallback deferred to the campaign LLM queue for %s",
+                target_lang,
+            )
+            return translation
         try:
             fallback_backend = engine.model_loader.load_model("professionalize_llm")
         except Exception as e:
@@ -2257,7 +2843,9 @@ class SegmentTranslator:
         if not text:
             return text
 
-        result = text
+        # TC-APT-073: normalize BEFORE restoring, so protected spans are still
+        # masked and cannot be altered by it.
+        result = normalize_injected_invisibles(getattr(segment, "source_text", "") or "", text)
 
         # TRM-05: Restore terminology placeholders first
         if engine.terminology_manager and getattr(segment, "protected_terms", None):

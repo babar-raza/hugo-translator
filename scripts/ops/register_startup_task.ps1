@@ -1,4 +1,4 @@
-# Run elevated (Administrator) once to register the robust startup task.
+﻿# Run elevated (Administrator) once to register the robust startup task.
 # Right-click PowerShell -> "Run as Administrator", then:
 #   powershell -ExecutionPolicy Bypass -File "...\register_startup_task.ps1"
 #

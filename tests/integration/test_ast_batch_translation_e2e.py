@@ -580,7 +580,7 @@ This is a test paragraph with **bold** text.
         source_content = """---
 title: "English Title"
 description: "English description for SEO"
-keywords: ["keyword1", "keyword2", "keyword3"]
+keywords: ["spreadsheet data", "document rendering", "file conversion"]
 slug: "test-slug"
 date: "2025-01-01"
 weight: 10
@@ -619,9 +619,9 @@ Test paragraph with some content.
         # Verify keywords units
         kw_units = [u for u in frontmatter_units if u.metadata.get("field_name") == "keywords"]
         assert len(kw_units) == 3
-        assert kw_units[0].source_text == "keyword1"
-        assert kw_units[1].source_text == "keyword2"
-        assert kw_units[2].source_text == "keyword3"
+        assert kw_units[0].source_text == "spreadsheet data"
+        assert kw_units[1].source_text == "document rendering"
+        assert kw_units[2].source_text == "file conversion"
 
         # Translate (mock adds "DE:" prefix)
         translated_units = extractor.batch_translate_units(

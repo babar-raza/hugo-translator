@@ -7,6 +7,18 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 13622
     corpus_agreement: agree
+  heading.installation:
+    value: इंस्टॉलेशन
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
+  heading.quickstart:
+    value: त्वरित प्रारंभ
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 507
+    corpus_agreement: agree
     rejected_variants:
     - समीक्षा
     - विधियाँ
@@ -176,6 +188,18 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 715
     corpus_agreement: no_corpus_evidence
+  table.header.component:
+    value: घटक
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 7
+    corpus_agreement: agree
+  table.header.role:
+    value: भूमिका
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
   table.header.enumeration:
     value: एन्युमरेशन
     reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
@@ -298,3 +322,15 @@ translations:
     rejected_variants:
     - सभी सार्वजनिक सदस्य किसी भी {platform} एप्लिकेशन के लिए Aspose.{family} FOSS
       for {platform} पैकेज स्थापित करने के बाद उपलब्ध हैं।
+  table.header.issue:
+    value: समस्या
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.header.cause:
+    value: कारण
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence

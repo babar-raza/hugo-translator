@@ -1,0 +1,19 @@
+taskcard: TC-APT-021
+title: Pin or monitor the LLM's production model identity (plan 5.1 root cause 1)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+capability_probe_result: "NO version-locked identifier is available. The Gate-1 /models probe (TC-APT-028) returns 7 ids: recommended (the configured alias), qwen3-next, gpt-oss, experimental, Qwen2.5-VL-7B, qwen3-embedding-8b, stable-diffusion-3.5-large -- concrete NAMES but no version/date-pinned identifier, so pinning config to e.g. 'qwen3-next' would still float. Prevention is unavailable; the plan's fallback design (detection) applies."
+deliverables:
+  - "src/model_runtime/model_identity.py (new): fixed canary (never changes: the baseline hash is only comparable to itself), probe() + alias RESOLUTION (the same canary is sent to each text-capable concrete model; the set whose answer matches the alias's is recorded as a second, independent drift signal; embedding/diffusion/VL models are skipped), write_baseline/load_baseline, check_identity -> MATCH | DRIFT | UNAVAILABLE | BASELINE_MISSING, drift log + review_items.jsonl, quarantine on DRIFT via CircuitBreaker.force_open (so ModelLoader reroutes to m2m100_418m and the campaign continues -- plan 6.1 / section 21), should_check() cadence, calibrate_false_positive_rate(), CLI --baseline/--calibrate/--check"
+  - "src/utils/circuit_breaker.py: force_open() (deliberate quarantine, distinct from a failure trip; cooldown defaults to the cap)"
+  - "src/workers/campaign_runner.py: _llm_identity_gate() runs before new LLM campaign work when the interval elapsed (config translation_engine.llm_identity_check: enabled, interval_hours 6, quarantine_on_drift, quarantine_seconds 21600); UNAVAILABLE is logged and recorded, never treated as a pass; a missing registry (test doubles) skips the gate rather than failing the run"
+live_calibration_2026-09-02:
+  false_positive_rate: 0.0 (20 canaries, 20/20 identical, 0 errors) -- measured, not assumed
+  false_negative_rate: "unmeasurable until a real model swap is observed; disclosed in the baseline file. Mitigated by the alias-resolution signal: a swap that changes which concrete model answers is caught even if the canary text happens to match"
+  baseline: data/runtime/llm_identity/professionalize_llm_canary_baseline.json -- sha 539e20d356f59cd7132bdd8ab90b8511128f5edab73d6e88df28aab413ffd17d, alias resolves to {experimental, qwen3-next}
+  first_check: MATCH ("canary hash and alias resolution consistent with baseline"), not quarantined
+verification:
+  - "pytest tests/unit/model_runtime/test_model_identity.py -> 7 passed (alias resolution skips non-text models; baseline->MATCH; canary change -> DRIFT + review item + quarantine with the breaker open at the configured cooldown; alias-resolution change ALONE -> DRIFT; UNAVAILABLE and BASELINE_MISSING never quarantine; cadence; FP calibration honest on a noisy provider)"
+  - "live: python -m src.model_runtime.model_identity --baseline --calibrate 20 --check -> baseline written, FP 0.0, check MATCH"
+acceptance: "a real pin is not available (probe evidence recorded), so the drift detector is running and has a documented false-positive rate (0.0 over 20 probes) and an explicit statement of what its false-negative rate is and why -- not silently skipped -> MET"

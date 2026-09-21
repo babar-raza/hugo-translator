@@ -1,0 +1,29 @@
+taskcard: TC-APT-009
+title: Close audit-phase7's three unresolved items (G-04)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+item_1_gate12_root_cause_fix:
+  finding: "the phase-7 fix was symptom-only in BOTH directions. (a) The cleaner rewrote '..' -> '.' in every non-fenced segment, so it could corrupt legitimate content that must keep a double dot: relative links [x](../y.md), inline code `range(0..5)`, Hugo shortcode parameters {{< include path=\"../shared.md\" >}}, HTML attributes, bare URLs, reference-style definitions. (b) The source-side bail-out ('if \"..\" in source body: return') was body-wide, so any page whose source legitimately contains '..' anywhere (a code sample, a relative link) disabled the gate for the whole page. The cleaner's blast radius was wider than the defect and its coverage narrower -- exactly the recurrence risk the audit flagged."
+  fix: "src/translation_engine/write_gate.py: _GATE12_PROTECTED_RE masks fenced code (FIRST -- masking inline code first ate the fence markers, a defect the new fixture caught), inline code, markdown link/image targets, HTML tags, Hugo shortcodes, bare URLs, reference definitions and ../ paths; the '..' -> '.' rewrite then runs once over prose only and the spans are restored verbatim. The source-side bail-out uses the same prose-scoped check (_gate12_has_prose_double_dot / _gate12_strip_protected)."
+  regression_fixture: tests/regression/test_gate12_double_period_prose_only.py (10 tests: prose still cleaned; ellipsis untouched; relative links, inline code, shortcodes, HTML+URL, reference definitions and fenced code all survive byte-for-byte; the historical source-prose bail-out preserved; no-change identity)
+  blast_radius_measured: "scripts/quality/scan_gate12_double_periods.py over the live content repo: 10 defective targets out of 112,584 existing targets (0.009%). Kinds: 10 prose, 3 list-item hits; languages ko 5, ro/ar/ru/sv/tr 1 each. Report: data/quality/gate12_double_period_scan.json. All 10 are UNKNOWN_PROVENANCE cells already scheduled for reprocessing by the ledger; no output patching was performed (plan 10 step 6)."
+  separate_finding_recorded: "the Arabic sample is not a double-period defect but PLACEHOLDER CORRUPTION ('{ p.l.c.h.o.r.e.s}' from a mangled {PLACEHOLDER_n} token). Routed to TC-APT-010/011 as a gate-43 placeholder-leak fixture candidate, not silently fixed here."
+item_2_l3_purge:
+  finding: "data/tm/l3_faiss/ is EMPTY on this host -- no index.faiss, no metadata.pkl, no config.json. The plan's deferred '764,510-entry L3 purge' has no index to purge; the figure is stale (it described a store that no longer exists here)."
+  disposition: "CLOSED as not-applicable-on-this-host, with the mechanism in place for when an index exists: TC-APT-008's read-time lineage denylist (data/tm/invalidated_lineage.json) is consulted by L3 semantic_search, so invalidation is a reversible denylist entry rather than a destructive purge. Applied concretely: nllb_200_1.3b and nllb_200_600m are denylisted (TC-APT-005), which suppresses 20 of the 82 live L2 entries at read time with zero deletions."
+item_3_backlog:
+  finding: "data/retranslate_queue.jsonl 3,472 rows + data/quarantine.jsonl 2,946 rows = 6,418 (the plan's '6,505-item backlog'). Their phase-7 categorisation was not trusted."
+  method: scripts/campaign/reevaluate_g04_backlog.py resolves every row against the TC-APT-003 ledger by output path
+  result:
+    resolved_by_ledger: 5141   # already scheduled: MISSING_TRANSLATION 1,813 + UNKNOWN_PROVENANCE 3,328
+    excluded_by_profile: 1276  # queue rows targeting the 11 disabled locales -- never actionable
+    no_ledger_cell: 1          # path is not a cell of the current portfolio
+    already_up_to_date: 0
+  disposition: "the backlog is fully accounted for and superseded: every actionable row is a ledger cell the mission will process anyway, so the queues stop being a parallel work list. Report: data/quality/g04_backlog_reevaluation.json. The queue files are left on disk untouched (nothing is deleted)."
+verification:
+  - "pytest tests/regression/test_gate12_double_period_prose_only.py -> 10 passed"
+  - "pytest tests/unit/translation_engine/ (full suite, one pre-existing failure deselected) -> 1,333 passed, 4 skipped in 12 min"
+  - "pytest tests/unit/content/test_fix_double_periods.py tests/unit/translation_engine/test_write_gate_new_gates.py tests/unit/quality/test_verify_fix.py tests/unit/quality/test_unit_heal_gate_rerun.py -> 119 passed"
+  - "live scans: gate12 scan over 112,584 targets; backlog re-evaluation over 6,418 rows"
+acceptance: "root-cause fix has a regression test; the purge question is resolved against the real store and its invalidation path is fingerprint-scoped and reversible; every backlog item has a current eligibility_state -> MET"

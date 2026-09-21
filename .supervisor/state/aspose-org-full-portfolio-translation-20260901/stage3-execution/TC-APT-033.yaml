@@ -1,0 +1,36 @@
+taskcard: TC-APT-033
+title: "Output invariant, progress metric, and wake budget (plan revision 6)"
+status: DONE
+executed_at: "2026-09-03"
+wake: 5
+design:
+  fields_added: "src/workers/mission_supervisor.py: ACTIONABLE_ELIGIBILITY_STATES,
+    cells_eligible_total(), record_cells_committed(), track_b_budget_ok(),
+    output_invariant_summary() -- returns cells_committed_this_wake,
+    cells_committed_total, cells_eligible_total, progress, track_b_time_share,
+    track_b_budget_ok for the wake summary (section 21 REPORT step)."
+  eligible_definition: "page_language_work rows in an actionable-now state
+    (MISSING_TRANSLATION, SOURCE_CHANGED, PROFILE_CHANGED,
+    PROTECTION_RULE_CHANGED, MODEL_OR_PROMPT_INVALIDATED) -- excludes
+    UNKNOWN_PROVENANCE (needs section 7.4's sampling gate first) and terminal/
+    non-actionable states."
+  committed_definition: "a NEW running counter in taskcard_status.json
+    (cells_committed_total), not derived from the ledger's UP_TO_DATE state --
+    that state does not distinguish mission-committed output from pre-existing
+    legacy content, so a separate counter is the only way to measure the
+    mission's OWN contribution honestly."
+  budget_rule: "Track B may use at most 50% of a wake's time while Track A has
+    eligible cells (cells_eligible_total > 0); unbounded once Track A is empty."
+verification:
+  - "pytest tests/unit/workers/test_mission_supervisor.py -> 20 passed (15
+    pre-existing + 5 new: budget-cap, budget-unbounded-when-empty, zero-wake-
+    seconds-never-blocks, record_cells_committed accumulates, full summary
+    progress ratio)"
+  - "live sanity check against the real ledger:
+    output_invariant_summary() -> cells_eligible_total=117066 (exact match to
+    the mission's own previously-measured 'missing' count),
+    cells_committed_total=0, progress=0.0 -- confirms plan section 0's stated
+    symptom numerically, not just narratively."
+acceptance: "unit test for the budget rule -> MET (5 tests); next wake summary
+  carries the fields -> MET (this taskcard's own evidence + TC-APT-013's wake
+  summary both use output_invariant_summary())"

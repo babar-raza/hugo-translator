@@ -28,6 +28,8 @@ import logging
 import re
 from dataclasses import dataclass, field
 
+from src.model_runtime.campaign_llm_policy import llm_category
+
 logger = logging.getLogger(__name__)
 
 _JUDGE_SYSTEM_PROMPT = (
@@ -195,6 +197,7 @@ def _aligned_fidelity_chunks(
     return chunks or None
 
 
+@llm_category("validation")
 def judge_fidelity(
     source_text: str,
     translated_text: str,
@@ -249,9 +252,14 @@ def judge_fidelity(
                 source=source_chunk,
                 translation=target_chunk,
             )
-            response, _in_tok, _out_tok = backend._provider.generate(
-                _JUDGE_SYSTEM_PROMPT, prompt
-            )
+            # TC-APT-094: this bypasses LLMModelBackend.translate()/translate_batch(),
+            # so it must acquire the cross-process slot itself or it evades the
+            # fleet-wide cap on in-flight professionalize_llm calls -- material here
+            # since review fans out per-language across parallel subagents (plan SS9).
+            with backend._llm_slot():
+                response, _in_tok, _out_tok = backend._provider.generate(
+                    _JUDGE_SYSTEM_PROMPT, prompt
+                )
             score, issues, parsed_ok = _parse_response(response)
             if score is None:
                 logger.warning(

@@ -1,0 +1,34 @@
+taskcard: TC-APT-011
+title: Preservation contract fixtures + test-gap closure (G-12)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+g12_collection_errors: "CLOSED -- pytest --collect-only -q reports 0 errors (was 11); 8,613 tests collect (was 8,267 with 11 modules unimportable)"
+root_cause: "a reorganisation moved scripts into scripts/<area>/ and ten test modules kept the old top-level import path; the eleventh tested a module deleted on purpose"
+fixes:
+  - "tests/integration/test_cpu_benchmarking.py -> scripts.bench.benchmark_cpu_comprehensive"
+  - "tests/operations/test_deployment_safety.py -> scripts.quality.check_deployment_safety"
+  - "tests/operations/test_rollback.py -> scripts.ops.rollback"
+  - "tests/regression/test_list_concatenation_check.py and test_phase5_untranslated_ratio_fix.py -> scripts.e2e.e2e_verify_single_file"
+  - "tests/unit/test_audit_script.py -> scripts.analysis.audit_codebase"
+  - "tests/unit/test_corpus_collection.py -> scripts.analysis.analyze_ast_corpus"
+  - "tests/unit/tools/test_specscan.py -> scripts.quality.specscan"
+  - "tests/operations/test_backup_restore.py sys.path -> scripts/tm; tests/unit/test_golden_corpus_builder.py sys.path -> scripts/analysis"
+  - "tests/archived/test_reviewer_bridge.py REMOVED -- scripts/ops/reviewer_bridge.py was deleted on purpose in 5f5ac754 ('dead code - reviewer app schema incompatible'), so the test could never pass again (G-20's other half; recoverable via git)"
+  - "tests/unit/workers/test_eligibility.py: repaired a corrupted string literal introduced by a shell heredoc during TC-APT-007 (it was the only collection error left after the repointing)"
+new_coverage: tests/regression/test_preservation_contracts.py (13 tests) -- the dedicated RTL/bidi, HTML-preservation and image-preservation files G-12 recorded as absent
+  - "RTL/bidi: Arabic, Hebrew and Persian sources with embedded LTR identifiers round-trip byte-for-byte; RLM/LRM directional marks are preserved exactly; placeholders reordered by a translator still restore to the right spans"
+  - "HTML: tags, attributes (including a literal '..' in an attribute value), void tags and anchors are masked and restored"
+  - "images: markdown ![alt](path \"title\") and <img src=...> both preserved, paths never exposed to translation"
+  - "bijectivity: duplicate tokens get independent placeholders; nested shortcode/code/brand constructs restore; CJK, emoji and combining Unicode survive; an invalid profile regex is inert rather than partially masking"
+defect_found_by_the_new_fixture (fixed):
+  finding: "PlaceholderManager was NOT bijective when the source itself contains a literal {PLACEHOLDER_<n>}: protect() minted the identical token for a real span and restore() rewrote BOTH occurrences, silently replacing the source's own literal text"
+  fix: "src/translation_engine/extractor/placeholder_manager.py: _collision_free_prefix() keeps the historical 'PLACEHOLDER_' token (output byte-identical to previous runs) unless the text already contains a placeholder-shaped literal, in which case a deterministic sha256-derived nonce prefix is used; restoration is map-driven so no caller changes"
+  live_trigger_today: "NONE -- 0 English source files in the content repo contain a literal {PLACEHOLDER_n}. The defect was latent; it is fixed rather than left to surface during the campaign."
+related_finding_recorded_not_fixed_here:
+  - "650 EXISTING target files contain leaked {PLACEHOLDER_n} literals (lt 406, fr 146, fi 31, hi 19, ru 15, cs 7, ms 5, sr 4, tr 4, uk 3, ca 3, fa 2). ~196 are in approved locales and all are UNKNOWN_PROVENANCE cells already scheduled for reprocessing; the rest are excluded locales that are never touched. This is the gate-43 placeholder-leak class and is routed to TC-APT-010's fixture set, not patched as output."
+verification:
+  - "pytest --collect-only -q -> 8,613 tests collected, 0 errors"
+  - "pytest tests/regression/test_preservation_contracts.py -> 13 passed"
+  - "pytest tests/unit/translation_engine tests/regression (one pre-existing failure deselected) -> full suite green after the placeholder change"
+acceptance: "pytest --collect-only -q reports 0 collection errors; masking/restoration proven bijective under duplicate tokens, nesting, Unicode and RTL in a dedicated fixture suite -> MET"

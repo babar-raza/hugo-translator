@@ -1,0 +1,17 @@
+taskcard: TC-APT-030
+title: Retire the legacy SweepScheduler execution path (G-19)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+finding:
+  - SweepScheduler._needs_translation() decides from st_mtime only and enqueues ungoverned TranslationJobs
+  - reachable via TranslationOrchestrator(enable_sweep_scheduler=True) <- python -m src.orchestrator --mode auto; no code outside src/orchestrator imports it (only docs/plans/archived tests)
+changes:
+  - src/orchestrator/scheduler.py: SweepScheduler.__init__ calls check_deprecated_entrypoint("sweep_scheduler") -> raises DeprecatedExecutionPathError without the exact override; class docstring marked RETIRED
+  - src/orchestrator/orchestrator.py: enable_sweep_scheduler default True -> False (documented)
+  - docs/operations/compatibility-matrix.md: 3 SweepScheduler rows -> RETIRED (TC-APT-030)
+  - tests/unit/phase-6/test_scheduler.py: autouse fixture sets the override so legacy internals stay covered
+  - tests/regression/test_sweep_scheduler_retired.py (new)
+verification:
+  - "pytest tests/regression/test_sweep_scheduler_retired.py tests/unit/phase-6/test_scheduler.py -> passed (part of 32 passed run)"
+acceptance: exactly one reachable translation execution path (campaign_runner.py under zero-defect) -> MET

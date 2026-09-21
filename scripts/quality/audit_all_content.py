@@ -92,7 +92,7 @@ from src.translation_engine.write_gate import GATE_ISSUE_NAMES as _GATE_ISSUE_NA
 _GATE_METHOD_NAMES = {gid: method for gid, method, _cat, _action in WriteGateEvaluator.GATE_REGISTRY}
 
 
-def _run_registry_gates(en_content, tr_content, locale, tr_path, record):
+def _run_registry_gates(en_content, tr_content, locale, tr_path, record, site_profile=None):
     """Run every GATE_REGISTRY gate not already hand-implemented by this
     script (see _HAND_IMPLEMENTED_GATE_IDS) and record a finding for each
     failure, under a name matching today's established issue-type strings
@@ -100,8 +100,17 @@ def _run_registry_gates(en_content, tr_content, locale, tr_path, record):
     for anything newer. This is the auto-propagation path (HT-QUALITY-
     GATES-001 Phase 8, F1) -- a new gate added to write_gate.py's
     GATE_REGISTRY is swept here with zero edits to this file.
+
+    ``site_profile`` (ASPOSE-BLOG-DEPLOY-ALIAS-RECURRENCE-001, 2026-09-17):
+    optional; without it, any gate whose whole check depends on the site
+    profile's own frontmatter rules (e.g. Gate 45's mode: ignore leak
+    detector) silently no-ops for this sweep -- pass the caller's already-
+    resolved profile through rather than leaving that gate class invisible
+    to the offline audit.
     """
-    gate_results, _final_content = _GATE_EVALUATOR.run_all_content_gates(en_content, tr_content, locale, tr_path)
+    gate_results, _final_content = _GATE_EVALUATOR.run_all_content_gates(
+        en_content, tr_content, locale, tr_path, site_profile=site_profile
+    )
     for gate_id, gres in gate_results.items():
         if gate_id in _HAND_IMPLEMENTED_GATE_IDS:
             continue
@@ -790,7 +799,7 @@ def scan(output_path=None, resume=False, sites=None):
                 # _GATE_EVALUATOR comment near the top of this file. Adding a
                 # new gate to write_gate.py's GATE_REGISTRY requires zero
                 # further edits to this file to be picked up here.
-                _run_registry_gates(en_content, tr_content, locale, tr_path, record)
+                _run_registry_gates(en_content, tr_content, locale, tr_path, record, site_profile=profile)
 
                 # Write JSONL record for this file if it has issues
                 if out_fh and file_issues:

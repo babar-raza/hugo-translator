@@ -180,9 +180,24 @@ class TerminologyPreservationValidator(Validator):
             )
         # Check for frequency mismatch
         elif source_count > 0 and translation_count != source_count:
+            # TC-APT-069: a PARTIAL loss keeps translation_count > 0, so this
+            # branch -- not the missing-entirely branch above -- is what a
+            # governed term actually trips when only some occurrences were
+            # translated. Measured on words-document-net: 8 of 10 locales lost
+            # some but not all occurrences, so a fixed WARNING here meant the
+            # gate never fired on the real defect.
+            #
+            # Not promoted globally: for a company name or platform token a
+            # legitimate restructure can change the count, and erroring on that
+            # would reject good translations. The severity is therefore per-term
+            # and DEFAULTS to the existing warning, so only a term that opts in
+            # via `frequency_severity` is tightened.
+            mismatch_severity = self._parse_severity(
+                term_config.get("frequency_severity", "warning")
+            )
             result.issues.append(
                 self.create_issue(
-                    ValidationSeverity.WARNING,
+                    mismatch_severity,
                     f"Term '{term}' ({category}) frequency mismatch: source has {source_count}, translation has {translation_count}",
                     location=f"terminology.{category}",
                     details={

@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from scripts.specscan import ScanSummary, SpecScanner, SpecScanResult
+from scripts.quality.specscan import ScanSummary, SpecScanner, SpecScanResult
 
 
 class TestSpecScanner:

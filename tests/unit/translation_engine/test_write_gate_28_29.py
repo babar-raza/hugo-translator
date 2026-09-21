@@ -168,7 +168,12 @@ class TestGateTitleIdentity:
         (per_language_folders: false) never investigated for this
         requirement — a family-root page there must not be flagged."""
         src = "---\ntitle: Aspose.Slides FOSS\n---\nbody\n"
-        tr = "---\ntitle: Something else entirely\n---\ntijelo\n"
+        # TC-APT-010 (2026-09-02): keeps the brand token so this fixture
+        # isolates Gate 28/29's own scoping logic without also tripping the
+        # now-block-tier Gate 33 (brand-token-presence) -- the title must
+        # still be genuinely DIFFERENT from source to test that Gate 28
+        # doesn't require identity here, just not brand-token-dropping.
+        tr = "---\ntitle: Nešto sasvim drugo za Aspose.Slides FOSS\n---\ntijelo\n"
         gate = _make_gate()
         output_path = Path("/content/blog.aspose.org/sr/slides/_index.md")
 

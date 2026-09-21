@@ -1,0 +1,23 @@
+taskcard: TC-APT-032
+title: Campaign-path-scoped dirty-tree check (G-22; hard prerequisite for Gate 4)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+design: "execution_policy.dirty_scope: campaign_paths (mission default in build_campaign_manifest.py) | frozen_baseline (the historical whole-tree frozen dirty baseline, kept for single-writer repos). Under campaign_paths verify_environment errors only if (a) a dirty path is one of the manifest's own outputs without a receipt (an unreceipted candidate) or (b) a manifest-listed English source is dirty; every other dirty path is ignored, never staged, never committed (session-ledger scoping on the commit side, plan 19.2). HEAD movement by other sessions is tolerated while the pinned content sha is an ancestor and neither a campaign source nor an unreceipted campaign output changed between pin and HEAD. tm_fingerprint_inputs is carried by the manifest so the runner hashes the same TM artifacts the builder did (the L3 FAISS index is absent on this host)."
+changes:
+  - "src/workers/campaign_manifest.py: DIRTY_SCOPES / DEFAULT_TM_FINGERPRINT_INPUTS; CampaignManifest.dirty_scope, tm_fingerprint_inputs; validate_schema rejects unknown scopes; verify_environment scoped branches (HEAD-movement rule, dirty rule) with the frozen_baseline branch byte-for-byte preserved"
+  - "src/workers/campaign_runner.py: both require_clean=True call sites unchanged (the scope is a manifest policy, not a call-site flag)"
+  - "scripts/campaign/build_campaign_manifest.py: --dirty-scope (default campaign_paths), tm_fingerprint_inputs emitted"
+acceptance_tests: tests/unit/workers/test_campaign_replace_existing_and_dirty_scope.py
+  - "unrelated dirty paths (untracked + modified) do not block under campaign_paths; the same repo blocks under frozen_baseline"
+  - "an unreceipted candidate output still blocks; a dirty/changed source still blocks"
+  - "HEAD moved by another session's unrelated commit -> passes; a committed source edit -> blocks"
+  - "manifest tm_fingerprint_inputs honoured; unknown dirty_scope rejected"
+live_dry_run_2026-09-02:
+  manifest: data/campaigns/manifests/tc032-dryrun-20260902.yaml (1 MISSING cell: content/docs.aspose.org/en/3d/java/developer-guide/format-support.md -> de; dirty_scope campaign_paths; tm inputs L2 only)
+  content_repo: D:/onedrive/Documents/GitHub/aspose.org at 334d86406f with 25 unrelated dirty paths (other sessions' data/ + keywords/ files)
+  result: "verify_environment(require_clean=True) -> OK under campaign_paths; the identical manifest with dirty_scope=frozen_baseline -> 'content repository is dirty (25 unexpected paths)'"
+  note: "first attempt failed with 'translator repository SHA drift' because the manifest was built before the last mission commit -- the pin worked as designed; rebuilt on the clean tree and passed. A regression test (tests/regression/test_nested_list_preservation.py) had dirtied tests/fixtures/nested_list_output_debug.md; restored with git checkout and routed to TC-APT-011"
+verification:
+  - "pytest tests/unit/workers/test_campaign_replace_existing_and_dirty_scope.py -> 10 passed; manifest/builder/canary suites -> 65 passed"
+acceptance: "tests prove the three rules; live dry run against the real content repo with its unrelated dirty paths passes -> MET"

@@ -339,3 +339,39 @@ def is_circuit_broken(
     state = load_state(state_file=state_file)
     failures = state.get("stats", {}).get("consecutive_failures", 0)
     return failures >= max_consecutive_failures
+
+
+def replace_blockers(
+    blockers: list[dict[str, Any]],
+    *,
+    state_file: Path | None = None,
+) -> dict[str, Any]:
+    """Replace the blockers list wholesale (idempotent re-sync, TC-APT-029).
+
+    ``add_blocker`` appends; a per-wake supervisor that re-derives the current
+    blocker set from authoritative state needs to *set* it so cleared blockers
+    disappear and repeated wakes never duplicate entries.  Entries keep the shape
+    ``add_blocker`` writes; ``added_at`` is stamped here when absent.
+    """
+    state = load_state(state_file=state_file)
+    now = datetime.now(timezone.utc).isoformat()
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in blockers:
+        blocker_id = str(item.get("blocker_id", ""))
+        if not blocker_id or blocker_id in seen:
+            continue
+        seen.add(blocker_id)
+        normalized.append(
+            {
+                "blocker_id": blocker_id,
+                "type": str(item.get("type", "unknown")),
+                "description": str(item.get("description", "")),
+                "added_at": str(item.get("added_at") or now),
+            }
+        )
+    state["blockers"] = normalized
+    state["updated_at"] = now
+    _atomic_write(_state_path(state_file), state)
+    logger.info("continuation_state: blockers replaced (%d active)", len(normalized))
+    return state

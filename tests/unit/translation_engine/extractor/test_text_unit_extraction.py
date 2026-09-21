@@ -17,7 +17,12 @@ from unittest.mock import MagicMock, Mock
 import pytest
 
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
-from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.translation_engine.extractor.text_unit_extractor import (
+    TextUnitExtractor,
+    _link_text_is_brand_navigation_label,
+    _link_text_is_schemeless_bare_url,
+    _link_text_matches_url_slug,
+)
 from src.translation_engine.parser.ast_nodes import (
     ASTNode,
     NodeType,
@@ -143,6 +148,244 @@ class TestNodeTypes:
         # URL should NOT be in units
         all_text = " ".join([u.source_text for u in plan.units])
         assert "https://example.com" not in all_text
+
+    def test_link_text_matching_url_slug_is_protected(self):
+        """TC-APT-004b: a link whose visible text is the URL's own final path segment
+        (a repo/product slug) must not be sent to the model.  Found via qualification on
+        real content: 'Aspose.3D-FOSS-for-Java' in
+        content/blog.aspose.org/3d/java/3d-scene-management-java/index.md matches none of
+        the CamelCase/snake_case/version-number patterns, so under zero-defect policy's
+        zero-tolerance same-as-source gate, the model correctly leaving it unchanged was
+        raising TranslationIncomplete on every retry."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+
+        link = ASTNode(
+            type=NodeType.LINK,
+            attrs={
+                "url": "https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-Java"
+            },
+            children=[text_node("Aspose.3D-FOSS-for-Java")],
+        )
+        para = paragraph_node([link])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
+    def test_link_text_not_matching_url_slug_stays_translatable(self):
+        """A link whose text is ordinary prose, not the URL's slug, must still translate --
+        the slug-matching heuristic must not become a general "protect all links" rule."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+
+        link = ASTNode(
+            type=NodeType.LINK,
+            attrs={"url": "https://docs.aspose.org/3d/java/"},
+            children=[text_node("Developer Guide")],
+        )
+        para = paragraph_node([link])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is False
+
+    def test_link_text_matches_url_slug_helper(self):
+        """Direct coverage of the normalization rules the extraction test relies on."""
+        assert _link_text_matches_url_slug(
+            "Aspose.3D-FOSS-for-Java",
+            "https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-Java",
+        )
+        # trailing slash and URL-encoded space are both normalized away
+        assert _link_text_matches_url_slug(
+            "My Repo Name", "https://github.com/org/My%20Repo%20Name/"
+        )
+        # ordinary prose never matches
+        assert not _link_text_matches_url_slug("Developer Guide", "https://docs.aspose.org/3d/java/")
+        # empty inputs are inert, not a crash
+        assert not _link_text_matches_url_slug("", "https://example.com/x")
+        assert not _link_text_matches_url_slug("x", "")
+        # TC-APT-014 Gate 5 (introducing-words-foss-net): a natural, space-separated
+        # nav link text must NOT match its own URL's hyphen-separated slug just
+        # because stripping both hyphens and spaces would make them equal -- that
+        # silently excluded "Getting Started" / "Developer Guide" / "API Reference"
+        # from translation in every reviewed language (ar/cs/el/es).
+        assert not _link_text_matches_url_slug(
+            "Getting Started", "https://docs.aspose.org/words/net/getting-started/"
+        )
+        assert not _link_text_matches_url_slug(
+            "Developer Guide", "https://docs.aspose.org/words/net/developer-guide/"
+        )
+        assert not _link_text_matches_url_slug(
+            "API Reference", "https://reference.aspose.org/words/net/api-reference/"
+        )
+
+    def test_link_text_is_schemeless_bare_url_helper(self):
+        """TC-APT-014 Gate 5: `[github.com/x/y](https://github.com/x/y)` -- visible
+        text is the URL minus its scheme, a very common way to write a plain
+        reference link. Confirmed on real content: professionalize_llm AND
+        m2m100_418m both failed TC-SAS-01 on this exact text before this fix,
+        since Strategy 0.6's `^https?://...$` bare-URL check only caught the
+        scheme-prefixed form."""
+        assert _link_text_is_schemeless_bare_url(
+            "github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go",
+            "https://github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go",
+        )
+        # trailing slash on either side is normalized away
+        assert _link_text_is_schemeless_bare_url(
+            "github.com/org/repo/", "https://github.com/org/repo"
+        )
+        assert _link_text_is_schemeless_bare_url(
+            "github.com/org/repo", "https://github.com/org/repo/"
+        )
+        # ordinary prose, and text matching only the final slug (a different,
+        # already-handled case), never match here
+        assert not _link_text_is_schemeless_bare_url(
+            "Developer Guide", "https://docs.aspose.org/3d/java/"
+        )
+        assert not _link_text_is_schemeless_bare_url(
+            "Aspose.3D-FOSS-for-Java",
+            "https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-Java",
+        )
+        # empty inputs are inert, not a crash
+        assert not _link_text_is_schemeless_bare_url("", "https://example.com/x")
+        assert not _link_text_is_schemeless_bare_url("x", "")
+
+    def test_bare_url_as_link_text_is_protected(self):
+        """TC-APT-004b: `[https://x](https://x)` -- a plain reference link whose
+        visible text IS its own href -- has no natural-language content at all."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        url = "https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-NET"
+        link = ASTNode(type=NodeType.LINK, attrs={"url": url}, children=[text_node(url)])
+        para = paragraph_node([link])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
+    def test_schemeless_bare_url_as_link_text_is_protected(self):
+        """TC-APT-014 Gate 5: real portfolio content
+        (blog.aspose.org/cells/go/cells-spreadsheet-management-go) links
+        `[github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go](https://github.com/...)`
+        -- the scheme-less form of the already-protected bare-URL pattern."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        url = "https://github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go"
+        text = "github.com/aspose-cells-foss/Aspose.Cells-FOSS-for-Go"
+        link = ASTNode(type=NodeType.LINK, attrs={"url": url}, children=[text_node(text)])
+        para = paragraph_node([link])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
+    def test_brand_navigation_label_helper(self):
+        """TC-APT-004b: confirmed against REAL, already-shipped translations --
+        blog.aspose.org/3d/net/introducing-3d-foss-dotnet's French and German
+        versions both leave '[Aspose.3D KB]' completely untranslated, matching
+        the established site convention for these fixed navigation labels."""
+        assert _link_text_is_brand_navigation_label("Aspose.3D KB")
+        assert _link_text_is_brand_navigation_label("Aspose.3D API Reference")
+        assert _link_text_is_brand_navigation_label("Aspose.3D — Enterprise Blog")
+        assert _link_text_is_brand_navigation_label(
+            "Aspose.Slides — Enterprise API Reference"
+        )
+        assert _link_text_is_brand_navigation_label("Aspose.3D")
+        # a lowercase connector word means this is a real sentence, not a label
+        assert not _link_text_is_brand_navigation_label("Aspose.3D FOSS for Java")
+        assert not _link_text_is_brand_navigation_label(
+            "Learn more about Aspose.3D and its features"
+        )
+        # not a brand-prefixed string at all
+        assert not _link_text_is_brand_navigation_label("Developer Guide")
+        assert not _link_text_is_brand_navigation_label("")
+
+    def test_brand_navigation_label_link_is_protected(self):
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        link = ASTNode(
+            type=NodeType.LINK,
+            attrs={"url": "/kb/3d/net/"},
+            children=[text_node("Aspose.3D KB")],
+        )
+        para = paragraph_node([link])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
+    def test_confirmed_fixed_technical_heading_is_protected(self):
+        """TC-APT-013: 'Scene Graph' recurred as the identical TC-SAS-01
+        same-as-source fingerprint across two unrelated real source files in
+        the Gate 4 canary -- confirmed against already-shipped nl/no/ru
+        translations, which all keep '### Scene Graph' verbatim."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        heading = heading_node(level=3, children=[text_node("Scene Graph")])
+        heading.assign_addresses("body.heading[0]")
+
+        plan = extractor.extract_from_ast([heading])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
+    def test_short_first_segment_pascalcase_heading_is_protected(self):
+        """TC-APT-013: the ACTUAL root cause behind the Gate 4 canary's repeated
+        TC-SAS-01 failure -- "PbrMaterial", a real API class name from a real
+        source file. sha256('PbrMaterial')[:16] == the exact fingerprint the
+        campaign run reported (verified directly, not assumed -- an earlier,
+        unverified guess at "Scene Graph" was wrong and is a separate, still-
+        valid fix, not this one). "Pbr" has only 2 lowercase chars after "P",
+        below the single-segment {3,} floor -- but a second capitalized
+        segment ("Material") is itself strong-enough technical-identifier
+        signal that the floor should not apply."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        heading = heading_node(level=3, children=[text_node("PbrMaterial")])
+        heading.assign_addresses("body.heading[0]")
+
+        plan = extractor.extract_from_ast([heading])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
+    def test_registry_covered_single_word_heading_is_translate_eligible(self):
+        """TC-APT-014 Gate 5 (introducing-words-foss-net) / TC-APT-049: '### Charts'
+        was silently left untranslated in 4 of 5 reviewed languages because
+        _is_technical_identifier's single-segment PascalCase pattern cannot
+        distinguish an ordinary capitalized English word from a genuine
+        single-word API identifier by shape alone -- it matches both
+        identically. Fixed via the SAME i18n registry override mechanism
+        already used for "Overview"/"Value"/"Type" etc. (config/i18n/
+        template_strings/_registry.yaml), not a regex change, so the
+        PbrMaterial/Scene-Graph protections above are untouched."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        heading = heading_node(level=3, children=[text_node("Charts")])
+        heading.assign_addresses("body.heading[0]")
+
+        plan = extractor.extract_from_ast([heading])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is False
+
+    def test_unregistered_single_word_heading_still_protected(self):
+        """The fix above is a targeted registry addition, not a regex
+        loosening -- a single-word heading with NO registry entry must still
+        be protected exactly as before (this is what PbrMaterial/Scene Graph
+        already prove for their own shapes; this covers the plain
+        single-segment PascalCase case those two don't)."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        heading = heading_node(level=3, children=[text_node("Camera")])
+        heading.assign_addresses("body.heading[0]")
+
+        plan = extractor.extract_from_ast([heading])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
 
     def test_image_alt_extraction(self):
         """Test image alt text is extracted but src is not."""
@@ -341,19 +584,47 @@ class TestSmartSegmentation:
         assert len(plan.units) == 2
         assert [u.source_text for u in plan.units] == ["Text with", "bold"]
 
-    def test_adaptive_mode_technical_paragraph(self):
-        """Test adaptive mode uses leaf-level for technical content."""
-        extractor = TextUnitExtractor(segmentation_strategy="adaptive")
+    def test_adaptive_mode_code_only_paragraph_extracts_as_full_sentence(self):
+        """
+        Adaptive mode extracts a paragraph containing only a code span (plus
+        plain text) as a single full-sentence unit, not leaf-level fragments
+        (TC-APT-013).
 
-        # Create paragraph with code
+        Superseded the old expectation (leaf-level, 3 units): CODE_SPAN was
+        removed from both _has_inline_formatting and _has_technical_content's
+        fallback triggers. The plain-text fragment "Call" preceding the code
+        span is NOT itself grounds for leaf fallback either -- confirmed by
+        direct-read review of real content, a single capitalized word right
+        before a code span (an ordinary sentence-initial verb, "Call") is
+        indistinguishable by shape from a genuine bare identifier, and
+        _is_technical_identifier's anchored regex was never meant to classify
+        sentence fragments -- only whole standalone text nodes. Leaf-splitting
+        this exact shape of paragraph was the confirmed root cause of dropped
+        verbs / incomplete sentences in real translations.
+        """
+        extractor = TextUnitExtractor(
+            segmentation_strategy="adaptive", preserve_patterns=[r"`[^`\n]+`"]
+        )
+
         code = ASTNode(type=NodeType.CODE_SPAN, raw="code()")
         para = paragraph_node([text_node("Call "), code, text_node(" here")])
         para.assign_addresses("body.paragraph[0]")
 
         plan = extractor.extract_from_ast([para])
 
-        # Should use leaf-level extraction (3 units)
-        assert len(plan.units) == 3
+        body_units = [u for u in plan.units if u.node_addr.startswith("body.")]
+        assert len(body_units) == 1, (
+            f"Expected 1 full-sentence unit, got {len(body_units)}: "
+            f"{[u.source_text for u in body_units]}"
+        )
+        unit = body_units[0]
+        assert "Call" in unit.source_text and "here" in unit.source_text
+        assert "`code()`" not in unit.source_text, (
+            "Code span should be placeholder-protected, not sent verbatim"
+        )
+        placeholder_map = unit.metadata.get("placeholder_map") or {}
+        assert placeholder_map, "Code span must be placeholder-protected"
+        assert "`code()`" in list(placeholder_map.values())
 
 
 class TestProductNameDetection:

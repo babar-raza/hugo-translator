@@ -1,0 +1,351 @@
+{
+  "campaign_id": "wave-pdftypescript-coreapi-20260911",
+  "campaign_state_at_review": {
+    "accepted": 16,
+    "alive": true,
+    "failed": 1,
+    "locale_count": 25,
+    "pid": 52476
+  },
+  "commits_landed_this_iteration": {
+    "aspose.org": [],
+    "hugo-translator": [
+      "60c3999d review(TC-APT-059): extend RB-008 to non-slug link-text echo variant"
+    ]
+  },
+  "cross_locale_finding": {
+    "class": "RB-008:mixed-link-text-localization (mechanism variant)",
+    "conclusion": "extractor emits the unit (10/16 translate it); model echo, not _link_text_matches_url_slug; minority recurrence => RECORD_ONLY",
+    "link_target": "/pdf/typescript/introducing-pdf-foss-typescript/",
+    "source_link_text": "introductory post",
+    "tally_at": "FINAL (23 committed locales)",
+    "ticket_id": "review-wave-pdftypescript-coreapi-20260911-rb008-linktext-pl",
+    "translated_in": [
+      "ar",
+      "cs",
+      "es",
+      "he",
+      "hi",
+      "hu",
+      "id",
+      "it",
+      "nl",
+      "pt",
+      "ro",
+      "ru",
+      "sv",
+      "tr",
+      "uk",
+      "zh"
+    ],
+    "untranslated_in": [
+      "de",
+      "el",
+      "fa",
+      "ja",
+      "ko",
+      "pl",
+      "th"
+    ]
+  },
+  "delivery_note": "pl/pt were committed by a concurrent peer session (371acb7b0a) before this review completed; this session did NOT commit content and stayed on trailing review per session-ledger scoping.",
+  "frontmatter_evidence_sections": {
+    "finding": "evidence.sections[].heading stays English in 20/20 locales",
+    "verdict": "by design, no ticket -- source-anchored provenance metadata (carries source `line:` numbers, `apis:`, `formats:`), not reader-facing content"
+  },
+  "governed_term_check": {
+    "preserved_in": "16/16 locales",
+    "source": "config/terminology.yaml",
+    "term": "API Guide",
+    "verdict": "correct per RB-002/RB-006"
+  },
+  "intermediate_gate_failures": [
+    {
+      "attempt": 3,
+      "gate": "StructureValidator",
+      "outcome": "accepted on a later attempt",
+      "target_lang": "ru"
+    },
+    {
+      "attempt": 3,
+      "gate": "FrontmatterLanguageCheck",
+      "outcome": "accepted on a later attempt",
+      "target_lang": "sv"
+    },
+    {
+      "attempt": 1,
+      "gate": "FrontmatterLanguageCheck",
+      "outcome": "accepted on a later attempt",
+      "target_lang": "cs"
+    }
+  ],
+  "kind": "trailing_review",
+  "launch_collision_note": "This session's uncommitted working-tree edit (campaign_runner.py + its test) was the 'translator repository is dirty (2 paths)' that killed the peer's wave-pdfgeneratedpython-20260911 launch at 14:50. Committed immediately (088a5db9); the peer holds a live claim on that page until 10:34Z and relaunches it.",
+  "loop_prompt_version_seen": "10.7 (2026-09-06)",
+  "mission": "aspose-org-full-portfolio-translation-20260901",
+  "rejected_cells": [
+    {
+      "attempts": 3,
+      "auto_ticket": "auto-wave-pdftypescript-coreapi-20260911-w0:blog.aspose.org:pdf:typescript:fr:1-index",
+      "models": [
+        "professionalize_llm",
+        "m2m100_418m"
+      ],
+      "target_lang": "fr",
+      "tm_purge": {
+        "applied": true,
+        "deleted": 32,
+        "scanned": 23120,
+        "tool": "scripts/tm/purge_page_lang_tm.py"
+      },
+      "validator": "RepetitionDetectorValidator"
+    },
+    {
+      "attempts": 3,
+      "auto_ticket": "auto-wave-pdftypescript-coreapi-20260911-w0:blog.aspose.org:pdf:typescript:vi:1-index",
+      "models": [
+        "professionalize_llm",
+        "m2m100_418m"
+      ],
+      "root_cause": "decision_engine Rule 5 with accept_after_max_retries=false rejects a warning-only result under zero-defect; ticket landed as auto:pipeline because _failure_metadata named no validator -- fixed in commit 088a5db9 (gate now warning:<Validator>)",
+      "target_lang": "vi",
+      "tm_purge": {
+        "applied": true,
+        "deleted": 26,
+        "scanned": 23374,
+        "tool": "scripts/tm/purge_page_lang_tm.py"
+      },
+      "validator": "RepetitionDetectorValidator (WARNING severity only)"
+    }
+  ],
+  "reviewed_cells": [
+    {
+      "output_sha256_prefix": "fe0d3f2fc5c6e17e",
+      "recorded_defects": [
+        "RB-008 MECHANISM VARIANT: one body link text left in source language"
+      ],
+      "rule_ids": [
+        "RB-003",
+        "RB-006",
+        "RB-008"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "pl",
+      "verdict": "APPROVE_WITH_RECORD"
+    },
+    {
+      "output_sha256_prefix": "0a4223a0cf1b5524",
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003",
+        "RB-006"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "pt",
+      "verdict": "APPROVE"
+    },
+    {
+      "notes": "'Open Source' retained in the licensing heading (brand-grade, RB-002/RB-003)",
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "ro",
+      "verdict": "APPROVE"
+    },
+    {
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "ru",
+      "verdict": "APPROVE"
+    },
+    {
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "sv",
+      "verdict": "APPROVE"
+    },
+    {
+      "recorded_defects": [
+        "RB-008 MECHANISM VARIANT: body link text left in source language",
+        "RB-003: English technical terms (metadata/bookmarks/page labels) in body while the heading uses the Thai transliteration -- terminology inconsistency, not a defect"
+      ],
+      "rule_ids": [
+        "RB-003",
+        "RB-008"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "th",
+      "verdict": "APPROVE_WITH_RECORD"
+    },
+    {
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "tr",
+      "verdict": "APPROVE"
+    },
+    {
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "uk",
+      "verdict": "APPROVE"
+    },
+    {
+      "recorded_defects": [],
+      "rule_ids": [
+        "RB-003"
+      ],
+      "structural_parity": {
+        "code_spans": "38/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "zh",
+      "verdict": "APPROVE"
+    },
+    {
+      "recorded_defects": [
+        "RB-010: one extra `Document.Merge()` code span -- grammatically integrated restatement opening the second sentence of a split, meaning intact; the only code-span count deviation in 23 locales"
+      ],
+      "rule_ids": [
+        "RB-003",
+        "RB-010"
+      ],
+      "structural_parity": {
+        "code_spans": "39/38",
+        "fences": "10/10",
+        "headings": "11/11",
+        "links": "7/7",
+        "url_set_diff": 0
+      },
+      "target_lang": "ja",
+      "verdict": "APPROVE"
+    }
+  ],
+  "rubric_change": {
+    "change": "MECHANISM VARIANT clause + evidence",
+    "commit": "60c3999d",
+    "file": "config/review_rubric.yaml",
+    "rule": "RB-008"
+  },
+  "rubric_changes": [
+    {
+      "change": "MECHANISM VARIANT clause",
+      "commit": "60c3999d",
+      "rule": "RB-008"
+    },
+    {
+      "change": "new: protected-identifier restatement on sentence split",
+      "commit": "pending",
+      "rule": "RB-010"
+    }
+  ],
+  "run_id": "review-pdftypescript-coreapi-20260911-pl-pt",
+  "source_path": "content/blog.aspose.org/pdf/typescript/pdf-core-api-typescript/index.md",
+  "va01_heal_queue_backfill": {
+    "action": "scripts/ops/reclassify_va01_heal_tickets.py --write (in-place rewrite, 414 rows, audit fields on each)",
+    "claim": "taskcard:heal-queue-va01-class-backfill (opus5-review-20260911)",
+    "consequence": "the mission's largest recurrence class was an artifact of pre-VA-01 attribution; degenerate repetition (RepetitionDetectorValidator), not link validation, is the real #1 target for Track B",
+    "measurement": {
+      "actual_error_validators": {
+        "RepetitionDetectorValidator": 287,
+        "SemanticSimilarityValidator": 16,
+        "StructureValidator": 105,
+        "unparseable": 66
+      },
+      "open_auto_LinkValidator_before": 475,
+      "pre_VA01_note_format": 475,
+      "tickets_where_LinkValidator_reported_an_error": 0
+    },
+    "open_class_ranking_after": {
+      "auto:FrontmatterLanguageCheck": 118,
+      "auto:LinkValidator": 66,
+      "auto:RepetitionDetectorValidator": 322,
+      "auto:SemanticSimilarityValidator": 120,
+      "auto:StructureValidator": 163
+    },
+    "quarantine_impact": {
+      "after": 105,
+      "lang_class_quarantines_before": 96,
+      "newly_added": [
+        "content/docs.aspose.org/en/3d/net/developer-guide/animation.md"
+      ],
+      "released": [],
+      "source_path_quarantines_before": 48
+    },
+    "verification": "pytest tests/unit -k heal_queue -> 43 passed; line count 1636 -> 1636; backup at data/campaigns/heal_queue.jsonl.bak-20260911-va01"
+  },
+  "wave_close": {
+    "closed_by_peer_commit": "450bd1b5",
+    "committed_locales": 23,
+    "rejected": [
+      "fr",
+      "vi"
+    ],
+    "wave_wide_audit": "all 23 locales re-checked for structural parity and link-text localization; single deviation is ja's code-span count (RB-010)"
+  },
+  "written_at": "2026-09-11T09:10:47.264198+00:00"
+}

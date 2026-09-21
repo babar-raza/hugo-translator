@@ -19,6 +19,7 @@ if str(_QUALITY_DIR) not in sys.path:
 
 import audit_all_content as aac  # noqa: E402
 from src.translation_engine.write_gate import WriteGateEvaluator  # noqa: E402
+from src.utils.models import FrontmatterMode  # noqa: E402
 
 
 def _collect(en_content, tr_content, locale="es"):
@@ -87,3 +88,37 @@ def test_gate_issue_name_fallback_for_unmapped_gate_id():
     # still get a predictable, non-empty issue-type string.
     name = aac._gate_issue_name(99, "_gate_something_new")
     assert name == "gate99_something_new"
+
+
+def test_gate45_ignore_field_leak_is_surfaced_when_site_profile_is_passed():
+    """ASPOSE-BLOG-DEPLOY-ALIAS-RECURRENCE-001 (2026-09-17): before this fix,
+    _run_registry_gates had no way to pass a site_profile through to
+    run_all_content_gates(), so Gate 45 (whose whole check is "does a mode:
+    ignore field leak into output") silently no-opped for every file this
+    audit sweep ever processed -- a real, currently-live blog post's
+    contamination would never have been caught by this tool."""
+    from types import SimpleNamespace
+
+    def _rule(mode):
+        return SimpleNamespace(mode=mode)
+
+    profile = SimpleNamespace(
+        frontmatter={
+            "title": _rule(FrontmatterMode.TRANSLATE),
+            "aliases": _rule(FrontmatterMode.IGNORE),
+        }
+    )
+    en = "---\ntitle: Test\naliases: [/old/]\n---\nHello world, a normal sentence."
+    tr = "---\ntitle: Test\naliases: [/old/]\n---\nHola mundo, una oracion normal."
+
+    without_profile = _collect(en, tr)
+    assert without_profile == []
+
+    findings = []
+
+    def record(issue, detail=""):
+        findings.append((issue, detail))
+
+    aac._run_registry_gates(en, tr, "es", Path("fake/es/test.md"), record, site_profile=profile)
+    issue_types = [f[0] for f in findings]
+    assert any("aliases" in detail for _issue, detail in findings), findings

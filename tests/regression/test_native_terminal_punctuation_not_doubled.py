@@ -1,0 +1,97 @@
+"""TC-APT-040 (Devanagari/CJK half): FIX-C must not double native terminals.
+
+The reconstructor's punctuation-preserve repair appended the source's ASCII
+terminal whenever the translation didn't literally end with it. A Hindi
+sentence ending with the danda, a Japanese/Chinese sentence ending with the
+ideographic full stop, or a Chinese label ending with the fullwidth colon all
+"lack" the ASCII char by that test — producing the recurring danda+period,
+fullwidth-stop+period, and fullwidth-colon+colon artifacts (11+ per page in
+hi/ja/zh on introducing-pdf-foss-cpp, plus one earlier page).
+
+TC-APT-073 (RB-005): the same bug existed on the LEADING side, undetected
+because no test covered it. Reproduced directly on current code: a segment
+whose source starts with ASCII "," and whose translation naturally starts
+with the script-appropriate comma (U+060C in ar/fa) produced U+002C
+immediately followed by U+060C -- byte-identical at ar:503 and fa:503 on
+words-document-net -- because the leading branch checked only
+`startswith(source_leading_punct)` with no equivalent-terminal fallback.
+"""
+
+from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
+
+
+def _render(source: str, translated: str) -> str:
+    renderer = ASTRenderer.__new__(ASTRenderer)
+    return renderer._preserve_punctuation(source, translated, "", "")
+
+
+class TestNativeTerminalsAreNotDoubled:
+    def test_devanagari_danda_satisfies_source_period(self):
+        assert _render("This is a sentence.", "यह एक वाक्य है।") == "यह एक वाक्य है।"
+
+    def test_ideographic_full_stop_satisfies_source_period(self):
+        assert _render("This is a sentence.", "これは文です。") == "これは文です。"
+        assert _render("This is a sentence.", "这是一个句子。") == "这是一个句子。"
+
+    def test_fullwidth_colon_satisfies_source_colon(self):
+        assert _render("Install the module:", "安装模块：") == "安装模块："
+
+    def test_fullwidth_exclamation_and_question(self):
+        assert _render("Really?", "本当に？") == "本当に？"
+        assert _render("Go!", "行け！") == "行け！"
+
+    def test_arabic_question_mark_satisfies_source_question(self):
+        assert _render("Why?", "لماذا؟") == "لماذا؟"
+
+
+class TestLeadingNativeTerminalsAreNotDoubled:
+    def test_arabic_comma_satisfies_source_leading_comma(self):
+        assert _render(", and more text", "، and more text") == "، and more text"
+
+    def test_fullwidth_comma_satisfies_source_leading_comma(self):
+        assert _render(", and more text", "， and more text") == "， and more text"
+
+    def test_missing_leading_comma_is_still_prepended(self):
+        assert _render(", and more text", "and more text") == ",and more text"
+
+
+class TestSubstitutedTerminalsAreNotDoubled:
+    """TC-APT-042 (reconstruction_punctuation_duplication, quickstart-punctuation-corruption).
+
+    Reproduced directly on pdf-document-management-in-cpp es/pl/th: the model
+    rewrote a colon-before-code-block sentence to end in its own period rather
+    than a colon, and FIX-C appended the source's colon on top anyway because
+    a period is neither the source char nor a registered *equivalent* of it --
+    producing "...aspose_pdf_foss`.:" and "...guarda el resultado.:" in the
+    committed candidate files. The translation's terminal is a different valid
+    mark, not a dropped one; appending on top of it is always wrong.
+    """
+
+    def test_spanish_period_satisfies_source_colon(self):
+        assert _render(
+            "Link against the `aspose_pdf_foss` target:",
+            "Enlaza contra el objetivo `aspose_pdf_foss`.",
+        ) == "Enlaza contra el objetivo `aspose_pdf_foss`."
+
+    def test_polish_period_satisfies_source_colon(self):
+        assert _render(
+            "and save the result:", "a nastepnie zapisz wynik."
+        ) == "a nastepnie zapisz wynik."
+
+    def test_thai_period_satisfies_source_colon(self):
+        assert _render(
+            "and save the result:", "และบันทึกผลลัพธ์."
+        ) == "และบันทึกผลลัพธ์."
+
+
+class TestGenuineDropsAreStillRestored:
+    def test_missing_ascii_period_is_still_appended(self):
+        assert _render("This is a sentence.", "Dies ist ein Satz") == "Dies ist ein Satz."
+
+    def test_missing_colon_is_still_appended(self):
+        assert _render("Install the module:", "Installieren Sie das Modul") == (
+            "Installieren Sie das Modul:"
+        )
+
+    def test_matching_ascii_terminal_is_untouched(self):
+        assert _render("This is a sentence.", "Dies ist ein Satz.") == "Dies ist ein Satz."

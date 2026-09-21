@@ -7,6 +7,18 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 13622
     corpus_agreement: agree
+  heading.installation:
+    value: インストール
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
+  heading.quickstart:
+    value: クイックスタート
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 507
+    corpus_agreement: agree
   heading.properties:
     value: プロパティ
     reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
@@ -167,6 +179,30 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 715
     corpus_agreement: override
+  table.header.component:
+    value: コンポーネント
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 7
+    corpus_agreement: agree
+  table.header.role:
+    value: 役割
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
+  table.header.renderer:
+    value: レンダラー
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 11
+    corpus_agreement: agree
+  table.header.handles:
+    value: 処理内容
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 11
+    corpus_agreement: agree
   table.header.enumeration:
     value: 列挙型
     reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
@@ -266,3 +302,15 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 3690
     corpus_agreement: agree
+  table.header.issue:
+    value: 問題
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.header.cause:
+    value: 原因
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence

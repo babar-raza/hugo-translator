@@ -12,7 +12,10 @@ and mutates the TranslationResult directly.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
+import re
 import time
 from copy import deepcopy
 from dataclasses import dataclass
@@ -33,6 +36,56 @@ if TYPE_CHECKING:
     from .engine import TranslationEngine
 
 logger = logging.getLogger(__name__)
+
+
+def _quarantine_diagnostic_candidate(
+    engine: Any,
+    *,
+    source_content: str,
+    candidate: str | None,
+    output_path: Path,
+    target_lang: str,
+    retry_count: int,
+    error: str,
+    validation_result: Any = None,
+    retry_feedback: str | None = None,
+) -> None:
+    """Persist an explicitly enabled recovery candidate outside campaign state."""
+    root = getattr(engine, "diagnostic_quarantine_root", None)
+    if not isinstance(root, (str, Path)) or candidate is None:
+        return
+    root = Path(root).resolve()
+    if ".local/rating-cause-analysis-runs" not in root.as_posix():
+        raise RuntimeError("diagnostic quarantine must be under .local/rating-cause-analysis-runs")
+    candidate_hash = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
+    entry = root / "candidates" / candidate_hash
+    entry.mkdir(parents=True, exist_ok=True)
+    (entry / "candidate.md").write_text(candidate, encoding="utf-8")
+    # Privacy-safe diagnostic fields only: numeric/typed values that cannot carry
+    # translated text (a fixed validator message, a float score, a threshold, an
+    # exception class name). Never widen this to arbitrary `details` values --
+    # some validators could in principle put source/candidate fragments there.
+    _SAFE_DETAIL_KEYS = {"similarity", "threshold", "exception_type"}
+    issues = []
+    for issue in getattr(validation_result, "issues", []) or []:
+        details = getattr(issue, "details", {}) or {}
+        safe_details = {k: details[k] for k in _SAFE_DETAIL_KEYS if k in details}
+        issues.append({"validator": str(getattr(issue, "validator", "unknown")),
+                       "severity": str(getattr(getattr(issue, "severity", None), "value", "")),
+                       "location": str(getattr(issue, "location", "")),
+                       "message": str(getattr(issue, "message", "")),
+                       "details": safe_details})
+    metadata = {
+        "source_sha256": hashlib.sha256(source_content.encode("utf-8")).hexdigest(),
+        "candidate_sha256": candidate_hash, "output_path": str(output_path),
+        "target_lang": target_lang, "attempt": retry_count + 1,
+        "error_sha256": hashlib.sha256(str(error).encode("utf-8")).hexdigest(),
+        "retry_feedback_sha256": hashlib.sha256((retry_feedback or "").encode("utf-8")).hexdigest(),
+        "source_body_chars": len(source_content),
+        "candidate_body_chars": len(candidate),
+        "validator_details": issues,
+    }
+    (entry / "metadata.json").write_text(json.dumps(metadata, sort_keys=True, indent=2), encoding="utf-8")
 
 
 def verification_error_metadata(verification_result: Any) -> list[dict[str, str]]:
@@ -68,6 +121,9 @@ class LanguageTranslationContext:
     output_paths_cache: dict[str, Path]
     force_overwrite: bool = False
     llm_model_override: str | None = None
+    # TC-APT-045: call-scoped campaign model pin; escalation override wins,
+    # matching the precedence of the old engine.model_id_override attribute.
+    model_id_pin: str | None = None
 
 
 @dataclass
@@ -150,6 +206,7 @@ class FileTranslationPipeline:
         max_retry_attempts = ctx.max_retry_attempts
         output_paths_cache = ctx.output_paths_cache
         _llm_model_override = ctx.llm_model_override
+        _model_id_pin = ctx.model_id_pin
         campaign_feedback = getattr(engine, "_campaign_retry_feedback_by_output", {})
         retry_feedback = campaign_feedback.pop(str(output_path.resolve()), retry_feedback)
 
@@ -181,9 +238,15 @@ class FileTranslationPipeline:
                     stats=result.stats,
                     retry_feedback=retry_feedback,
                     retry_count=retry_count,
-                    model_id_override=_llm_model_override,
+                    model_id_override=_llm_model_override or _model_id_pin,
                     tm_write_buffer=_tm_write_buffer,
                 )
+                # Persist only a digest in the in-memory result.  Campaign
+                # orchestration uses it to avoid repeatedly paying for an
+                # LLM candidate that has already failed the same gates.
+                result.candidate_sha256[target_lang] = hashlib.sha256(
+                    translated_content.encode("utf-8")
+                ).hexdigest()
 
                 # Pre-write validation (if enabled)
                 if should_validate and engine.validation_suite and engine.decision_engine:
@@ -245,18 +308,37 @@ class FileTranslationPipeline:
                         result.validation_result = validation_result
 
                         # Check frontmatter language
+                        # TC-APT-090: pass the SOURCE so a short frontmatter residue can be
+                        # judged by comparison instead of by a language verdict it cannot
+                        # support. Without this the guard falls back to language detection
+                        # and reproduces the false positives (cs read as sl, it as ca).
                         _fm_issues = engine._check_frontmatter_language(
-                            translated_content, target_lang
+                            translated_content, target_lang, source_content=content
                         )
                         validation_result.issues.extend(_fm_issues)
+                        # TC-APT-112: see engine._check_frontmatter_glued_identifiers
+                        # docstring -- the suite above never sees frontmatter text.
+                        validation_result.issues.extend(
+                            engine._check_frontmatter_glued_identifiers(
+                                translated_content, source_content=content
+                            )
+                        )
 
                         # Make decision
+                        # VA-01: pass this call's actual per-attempt budget
+                        # (which may be tighter than the engine's own static
+                        # config, e.g. an LLM-escalation phase's
+                        # retry_budget_override=0) so Rule 4/5 arbitrate
+                        # against the same number this loop enforces below,
+                        # instead of exhausting silently and unconditionally
+                        # rejecting a WARNING-only result Rule 5 would accept.
                         decision_result = engine.decision_engine.make_decision(
                             validation_result=validation_result,
                             retry_count=retry_count,
                             source=source_body,
                             site_id=site_id,
                             target_lang=target_lang,
+                            effective_max_retries=max_retry_attempts,
                         )
 
                         final_decision = decision_result
@@ -368,16 +450,27 @@ class FileTranslationPipeline:
                                             )
                                         )
                                         result.validation_result = validation_result
+                                        # TC-APT-090: see the note on the first call site.
                                         _fm_issues = engine._check_frontmatter_language(
-                                            translated_content, target_lang
+                                            translated_content,
+                                            target_lang,
+                                            source_content=content,
                                         )
                                         validation_result.issues.extend(_fm_issues)
+                                        # TC-APT-112: see the note on the first call site.
+                                        validation_result.issues.extend(
+                                            engine._check_frontmatter_glued_identifiers(
+                                                translated_content, source_content=content
+                                            )
+                                        )
+                                        # VA-01: see the note on the first call site.
                                         decision_result = engine.decision_engine.make_decision(
                                             validation_result=validation_result,
                                             retry_count=retry_count,
                                             source=source_body,
                                             site_id=site_id,
                                             target_lang=target_lang,
+                                            effective_max_retries=max_retry_attempts,
                                         )
                                         final_decision = decision_result
                                         final_validation_result = validation_result
@@ -403,64 +496,26 @@ class FileTranslationPipeline:
 
                         # After correction attempt, re-check decision
                         if decision_result.decision == PostValidationDecision.REJECT:
-                            # BUG-022-FIX: MT backends (NLLB, m2m100) cannot improve on rejection
-                            # with feedback. For non-critical rejections (terminology, completeness,
-                            # language consistency) accept best-effort — write gates (unconditional,
-                            # gates 9-17) provide adequate quality protection. Critical failures
-                            # (placeholder corruption, code blocks, shortcodes, links, structure)
-                            # still hard-reject. LLM backends can benefit from correction, so they
-                            # retain the original reject behaviour. Pattern matches BUG-010 / TC-RETRY-FIX-018.
-                            _model_used_rej = getattr(result.stats, "model_used", "") or ""
-                            _is_llm_rej = "llm" in _model_used_rej.lower()
-                            if not _is_llm_rej:
-                                _critical_rej = (
-                                    engine.decision_engine._check_critical_failure(
-                                        validation_result
-                                    )
-                                    if validation_result is not None
-                                    and hasattr(engine, "decision_engine")
-                                    and engine.decision_engine is not None
-                                    else None
-                                )
-                                if _critical_rej:
-                                    logger.warning(
-                                        f"MT backend ({_model_used_rej or 'tm/passthrough'}) CRITICAL reject "
-                                        f"({_critical_rej}) — hard-rejecting {file_path} to {target_lang}"
-                                    )
-                                    raise TranslationRejectedError(
-                                        message=f"Translation rejected: {decision_result.decision_reason}",
-                                        file_path=str(file_path),
-                                        validation_result=validation_result,
-                                        rejection_reason=decision_result.decision_reason,
-                                    )
-                                else:
-                                    # Non-critical REJECT: accept best-effort, fall through to write.
-                                    _issue_summary_rej = "; ".join(
-                                        f"{getattr(iss, 'validator', '?')}: "
-                                        f"{str(getattr(iss, 'message', ''))[:60]}"
-                                        for iss in (
-                                            validation_result.issues if validation_result else []
-                                        )
-                                    )
-                                    logger.info(
-                                        f"MT backend ({_model_used_rej or 'tm/passthrough'}): non-critical REJECT, "
-                                        f"accepting best-effort for {file_path} to {target_lang}. "
-                                        f"Issues: [{_issue_summary_rej}]"
-                                    )
-                                    # (fall through to ACCEPT path below — no raise)
-                            else:
-                                raise TranslationRejectedError(
-                                    message=f"Translation rejected: {decision_result.decision_reason}",
-                                    file_path=str(file_path),
-                                    validation_result=validation_result,
-                                    rejection_reason=decision_result.decision_reason,
-                                )
+                            # VA-02 (TC-APT-105 audit): honor decision_engine's own
+                            # REJECT verdict uniformly for every backend. BUG-022's
+                            # original fix (below, removed) special-cased MT backends
+                            # to silently downgrade a non-critical REJECT to
+                            # accept-best-effort -- regardless of the operator's own
+                            # accept_after_max_retries policy setting, which this
+                            # engine already has and Rule 5 already arbitrates by.
+                            # A REJECT reaching this point means Rule 1/2 (critical/
+                            # error-count) or Rule 5 (accept_after_max_retries=False,
+                            # non-critical) already declined best-effort acceptance --
+                            # file_pipeline.py must not maintain its own competing,
+                            # policy-blind copy of that decision.
+                            raise TranslationRejectedError(
+                                message=f"Translation rejected: {decision_result.decision_reason}",
+                                file_path=str(file_path),
+                                validation_result=validation_result,
+                                rejection_reason=decision_result.decision_reason,
+                            )
 
                     elif decision_result.decision == PostValidationDecision.RETRY:
-                        # TC-RETRY-FIX-018: MT backends produce identical output on retry.
-                        # Split by severity: critical issues still reject; non-critical → accept best-effort.
-                        # This aligns with accept_after_max_retries=True semantics (skip futile retries).
-                        # LLM backends (professionalize_llm) CAN improve on retry — leave their path unchanged.
                         # BUG-019-FIX: model_used can be empty when all content is TM/passthrough (no model call).
                         # In that case _is_llm_backend=False; the old `if _model_used and ...` skipped the MT path.
                         # Drop _model_used from the guard — empty model_used is definitely not an LLM backend.
@@ -471,42 +526,53 @@ class FileTranslationPipeline:
                         _model_used = getattr(result.stats, "model_used", "") or ""
                         _is_llm_backend = "llm" in _model_used.lower()
                         if not _is_llm_backend:
-                            _critical = (
-                                engine.decision_engine._check_critical_failure(validation_result)
-                                if validation_result is not None
-                                and hasattr(engine, "decision_engine")
-                                and engine.decision_engine is not None
-                                else None
+                            # VA-02 (TC-APT-105 audit): MT backends (NLLB, m2m100)
+                            # produce identical output on retry -- they have no
+                            # feedback channel (only isinstance(mt_model,
+                            # LLMModelBackend) consumes retry_feedback text, see
+                            # segment_translator.py), so looping one through the
+                            # LLM retry path below would just burn its full retry
+                            # budget reproducing the same result before finally
+                            # reaching Rule 5. BUG-022's original fix avoided that
+                            # waste by re-deriving its own "is this critical" check
+                            # here and unconditionally accepting best-effort when
+                            # not critical -- silently ignoring the operator's own
+                            # accept_after_max_retries policy in the process.
+                            #
+                            # Instead of maintaining that separate, policy-blind
+                            # copy of Rule 5, ask the SAME decision engine what
+                            # Rule 5 says right now, by re-invoking make_decision()
+                            # with the budget pretend-exhausted at this exact
+                            # retry_count. This is authoritative (never a second,
+                            # competing implementation), respects
+                            # accept_after_max_retries correctly, and can only
+                            # return ACCEPT or REJECT -- never RETRY, since Rule 4
+                            # cannot fire once retry_count >= its own effective
+                            # budget.
+                            decision_result = engine.decision_engine.make_decision(
+                                validation_result=validation_result,
+                                retry_count=retry_count,
+                                source=source_body,
+                                site_id=site_id,
+                                target_lang=target_lang,
+                                effective_max_retries=retry_count,
                             )
-                            if _critical:
+                            final_decision = decision_result
+                            if decision_result.decision == PostValidationDecision.REJECT:
                                 logger.warning(
-                                    f"MT backend ({_model_used or 'tm/passthrough'}) CRITICAL validation failure "
-                                    f"({_critical}) — escalating to reject + retranslate queue "
-                                    f"for {file_path} to {target_lang}"
+                                    f"MT backend ({_model_used or 'tm/passthrough'}) cannot retry "
+                                    f"with feedback and Rule 5 declined best-effort for {file_path} "
+                                    f"to {target_lang}: {decision_result.decision_reason}"
                                 )
                                 raise TranslationRejectedError(
                                     message=f"MT backend cannot retry with feedback: {decision_result.decision_reason}",
                                     file_path=str(file_path),
                                     validation_result=validation_result,
-                                    rejection_reason=f"MT backend: critical issue ({_critical}) cannot be resolved by retrying",
+                                    rejection_reason=decision_result.decision_reason,
                                 )
-                            else:
-                                # Non-critical issues (terminology warnings, minor checks).
-                                # MT model cannot improve on retry. Accept best-effort.
-                                # Fall through to line 500 (ACCEPT) → write path runs normally.
-                                _issue_summary = "; ".join(
-                                    f"{getattr(iss, 'validator', '?')}: "
-                                    f"{str(getattr(iss, 'message', ''))[:60]}"
-                                    for iss in (
-                                        validation_result.issues if validation_result else []
-                                    )
-                                )
-                                logger.info(
-                                    f"MT backend ({_model_used or 'tm/passthrough'}): non-critical validation issues, "
-                                    f"accepting best-effort for {file_path} to {target_lang}. "
-                                    f"Issues: [{_issue_summary}]"
-                                )
-                                # (no break, no continue — fall through to ACCEPT path below)
+                            # else: ACCEPT -- fall through to the write path below,
+                            # matching accept_after_max_retries semantics exactly
+                            # as Rule 5 itself computed them, not a duplicate guess.
                         else:
                             # LLM backend: repeated feedback guard + retry with feedback
                             try:
@@ -863,6 +929,7 @@ class FileTranslationPipeline:
                             site_id=site_id,
                             model_fingerprint=str(
                                 _llm_model_override
+                                or _model_id_pin
                                 or getattr(engine, "model_id_override", "")
                                 or getattr(site_profile, "default_model", "")
                                 or ""
@@ -871,16 +938,45 @@ class FileTranslationPipeline:
                     except Exception as acceptance_error:
                         validation_passed = False
                         validation_error = str(acceptance_error)
+                        # ``accept_candidate_bytes`` deliberately returns
+                        # payload-free errors.  Retain its safe classification
+                        # for the campaign watchdog; otherwise a final-byte
+                        # rejection is misreported as generic ``pipeline``.
+                        _failed_gates = re.search(
+                            r"\bfailed_gates=([0-9,]+)", validation_error
+                        )
+                        if _failed_gates:
+                            result.rejection_gate_results = {
+                                int(gate_id): {"passed": False, "action": "acceptance_block"}
+                                for gate_id in _failed_gates.group(1).split(",")
+                                if gate_id
+                            }
+                        elif "write receipt" in validation_error and "gate_ids=" in validation_error:
+                            result.rejection_diagnostic_code = "TC-ACCEPTANCE-RECEIPT"
+                        else:
+                            result.rejection_diagnostic_code = "TC-ACCEPTANCE-ERROR"
                 else:
                     _accepted_candidate = None
 
                 # PHASE 2: WRITE (only if ALL validation passed)
                 if validation_passed:
                     try:
+                        if getattr(engine, "diagnostic_no_write", False) is True:
+                            # Exercise acceptance without creating content, receipts, or TM writes.
+                            _quarantine_diagnostic_candidate(
+                                engine, source_content=content, candidate=translated_content,
+                                output_path=output_path, target_lang=target_lang,
+                                retry_count=retry_count, error="diagnostic accepted candidate",
+                                validation_result=final_validation_result,
+                                retry_feedback=retry_feedback,
+                            )
+                            result.error = "DIAGNOSTIC_NO_WRITE_ACCEPTED"
+                            lang_result.error = result.error
+                            break
                         if getattr(engine, "validation_policy", "standard") == "zero-defect":
                             accepted = _accepted_candidate
                             engine._write_accepted_output(accepted, result.stats)
-                            result.acceptance_receipts[target_lang] = accepted.receipt()
+                            result.acceptance_receipts[target_lang] = accepted.receipt(result.stats)
                         else:
                             engine._write_output(
                                 translated_content, output_path, source_path, result.stats
@@ -911,6 +1007,13 @@ class FileTranslationPipeline:
                         lang_result.error = str(write_error)
                         break  # Exit retry loop
                 else:
+                    _quarantine_diagnostic_candidate(
+                        engine, source_content=content, candidate=translated_content,
+                        output_path=output_path, target_lang=target_lang,
+                        retry_count=retry_count, error=validation_error or "write blocked",
+                        validation_result=final_validation_result,
+                        retry_feedback=retry_feedback,
+                    )
                     logger.error(f"WRITE BLOCKED for {output_path.name}: {validation_error}")
                     result.success = False
                     result.error = validation_error
@@ -1079,6 +1182,12 @@ class FileTranslationPipeline:
                 result.stats.validation_failed = True
                 result.stats.validation_decision = "REJECT"
                 result.stats.quality_score = "FAIL"  # TC-H5
+                _quarantine_diagnostic_candidate(
+                    engine, source_content=content, candidate=translated_content,
+                    output_path=output_path, target_lang=target_lang,
+                    retry_count=retry_count, error=str(_rej_err),
+                    validation_result=_rej_err.validation_result, retry_feedback=retry_feedback,
+                )
                 try:
                     _rtq_add(output_path, target_lang)
                     logger.info(
@@ -1114,6 +1223,12 @@ class FileTranslationPipeline:
                     result.stats.validation_failed = True
                     result.stats.validation_decision = "REJECT"
                     result.stats.quality_score = "FAIL"
+                    _quarantine_diagnostic_candidate(
+                        engine, source_content=content, candidate=translated_content,
+                        output_path=output_paths_cache.get(target_lang, output_path), target_lang=target_lang,
+                        retry_count=retry_count, error=str(e), validation_result=e.validation_result,
+                        retry_feedback=retry_feedback,
+                    )
                     try:
                         _rtq_add(output_paths_cache.get(target_lang, output_path), target_lang)
                         logger.info(
@@ -1165,6 +1280,21 @@ class FileTranslationPipeline:
 
         # BM-08: Record retry metrics after retry loop completes
         lang_result.retry_count = retry_count
+        # RT-02: result.retry_attempts (read by campaign_runner.py's
+        # _failure_metadata() as `internal_retries=` in every failure ledger
+        # row) was previously set ONLY inside the success/accept branch
+        # above (~line 1039) -- on every rejection/failure exit (
+        # TranslationRejectedError, TranslationRetryableError exhausting its
+        # budget, an unexpected exception, OOM without a retry handler),
+        # `result.retry_attempts` was never assigned at all, so
+        # campaign_runner.py's getattr(result, "retry_attempts", 0) silently
+        # read the default 0 -- while this same line's `lang_result.retry_count`
+        # (and the "High retry overhead" log right below) correctly showed the
+        # real count. Confirmed live: a phase logging "3 retries in 94839.8ms"
+        # simultaneously recorded internal_retries=0 in the ledger for the
+        # identical attempt. Setting it here, unconditionally, after the loop
+        # exits by any path, makes both counters agree in every case.
+        result.retry_attempts = retry_count
         retry_duration_ms = (time.perf_counter() - retry_start_time) * 1000
         with engine._retry_metrics_lock:
             engine._retry_metrics["retry_attempts"].append(retry_count)

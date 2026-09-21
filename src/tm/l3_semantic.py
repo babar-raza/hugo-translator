@@ -12,6 +12,7 @@ Enhanced with:
 
 import json
 import logging
+import os
 import pickle
 import threading
 import time
@@ -50,9 +51,30 @@ class SemanticMatch:
         return asdict(self)
 
 
-def load_standalone_sentence_encoder(
-    model_name: str, use_gpu: bool = False
-) -> SentenceTransformer:
+def _cached_sentence_transformer_snapshot(model_name: str) -> Path | None:
+    """Resolve a cached Hugging Face snapshot without a network request."""
+    candidate = Path(model_name)
+    if candidate.is_dir():
+        return candidate.resolve()
+
+    from huggingface_hub import constants as hf_constants
+
+    cache_root = Path(os.environ.get("HF_HUB_CACHE", hf_constants.HF_HUB_CACHE))
+    repo_cache = cache_root / f"models--{model_name.replace('/', '--')}"
+    ref = repo_cache / "refs" / "main"
+    if ref.is_file():
+        snapshot = repo_cache / "snapshots" / ref.read_text(encoding="utf-8").strip()
+        if snapshot.is_dir():
+            return snapshot.resolve()
+    snapshots = repo_cache / "snapshots"
+    if snapshots.is_dir():
+        available = sorted(path for path in snapshots.iterdir() if path.is_dir())
+        if len(available) == 1:
+            return available[0].resolve()
+    return None
+
+
+def load_standalone_sentence_encoder(model_name: str, use_gpu: bool = False) -> SentenceTransformer:
     """Load a SentenceTransformer encoder without the rest of L3SemanticTM's
     setup (FAISS index, on-disk metadata, periodic-save machinery).
 
@@ -75,8 +97,20 @@ def load_standalone_sentence_encoder(
     which is an acceptable tradeoff for a per-file validation check (one
     call per translated document) versus the bulk-embedding workload L3's
     own GPU path is optimized for.
+
+    Professionalize-only campaigns set HF_HUB_OFFLINE and
+    TRANSFORMERS_OFFLINE to prevent hidden model downloads.  Passing an
+    identifier to SentenceTransformer can still resolve tokenizer metadata
+    remotely in the installed transformers version.  Resolve the immutable
+    cached snapshot first and retain ``local_files_only``.  A cache miss must
+    fail closed rather than download or hang in an unattended run.
     """
-    return SentenceTransformer(model_name, device="cuda" if use_gpu else "cpu")
+    cached_snapshot = _cached_sentence_transformer_snapshot(model_name)
+    return SentenceTransformer(
+        str(cached_snapshot) if cached_snapshot is not None else model_name,
+        device="cuda" if use_gpu else "cpu",
+        local_files_only=True,
+    )
 
 
 class L3SemanticTM:
@@ -570,6 +604,12 @@ class L3SemanticTM:
                     if len(matches) >= k:
                         break
 
+            # TC-APT-008: read-time lineage invalidation (reversible denylist)
+            from src.tm.lineage import filter_denied
+
+            matches, dropped = filter_denied(matches)
+            if dropped:
+                self._metrics["lineage_denied"] = self._metrics.get("lineage_denied", 0) + dropped
             # BM-08: Record cache hit/miss
             if matches:
                 self._metrics["cache_hits"] += 1
@@ -947,6 +987,21 @@ class L3SemanticTM:
             else:
                 self.metadata = []
 
+            # TM-02: rebuild entry_id -> position lookup from the loaded
+            # metadata. Without this, update_entry() can never find an entry
+            # that existed before this process started (it only sees
+            # positions recorded by add_entry() calls made in THIS session),
+            # so every reload silently disables in-place updates -- callers
+            # relying on "update if present, else add" (e.g. the TM
+            # improvement worker and TMIntentWriter.reconcile_l3()) would
+            # wrongly treat every on-disk entry as missing and append a
+            # duplicate vector for it via add_entry() instead of updating it.
+            self._entry_id_to_positions = {}
+            for position, entry in enumerate(self.metadata):
+                entry_id = entry.get("entry_id")
+                if entry_id is not None:
+                    self._entry_id_to_positions.setdefault(entry_id, []).append(position)
+
     def rebuild_index(self, entries: list[dict[str, Any]]) -> None:
         """
         Rebuild index from scratch with given entries.
@@ -1004,7 +1059,10 @@ class L3SemanticTM:
 
             logger.warning(
                 "L3 remove_entries: removing %d of %d entries, rebuilding index "
-                "(re-embeds %d survivors)", removed, len(self.metadata), len(survivors),
+                "(re-embeds %d survivors)",
+                removed,
+                len(self.metadata),
+                len(survivors),
             )
             self.rebuild_index(survivors)
             return removed

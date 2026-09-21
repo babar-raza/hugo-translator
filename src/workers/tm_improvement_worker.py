@@ -20,7 +20,7 @@ import signal
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +36,7 @@ from src.observability.worker_telemetry import (
 )
 from src.tm import TranslationMemory
 from src.tm.improvement_queue import ImprovementCandidate, ImprovementQueue
+from src.tm.intent_spool import TMIntentSpool
 from src.tm.l1_cache import L1Cache
 from src.tm.l2_persistent import L2PersistentTM
 from src.tm.normalization import hash_text
@@ -309,6 +310,14 @@ class TMImprovementWorker:
             from src.tm.l2_persistent import L2_DB_NAME
             _raw_cfg = self.config_service.get_config() if self.config_service else {}
             _l2_max_mb = _raw_cfg.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
+            _writer_cfg = _raw_cfg.get("tm_writer", {}) or {}
+            _intent_spool = (
+                TMIntentSpool(
+                    Path(_writer_cfg.get("intent_spool_path", self.config.tm_path / "intent_spool.sqlite3"))
+                )
+                if _writer_cfg.get("enabled", False)
+                else None
+            )
             l2_store = L2PersistentTM(db_path=self.config.tm_path / L2_DB_NAME, max_size_mb=_l2_max_mb)
 
             # Create L3 semantic store (optional)
@@ -327,6 +336,7 @@ class TMImprovementWorker:
                 l1_cache=l1_cache,
                 l2_persistent=l2_store,
                 l3_semantic=l3_store,
+                intent_spool=_intent_spool,
             )
 
             logger.info("Initialized TranslationMemory")
@@ -1177,7 +1187,7 @@ class TMImprovementWorker:
             # Store improved translation back to TM with force_update=True
             metadata = {
                 "improved_by": "tm_improvement_worker",
-                "improved_at": datetime.utcnow().isoformat(),
+                "improved_at": datetime.now(timezone.utc).isoformat(),
                 "previous_hash": previous_hash,
                 "previous_translation": candidate.translation,
                 "llm_provider": self.config.llm_provider,
@@ -1187,7 +1197,11 @@ class TMImprovementWorker:
             # Attempt in-place L3 metadata update first (avoids duplicate vectors).
             # The entry_id format matches translation_memory.py:218.
             l3_updated = False
-            if self.tm is not None and self.tm.l3 is not None:
+            if (
+                self.tm is not None
+                and self.tm.l3 is not None
+                and getattr(self.tm, "intent_spool", None) is None
+            ):
                 entry_id = (
                     f"{candidate.site_id}:{candidate.src_lang}:"
                     f"{candidate.tgt_lang}:{hash_text(candidate.text)}"

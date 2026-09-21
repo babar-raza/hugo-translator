@@ -103,7 +103,8 @@ class TestGateBrandTokenPresence:
         with caplog.at_level(logging.WARNING):
             result = gate.evaluate(tr, src, "ar", output_path)
 
-        assert result.passed is True  # warn-only
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block".
+        assert result.passed is False
         assert any("GATE33 BRAND TOKEN MISSING" in r.message for r in caplog.records)
 
     def test_aspose_absent_from_en_source_is_silent(self, caplog):
@@ -143,7 +144,8 @@ class TestGateBrandTokenPresence:
         with caplog.at_level(logging.WARNING):
             result = gate.evaluate(tr, src, "de", output_path)
 
-        assert result.passed is True  # warn-only
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block".
+        assert result.passed is False
         assert any("GATE33 BRAND TOKEN MISSING" in r.message for r in caplog.records)
 
     def test_seotitle_dropped_brand_token_is_flagged(self, caplog):
@@ -155,5 +157,6 @@ class TestGateBrandTokenPresence:
         with caplog.at_level(logging.WARNING):
             result = gate.evaluate(tr, src, "de", output_path)
 
-        assert result.passed is True  # warn-only
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block".
+        assert result.passed is False
         assert any("GATE33 BRAND TOKEN MISSING" in r.message for r in caplog.records)

@@ -125,6 +125,8 @@ class TestJudgeFidelity:
         assert verdict.score == 0.4
         assert verdict.verdict == "fail"
         assert mock_backend._provider.generate.call_count == 2
+        # TC-APT-094: one slot acquisition per chunk, not one for the whole call.
+        assert mock_backend._llm_slot.call_count == 2
         second_prompt = mock_backend._provider.generate.call_args_list[1].args[1]
         assert "# Three" in second_prompt
         assert "# Drei" in second_prompt
@@ -153,6 +155,9 @@ class TestJudgeFidelity:
         assert verdict.verdict == "pass"
         assert verdict.issues == []
         mock_backend.load.assert_called_once()
+        # TC-APT-094: each judge call must go through the cross-process LLM
+        # slot semaphore, not straight to the provider.
+        mock_backend._llm_slot.assert_called_once()
 
     @patch("src.model_runtime.llm_backend.LLMModelBackend")
     @patch("src.model_runtime.registry.ModelRegistry")

@@ -1,0 +1,45 @@
+taskcard: TC-APT-001
+title: Governance reconciliation
+mission: aspose-org-full-portfolio-translation-20260901
+executed_at: "2026-09-02"
+wake: 1
+status: DONE
+dispositions:
+  G-05:
+    finding: pilot plan-binding predates warn->block promotion (b25118d) + ~18 hardening commits; 30,325 receipts untrusted
+    checks:
+      - "git merge-base --is-ancestor 551724deb3dd0b59d522927e09c439d51f7dc104 HEAD -> IS ancestor (re-confirmed)"
+      - "pilot ledger data/campaigns/aspose-foss-25-locales-v1/ absent from hugo-translator, hugo-translator-fresh, hugo-translator-gitlab; bound worktree hugo-translator-pilot-zero-defect no longer exists; no aspose-foss-25-locales* dir on C: or D: GitHub trees"
+      - "content_head_at_binding 512a6e8d != content HEAD 338efbb6d37263a06c4d1baeaf609cb8b326025f"
+    decision: SUPERSEDED_UNRECONCILABLE_RECEIPTS_ABSENT
+    consequence: _revalidate_accepted_receipt cannot be re-run (no receipts on disk); all pilot outputs -> UNKNOWN_PROVENANCE, audited via plan 7.4 sampling in TC-APT-003
+    recorded_in: docs/runbooks/aspose-foss-zero-defect-plan-binding.yaml (mission_supersession block)
+  G-06:
+    finding: stale ungoverned slash command .claude/commands/translate-aspose-org.md -> .local/unified_translate.py (36 locales, standard policy)
+    actions:
+      - deprecation banner prepended to .claude/commands/translate-aspose-org.md (file is gitignored via .claude/; banner is on disk and visible in the skill listing)
+      - scheduled tasks enumerated: only HugoTranslatorGitlab-Orchestrator (Disabled) exists; its action is `python -m src.workers.worker_orchestrator` in hugo-translator-gitlab, NOT unified_translate.py -> no live scheduled reference
+      - repo references to unified_translate outside .local/: historical .supervisor/reports evidence + a docstring in scripts/quality/heal_english_headings.py:363 (comment only, no import/exec)
+    structural_guard: deferred to TC-APT-022 (same wake)
+  G-09:
+    finding: kb.aspose.org.yaml `frontmatter_translation:` block is not a SiteProfile field (Pydantic ignores it)
+    action: removed 21-line dead block; replacement comment left in place; the live `frontmatter:` map (22 fields) is authoritative
+    verification: ConfigService('config').get_site_profile('kb.aspose.org') loads; 22 frontmatter rules; no src/scripts/tests reference `frontmatter_translation`
+  G-10:
+    finding: websites.aspose.org.yaml lacked validation:/terminology: blocks (silent global fallback)
+    action: added explicit validation (mode normal, 5 validators mirroring docs.aspose.org) + terminology (BOTH, inherit_global true, custom_terms []); www.aspose.org left untouched (out of scope)
+    verification: profile loads; validation_mode=normal; terminology.inherit_global=True
+  G-15:
+    finding: 11 profile-excluded locale dirs still populated
+    decision: RESOLVED BY EVIDENCE (Hugo configs' verbatim locale-contract comment); EXCLUDED_BY_PROFILE rows never touched; preservation rule stands. No action.
+  G-20:
+    finding: README.md:442 documents deleted scripts/ops/reviewer_bridge.py
+    action: line replaced with removal note pointing at ClaudeReviewResult (TC-APT-012)
+  gate0_one_line_check_blog_config:
+    finding: configs/blog.aspose.org.yml uses `defaultContentLang: en` (line 87) where TOML sites use `defaultContentLanguage`
+    disposition: recorded as a content-repo config anomaly; not a scope discrepancy (25-locale set unaffected); no action by this mission (content repo config is outside hugo-translator; noted for the operator in the Gate 11 bundle)
+verification:
+  - "pytest tests/unit/config/ tests/unit/quality/test_aspose_org_multisite_unattended.py -> 80 passed"
+  - "yaml.safe_load(docs/runbooks/aspose-foss-zero-defect-plan-binding.yaml) -> OK"
+  - "ConfigService load of kb/websites/docs profiles -> OK (25 langs each)"
+acceptance: every G-05/G-06/G-09/G-10/G-15 (and folded G-20) item has a disposition on record -> MET

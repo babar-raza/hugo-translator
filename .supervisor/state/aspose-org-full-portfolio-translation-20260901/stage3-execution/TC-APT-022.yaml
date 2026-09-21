@@ -1,0 +1,20 @@
+taskcard: TC-APT-022
+title: Structurally retire the ungoverned execution path (G-06, root cause 2 in plan 5.1)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+design:
+  tracked_guard: src/utils/deprecated_execution_guard.py
+  override: HT_ALLOW_DEPRECATED_EXECUTION_PATH=<exact path name> (a bare "1" is rejected; one path's override never unlocks another)
+  refusal_exit_code: 2
+  guarded_scripts (gitignored .local/, guard inserted immediately after sys.path setup, before any engine import):
+    - .local/unified_translate.py            -> unified_translate
+    - .local/fast_translate_kb_direct.py     -> fast_translate_kb_direct
+    - .local/fast_translate_kb_shard.py      -> fast_translate_kb_shard
+    - .local/heal_missing_indexes_s3.py      -> heal_missing_indexes_s3
+  scheduled_tasks: only HugoTranslatorGitlab-Orchestrator exists (Disabled; runs src.workers.worker_orchestrator, not the shard script)
+  remaining_references: docstring mention in scripts/quality/heal_english_headings.py:363 (comment only)
+verification:
+  - "pytest tests/regression/test_deprecated_execution_paths_guarded.py -> 12 passed (incl. subprocess run of .local/unified_translate.py --dry-run -> exit 2, REFUSED, no model/TM output)"
+  - "manual: .venv/Scripts/python.exe .local/unified_translate.py --dry-run -> REFUSED ... exit=2"
+acceptance: attempting the deprecated path refuses to run; campaign_runner.py (zero-defect) is the only reachable translation path from this repo's scripts -> MET (SweepScheduler leg closed by TC-APT-030)

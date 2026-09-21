@@ -1,8 +1,89 @@
 """
 Placeholder management for protecting non-translatable content.
 """
+
 import difflib
 import re
+
+
+class PlaceholderMapIntegrityError(RuntimeError):
+    """Raised when a placeholder map is not safe to restore().
+
+    CU-02 (TC-APT-105/TC-APT-106 hardening): every `protect()`/`restore()`
+    pair must be scoped to one unit's own map -- maps must never be merged
+    or nested before a single `restore()` call. `restore()`'s substitution
+    is a sequential, non-atomic loop over `dict.items()`; if a stored
+    "original" value itself contains another placeholder token from the
+    same map, the outcome would silently depend on dict iteration order
+    instead of being well-defined. This is exactly the collision shape
+    behind the already-fixed TC-APT-106 (AST-reuse map keyed by re-derived
+    text) and TC-APT-105 (a container's combined translation duplicating a
+    protected leaf) bugs -- this exception exists so a future caller that
+    accidentally merges two independently-produced maps fails loudly in
+    tests, instead of shipping a silent duplicate/collision.
+    """
+
+
+# TC-APT-110 (2026-09-11): scripts that conventionally write with NO space
+# between adjacent words/foreign terms -- inserting a synthetic space for
+# these would itself be wrong, so the glued-word fix below never fires when
+# either boundary character falls in one of these ranges. Confirmed by the
+# real defect's own distribution: it only ever appeared in space-delimited
+# scripts (ar cs es fa hu nl pt uk); ja/ko/zh/th candidates on the same page,
+# same run, kept correct spacing around the identical Latin identifiers.
+_NO_SPACE_SCRIPT_RANGES = (
+    (0x3040, 0x30FF),  # Hiragana, Katakana
+    (0x3400, 0x4DBF),  # CJK Unified Ideographs Extension A
+    (0x4E00, 0x9FFF),  # CJK Unified Ideographs
+    (0xF900, 0xFAFF),  # CJK Compatibility Ideographs
+    (0x1100, 0x11FF),  # Hangul Jamo
+    (0xAC00, 0xD7A3),  # Hangul Syllables
+    (0x0E00, 0x0E7F),  # Thai
+    (0x0E80, 0x0EFF),  # Lao
+    (0x1000, 0x109F),  # Myanmar
+    (0x1780, 0x17FF),  # Khmer
+)
+
+
+def _is_no_space_script_char(ch: str) -> bool:
+    codepoint = ord(ch)
+    return any(lo <= codepoint <= hi for lo, hi in _NO_SPACE_SCRIPT_RANGES)
+
+
+def _needs_space_boundary(context_char: str, value_char: str) -> bool:
+    """True if a placeholder's restored value would butt directly against
+    `context_char` with zero separator, in a script where that is never a
+    legitimate construction (see `_NO_SPACE_SCRIPT_RANGES`).
+
+    Deliberately restricted to letter/digit-against-letter/digit: a
+    placeholder boundary against punctuation (parens, colons, quotes) is
+    common and legitimate (e.g. the documented Finnish case-suffix
+    "PLACEHOLDER_0:n" -- the colon is not alnum, so this returns False and
+    that behavior is unchanged).
+    """
+    if not context_char or not value_char:
+        return False
+    if not (context_char.isalnum() and value_char.isalnum()):
+        return False
+    if _is_no_space_script_char(context_char) or _is_no_space_script_char(value_char):
+        return False
+    return True
+
+
+def _boundary_spaces(match: re.Match, value: str) -> tuple[str, str]:
+    """Prefix/suffix space to re-insert when substituting `value` over
+    `match`'s span, per `_needs_space_boundary` on the REAL surrounding
+    characters of the string being scanned (TC-APT-110). Shared by every
+    restore pass that substitutes a placeholder-shaped token -- the model
+    can drop the boundary space around any of the token shapes (braced,
+    bare, fuzzy, brace-wrapped-value), not just the intact braced one."""
+    if not value:
+        return "", ""
+    s = match.string
+    start, end = match.span()
+    prefix = " " if start > 0 and _needs_space_boundary(s[start - 1], value[0]) else ""
+    suffix = " " if end < len(s) and _needs_space_boundary(s[end], value[-1]) else ""
+    return prefix, suffix
 
 
 class PlaceholderManager:
@@ -12,6 +93,11 @@ class PlaceholderManager:
         """Initialize placeholder manager."""
         self.placeholder_map: dict[str, str] = {}
         self.counter = 0
+        # TC-APT-011: token prefix actually in use. Normally the historical
+        # "PLACEHOLDER_" so output is byte-identical to previous runs; a nonce is added
+        # only when the text itself already contains a placeholder-shaped literal, which
+        # would otherwise make masking non-bijective and corrupt the source's own text.
+        self.token_prefix = "PLACEHOLDER_"
 
     def protect(self, text: str, patterns: list[str]) -> tuple[str, dict[str, str]]:
         """
@@ -26,6 +112,7 @@ class PlaceholderManager:
         """
         self.placeholder_map = {}
         self.counter = 0
+        self.token_prefix = self._collision_free_prefix(text)
         protected_text = text
 
         for pattern in patterns:
@@ -33,12 +120,52 @@ class PlaceholderManager:
 
         return protected_text, dict(self.placeholder_map)
 
+    @staticmethod
+    def _collision_free_prefix(text: str) -> str:
+        """Token prefix that cannot already occur in ``text`` (TC-APT-011).
+
+        Returns the historical ``PLACEHOLDER_`` unless the text already contains a
+        ``{PLACEHOLDER_<digits>}`` literal, in which case a short deterministic nonce is
+        appended until no collision remains.  Restoration is driven by the returned map, so
+        callers need no change.
+        """
+        import hashlib
+        import re as _re
+
+        base = "PLACEHOLDER_"
+        if not _re.search(r"\{" + base + r"\d+\}", text):
+            return base
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        for size in (6, 10, 16, 32):
+            candidate = f"PH{digest[:size]}_"
+            if not _re.search(r"\{" + candidate + r"\d+\}", text):
+                return candidate
+        return f"PH{digest}_"  # pragma: no cover - astronomically unlikely
+
     def _apply_pattern(self, text: str, pattern: str) -> str:
         """Apply a single protection pattern."""
 
         def replace_match(match: re.Match) -> str:
-            placeholder = f"{{PLACEHOLDER_{self.counter}}}"
-            self.placeholder_map[placeholder] = match.group(0)
+            value = match.group(0)
+            # TC-APT-105 audit (VA-06): a later pattern in this protect()
+            # call can match a span that already contains an earlier
+            # pattern's placeholder token -- e.g. preserve_patterns
+            # protects the bare identifier "GitHub" first, then the link
+            # pattern protects the whole "[{PLACEHOLDER_0} repository]
+            # (url)" as one match. Storing that match verbatim would leave
+            # this new placeholder's value containing another placeholder
+            # token, which restore() cannot safely unwind (see
+            # PlaceholderMapIntegrityError) and which previously surfaced
+            # only as that loud, blocking guard. Unpack any such nested
+            # token back to its original text before storing -- this new,
+            # larger match supersedes the earlier, now fully-covered one,
+            # so that entry is removed rather than left orphaned in the map.
+            for existing_token, existing_original in list(self.placeholder_map.items()):
+                if existing_token in value:
+                    value = value.replace(existing_token, existing_original)
+                    del self.placeholder_map[existing_token]
+            placeholder = f"{{{self.token_prefix}{self.counter}}}"
+            self.placeholder_map[placeholder] = value
             self.counter += 1
             return placeholder
 
@@ -47,6 +174,33 @@ class PlaceholderManager:
         except re.error:
             # If pattern is invalid, return text unchanged
             return text
+
+    @staticmethod
+    def _check_no_nested_placeholders(placeholder_map: dict[str, str]) -> None:
+        """Raise `PlaceholderMapIntegrityError` if any stored value in
+        `placeholder_map` contains another key from the SAME map as a
+        literal substring -- see that class's docstring for why this is an
+        integrity violation, not a coincidence worth tolerating.
+
+        Deliberately scoped to keys within THIS map only (not any
+        placeholder-shaped string in general): a legitimately-protected
+        value coincidentally looking like `{PLACEHOLDER_0}` text is not this
+        bug; a value containing a key that this very map also defines is.
+        """
+        if len(placeholder_map) < 2:
+            return
+        for key, value in placeholder_map.items():
+            for other_key in placeholder_map:
+                if other_key != key and other_key in value:
+                    raise PlaceholderMapIntegrityError(
+                        f"Placeholder map integrity violation: stored value "
+                        f"for {key!r} contains another placeholder token "
+                        f"{other_key!r} from the same map. This indicates "
+                        "two independently-produced placeholder maps were "
+                        "merged or nested before a single restore() call -- "
+                        "protect()/restore() pairs must stay scoped to one "
+                        "unit's own map (see TC-APT-105/TC-APT-106)."
+                    )
 
     def restore(self, text: str, placeholder_map: dict[str, str]) -> str:
         """
@@ -58,12 +212,40 @@ class PlaceholderManager:
 
         Returns:
             Text with placeholders restored
+
+        Raises:
+            PlaceholderMapIntegrityError: if `placeholder_map` is not safe to
+                restore (see that class's docstring) -- this never fires for
+                a map produced by a single `protect()` call on its own text,
+                only for a map a caller has incorrectly merged/nested.
         """
+        self._check_no_nested_placeholders(placeholder_map)
         restored = text
 
         # Exact replacements first
+        # TC-APT-110 (2026-09-11): the MT/LLM model can drop the space that
+        # preceded/followed a placeholder token during generation (confirmed
+        # directly: en "with {PLACEHOLDER_0}" -> pt "com{PLACEHOLDER_0}",
+        # braces intact, just the space gone) -- restoring naively then glues
+        # the restored value directly onto adjacent prose, e.g.
+        # "comWorkbook.save", a reader-facing garbled non-word. Found on
+        # cells/rust/getting-started/quickstart.md's frontmatter `description`
+        # field, 8/25 locales (ar cs es fa hu nl pt uk), because that field
+        # has no backtick delimiter around the protected identifier the way
+        # body markdown does -- nothing else was absorbing the lost space.
+        # Fixed generally here (not field-specific) via regex substitution so
+        # each match's real surrounding context (not the placeholder's
+        # position in the object generically) decides whether a space was
+        # actually lost, using match.string on the ORIGINAL text so context
+        # characters are the model's real output, not a previous iteration's
+        # partially-restored string.
         for placeholder, original in placeholder_map.items():
-            restored = restored.replace(placeholder, original)
+
+            def _restore_one(match: re.Match, _original: str = original) -> str:
+                prefix, suffix = _boundary_spaces(match, _original)
+                return f"{prefix}{_original}{suffix}"
+
+            restored = re.sub(re.escape(placeholder), _restore_one, restored)
 
         # HT-QUALITY-GATES-001 RC2: brace-stripped fallback. The MT model can drop
         # the `{`/`}` entirely around a placeholder while translating the
@@ -79,7 +261,11 @@ class PlaceholderManager:
         # leaked placeholder token is not.
         def bare_replace(match: re.Match) -> str:
             key = f"{{PLACEHOLDER_{match.group(1)}}}"
-            return placeholder_map.get(key, match.group(0))
+            value = placeholder_map.get(key)
+            if value is None:
+                return match.group(0)
+            prefix, suffix = _boundary_spaces(match, value)
+            return f"{prefix}{value}{suffix}"
 
         restored = re.sub(r"PLACEHOLDER_(\d+)", bare_replace, restored)
 
@@ -91,7 +277,11 @@ class PlaceholderManager:
             token = match.group(0)
             number = match.group(1)
             key = f"{{PLACEHOLDER_{number}}}"
-            return placeholder_map.get(key, token)
+            value = placeholder_map.get(key)
+            if value is None:
+                return token
+            prefix, suffix = _boundary_spaces(match, value)
+            return f"{prefix}{value}{suffix}"
 
         restored = re.sub(r"\{[^{}]*?(\d+)[^{}]*?\}", fuzzy_replace, restored)
 
@@ -100,7 +290,7 @@ class PlaceholderManager:
         # Pattern: { followed by ALL-CAPS/underscore only (no digit) followed by one or more }
         # This can only be a corrupted placeholder — valid translated content never looks like this.
         if placeholder_map:
-            restored = re.sub(r'\{[A-Z][A-Z_]*[A-Z]\}+', '', restored)
+            restored = re.sub(r"\{[A-Z][A-Z_]*[A-Z]\}+", "", restored)
 
         # Bare-brace-wrapped-correct-value cleanup (found 2026-07-22, live in
         # reference.aspose.org's cross_locale_dup remediation output on files
@@ -118,8 +308,13 @@ class PlaceholderManager:
         # wrapping an already-correct placeholder value.
         def _strip_wrapping_braces(text: str) -> str:
             for original in placeholder_map.values():
+
+                def _strip_one(match: re.Match, _original: str = original) -> str:
+                    prefix, suffix = _boundary_spaces(match, _original)
+                    return f"{prefix}{_original}{suffix}"
+
                 text = re.sub(
-                    r"\{\s*" + re.escape(original) + r"\s*\}", original, text
+                    r"\{\s*" + re.escape(original) + r"\s*\}", _strip_one, text
                 )
             return text
 

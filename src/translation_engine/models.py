@@ -44,6 +44,7 @@ class TranslationStats:
     l1_hits: int = 0  # L1 cache hits
     l2_hits: int = 0  # L2 persistent hits
     l3_hits: int = 0  # L3 semantic hits
+    tm_miss_reasons: dict[str, int] = field(default_factory=dict)
     translated_segments: int = 0  # New translations via model
     skipped_segments: int = 0  # Skipped (excluded by rules)
     duration_seconds: float = 0.0
@@ -93,6 +94,11 @@ class TranslationStats:
     ast_units_protected: int = 0  # TextUnits marked as do_not_translate
     ast_batch_calls: int = 0  # Number of batch translation calls
     ast_individual_fallbacks: int = 0  # Number of fallbacks to individual translation
+    # Provider calls made through the governed Professionalize backend.  This
+    # is deliberately distinct from ast_batch_calls: AST can use a local MT
+    # backend, while a Professionalize attempt can include context-aware
+    # single-unit calls as well as native list batches.
+    professionalize_calls: int = 0
     ast_missing_nodes: int = (
         0  # TC-MLD-01: AST nodes with no matching TextUnit (source-text leakage risk)
     )
@@ -123,6 +129,20 @@ class TranslationStats:
     multiline_segments: int = 0  # Multiline segments translated
     multiline_lines: int = 0  # Translatable multiline lines
     multiline_backend_calls: int = 0  # Backend calls for multiline batching
+
+    # HT-QUALITY-GATES-001 RC2 (follow-up to TC-APT-042/TC-APT-106): frontmatter
+    # keys a downstream AST-side repair pass (_repair_cross_field_frontmatter_
+    # residuals) legitimately re-translated, mapped to the actual accepted
+    # rendered value(s) -- read from doc.frontmatter via the same accessor the
+    # placement-consistency check uses. translate_to_language's stale legacy-
+    # segment snapshot (_fm_expected_by_key) never sees this repair (it mutates
+    # the separate AST translated_units, not the legacy segments/translations
+    # dict), so without this the check compares a genuinely-fixed value against
+    # a pre-repair expectation and raises a false-positive
+    # frontmatter_segment_not_applied. Reset at the start of each
+    # _translate_body_ast() call -- it must never leak across retry attempts of
+    # the same file+language, since `stats` is reused across the retry loop.
+    fm_repair_overrides: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def tm_hit_rate(self) -> float:
@@ -200,6 +220,14 @@ class TranslationResult:
     # Metadata-only gate outcomes for rejected candidates. Error strings are
     # intentionally excluded because they may contain candidate fragments.
     rejection_gate_results: dict[int, dict[str, Any]] = field(default_factory=dict)
+    # Safe, stable diagnostic code for a final-byte acceptance failure that is
+    # not attributable to a numbered write gate.  This never contains
+    # candidate-derived content.
+    rejection_diagnostic_code: str = ""
+    # Candidate hashes are transient, metadata-only diagnostics for retry
+    # deduplication.  Candidate bytes never leave the file pipeline on a
+    # rejected run.
+    candidate_sha256: dict[str, str] = field(default_factory=dict)
 
     def __str__(self) -> str:
         """Human-readable summary."""
@@ -270,9 +298,9 @@ class AcceptedTranslation:
         """Return the accepted UTF-8 payload as text."""
         return self.content.decode("utf-8")
 
-    def receipt(self) -> dict[str, Any]:
+    def receipt(self, stats: "TranslationStats | None" = None) -> dict[str, Any]:
         """Return a JSON-serializable acceptance receipt without content."""
-        return {
+        receipt = {
             "campaign_id": self.campaign_id,
             "source_path": str(self.source_path),
             "output_path": str(self.output_path),
@@ -284,6 +312,24 @@ class AcceptedTranslation:
             "model_fingerprint": self.model_fingerprint,
             "gate_results": self.gate_results,
         }
+        # Receipts are written before the campaign runner regains control, so
+        # bind fast-path and AST facts here rather than trying to reconstruct
+        # them later from mutable process counters.  Keep every field numeric
+        # so JSONL summaries can safely aggregate old and new receipts.
+        if stats is not None:
+            receipt["translation_stats"] = {
+                "i18n_hits": int(stats.i18n_hits),
+                "tm_hits": int(stats.tm_hits),
+                "l1_hits": int(stats.l1_hits),
+                "l2_hits": int(stats.l2_hits),
+                "semantic_tm_hits": int(stats.l3_hits),
+                "professionalize_calls": int(stats.professionalize_calls),
+                "ast_batches": int(stats.ast_batch_calls),
+                "individual_fallback_batches": int(stats.ast_individual_fallbacks),
+                "validation_retries": int(stats.validation_retried),
+                "tm_miss_reasons": dict(stats.tm_miss_reasons),
+            }
+        return receipt
 
 
 @dataclass
@@ -314,6 +360,8 @@ class DirectoryResult:
             agg.l1_hits += result.stats.l1_hits
             agg.l2_hits += result.stats.l2_hits
             agg.l3_hits += result.stats.l3_hits
+            for reason, count in result.stats.tm_miss_reasons.items():
+                agg.tm_miss_reasons[reason] = agg.tm_miss_reasons.get(reason, 0) + int(count)
             agg.translated_segments += result.stats.translated_segments
             agg.skipped_segments += result.stats.skipped_segments
             agg.words_translated += result.stats.words_translated
@@ -340,6 +388,7 @@ class DirectoryResult:
             agg.ast_units_protected += result.stats.ast_units_protected
             agg.ast_batch_calls += result.stats.ast_batch_calls
             agg.ast_individual_fallbacks += result.stats.ast_individual_fallbacks
+            agg.professionalize_calls += result.stats.professionalize_calls
             agg.ast_missing_nodes += result.stats.ast_missing_nodes
             agg.llm_units_translated += result.stats.llm_units_translated
 

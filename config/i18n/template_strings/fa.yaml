@@ -133,6 +133,18 @@ translations:
     reviewed_at: '2026-07-25'
     evidence_count: 715
     corpus_agreement: override
+  table.header.component:
+    value: مؤلفه
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 7
+    corpus_agreement: agree
+  table.header.role:
+    value: نقش
+    reviewed_by: agent:aspose-org-full-portfolio-translation-20260901
+    reviewed_at: '2026-09-12'
+    evidence_count: 58
+    corpus_agreement: agree
     rejected_variants:
     - Example
   table.header.enumeration:
@@ -257,3 +269,15 @@ translations:
       برنامه {platform} قابل دسترسی هستند.
     - تمام اعضای عمومی پس از نصب بسته Aspose.{family} FOSS for {platform} برای هر
       برنامه {platform} در دسترس هستند.
+  table.header.issue:
+    value: مشکل
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.header.cause:
+    value: علت
+    reviewed_by: agent:interactive-continue-20260910/TC-APT-108-table-header-fix
+    reviewed_at: '2026-09-10'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence

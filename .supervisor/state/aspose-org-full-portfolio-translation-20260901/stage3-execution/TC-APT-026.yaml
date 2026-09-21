@@ -1,0 +1,15 @@
+taskcard: TC-APT-026
+title: Register this mission in the content repo's own governance
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+procedure:
+  - "mission_authority.py status --json + list (read-only): MT058-2026-08-31-STALE-GUARD-WINDOW-IDENTITY-ENCODING is the root MISSION_AUTHORITY.yaml projection (status open, mission_locked false); a pending override token 20260831-135316-MISSION_AUTHORITY-yaml belongs to another live session (MT059 bind)"
+  - "allocate --track main --slug ASPOSE-ORG-FULL-PORTFOLIO-TRANSLATION -> MT062-2026-09-02-ASPOSE-ORG-FULL-PORTFOLIO-TRANSLATION (collision-safe ledger allocation, session id recorded)"
+  - "root file NOT overwritten: although MT058 is not locked, a concurrent session holds a pending edit token on MISSION_AUTHORITY.yaml; overwriting it would clobber another session's in-flight work (plan 19.2 / HARDEN-A2). Registered instead via the script's durable archive path (archive_mission(status=open)) per the GOV-02 retroactive-registration rule: reports/plan_state/MT062-2026-09-02-ASPOSE-ORG-FULL-PORTFOLIO-TRANSLATION/mission_authority.yaml"
+  - "contract fields transcribed from the approved plan (mission_summary, governing_plan_path, in_scope_outcomes, out_of_scope_items, mandatory_acceptance_criteria, mission_locked true) + external_mission_id, registered_by_session, registration_mode"
+  - "validate_mission_authority(contract) -> no errors"
+verification:
+  - "mission_authority.py list -> '[  open] MT062-2026-09-02-ASPOSE-ORG-FULL-PORTFOLIO-TRANSLATION - Autonomous /loop mission ...'"
+commit: "none - reports/ is the content repo's strict local-only boundary; the archive is the durable record the CLI reads; no hook reads registration"
+acceptance: "mission_authority.py list shows this mission; recorded in evidence -> MET"

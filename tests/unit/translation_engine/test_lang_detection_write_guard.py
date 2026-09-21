@@ -78,6 +78,36 @@ class TestLatinTechnicalFrontmatter:
         assert issues[0].details["detected_lang"] == "en"
 
 
+class TestShortSignalFrontmatterExemption:
+    """TC-APT-040: bare `_index.md` titles like "Aspose.X FOSS for Y" strip down
+    to a 1-3 char connector word after governed technical tokens are removed,
+    which used to fall through to raw-text detection and hard-fail every
+    language 100% of the time regardless of actual translation (confirmed on
+    blog.aspose.org/note/python/_index.md, 25/25 languages). Below the 6-alpha-
+    char signal floor there is too little independent prose to make any
+    reliable determination, so the check must skip instead of misreport.
+    """
+
+    def test_bare_index_title_below_signal_floor_skips_validation(self):
+        content = "---\ntitle: 'Aspose.Note FOSS for Python'\n---\n"
+
+        for lang in ("fr", "es", "de", "ja"):
+            assert _make_engine()._check_frontmatter_language(content, lang) == []
+
+    def test_introducing_prefixed_title_above_floor_still_flags_untranslated(self):
+        """The exemption must be narrow: titles with enough real prose (e.g. the
+        "Introducing" prefix supplies 11 signal chars) must still correctly
+        catch genuinely untranslated English -- this is not a blanket disable.
+        """
+        content = "---\ntitle: 'Introducing Aspose.Words FOSS for .NET'\n---\n"
+
+        issues = _make_engine()._check_frontmatter_language(content, "fr")
+
+        assert len(issues) == 1
+        assert issues[0].validator == "FrontmatterLanguageCheck"
+        assert issues[0].details["detected_lang"] == "en"
+
+
 class TestDetectorNoneBlocksWrite:
     """When _get_language_detector() returns None, writes must be blocked."""
 

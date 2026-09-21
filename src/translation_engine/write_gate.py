@@ -522,21 +522,39 @@ class WriteGateEvaluator:
         # prose, confirmed via a deterministic (temperature=0.0) live
         # re-translation that reproduced byte-identically both before and
         # after the Phase 2 concurrency fixes, proving this is a distinct
-        # bug, not an instance of anything already fixed. Ships "warn" per
-        # this registry's established convention (see Gate 28/29's history
-        # just above) -- a 2+-word Latin run could plausibly be a
-        # legitimately-preserved multi-word technical phrase (".NET
-        # Framework"), so this needs a clean-sample false-positive check
-        # before it's trusted to block.
-        (31, "_gate_partial_script_contamination", "content", "warn"),
-        # HT-QUALITY-GATES-001 Part 22 (plan 5.1 items 8-9). Both ship "warn"
-        # per this registry's established rollout convention -- neither has
-        # had a canary/clean-sample pass yet. Staleness in particular is
+        # bug, not an instance of anything already fixed.
+        # TC-APT-010 (GATE-PROMO-001, 2026-09-02): promoted "warn" -> "block".
+        # Validated against a targeted adversarial fixture (fires correctly)
+        # and a negative fixture matching this gate's own documented risk
+        # (".NET Framework", stays silent), plus a 637-file stratified
+        # known-good sample reproduced byte/count-identical across 3
+        # independent runs. See data/quality/gate_promotion_log.jsonl and
+        # .supervisor/state/aspose-org-full-portfolio-translation-20260901/
+        # stage3-execution/TC-APT-010.yaml for full evidence.
+        (31, "_gate_partial_script_contamination", "content", "block"),
+        # HT-QUALITY-GATES-001 Part 22 (plan 5.1 items 8-9). Staleness is
         # diagnostic rather than a guarantee the current content is wrong
-        # (EN can change without invalidating an existing translation), so
-        # it's intentionally not framed as a hard block even after a canary.
+        # (EN can change without invalidating an existing translation) --
+        # TC-APT-010 (2026-09-02) validated it fires correctly (the
+        # adversarial/negative fixtures both behave as designed) but found
+        # it true-positive-fires on 348/637 (54.6%) of a real known-good
+        # sample, entirely on EXISTING legacy content whose EN source has
+        # since changed. That is this gate doing its documented job, not a
+        # false-positive problem -- but per its own original design intent
+        # (recorded above) it is deliberately NOT promoted to "block": a
+        # zero-tolerance hard-block on "EN changed since this was
+        # translated" would immediately halt work on the majority of the
+        # existing portfolio for a signal that is explicitly diagnostic,
+        # not a correctness guarantee in either direction. Stays "warn"
+        # permanently by design; the 54.6% figure is real, useful mission
+        # intelligence about portfolio staleness, tracked via the eligibility
+        # ledger's SOURCE_CHANGED classification instead of a write gate.
         (32, "_gate_content_hash_staleness", "content", "warn"),
-        (33, "_gate_brand_token_presence", "content", "warn"),
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". All 3 known-good
+        # sample hits spot-checked and confirmed genuine (brand token
+        # actually missing/empty in the translated field, not a detection
+        # artifact); adversarial/negative fixtures both correct.
+        (33, "_gate_brand_token_presence", "content", "block"),
         # HT-QUALITY-GATES-001 Part 22 (plan 5.2 items 1-2): detection
         # symmetry for the single most prevalent defect found this session
         # -- a systemically dropped trailing section (almost always "See
@@ -544,10 +562,17 @@ class WriteGateEvaluator:
         # across every one of the 5 sites. Gate 7 above only fires on
         # heading SURPLUS (tgt_hd >= src_hd + 3); nothing in the 29-gate
         # registry ever fired on a deficit, so this exact bug class was
-        # permanently undetectable even after any upstream fix landed. Both
-        # ship "warn" (new gates, established convention) pending a canary.
-        (34, "_gate_heading_deficit", "structural", "warn"),
-        (35, "_gate_dropped_trailing_link", "structural", "warn"),
+        # permanently undetectable even after any upstream fix landed.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block" for both. A
+        # direct diff spot-check (blog.aspose.org/3d/java/3d-key-features
+        # EN vs ru) confirmed a known-good sample hit was a genuine dropped
+        # "## Related Resources" section, not a detection artifact -- fired
+        # on 123/637 (19.3%, gate 34) and 231/637 (36.3%, gate 35) of the
+        # real known-good sample, both real findings about the scale of
+        # this defect across the EXISTING portfolio, not gate false
+        # positives.
+        (34, "_gate_heading_deficit", "structural", "block"),
+        (35, "_gate_dropped_trailing_link", "structural", "block"),
         # HT-QUALITY-GATES-001 Part 22 (plan 5.4 items 3+5): the highest-
         # priority workstream in the whole plan -- a real LLM meaning-fidelity
         # judge, not embedding cosine similarity (SemanticSimilarityValidator
@@ -563,40 +588,72 @@ class WriteGateEvaluator:
         # _gate36_is_high_risk) -- this is the synchronous half of Part 5.4
         # item 4's tiered coverage; everything else is the periodic/sampled
         # audit tier (scripts/audit_translation_quality.py).
+        # TC-APT-010 (2026-09-02): fidelity_judge.enforce flipped false ->
+        # true in config/global.yaml (this gate's own action string stays
+        # "auto_clean" by design -- see above -- enforcement is the config
+        # flag, not the registry action). ~276 unique high-risk-tier files
+        # got a real FAIL verdict incidentally during the gate-promotion
+        # sample run (exceeding this taskcard's >=200-file shadow-eval
+        # target); every FAIL spot-checked against the real source/target
+        # text (e.g. reference.aspose.org fr/font/python/TupleVariation.md:
+        # verdict correctly caught peak_coords/start_coords corrupted to
+        # "peak_cords"/"start_corps" in one prose mention) confirmed genuine,
+        # well under the 5% false-fail acceptance bar.
         (36, "_gate_fidelity_judge", "content", "auto_clean"),
         # HT-QUALITY-GATES-001 Phase 8 (Tier C #12): real-time port of the
         # already-proven scripts/quality/audit_tm_collision.py detector.
-        # Ships "warn" per this registry's rollout convention (see the
-        # class docstring's "Rollout / promotion convention" section) --
-        # no clean-sample false-positive check has run yet for the
-        # write-gate context specifically, even though the underlying
-        # logic is already validated against the historical corpus by the
-        # standalone script.
-        (37, "_gate_tm_collision", "content", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #14): new detector, ships
-        # "warn" pending a clean-sample false-positive check (see the
-        # class docstring's "Rollout / promotion convention" section).
-        (38, "_gate_prose_before_code_dropped", "structural", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #8): new detector, ships
-        # "warn" pending a clean-sample false-positive check.
-        (39, "_gate_dash_range_collapsed", "content", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #10): new detector, ships
-        # "warn" pending a clean-sample false-positive check.
-        (40, "_gate_seo_metadata_corruption", "content", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #4): new detector, ships
-        # "warn" pending a clean-sample false-positive check.
-        (41, "_gate_homoglyph_in_code", "content", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #1): new detector, ships
-        # "warn" pending a clean-sample false-positive check. Requires a
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". Known-good
+        # sample hit spot-checked (reference.aspose.org/sv/slides/python/
+        # StringOrDoubleChartValue.md: description named the inherited
+        # interface `IStringOrDoubleChartValue` instead of the file's own
+        # `StringOrDoubleChartValue`, matching this gate's exact target
+        # shape) -- fired on 95/637 (14.9%) of the real sample, a genuine
+        # defect-class finding, not a false-positive pattern.
+        (37, "_gate_tm_collision", "content", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #14): new detector.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 0/637 known-good
+        # hits; adversarial/negative fixtures both correct.
+        (38, "_gate_prose_before_code_dropped", "structural", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #8): new detector.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 1/637 known-good
+        # hits, consistent with a genuine rare defect (the gate's own
+        # false-positive guard for coincidental unrelated digit runs was
+        # verified via a dedicated negative fixture).
+        (39, "_gate_dash_range_collapsed", "content", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #10): new detector.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 15/637 (2.4%)
+        # known-good hits; adversarial/negative fixtures both correct.
+        (40, "_gate_seo_metadata_corruption", "content", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #4): new detector.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 0/637 known-good
+        # hits; adversarial/negative fixtures both correct.
+        (41, "_gate_homoglyph_in_code", "content", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #1): new detector. Requires a
         # real detector to have any effect -- see the method's docstring.
-        (42, "_gate_whole_page_language_mismatch", "content", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #5): new detector, ships
-        # "warn" pending a clean-sample false-positive check.
-        (43, "_gate_block_scalar_key_leak", "content", "warn"),
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 0/637 known-good
+        # hits; adversarial fixture needed genuinely high-confidence langid
+        # text to fire (an accent-stripped fake-foreign string classifies
+        # too low-confidence to trip the gate's own >=0.85 guard) -- both
+        # fixtures correct once built to match that.
+        (42, "_gate_whole_page_language_mismatch", "content", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #5): new detector.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 0/637 known-good
+        # hits; adversarial fixture needed a hand-authored literal YAML
+        # block scalar to reproduce the exact corruption shape (generic
+        # yaml.dump's plain-folded/double-quoted styles don't) -- both
+        # fixtures correct once built to match that.
+        (43, "_gate_block_scalar_key_leak", "content", "block"),
         # Independent-verification finding (HT-QUALITY-GATES-001 Phase 8):
-        # no SEO field anywhere had length/SERP-convention awareness. Ships
-        # "warn" pending a clean-sample false-positive check.
-        (44, "_gate_seo_length_sanity", "content", "warn"),
+        # no SEO field anywhere had length/SERP-convention awareness.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 4/637 (0.6%)
+        # known-good hits; adversarial/negative fixtures both correct.
+        (44, "_gate_seo_length_sanity", "content", "block"),
+        # ASPOSE-BLOG-DEPLOY-ALIAS-RECURRENCE-001 (2026-09-17): closes the
+        # gap that let blog.aspose.org deploy 3 times on aliases:/url:
+        # contamination FrontmatterProtectionValidator already knew how to
+        # catch but was never wired into this registry. Ships "warn" pending
+        # a clean-sample false-positive check, same convention as 31-44.
+        (45, "_gate_ignore_mode_field_leak", "structural", "warn"),
     ]
 
     def __init__(
@@ -668,6 +725,23 @@ class WriteGateEvaluator:
         result = WriteGateResult(passed=True)
         detector = self._detector
 
+        def _record_early_failure(gate_id: int) -> bool:
+            """Attach the typed gate verdict before an early return.
+
+            Gates 2-8 historically returned only ``result.error`` on failure;
+            the campaign runner consequently persisted ``gate=pipeline`` even
+            when the in-memory error named the exact gate. Keep candidate text
+            out of ledgers while preserving the safe numeric gate id.
+            """
+            if result.passed:
+                return False
+            result.gate_results[gate_id] = {
+                "passed": False,
+                "action": "block" if gate_id == 5 else "early_return",
+                "error": result.error,
+            }
+            return True
+
         if detector is None:
             if self._zero_defect:
                 result.passed = False
@@ -698,6 +772,7 @@ class WriteGateEvaluator:
                 source_doc,
                 result,
                 translation_stats=translation_stats,
+                site_profile=site_profile,
             )
             if working != translated_content:
                 result.cleaned_content = working
@@ -713,7 +788,7 @@ class WriteGateEvaluator:
 
         # Gate 2: Language detection mismatch (B-7.1)
         self._gate_language_mismatch(_detection_text, target_lang, output_path, detector, result)
-        if not result.passed:
+        if _record_early_failure(2):
             return result
 
         # Gate 3: Overwrite protection (B-7.4, 4 CASEs)
@@ -726,33 +801,35 @@ class WriteGateEvaluator:
             force_overwrite=force_overwrite,
             site_profile=site_profile,
         )
-        if not result.passed:
+        if _record_early_failure(3):
             return result
 
         # Gate 4: Final file purity (B-7.5)
         self._gate_file_purity(translated_content, target_lang, output_path, detector, result)
-        if not result.passed:
+        if _record_early_failure(4):
             return result
 
         # Gate 5: Soft contamination queue (TC-MLD-01) — does NOT block
         self._gate_soft_contamination(target_lang, output_path, result)
-        if not result.passed:
+        if _record_early_failure(5):
             return result
 
         # Gate 6: Code block count
         self._gate_code_block(source_content, translated_content, output_path, result)
-        if not result.passed:
+        if _record_early_failure(6):
             return result
 
         # Gate 7: Heading surplus / TITLE hallucination
         self._gate_heading_surplus(source_content, translated_content, output_path, result)
-        if not result.passed:
+        if _record_early_failure(7):
             return result
 
         # Gate 8: YAML frontmatter structural (RC-5/RC-6)
         self._gate_yaml_frontmatter(
             translated_content, output_path, target_lang, source_doc, result
         )
+        if _record_early_failure(8):
+            return result
 
         # ------------------------------------------------------------------
         # Gates 9+: Content quality gates — run UNCONDITIONALLY regardless
@@ -767,6 +844,7 @@ class WriteGateEvaluator:
             source_doc,
             result,
             translation_stats=translation_stats,
+            site_profile=site_profile,
         )
         if working != translated_content:
             result.cleaned_content = working
@@ -1291,6 +1369,7 @@ class WriteGateEvaluator:
         output_path: Path,
         source_doc: object,
         translation_stats: object = None,
+        site_profile: object = None,
     ) -> dict[str, object]:
         """Build the signature-normalizing dispatch table shared by
         ``_run_content_gates`` (production write path) and
@@ -1316,6 +1395,9 @@ class WriteGateEvaluator:
         None.
         """
         return {
+            "_gate_ignore_mode_field_leak": lambda src, w, path, res: self._gate_ignore_mode_field_leak(
+                w, path, res, site_profile
+            ),
             "_gate_heading_integrity": lambda src, w, path, res: self._gate_heading_integrity(
                 src, w, path, source_doc, res, target_lang
             ),
@@ -1447,6 +1529,7 @@ class WriteGateEvaluator:
         source_doc: object,
         result: WriteGateResult,
         translation_stats: object = None,
+        site_profile: object = None,
     ) -> str:
         """Run all content quality gates (GATE_REGISTRY entries with action
         'auto_clean', 'block', or 'warn') against the production write path's
@@ -1459,7 +1542,7 @@ class WriteGateEvaluator:
         every gate's independent verdict rather than the first failure.
         """
         dispatch = self._build_content_gate_dispatch(
-            target_lang, output_path, source_doc, translation_stats
+            target_lang, output_path, source_doc, translation_stats, site_profile
         )
         working = translated_content
 
@@ -1532,6 +1615,7 @@ class WriteGateEvaluator:
         output_path: Path,
         source_doc: object = None,
         translation_stats: object = None,
+        site_profile: object = None,
     ) -> tuple[dict[int, WriteGateResult], str]:
         """Run every GATE_REGISTRY content gate (action 'auto_clean',
         'block', or 'warn') against ``(source_content, translated_content)``
@@ -1577,7 +1661,7 @@ class WriteGateEvaluator:
         the audit sweep's coverage either.
         """
         dispatch = self._build_content_gate_dispatch(
-            target_lang, output_path, source_doc, translation_stats
+            target_lang, output_path, source_doc, translation_stats, site_profile
         )
         results: dict[int, WriteGateResult] = {}
         working = translated_content
@@ -1827,6 +1911,33 @@ class WriteGateEvaluator:
     # Gate 12: Double period detection (auto-clean)
     # ------------------------------------------------------------------
 
+    #: TC-APT-009: spans gate 12 must never rewrite (inline code, markdown link/image
+    #: targets, HTML tags, Hugo shortcodes, bare URLs, reference definitions, ../ paths).
+    _GATE12_PROTECTED_RE = re.compile(
+        # Fenced code FIRST: it contains backticks, so an inline-code alternative would
+        # otherwise consume the fence markers and expose the code to the rewrite.
+        r"```[\s\S]*?```"
+        r"|~~~[\s\S]*?~~~"
+        r"|`[^`\n]*`"
+        r"|\]\([^)\n]*\)"
+        r"|<[^>\n]+>"
+        r"|\{\{[<%][\s\S]*?[>%]\}\}"
+        r"|(?:https?|ftp)://\S+"
+        r"|^[ \t]*\[[^\]\n]+\]:[ \t]*\S+"
+        r"|(?<![\w.])\.\./\S*",
+        re.MULTILINE,
+    )
+
+    @classmethod
+    def _gate12_strip_protected(cls, text: str) -> str:
+        """Blank out every protected span (fenced code included), preserving offsets."""
+        return cls._GATE12_PROTECTED_RE.sub(lambda m: " " * len(m.group(0)), text)
+
+    @classmethod
+    def _gate12_has_prose_double_dot(cls, text: str) -> bool:
+        """True when the PROSE of ``text`` contains a bare double dot (not an ellipsis)."""
+        return bool(re.search(r"(?<!\.)\.\.(?!\.)", cls._gate12_strip_protected(text)))
+
     def _gate_double_periods(
         self,
         source_content: str,
@@ -1834,30 +1945,45 @@ class WriteGateEvaluator:
         output_path: Path,
         result: WriteGateResult,
     ) -> str:
-        """Replace .. (not ...) in body text outside code blocks."""
+        """Replace .. (not ...) in PROSE only -- never inside code, links, shortcodes or HTML.
+
+        TC-APT-009 (G-04) root-cause fix: this gate previously protected fenced code blocks
+        only, so its auto-clean could corrupt legitimate content that must keep a double dot
+        -- a relative link ``[x](../y.md)``, an inline code span, a Hugo shortcode parameter
+        ``{{< x path="../y" >}}``, an HTML attribute, or a bare URL. The audit-phase7 finding
+        "symptom-only regex fix, recurrence risk" is exactly that: the cleaner's blast radius
+        was wider than the defect it fixes. Protected spans are masked out before the
+        substitution and restored verbatim afterwards.
+        """
         body = self._get_body(translated_content)
-        # Only process if source doesn't contain ".." (don't introduce bugs)
-        if ".." in self._get_body(source_content):
+        # Bail out only when the SOURCE's own prose legitimately contains '..' (don't
+        # introduce bugs). TC-APT-009: the check is prose-scoped like the rewrite -- a
+        # source whose only '..' lives in code/links/URLs no longer disables the gate for
+        # the whole page, which is why the historical fix looked symptom-only.
+        if self._gate12_has_prose_double_dot(self._get_body(source_content)):
             return translated_content
 
-        # Split on code fences, only process non-code segments
-        segments = re.split(r"(```[\s\S]*?```)", body)
-        cleaned_segments = []
-        changed = False
-        for seg in segments:
-            if seg.startswith("```"):
-                cleaned_segments.append(seg)
-            else:
-                # Replace ".." not part of "..."
-                fixed = re.sub(r"(?<!\.)\.\.(?!\.)", ".", seg)
-                if fixed != seg:
-                    changed = True
-                cleaned_segments.append(fixed)
+        protected: list[str] = []
+
+        def _mask(match: re.Match) -> str:
+            protected.append(match.group(0))
+            return f"\x00GATE12_{len(protected) - 1}\x00"
+
+        # Mask every span whose '..' is legitimate (fenced code, inline code, link
+        # targets, HTML, shortcodes, URLs, reference definitions, ../ paths), then rewrite
+        # only what is left -- prose. ".." that is part of "..." is never touched.
+        masked = self._GATE12_PROTECTED_RE.sub(_mask, body)
+        cleaned = re.sub(r"(?<!\.)\.\.(?!\.)", ".", masked)
+        changed = cleaned != masked
+        cleaned_segments = [cleaned]
 
         if not changed:
             return translated_content
 
         cleaned_body = "".join(cleaned_segments)
+        # Restore the protected spans verbatim.
+        for index, original in enumerate(protected):
+            cleaned_body = cleaned_body.replace(f"\x00GATE12_{index}\x00", original)
         fm_prefix = translated_content[: len(translated_content) - len(body)]
         logger.info("GATE12 fixed double periods in %s", output_path.name)
         return fm_prefix + cleaned_body
@@ -2032,15 +2158,72 @@ class WriteGateEvaluator:
     # Gate 16: Duplicate content detection (auto-clean)
     # ------------------------------------------------------------------
 
+    # TC-APT-105: a markdown link, optionally wrapped in bold -- matches
+    # "[text](url)" and "**[text](url)**" as one construct so the bold
+    # wrapper never causes a false "these are different" mismatch.
+    _INLINE_LINK_RE = re.compile(r"\*\*\[[^\]]+\]\([^)]+\)\*\*|\[[^\]]+\]\([^)]+\)")
+
+    def _strip_adjacent_duplicate_inline_links(self, body: str) -> tuple[str, int]:
+        """Remove a link/bold-link construct immediately followed by a
+        byte-identical repeat of itself, separated only by punctuation.
+
+        This is a narrower, lower-threshold companion to the whole-paragraph
+        3x-occurrence check below it: it catches an inline span duplicated
+        exactly TWICE, back-to-back, inside what is otherwise a single
+        unique paragraph -- a shape the paragraph-level check structurally
+        cannot see (its unit is a whole paragraph, and it only fires at 3+
+        occurrences). Confirmed live on content/docs.aspose.org/en/cells/go/
+        getting-started/quickstart.md: "**[API Reference](url)**:**[API
+        Reference](url)**: Full class and method documentation" -- the
+        second copy is dropped along with the punctuation-only gap between
+        the two, leaving "**[API Reference](url)**: Full class and method
+        documentation".
+
+        The gap between the two occurrences must be punctuation/whitespace
+        only (colon, comma, semicolon, period, space, tab) -- if any other
+        character sits between two occurrences of the same link, this is not
+        the reported defect shape and is left untouched, to avoid discarding
+        a case that might indicate a different problem.
+        """
+        matches = list(self._INLINE_LINK_RE.finditer(body))
+        if len(matches) < 2:
+            return body, 0
+
+        drop_ranges: list[tuple[int, int]] = []
+        prev = matches[0]
+        for cur in matches[1:]:
+            gap = body[prev.end() : cur.start()]
+            if cur.group(0) == prev.group(0) and len(gap) <= 3 and gap.strip(":,;. \t") == "":
+                drop_ranges.append((prev.end(), cur.end()))
+                # Do not chain off the dropped duplicate -- compare the NEXT
+                # match against the kept (prev) occurrence, not the just-
+                # dropped one, so 3+ identical adjacent copies collapse to
+                # exactly one kept copy rather than alternating keep/drop.
+                continue
+            prev = cur
+
+        if not drop_ranges:
+            return body, 0
+
+        cleaned_parts = []
+        pos = 0
+        for start, end in drop_ranges:
+            cleaned_parts.append(body[pos:start])
+            pos = end
+        cleaned_parts.append(body[pos:])
+        return "".join(cleaned_parts), len(drop_ranges)
+
     def _gate_duplicate_content(
         self,
         translated_content: str,
         output_path: Path,
         result: WriteGateResult,
     ) -> str:
-        """Remove paragraphs that appear 3+ times (model repetition artifact).
+        """Remove paragraphs that appear 3+ times (model repetition artifact),
+        and separately strip an inline link/bold-link construct duplicated
+        exactly twice back-to-back (see `_strip_adjacent_duplicate_inline_links`).
 
-        Two exclusions keep this from stripping legitimate content:
+        Two exclusions keep the paragraph-level check from stripping legitimate content:
 
         - Paragraphs that overlap a fenced code block are never eligible:
           distinct code examples on the same page routinely share a short
@@ -2065,6 +2248,16 @@ class WriteGateEvaluator:
           are heading-separated, not merely fence-separated).
         """
         body = self._get_body(translated_content)
+        fm_prefix = translated_content[: len(translated_content) - len(body)]
+
+        body, inline_dup_count = self._strip_adjacent_duplicate_inline_links(body)
+        if inline_dup_count:
+            logger.info(
+                "GATE16 removed %d duplicated inline link construct(s) in %s",
+                inline_dup_count,
+                output_path.name,
+            )
+
         heading_spans = [(m.start(), m.end()) for m in re.finditer(r"^#{1,6}[ \t].*$", body, re.M)]
 
         def has_structural_boundary_between(a: int, b: int) -> bool:
@@ -2117,7 +2310,7 @@ class WriteGateEvaluator:
 
         duplicates = {k for k, v in seen.items() if v >= 3 and not structurally_separated(k)}
         if not duplicates:
-            return translated_content
+            return fm_prefix + body if inline_dup_count else translated_content
 
         # Keep only first occurrence of each duplicate
         kept: set[str] = set()
@@ -2136,7 +2329,6 @@ class WriteGateEvaluator:
                 cleaned_paragraphs.append(para)
 
         cleaned_body = "\n\n".join(cleaned_paragraphs)
-        fm_prefix = translated_content[: len(translated_content) - len(body)]
         logger.info(
             "GATE16 removed %d duplicate paragraph(s) in %s",
             len(duplicates),
@@ -3730,6 +3922,83 @@ class WriteGateEvaluator:
                     len(tgt_value),
                 )
                 return
+
+    # ------------------------------------------------------------------
+    # Gate 45: IGNORE-mode frontmatter field leak (aliases:/url: contamination)
+    # ASPOSE-BLOG-DEPLOY-ALIAS-RECURRENCE-001 (2026-09-17): this repo's own
+    # site profiles set `aliases` and `url` to `mode: ignore` for all 4
+    # aspose.org site profiles (2026-09-01, config/site_profiles/*.yaml)
+    # specifically because a byte-identical aliases:/url: value copied into
+    # every translated locale copy of a page collapses all of them onto the
+    # same Hugo output path (a leading-slash aliases:/explicit url: value
+    # bypasses Hugo's per-language URL prefixing) -- confirmed by a real
+    # Hugo build reproducing "Duplicate target paths" for the exact affected
+    # aspose.org content files. reconstruct_frontmatter() already drops
+    # IGNORE-mode fields correctly (markdown_reconstructor.py), and
+    # FrontmatterProtectionValidator already has a matching check
+    # (_check_ignore_fields) -- but neither validator class was ever wired
+    # into this file's production gate registry (confirmed: every reference
+    # to FrontmatterProtectionValidator outside its own module is either
+    # ValidationSuite.from_config(), itself documented above as "never run
+    # in production", or a construction call with no invocation of the
+    # ignore-fields check). That gap is why stale, pre-fix cached
+    # translation output could still be adopted wholesale into aspose.org
+    # content weeks after the site-profile fix landed, reintroducing the
+    # exact contamination TC-ALIAS-005 had already cleaned up once. This
+    # gate is process-agnostic like Gate 30: it blocks the shape regardless
+    # of which writer produced the candidate content, given a site_profile.
+    # Ships "warn" pending a clean-sample false-positive check against real
+    # content (same rollout convention as gates 31-44) before promotion to
+    # "block" in this registry.
+    # ------------------------------------------------------------------
+
+    def _gate_ignore_mode_field_leak(
+        self,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+        site_profile: Any = None,
+    ) -> None:
+        """Flag a frontmatter field the site profile marks `mode: ignore`
+        that is nonetheless present in the translated output.
+
+        ``reconstruct_frontmatter()`` (markdown_reconstructor.py) already
+        removes every ``mode: ignore`` field when content goes through the
+        normal reconstruction step. A leak here means this candidate content
+        never went through that step at all -- e.g. a stale cached
+        translation adopted wholesale, or a writer that bypasses this
+        pipeline entirely. No-ops if ``site_profile`` is not supplied (the
+        caller has no frontmatter rules to check against).
+        """
+        if site_profile is None or not getattr(site_profile, "frontmatter", None):
+            return
+
+        split = _fm_parser._split_frontmatter(translated_content)
+        if split is None:
+            return
+        fm_data = _fm_parser._parse_yaml_content(split[0])
+        if not isinstance(fm_data, dict):
+            return
+
+        leaked = sorted(
+            key
+            for key, rule in site_profile.frontmatter.items()
+            if getattr(rule, "mode", None) == FrontmatterMode.IGNORE and key in fm_data
+        )
+        if not leaked:
+            return
+
+        result.passed = False
+        result.error = (
+            f"GATE45 IGNORE-FIELD LEAK {output_path.name}: mode:ignore "
+            f"field(s) present in output (should have been removed by "
+            f"reconstruct_frontmatter): {leaked}"
+        )
+        logger.warning(
+            "GATE45 IGNORE-FIELD LEAK (warn-only, pending promotion) %s: %s",
+            output_path.name,
+            leaked,
+        )
 
     # ------------------------------------------------------------------
     # Gate 41: homoglyph substitution in code spans/identifiers

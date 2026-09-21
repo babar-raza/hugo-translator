@@ -1,0 +1,94 @@
+{
+  "taskcard": "TC-APT-028",
+  "model_id": "professionalize_llm",
+  "started_at": "2026-09-02T06:20:43.178496+00:00",
+  "finished_at": "2026-09-02T06:22:53.225327+00:00",
+  "hard_stops": [],
+  "preflight": {
+    "api_key_env": "litellm_key",
+    "api_key_resolved": true,
+    "health_check": {
+      "ok": true,
+      "seconds": 3.308
+    },
+    "canary": {
+      "ok": true,
+      "response_sha256": "539e20d356f59cd7132bdd8ab90b8511128f5edab73d6e88df28aab413ffd17d",
+      "echo_exact": true,
+      "seconds": 1.955,
+      "error": null
+    },
+    "models_probe": {
+      "supported": true,
+      "model_ids": [
+        "Qwen2.5-VL-7B",
+        "experimental",
+        "gpt-oss",
+        "qwen3-embedding-8b",
+        "qwen3-next",
+        "recommended",
+        "stable-diffusion-3.5-large"
+      ],
+      "count": 7,
+      "configured_alias": "recommended",
+      "alias_listed": true,
+      "version_locked_candidates": [
+        "Qwen2.5-VL-7B",
+        "qwen3-embedding-8b",
+        "qwen3-next",
+        "stable-diffusion-3.5-large"
+      ]
+    },
+    "representative_segments": {
+      "placeholder_tokens": {
+        "ok": true,
+        "non_empty": true,
+        "placeholders_preserved": true,
+        "seconds": 4.376,
+        "input_tokens": 358,
+        "output_tokens": 261,
+        "error": null
+      },
+      "rtl_arabic": {
+        "ok": true,
+        "non_empty": true,
+        "has_arabic_script": true,
+        "identifier_kept": true,
+        "seconds": 2.358,
+        "input_tokens": 343,
+        "output_tokens": 133,
+        "error": null
+      },
+      "fenced_code": {
+        "ok": true,
+        "non_empty": true,
+        "fence_preserved": true,
+        "code_line_intact": true,
+        "seconds": 3.235,
+        "input_tokens": 360,
+        "output_tokens": 186,
+        "error": null
+      },
+      "long_technical_paragraph": {
+        "ok": true,
+        "non_empty": true,
+        "not_truncated": true,
+        "length_ratio": 1.352,
+        "seconds": 91.512,
+        "input_tokens": 2006,
+        "output_tokens": 6000,
+        "error": null
+      }
+    },
+    "determinism": {
+      "n": 10,
+      "successful": 10,
+      "errors": 0,
+      "distinct_outputs": 1,
+      "byte_identical_rate": 1.0,
+      "is_deterministic": true
+    }
+  },
+  "calibration": {},
+  "recommendations": {}
+}

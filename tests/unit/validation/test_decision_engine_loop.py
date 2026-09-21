@@ -191,3 +191,89 @@ class TestDecisionEngineLoop:
         d = engine.make_decision(clean, retry_count=0, source="text")
         assert d.decision_reason is not None
         assert len(d.decision_reason) > 0
+
+
+# --- VA-01: effective_max_retries reconciles decision-engine retry-budget
+# semantics with file_pipeline.py's own loop-scoped retry_budget_override.
+#
+# Live incident shape: an LLM-escalation phase configured with a tighter
+# per-call budget than this engine's static config (e.g.
+# retry_budget_override=0) still had Rule 4 return RETRY here (since
+# retry_count < self.max_retry_attempts, a larger number this call knew
+# nothing about) -- only for file_pipeline.py's own separate retry-count
+# tracking to then hard-reject unconditionally once ITS budget was
+# exhausted, bypassing Rule 5's accept_after_max_retries arbitration
+# entirely, even for a WARNING-only, non-critical result Rule 5 would have
+# accepted as best effort. Reproduces under strict mode (accept_warnings=
+# False), the config under which a WARNING-only result falls through
+# Rule 3 at all.
+
+_STRICT_CONFIG = {
+    "decision_rules": {
+        **DEFAULT_CONFIG["decision_rules"],
+        "accept_warnings": False,
+    }
+}
+
+
+class TestEffectiveMaxRetriesReconciliation:
+    def test_warning_only_result_with_zero_effective_budget_reaches_rule_5(self):
+        """The exact live scenario: reaches Rule 5's arbitration (ACCEPT,
+        since accept_after_max_retries=True and nothing critical is failing)
+        on the very first call, instead of Rule 4 returning RETRY only for
+        an outer, budget-blind caller to later hard-reject."""
+        engine = ValidationDecisionEngine(_STRICT_CONFIG)
+        result = _make_result(
+            warnings=[{"validator": "TerminologyPreservationValidator", "message": "suggestion"}]
+        )
+
+        decision = engine.make_decision(
+            result, retry_count=0, source="Aspose.Words", effective_max_retries=0
+        )
+
+        assert decision.decision == ValidationDecision.ACCEPT
+        assert "Best effort" in decision.decision_reason
+
+    def test_warning_only_result_with_positive_effective_budget_retries_normally(self):
+        """Unchanged behavior: a positive effective budget still retries a
+        WARNING-only result under strict mode, exactly as
+        self.max_retry_attempts alone would have."""
+        engine = ValidationDecisionEngine(_STRICT_CONFIG)
+        result = _make_result(
+            warnings=[{"validator": "TerminologyPreservationValidator", "message": "suggestion"}]
+        )
+
+        decision = engine.make_decision(
+            result, retry_count=0, source="Aspose.Words", effective_max_retries=2
+        )
+
+        assert decision.decision == ValidationDecision.RETRY
+
+    def test_error_present_result_still_rejects_regardless_of_effective_budget(self):
+        """Rule 1/2 (ERROR-driven REJECT) are completely unaffected by
+        effective_max_retries -- a critical validator error still rejects
+        immediately at any budget, zero included."""
+        engine = ValidationDecisionEngine(_STRICT_CONFIG)
+        result = _make_result(
+            errors=[{"validator": "PlaceholderValidator", "message": "missing placeholder"}]
+        )
+
+        decision = engine.make_decision(
+            result, retry_count=0, source="Hello {{placeholder}}", effective_max_retries=0
+        )
+
+        assert decision.decision == ValidationDecision.REJECT
+
+    def test_effective_max_retries_none_falls_back_to_static_config(self):
+        """Backward compatibility: omitting effective_max_retries entirely
+        (the default, None) behaves identically to before this taskcard --
+        self.max_retry_attempts alone governs Rule 4/5."""
+        engine = ValidationDecisionEngine(DEFAULT_CONFIG)
+        result = _make_result(
+            errors=[{"validator": "CompletenessValidator", "message": "heading error"}]
+        )
+
+        decision = engine.make_decision(result, retry_count=0, source="# Hello")
+
+        assert decision.decision == ValidationDecision.RETRY
+        assert "2" in decision.decision_reason  # self.max_retry_attempts == 2

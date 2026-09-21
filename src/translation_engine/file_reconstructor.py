@@ -113,7 +113,7 @@ class FileReconstructor:
 
         # Render: apply translated units back to the TR AST
         renderer = ASTRenderer()
-        renderer.apply_translations(tr_doc.ast, tr_units, frontmatter=tr_doc.frontmatter)
+        renderer.apply_translations(tr_doc.ast, tr_units, frontmatter=tr_doc.frontmatter, target_lang=locale)
 
         # Reconstruct frontmatter YAML from the (now-updated) tr_doc.frontmatter dict
         yaml_formatter = YAMLFormatter()

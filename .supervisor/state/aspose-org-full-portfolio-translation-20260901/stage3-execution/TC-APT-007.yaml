@@ -1,0 +1,19 @@
+taskcard: TC-APT-007
+title: Eligibility algorithm implementation (plan 7.2 precedence, 7.3 fingerprints, G-08 decision)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+deliverables:
+  - "src/workers/eligibility.py: CellFacts (content-free), classify() with the strict 7.2 precedence (UNSUPPORTED_LANGUAGE > EXCLUDED_BY_PROFILE > SOURCE_INVALID > BLOCKED > MANUAL_REVIEW_REJECTED > FAILED_PRIOR_VALIDATION > target/provenance branch -> MISSING_TRANSLATION | UNKNOWN_PROVENANCE | SOURCE_CHANGED | PROFILE_CHANGED | PROTECTION_RULE_CHANGED | MODEL_OR_PROMPT_INVALIDATED | UP_TO_DATE); holds list (data/campaigns/holds.yaml), TM lineage denylist (data/tm/invalidated_lineage.json), source_validity(); reclassify_ledger() re-evaluates every ledger row against live fingerprints/hashes and writes transitions (+events); CLI python -m src.workers.eligibility [--dry-run]"
+  - "fingerprints landed in TC-APT-003 (src/workers/fingerprints.py): profile_fingerprint = sha256(SiteProfile.model_dump), protection_fingerprint per 7.3 recipe; default.yaml is never an input"
+  - "G-08 applied everywhere: fingerprints.py, build_campaign_manifest.config_fingerprint, and the legacy build_aspose_foss_pilot_manifest._config_fingerprint (its test test_config_fingerprint_binds_default_profile flipped to ..._ignores_dead_default_profile)"
+decisions:
+  - "SOURCE_INVALID 'empty after frontmatter strip' = no body AND no translatable frontmatter scalar (title/description/summary/seoTitle/subtitle/linkTitle/keywords/corporate_header). The first dry run would have moved 88 sources (2,200 cells: blog section _index.md pages and archive.md) to SOURCE_INVALID although their titles are translatable and were translated historically; refined, re-verified"
+  - "MANUAL_REVIEW_REJECTED / FAILED_PRIOR_VALIDATION apply only while source/profile/protection fingerprints are unchanged since the review/attempt (stale verdicts fall through to fresh reappraisal); an unknown attempt baseline counts as unchanged"
+  - "GIT_COMMIT_BACKED is not trustworthy provenance for eligibility (no source hash) -> UNKNOWN_PROVENANCE, consistent with TC-APT-003"
+  - "assigned_model for the BLOCKED/NLLB rule defaults to the campaign primary (m2m100_418m); nllb_approved read from model_licensing.nllb_200.production_approved (false)"
+verification:
+  - "pytest tests/unit/workers/test_eligibility.py -> 27 passed (all 13 states reachable; precedence: EXCLUDED beats SOURCE_INVALID/BLOCKED, BLOCKED beats review/validation states, stale rejection falls through on source or protection change, FAILED_PRIOR_VALIDATION only while unchanged, NLLB block lifts only with approval; loaders; source_validity; reclassify_ledger transitions + idempotence)"
+  - "live: python -m src.workers.eligibility --dry-run over the real ledger -> rows 330,696, changed 0 (states UNKNOWN_PROVENANCE 112,584 / EXCLUDED_BY_PROFILE 101,046 / MISSING_TRANSLATION 117,066 -- identical to the TC-APT-003 backfill, confirming the two agree)"
+  - "pytest tests/unit/workers/test_aspose_campaign_manifest_builder.py -> 6 passed after the G-08 flip"
+acceptance: "unit tests cover all 13 states + precedence edge cases (incl. simultaneously changed source + prior rejection) -> MET"

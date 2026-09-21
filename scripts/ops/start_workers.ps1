@@ -1,4 +1,4 @@
-# start_workers.ps1 — Detached worker startup for Windows
+﻿# start_workers.ps1 — Detached worker startup for Windows
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts\start_workers.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts\start_workers.ps1 -TmWorker

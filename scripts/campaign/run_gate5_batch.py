@@ -1,0 +1,386 @@
+"""TC-APT-013 (Gate 4): the mission's first real campaign run against the
+real content repository.
+
+Plan section 21, Track A step 2: "Run campaign_runner.py against exactly
+that scope. It writes receipt-backed files directly into
+content/<site>/<lang>/...; nothing else writes there." This script builds
+the REAL production TranslationEngine (persistent TM, no sandbox override --
+ASPOSE_ORG_CONTENT resolves to the real content repo from .env) and hands it
+to CampaignRunner against the tiny 2-cell manifest
+data/campaigns/gate4-canary/manifest.yaml.
+
+Deliberately does NOT set model_id_override or force=True: CampaignRunner's
+own per-phase logic (primary_model=m2m100_418m, escalation=professionalize_llm
+per the manifest's retry_policy) owns model routing, and normal TM lookups
+should apply exactly as they would in any real campaign.
+
+Never commits anything itself -- campaign_runner.py writes receipt-backed
+files only (per its own design, confirmed in this plan's section 19.2); the
+governed content-repo commit is a separate, explicit step this session
+performs after Claude review, following section 19.2's procedure exactly.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import threading
+import time
+from pathlib import Path
+
+# Keeps the ctypes callback objects alive for the life of the process --
+# ctypes.WINFUNCTYPE instances are garbage-collected like anything else, and a
+# collected callback becomes a dangling native pointer Windows would call into.
+_CONSOLE_CTRL_HANDLERS: list[object] = []
+
+
+def _install_console_control_handler() -> None:
+    """TC-PORT-LLM-012: this process hosts the Intel/Fortran-backed runtime
+    (torch/sentence-transformers/FastText, linked via MKL) that aborts with
+    "forrtl: error (200): program aborting due to window-CLOSE event" --
+    observed recurring across 13+ soak attempts under every console
+    configuration tried by the controller (start_portfolio_missing_sweep_
+    autonomous.ps1), including its SetConsoleCtrlHandler(NULL, TRUE) call.
+
+    That call does not protect this process: per documented Win32 semantics,
+    SetConsoleCtrlHandler(NULL, TRUE) only installs an ignore-default for
+    CTRL_C_EVENT/CTRL_BREAK_EVENT. It does NOT suppress CTRL_CLOSE_EVENT,
+    CTRL_LOGOFF_EVENT, or CTRL_SHUTDOWN_EVENT -- exactly the event class the
+    Fortran runtime's own abort message names. A real handler that returns
+    TRUE (handled) for all five event types is required so Windows never
+    invokes the default terminate action here, regardless of what console
+    configuration the parent launcher uses.
+
+    This makes the process immune to ANY console-control event, including a
+    direct Ctrl+C typed into a shared console -- intentionally. The only
+    sanctioned shutdown paths remain the launcher's own controlled
+    terminate()/wait()/kill() sequence (launch_parallel_campaign_shards.py's
+    KeyboardInterrupt handler) and genuine OS process teardown on reboot,
+    both of which are unaffected by this handler (TerminateProcess and a real
+    OS shutdown are not control events a handler can decline).
+    """
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    handler_routine = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_uint)
+
+    def _handle_ctrl_event(_event: int) -> int:
+        return 1  # TRUE: handled, suppress Windows' default terminate action
+
+    callback = handler_routine(_handle_ctrl_event)
+    _CONSOLE_CTRL_HANDLERS.append(callback)
+    if not ctypes.windll.kernel32.SetConsoleCtrlHandler(callback, 1):
+        raise OSError(
+            "SetConsoleCtrlHandler installation failed: " + str(ctypes.WinError())
+        )
+
+
+def _read_text_with_retry(path: Path, *, attempts: int = 6, initial_delay: float = 0.2) -> str:
+    """TC-PORT-LLM-013: a real 4-worker soak hit
+    "PermissionError: [Errno 13] Permission denied:
+    'logs\\...campaign..._child0.shards.txt'" reading this process's OWN
+    just-written, single-owner shard-list file -- not a cross-worker race
+    (each child has a distinct path), so a FileLock would not help.  The
+    repo lives under OneDrive, whose sync client is documented to briefly
+    hold a sharing lock on a just-created/modified file; that transient
+    window is exactly what a short bounded retry absorbs.  Re-raises the
+    original error if it is still failing after all attempts, so a genuine,
+    persistent permission problem is never silently swallowed.
+    """
+    delay = initial_delay
+    last_error: OSError | None = None
+    for attempt in range(attempts):
+        try:
+            return path.read_text(encoding="utf-8")
+        except PermissionError as exc:
+            last_error = exc
+            if attempt == attempts - 1:
+                break
+            time.sleep(delay)
+            delay *= 2
+    assert last_error is not None
+    raise last_error
+
+
+def build_real_engine(
+    translator_repo: Path,
+    max_gpu_memory_percent: int | None = None,
+    tm_intent_spool_path: Path | None = None,
+):
+    from src.model_runtime.loader import ModelLoader
+    from src.model_runtime.registry import ModelRegistry
+    from src.tm import TranslationMemory
+    from src.tm.intent_spool import TMIntentSpool
+    from src.tm.l1_cache import L1Cache
+    from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
+    from src.translation_engine.engine import TranslationEngine
+    from src.utils.config_loader import ConfigService, get_global_config
+
+    config_service = ConfigService(translator_repo / "config")
+    raw = get_global_config()
+    device = "cpu"
+    if (raw.get("hardware", {}) or {}).get("enable_gpu", True):
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                device = "cuda"
+        except Exception:
+            device = "cpu"
+    # TC-APT-047/065: a dedicated GPU shard process needs its own VRAM budget.
+    # Resolved percent -> MB exactly the way the legacy worker does it
+    # (autonomous_content_translation_worker.py:410-420) so both entry points
+    # enforce the same budget.  None keeps config/global.yaml's own default.
+    max_memory_mb = None
+    if max_gpu_memory_percent is not None and device.startswith("cuda"):
+        from src.hardware.vram_enforcer import VRAMEnforcer
+
+        max_memory_mb, budget = VRAMEnforcer().enforce_from_config(
+            {"enable_gpu": True, "max_gpu_memory_percent": max_gpu_memory_percent},
+            device=device,
+        )
+        if budget:
+            print(f"VRAM budget enforced: {max_memory_mb}MB ({budget.percent:.1f}% of total)")
+    loader = ModelLoader(
+        ModelRegistry(translator_repo / "config" / "model_registry.yaml"),
+        device=device,
+        max_memory_mb=max_memory_mb,
+        config=raw,
+    )
+    tm_data_dir = Path(raw.get("paths", {}).get("tm_data_dir", "data/tm"))
+    l2_max_size_mb = raw.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
+    # Parallel campaign children must never write canonical LMDB directly.
+    # A campaign-scoped durable spool leaves read lookup behaviour unchanged,
+    # while exactly one separately supervised writer owns L2 mutation.
+    intent_spool = TMIntentSpool(tm_intent_spool_path) if tm_intent_spool_path else None
+    tm = TranslationMemory(
+        l1_cache=L1Cache(max_size=10000),
+        l2_persistent=L2PersistentTM(
+            db_path=tm_data_dir / L2_DB_NAME,
+            max_size_mb=l2_max_size_mb,
+            read_only=tm_intent_spool_path is not None,
+        ),
+        l3_semantic=None,  # L3 FAISS index absent on this host (verified, plan section 0)
+        intent_spool=intent_spool,
+    )
+    engine = TranslationEngine(
+        config_service=config_service,
+        tm=tm,
+        model_loader=loader,
+        enable_validation=True,
+        enable_telemetry=False,
+        validation_mode="strict",
+        validation_policy="zero-defect",
+        enable_verification=True,
+        enable_verification_fix=True,
+        max_retries=4,
+        save_rejected=False,
+    )
+    return engine
+
+
+def main(argv: list[str] | None = None) -> int:
+    _install_console_control_handler()
+    parser = argparse.ArgumentParser(description="TC-APT-013 Gate 4 canary run")
+    parser.add_argument(
+        "--manifest", type=Path, default=Path("data/campaigns/gate4-canary/manifest.yaml")
+    )
+    parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--shard-id",
+        action="append",
+        default=None,
+        help="run only this shard (repeatable) -- isolates one cell's failure from "
+        "others in the same manifest; see data/summaries/fp-gate4-canary-TC-APT-013.json",
+    )
+    parser.add_argument(
+        "--shard-list",
+        type=Path,
+        help="File containing one shard id per line; avoids Windows command-line limits for large waves.",
+    )
+    parser.add_argument(
+        "--max-gpu-memory-percent",
+        type=int,
+        default=None,
+        help="VRAM budget for this process (TC-APT-047 dedicated GPU shard); "
+        "omit to use config/global.yaml's hardware.max_gpu_memory_percent",
+    )
+    parser.add_argument(
+        "--no-force-serialize",
+        action="store_true",
+        help="TC-APT-046 step 2 canary only: turn off the force_serialize_all_backends "
+        "rollback for THIS process, without flipping the shipped config for every other "
+        "session sharing this working tree",
+    )
+    parser.add_argument(
+        "--tm-intent-spool-path",
+        type=Path,
+        default=None,
+        help=(
+            "Campaign-scoped SQLite intent spool. When supplied, this process only enqueues "
+            "TM writes; a separately supervised single writer applies them to canonical LMDB."
+        ),
+    )
+    parser.add_argument(
+        "--diagnostic-quarantine-root", type=Path,
+        help="Protected local recovery evidence root; candidate text never enters ledgers.",
+    )
+    parser.add_argument(
+        "--diagnostic-no-write", action="store_true",
+        help="Exercise translation/gates but refuse content, receipt, and TM writes.",
+    )
+    parser.add_argument(
+        "--max-parallel-jobs", type=int,
+        help="Narrow process-local cap; recovery diagnosis must use one worker.",
+    )
+    parser.add_argument(
+        "--throughput-release", type=Path,
+        help="Immutable release artifact authorizing production parallelism.",
+    )
+    parser.add_argument(
+        "--translator-repo", type=Path,
+        help="Pinned runtime code root; permits a separate read-only working directory for shared caches.",
+    )
+    parser.add_argument(
+        "--recovery-qualification", action="store_true",
+        help="Run an explicitly bounded recovery canary despite stale heal tickets; never use for portfolio waves.",
+    )
+    args = parser.parse_args(argv)
+
+    translator_repo = (args.translator_repo or Path.cwd()).resolve()
+
+    from src.workers.campaign_manifest import CampaignManifest, CampaignManifestError
+    from src.workers.campaign_runner import CampaignRunner
+
+    manifest = CampaignManifest.load(args.manifest)
+    print(
+        f"[{manifest.campaign_id}] {len(manifest.sources)} sources, "
+        f"{sum(len(s.outputs) for s in manifest.sources)} cells, "
+        f"primary={manifest.retry_policy['primary_model']}"
+    )
+
+    engine = build_real_engine(
+        translator_repo,
+        args.max_gpu_memory_percent,
+        args.tm_intent_spool_path,
+    )
+    print(f"[{manifest.campaign_id}] startup engine_ready", flush=True)
+    # Child processes may run from an ACL-restricted pinned clone; keep the
+    # small mutable identity log in the governed control workspace instead.
+    import os
+    identity_override = os.environ.get("CAMPAIGN_IDENTITY_DIR")
+    if identity_override:
+        engine.campaign_identity_dir = Path(identity_override).resolve()
+    if args.diagnostic_no_write and not args.diagnostic_quarantine_root:
+        parser.error("--diagnostic-no-write requires --diagnostic-quarantine-root")
+    if args.diagnostic_quarantine_root:
+        root = args.diagnostic_quarantine_root.resolve()
+        if ".local/rating-cause-analysis-runs" not in root.as_posix():
+            parser.error("diagnostic quarantine must be below .local/rating-cause-analysis-runs")
+        engine.diagnostic_quarantine_root = root
+        engine.diagnostic_no_write = args.diagnostic_no_write
+        engine.campaign_identity_dir = root / "identity"
+    if args.tm_intent_spool_path:
+        print(f"[{manifest.campaign_id}] TM writes spool to {args.tm_intent_spool_path}")
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=translator_repo,
+        ledger_root=args.ledger_root,
+    )
+    release = None
+    if args.throughput_release:
+        import subprocess
+        from src.workers.throughput_release import verify_release
+        release = verify_release(
+            args.throughput_release,
+            campaign_id=manifest.campaign_id,
+            runtime_sha=subprocess.check_output(
+                ["git", "-C", str(translator_repo), "rev-parse", "HEAD"], text=True
+            ).strip(),
+            manifest_path=args.manifest,
+        )
+        runner.manifest.execution_policy["max_parallel_jobs"] = release.max_parallel_jobs
+    print(f"[{manifest.campaign_id}] startup runner_ready", flush=True)
+    if args.recovery_qualification:
+        if not args.shard_id and not args.shard_list:
+            parser.error("--recovery-qualification requires an explicit shard scope")
+        engine.campaign_context["recovery_qualification"] = True
+    if args.max_parallel_jobs is not None:
+        if args.max_parallel_jobs < 1:
+            parser.error("--max-parallel-jobs must be positive")
+        if not args.diagnostic_no_write:
+            parser.error("--max-parallel-jobs is reserved for diagnostic no-write runs")
+        runner.manifest.execution_policy["max_parallel_jobs"] = args.max_parallel_jobs
+    if args.no_force_serialize:
+        if release is not None and release.force_serialize:
+            parser.error("throughput release requires serialization")
+        # Process-scoped, so a canary never changes what any concurrently running
+        # session sees. The shipped default stays the safe one (TC-APT-046 step 1).
+        runner._force_serialize = False
+        print(
+            f"[{manifest.campaign_id}] force_serialize_all_backends OFF for this process; "
+            f"max_parallel_jobs={manifest.execution_policy.get('max_parallel_jobs', 1)}"
+        )
+    elif release is not None and not release.force_serialize:
+        parser.error("throughput release requires --no-force-serialize")
+    listed_shards: list[str] = []
+    if args.shard_list:
+        listed_shards = [
+            line.strip()
+            for line in _read_text_with_retry(args.shard_list).splitlines()
+            if line.strip()
+        ]
+        if not listed_shards:
+            parser.error("--shard-list contains no shard ids")
+    shard_ids = set((args.shard_id or []) + listed_shards) or None
+    print(
+        f"[{manifest.campaign_id}] startup runner_run_begin "
+        f"shards={len(shard_ids) if shard_ids is not None else 'all'}",
+        flush=True,
+    )
+    # A long Professionalize request may legitimately produce no terminal
+    # receipt for several minutes.  Emit candidate-free process heartbeats so
+    # the parent distinguishes that from a dead Python/Windows child and does
+    # not kill healthy overnight work merely because a page is large.
+    heartbeat_stop = threading.Event()
+
+    def _heartbeat() -> None:
+        while not heartbeat_stop.wait(30):
+            print(f"[{manifest.campaign_id}] worker_heartbeat", flush=True)
+
+    heartbeat = threading.Thread(target=_heartbeat, name="campaign-worker-heartbeat", daemon=True)
+    heartbeat.start()
+    try:
+        result = runner.run(resume=args.resume, shard_ids=shard_ids)
+    except CampaignManifestError as exc:
+        # TC-APT-041: a partial-failure run still commits every shard's
+        # receipted outputs (see CampaignRunner._run_locked); print the
+        # attached summary instead of losing it to a bare traceback.
+        summary = getattr(exc, "summary", None)
+        if summary is not None:
+            print(json.dumps(summary, indent=2, default=str))
+            # A CampaignRunner partial summary means the worker completed its
+            # assigned cells and placed validator rejects in the failure/heal
+            # backlog.  Those are expected data outcomes, not an orchestration
+            # failure.  Keep a non-zero exit for untyped/exceptional failures
+            # so locks, provider crashes, and manifest defects still stop the
+            # controller.
+            if str(summary.get("status", "")) == "PARTIAL_WITH_TICKETS":
+                return 0
+        else:
+            print(json.dumps({"error": str(exc)}, indent=2, default=str))
+        return 1
+    finally:
+        heartbeat_stop.set()
+        heartbeat.join(timeout=1)
+    print(f"[{manifest.campaign_id}] startup runner_run_complete", flush=True)
+    print(json.dumps(result, indent=2, default=str))
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(main())
