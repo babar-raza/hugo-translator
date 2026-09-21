@@ -153,6 +153,11 @@ def build_real_engine(
         config=raw,
     )
     tm_data_dir = Path(raw.get("paths", {}).get("tm_data_dir", "data/tm"))
+    # Campaign children are launched from the mutable control checkout while
+    # their code/config live in the immutable runtime.  Resolve a relative TM
+    # location against that runtime, never against the controller CWD.
+    if not tm_data_dir.is_absolute():
+        tm_data_dir = translator_repo / tm_data_dir
     l2_max_size_mb = raw.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
     # Parallel campaign children must never write canonical LMDB directly.
     # A campaign-scoped durable spool leaves read lookup behaviour unchanged,
