@@ -1,0 +1,6 @@
+task_id: TC-APT-108
+title: Interruption recovery and real 64-job canary
+status: pending
+lane: verification
+depends_on: [TC-APT-107]
+acceptance: [eight workers ready, real receipts, no duplicates, interruption resume proof, CPU only]

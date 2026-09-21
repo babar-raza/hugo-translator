@@ -1,0 +1,6 @@
+task_id: TC-APT-109
+title: Eight-hour soak and complete missing translation campaign
+status: pending
+lane: production
+depends_on: [TC-APT-108]
+acceptance: [eight-hour soak, zero remaining, zero pending writes, receipt hash reconciliation]

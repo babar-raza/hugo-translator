@@ -1,0 +1,9 @@
+task_id: TC-APT-107
+title: Durable native controller and authoritative lifecycle state
+status: in_progress
+lane: controller
+depends_on: []
+allowed_paths: [scripts/campaign, tests/unit/workers, .supervisor/state/aspose-org-full-portfolio-translation-20260901, reports/campaigns]
+forbidden_paths: [content]
+acceptance: [nonzero unexpected exit, atomic heartbeat, reboot-safe scheduled task, durable logs]
+recovery: resume receipt-backed work after journal merge
