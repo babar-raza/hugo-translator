@@ -54,7 +54,8 @@ if ($ShardList) {
     $candidate = if ([IO.Path]::IsPathRooted($ShardList)) { $ShardList } else { Join-Path $ControlRepo $ShardList }
     $ResolvedShardList = (Resolve-Path $candidate).Path
 }
-$py = Join-Path $ControlRepo '.venv\Scripts\python.exe'
+$py = if ($env:HUGO_TRANSLATOR_PYTHON) { $env:HUGO_TRANSLATOR_PYTHON } else { Join-Path $ControlRepo '.venv\Scripts\python.exe' }
+if (-not (Test-Path $py)) { throw "Python missing: $py" }
 $campaign = $CampaignId
 $manifest = Join-Path $ControlRepo "data\campaigns\manifests\$campaign.yaml"
 $ledger = Join-Path $ControlRepo 'data\campaigns'

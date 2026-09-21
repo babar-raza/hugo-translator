@@ -9,7 +9,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $control = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$py = Join-Path $control '.venv\Scripts\python.exe'
+$py = if ($env:HUGO_TRANSLATOR_PYTHON) { $env:HUGO_TRANSLATOR_PYTHON } else { Join-Path $control '.venv\Scripts\python.exe' }
+$controlVenv = Join-Path $control '.venv\Scripts\python.exe'
 $runtime = Join-Path $control '.local\portfolio-runtime-64'
 $manifest = Join-Path $control "data\campaigns\manifests\$CampaignId.yaml"
 $ledger = Join-Path $control 'data\campaigns'
@@ -22,7 +23,8 @@ $taskName = 'HugoTranslator-PortfolioProfessionalize64'
 $contentRepo = 'D:\onedrive\Documents\GitHub\aspose.org'
 
 function Assert-Prerequisites {
-    if (-not (Test-Path $py)) { throw "Python missing: $py" }
+    if (-not (Test-Path $py) -and (Test-Path $controlVenv)) { $script:py = $controlVenv }
+    if (-not (Test-Path $py)) { throw "Python missing in control checkout: $py" }
     if (-not (Test-Path (Join-Path $contentRepo 'content'))) { throw "Content repo missing: $contentRepo" }
     $key = [Environment]::GetEnvironmentVariable('litellm_key','User')
     if ([string]::IsNullOrWhiteSpace($key)) { $key = [Environment]::GetEnvironmentVariable('litellm_key','Machine') }
@@ -33,11 +35,13 @@ function Assert-Prerequisites {
 
 function Sync-Runtime {
     $sha = (git -C $control rev-parse HEAD).Trim()
+    $created = $false
     if (-not (Test-Path (Join-Path $runtime '.git'))) {
         New-Item -ItemType Directory -Force (Split-Path $runtime) | Out-Null
         git clone --no-hardlinks --no-checkout $control $runtime | Out-Null
+        $created = $true
     }
-    if (git -C $runtime status --porcelain) { throw "Runtime clone is dirty: $runtime" }
+    if (-not $created -and (git -C $runtime status --porcelain)) { throw "Runtime clone is dirty: $runtime" }
     git -C $runtime fetch $control $sha | Out-Null
     git -C $runtime checkout --detach $sha | Out-Null
     if ((git -C $runtime status --porcelain)) { throw 'Runtime clone did not remain clean.' }
