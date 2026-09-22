@@ -29,8 +29,13 @@ class Controller:
         """Stop the owned launcher and every worker it created."""
         if not self.child or self.child.poll() is not None: return
         if sys.platform == "win32":
-            subprocess.run(["taskkill.exe","/PID",str(self.child.pid),"/T","/F"],
-                           capture_output=True,timeout=60,check=False)
+            try:
+                self.child.send_signal(signal.CTRL_BREAK_EVENT)
+                self.child.wait(timeout=90)
+                return
+            except (OSError,subprocess.TimeoutExpired):
+                subprocess.run(["taskkill.exe","/PID",str(self.child.pid),"/T","/F"],
+                               capture_output=True,timeout=60,check=False)
         else:
             self.child.terminate()
         try: self.child.wait(timeout=60)
@@ -77,7 +82,9 @@ class Controller:
             self.write("RUNNING",command="bounded_wave")
             with self.log_path.open("a",encoding="utf-8",buffering=1) as log:
                 log.write(f"{datetime.now(timezone.utc).isoformat()} launching bounded wave session={self.session}\n")
-                self.child=subprocess.Popen(cmd,cwd=self.a.control,stdout=log,stderr=subprocess.STDOUT)
+                flags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+                self.child=subprocess.Popen(cmd,cwd=self.a.control,stdout=log,stderr=subprocess.STDOUT,
+                                            creationflags=flags)
                 code=self._wait_for_wave()
             self.child=None
             if self.stop: self.write("INTERRUPTED","controller_signal"); return 130
