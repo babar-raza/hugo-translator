@@ -1111,8 +1111,6 @@ def main(argv: list[str] | None = None) -> int:
                         gpu_lane_lock.release_admission()
                     else:
                         gpu_lane_lock.release()
-            if wave_status != 0:
-                return wave_status
             if args.checkpoint_wave_shards:
                 try:
                     checkpoint_committed = checkpoint_wave(args, manifest, translator_repo)
@@ -1132,12 +1130,19 @@ def main(argv: list[str] | None = None) -> int:
                         file=sys.stderr,
                         flush=True,
                     )
+                # All children have exited and journals have been merged.
+                # Preserve valid work even when another job failed; do not
+                # mark unsuccessful shards visited.
+                if wave_status != 0:
+                    return wave_status
                 visited.update(str(shard["shard_id"]) for group in groups for shard in group)
                 temporary = completed_waves_path.with_suffix(".tmp")
                 temporary.write_text(json.dumps({"schema_version": 1, "manifest_sha256": manifest_digest,
                                                 "shards": sorted(visited)}, sort_keys=True), encoding="utf-8")
                 temporary.replace(completed_waves_path)
                 continue
+            if wave_status != 0:
+                return wave_status
             if not args.drain:
                 break
 

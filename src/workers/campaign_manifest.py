@@ -8,7 +8,6 @@ into another product, surface, locale, or repository revision.
 from __future__ import annotations
 
 import hashlib
-import os
 import json
 import subprocess
 from dataclasses import dataclass, field
@@ -458,7 +457,8 @@ class CampaignManifest:
                     if changed_sources:
                         errors.append(f"campaign source changed since pin: {changed_sources[:5]}")
                     changed_outputs = sorted((changed & all_outputs) - accepted_set - set(declared))
-                    if changed_outputs and os.environ.get("CAMPAIGN_ALLOW_UNRECEIPTED_OUTPUTS") != "1":
+                    changed_outputs = [p for p in changed_outputs if (content_repo / p).exists()]
+                    if changed_outputs:
                         errors.append(
                             f"campaign output changed outside receipts: {changed_outputs[:5]}"
                         )
@@ -510,7 +510,8 @@ class CampaignManifest:
                 # --resume could route around it (a fresh id can't attribute pre-existing
                 # untracked output; resume re-gates existing bytes instead of re-translating).
                 dirty_candidates = sorted((dirty & all_outputs) - accepted_set - set(declared))
-                if dirty_candidates and os.environ.get("CAMPAIGN_ALLOW_UNRECEIPTED_OUTPUTS") != "1":
+                dirty_candidates = [p for p in dirty_candidates if (content_repo / p).exists()]
+                if dirty_candidates:
                     errors.append(f"unreceipted campaign output is dirty: {dirty_candidates[:5]}")
             elif require_clean:
                 dirty = git_dirty_paths(content_repo)
@@ -632,13 +633,6 @@ class CampaignManifest:
                     continue
                 spec = source.replacement_for(locale)
                 if spec is None:
-                    # During a live multi-worker wave another worker may have
-                    # atomically materialized this output before its receipt
-                    # journal is merged. The controller will reconcile that
-                    # journal at the wave boundary; do not abort every peer
-                    # worker on this transient state.
-                    if os.environ.get("CAMPAIGN_ALLOW_UNRECEIPTED_OUTPUTS") == "1":
-                        continue
                     errors.append(f"unexpected existing output: {output}")
                 elif sha256_file(content_repo / output) != spec.get("expected_sha256"):
                     errors.append(

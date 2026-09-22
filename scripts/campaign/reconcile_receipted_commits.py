@@ -287,6 +287,8 @@ def main(argv: list[str] | None = None) -> int:
              "fixed-size chunks, and never held back once the minimum is met.",
     )
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--max-batch-wait-seconds", type=int, default=3600,
+                        help="Flush smaller verified groups after this age; 0 flushes immediately.")
     parser.add_argument("--co-author", default="hugo-translator <hugo-translator@aspose.org>")
     parser.add_argument("--session-id", help="Explicit governed aspose.org S-76 session identity.")
     args = parser.parse_args(argv)
@@ -324,12 +326,23 @@ def reconcile(args: argparse.Namespace, manifest: CampaignManifest) -> int:
     grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for receipt in verified:
         grouped[index[str(receipt["output_path"])]].append(receipt)
+    # Ageing small groups may be combined within their site, retaining the
+    # content repository's minimum commit size and exact receipt ownership.
+    aged: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for group, rows in list(grouped.items()):
+        times = [datetime.fromisoformat(row["accepted_at"].replace("Z", "+00:00"))
+                 for row in rows if row.get("accepted_at")]
+        age = (datetime.now(timezone.utc) - min(times)).total_seconds() if times else 0
+        if len(rows) < args.min_batch_size and age >= getattr(args, "max_batch_wait_seconds", 3600):
+            aged[group[0]].extend(grouped.pop(group))
+    for site, rows in aged.items():
+        grouped[(site, "portfolio", "mixed")].extend(rows)
     base_sha = subprocess.check_output(["git", "rev-parse", "main"], cwd=content_repo, text=True).strip()
     planned = 0
     for group in sorted(grouped):
         rows = sorted(grouped[group], key=lambda row: str(row["output_path"]))
         if len(rows) < args.min_batch_size:
-            continue  # never create an undersized checkpoint; leave a visible backlog.
+            continue
         chunk = rows  # commit everything currently available in this group as one batch
         paths = [str(row["output_path"]) for row in chunk]
         message = build_commit_message(group, chunk)

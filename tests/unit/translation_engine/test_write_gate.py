@@ -369,6 +369,18 @@ class TestGateYamlFrontmatter:
         assert r.passed
 
 
+    def test_unconfigured_metadata_must_be_preserved(self):
+        src_doc = MagicMock()
+        src_doc.frontmatter = {"title": "Test", "weight": 2, "provenance": {"origin": "skill"}}
+        profile = MagicMock()
+        profile.frontmatter = {"title": MagicMock(mode="translate")}
+        gate = _make_evaluator()
+        valid = "---\ntitle: Test DE\nweight: 2\nprovenance:\n  origin: skill\n---\nbody"
+        assert gate.evaluate(valid, "", "de", Path("test.md"), source_doc=src_doc, site_profile=profile).passed
+        dropped = "---\ntitle: Test DE\n---\nbody"
+        assert not gate.evaluate(dropped, "", "de", Path("test.md"), source_doc=src_doc, site_profile=profile).passed
+
+
 # ---------------------------------------------------------------------------
 # WriteGateResult dataclass
 # ---------------------------------------------------------------------------
