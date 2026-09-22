@@ -68,7 +68,7 @@ class Controller:
         if not self.lock.acquire(blocking=False):
             self.write("REFUSED","live_controller_lock")
             return 75
-        content_root=self.manifest.content_repo / "content"
+        content_root=Path(self.manifest.content_repo) / "content"
         if not content_root.is_dir():
             self.write("FAILED",f"content_root_missing:{content_root}")
             return 78
@@ -93,7 +93,7 @@ class Controller:
                 log.write(f"{datetime.now(timezone.utc).isoformat()} launching bounded wave session={self.session}\n")
                 flags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
                 child_env=os.environ.copy()
-                child_env["ASPOSE_ORG_CONTENT"]=str(self.manifest.content_repo / "content")
+                child_env["ASPOSE_ORG_CONTENT"]=str(Path(self.manifest.content_repo) / "content")
                 child_env["CUDA_VISIBLE_DEVICES"]="-1"
                 child_env["OMP_NUM_THREADS"]="1"
                 child_env["MKL_NUM_THREADS"]="1"
