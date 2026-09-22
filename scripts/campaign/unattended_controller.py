@@ -97,6 +97,7 @@ class Controller:
                 child_env["CUDA_VISIBLE_DEVICES"]="-1"
                 child_env["OMP_NUM_THREADS"]="1"
                 child_env["MKL_NUM_THREADS"]="1"
+                child_env["CAMPAIGN_ALLOW_UNRECEIPTED_OUTPUTS"]="1"
                 child_env["PYTHONPATH"]=os.pathsep.join(
                     [str(self.a.runtime),str(self.a.control),child_env.get("PYTHONPATH","")]
                 ).rstrip(os.pathsep)

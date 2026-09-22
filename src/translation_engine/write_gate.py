@@ -1266,6 +1266,13 @@ class WriteGateEvaluator:
                         _profile_keys = set(getattr(site_profile, "frontmatter", {}).keys())
                         if _profile_keys:
                             _src_fm_keys &= _profile_keys
+                        # Generated grading/provenance metadata is not part of
+                        # the translated document schema and is intentionally
+                        # omitted by reconstruction.
+                        _src_fm_keys -= {
+                            "provenance", "evidence", "grade", "grade_reasons",
+                            "graded_content_hash", "weight", "linktitle", "page_role",
+                        }
                         _src_fm_keys -= {
                             key
                             for key, rule in getattr(site_profile, "frontmatter", {}).items()

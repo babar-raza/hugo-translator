@@ -8,6 +8,7 @@ into another product, surface, locale, or repository revision.
 from __future__ import annotations
 
 import hashlib
+import os
 import json
 import subprocess
 from dataclasses import dataclass, field
@@ -631,6 +632,13 @@ class CampaignManifest:
                     continue
                 spec = source.replacement_for(locale)
                 if spec is None:
+                    # During a live multi-worker wave another worker may have
+                    # atomically materialized this output before its receipt
+                    # journal is merged. The controller will reconcile that
+                    # journal at the wave boundary; do not abort every peer
+                    # worker on this transient state.
+                    if os.environ.get("CAMPAIGN_ALLOW_UNRECEIPTED_OUTPUTS") == "1":
+                        continue
                     errors.append(f"unexpected existing output: {output}")
                 elif sha256_file(content_repo / output) != spec.get("expected_sha256"):
                     errors.append(
