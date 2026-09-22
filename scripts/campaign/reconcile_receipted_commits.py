@@ -242,6 +242,22 @@ def commit_group(
     import tempfile
 
     tool = content_repo / "scripts/pipeline/commands/ops/git_plumb_commit.py"
+    ledger_tool = content_repo / "scripts/pipeline/commands/ops/session_ledger.py"
+    if not session_id:
+        raise ValueError("receipt checkpoint requires an explicit session id")
+    init = subprocess.run(
+        [sys.executable, str(ledger_tool), "init", "--session-id", session_id, "--if-missing"],
+        cwd=content_repo, text=True, encoding="utf-8", errors="replace", capture_output=True,
+    )
+    if init.returncode:
+        return init.returncode, (init.stdout + "\n" + init.stderr)[-8000:]
+    adopt = subprocess.run(
+        [sys.executable, str(ledger_tool), "adopt", "--files", *paths,
+         "--skill", "S-HT-02", "--session-id", session_id],
+        cwd=content_repo, text=True, encoding="utf-8", errors="replace", capture_output=True,
+    )
+    if adopt.returncode:
+        return adopt.returncode, (adopt.stdout + "\n" + adopt.stderr)[-8000:]
     with tempfile.TemporaryDirectory(prefix="portfolio-receipts-") as temp:
         root = Path(temp)
         files = root / "files.txt"
@@ -251,8 +267,7 @@ def commit_group(
         cmd = [sys.executable, str(tool), "--files-from", str(files), "--message-file", str(message_path),
              "--skills", "S-76", "S-HT-02", "--plan", "receipt-backed portfolio checkpoint",
              "--branch", "main", "--base-sha", base_sha, "--co-author", co_author, "--no-push"]
-        if session_id:
-            cmd.extend(["--session-id", session_id])
+        cmd.extend(["--session-id", session_id])
         result = subprocess.run(
             cmd,
             cwd=content_repo, text=True, encoding="utf-8", errors="replace", capture_output=True,
@@ -335,7 +350,8 @@ def reconcile(args: argparse.Namespace, manifest: CampaignManifest) -> int:
             append_jsonl(batches_path, record)
             code, output = commit_group(
                 content_repo=content_repo, paths=paths, message=message, base_sha=base_sha,
-                co_author=args.co_author, session_id=args.session_id,
+                co_author=args.co_author,
+                session_id=args.session_id or f"{manifest.campaign_id}-checkpoint",
             )
             if code:
                 record.update({"status": "FAILED", "error": output})
