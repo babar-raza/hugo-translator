@@ -150,7 +150,9 @@ def main() -> int:
             with sqlite3.connect(spool_path) as conn:
                 for state, count in conn.execute("select state, count(*) from tm_intents group by state"):
                     spool[str(state)] += count
-    remaining = max(0, manifest.expected_output_count - accepted)
+    expected_outputs = {output for source in manifest.sources for output in source.outputs.values()}
+    accepted_in_manifest = len(expected_outputs.intersection(receipts))
+    remaining = max(0, manifest.expected_output_count - accepted_in_manifest)
     elapsed_seconds = 0.0
     if len(accepted_times) > 1:
         elapsed_seconds = max((end - start).total_seconds(), 0.0)
@@ -168,6 +170,8 @@ def main() -> int:
     )
     payload = {"campaign": manifest.campaign_id, "accepted": accepted, "failures": len(failures), "rate_per_minute": round(rate, 3), "remaining": remaining, "eta_minutes": round(remaining / rate, 1) if rate else None, "committed": committed, "pending_commit": max(0, accepted-committed), "spool": spool, "metrics": metrics, "throughput": throughput}
     payload["pending_journals"] = len(list((root / "journals").glob("*/acceptance_receipts.jsonl"))) if (root / "journals").is_dir() else 0
+    payload["accepted_in_manifest"] = accepted_in_manifest
+    payload["historical_accepted"] = accepted - accepted_in_manifest
     payload["rolling_15m"] = rolling_receipt_rate(receipts.values(), now=time.time())
     payload["llm_slots"] = live_llm_slots(args.llm_slots, args.llm_slot_capacity)
     state_path = root / "watchdog_state.json"

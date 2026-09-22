@@ -101,7 +101,9 @@ class CampaignLedger:
 
     def _journal_paths(self, name: str) -> list[Path]:
         if self.partition_id is not None:
-            return [self.write_root / name]
+            # Isolation applies to writes. Completed canonical work must remain
+            # visible after journals are merged and assignments are reshuffled.
+            return [self.root / name, self.write_root / name]
         paths = [self.root / name]
         journals = self.root / "journals"
         if journals.is_dir():
@@ -688,7 +690,21 @@ class CampaignRunner:
         }
         for output, receipt in receipts.items():
             if output not in expected_outputs:
-                raise CampaignManifestError(f"receipt outside campaign scope: {output}")
+                # Missing-only rebuilds remove already completed cells from
+                # the manifest. Verify their immutable evidence but do not
+                # schedule or count them as work in the current manifest.
+                historical = {k: v for k, v in receipt.items() if k != "receipt_sha256"}
+                historical_source = (self.content_repo / receipt.get("source_path", "")).resolve()
+                historical_output = (self.content_repo / output).resolve()
+                if (receipt.get("campaign_id") != self.manifest.campaign_id
+                    or receipt_fingerprint(historical) != receipt.get("receipt_sha256")
+                    or not historical_source.is_relative_to(self.content_repo.resolve())
+                    or not historical_output.is_relative_to(self.content_repo.resolve())
+                    or not historical_source.is_file() or not historical_output.is_file()
+                    or sha256_file(historical_source) != receipt.get("source_sha256")
+                    or sha256_file(historical_output) != receipt.get("output_sha256")):
+                    raise CampaignManifestError(f"invalid historical receipt outside campaign scope: {output}")
+                continue
             source, locale = expected_outputs[output]
             claimed_fingerprint = receipt.get("receipt_sha256")
             unsigned = {key: value for key, value in receipt.items() if key != "receipt_sha256"}

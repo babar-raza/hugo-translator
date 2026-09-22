@@ -35,3 +35,15 @@ def test_conflicting_partition_receipts_fail_closed(tmp_path):
     CampaignLedger(tmp_path, "campaign", "worker-01").append_receipt(receipt("content/a.md", "b" * 64))
     with pytest.raises((RuntimeError, ValueError), match="conflicting"):
         merge(tmp_path / "campaign")
+
+
+def test_new_worker_sees_merged_receipts_without_writing_canonical(tmp_path):
+    CampaignLedger(tmp_path, "campaign", "worker-00").append_receipt(receipt("content/a.md"))
+    merge(tmp_path / "campaign")
+    canonical = tmp_path / "campaign" / "acceptance_receipts.jsonl"
+    before = canonical.read_bytes()
+    resumed = CampaignLedger(tmp_path, "campaign", "worker-07")
+    assert "content/a.md" in resumed.receipts()
+    resumed.append_receipt(receipt("content/b.md", "b" * 64))
+    assert canonical.read_bytes() == before
+    assert set(resumed.receipts()) == {"content/a.md", "content/b.md"}
