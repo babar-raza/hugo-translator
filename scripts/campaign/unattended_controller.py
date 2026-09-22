@@ -83,8 +83,12 @@ class Controller:
             with self.log_path.open("a",encoding="utf-8",buffering=1) as log:
                 log.write(f"{datetime.now(timezone.utc).isoformat()} launching bounded wave session={self.session}\n")
                 flags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+                child_env=os.environ.copy()
+                child_env["PYTHONPATH"]=os.pathsep.join(
+                    [str(self.a.runtime),str(self.a.control),child_env.get("PYTHONPATH","")]
+                ).rstrip(os.pathsep)
                 self.child=subprocess.Popen(cmd,cwd=self.a.control,stdout=log,stderr=subprocess.STDOUT,
-                                            creationflags=flags)
+                                            creationflags=flags,env=child_env)
                 code=self._wait_for_wave()
             self.child=None
             if self.stop: self.write("INTERRUPTED","controller_signal"); return 130
