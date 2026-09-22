@@ -353,6 +353,21 @@ class TestGateYamlFrontmatter:
         assert not r.passed
         assert r.quarantine_content is not None
 
+    def test_ignored_profile_keys_are_expected_to_be_absent(self):
+        src_doc = MagicMock()
+        src_doc.frontmatter = {"title": "Test", "aliases": ["/old/"]}
+        profile = MagicMock()
+        profile.frontmatter = {
+            "title": MagicMock(mode="translate"),
+            "aliases": MagicMock(mode="ignore"),
+        }
+        tgt = "---\ntitle: Test DE\n---\nbody"
+        gate = _make_evaluator()
+        r = gate.evaluate(
+            tgt, "", "de", Path("test.md"), source_doc=src_doc, site_profile=profile
+        )
+        assert r.passed
+
 
 # ---------------------------------------------------------------------------
 # WriteGateResult dataclass

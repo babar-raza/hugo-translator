@@ -762,7 +762,7 @@ class WriteGateEvaluator:
                 self._gate_heading_surplus(source_content, translated_content, output_path, result)
             if result.passed:
                 self._gate_yaml_frontmatter(
-                    translated_content, output_path, target_lang, source_doc, result
+                    translated_content, output_path, target_lang, source_doc, result, site_profile
                 )
             working = self._run_content_gates(
                 source_content,
@@ -826,7 +826,7 @@ class WriteGateEvaluator:
 
         # Gate 8: YAML frontmatter structural (RC-5/RC-6)
         self._gate_yaml_frontmatter(
-            translated_content, output_path, target_lang, source_doc, result
+            translated_content, output_path, target_lang, source_doc, result, site_profile
         )
         if _record_early_failure(8):
             return result
@@ -1238,6 +1238,7 @@ class WriteGateEvaluator:
         target_lang: str,
         source_doc: Any,
         result: WriteGateResult,
+        site_profile: Any = None,
     ) -> None:
         try:
             import yaml as _pre_write_yaml
@@ -1254,6 +1255,14 @@ class WriteGateEvaluator:
                     and source_doc.frontmatter
                 ):
                     _src_fm_keys = set(source_doc.frontmatter.keys())
+                    if site_profile is not None:
+                        _src_fm_keys -= {
+                            key
+                            for key, rule in getattr(site_profile, "frontmatter", {}).items()
+                            if "." not in key
+                            and str(getattr(rule, "mode", "")).lower()
+                            in {"ignore", "frontmattermode.ignore"}
+                        }
                     _out_fm_keys = set(_fm_parsed.keys())
                     if _src_fm_keys != _out_fm_keys:
                         _diff = _src_fm_keys ^ _out_fm_keys
