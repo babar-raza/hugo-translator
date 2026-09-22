@@ -41,6 +41,22 @@ class Controller:
             self.write("RUNNING",command="bounded_wave",child_pid=self.child.pid)
             time.sleep(15)
         return self.child.returncode if self.child else 1
+    def _active_shard_locks(self):
+        active=[]
+        for path in self.root.glob("shard-*.lock"):
+            probe=FileLock(path,timeout=0)
+            if probe.acquire(blocking=False):
+                probe.release()
+            else:
+                active.append(path.name)
+        return active
+    def _adopt_orphan_wave(self):
+        """Wait for durable workers left by an interrupted prior controller."""
+        while not self.stop:
+            active=self._active_shard_locks()
+            if not active: return
+            self.write("RUNNING","adopting_orphan_wave",active_shard_locks=len(active))
+            time.sleep(15)
     def run(self):
         for sig in (signal.SIGINT,signal.SIGTERM): signal.signal(sig,self.on_signal)
         if not self.lock.acquire(blocking=False):
@@ -49,6 +65,8 @@ class Controller:
         self.write("STARTING")
         merge=[sys.executable,str(self.a.runtime/"scripts/campaign/merge_campaign_journals.py"),"--campaign-id",self.root.name,"--ledger-root",str(self.a.ledger_root)]
         while not self.stop:
+            self._adopt_orphan_wave()
+            if self.stop: break
             subprocess.run(merge,check=True,timeout=300)
             cmd=[sys.executable,"-u",str(self.a.runtime/"scripts/campaign/launch_parallel_campaign_shards.py"),
                  "--campaign-manifest",str(self.a.manifest),"--ledger-root",str(self.a.ledger_root),"--child","gate5",
