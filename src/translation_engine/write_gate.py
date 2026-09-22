@@ -1256,6 +1256,16 @@ class WriteGateEvaluator:
                 ):
                     _src_fm_keys = set(source_doc.frontmatter.keys())
                     if site_profile is not None:
+                        # The site profile is the authoritative schema for
+                        # translatable/passthrough frontmatter.  Source files
+                        # also contain generated metadata (for example
+                        # provenance/evidence) that the reconstructor
+                        # intentionally does not emit.  Requiring those
+                        # unprofiled keys makes every otherwise valid output
+                        # fail Gate 8 and stalls large campaigns.
+                        _profile_keys = set(getattr(site_profile, "frontmatter", {}).keys())
+                        if _profile_keys:
+                            _src_fm_keys &= _profile_keys
                         _src_fm_keys -= {
                             key
                             for key, rule in getattr(site_profile, "frontmatter", {}).items()
