@@ -80,8 +80,43 @@ def manifest_output_index(manifest: CampaignManifest) -> dict[str, tuple[str, st
     return index
 
 
+def manifest_source_index(manifest: CampaignManifest) -> dict[str, tuple[tuple[str, str, str], str]]:
+    """Ownership and immutable hash for sources retained by a missing-only rebuild."""
+    return {
+        source.source_path: (
+            (source.site_id, source.family, source.platform),
+            source.source_sha256,
+        )
+        for source in manifest.sources
+    }
+
+
+def receipt_source_ownership(
+    receipt: dict[str, Any], *, content_repo: Path
+) -> tuple[tuple[str, str, str], str]:
+    """Recover ownership for a source fully omitted by a missing-only rebuild.
+
+    The receipt's immutable source hash remains the authority.  Path segments
+    are used only for checkpoint grouping, never to authorize content bytes.
+    """
+    source_path = str(receipt.get("source_path") or "").replace("\\", "/")
+    parts = Path(source_path).parts
+    if len(parts) < 4 or parts[0] != "content" or not parts[1].endswith(".aspose.org"):
+        raise ValueError(f"cannot recover receipt source ownership: {source_path or '<missing>'}")
+    source = (content_repo / source_path).resolve()
+    if content_repo not in source.parents or not source.is_file():
+        raise ValueError(f"receipted source missing from content repo: {source_path}")
+    source_sha256 = str(receipt.get("source_sha256") or "")
+    if not source_sha256 or sha256_file(source) != source_sha256:
+        raise ValueError(f"receipt/source sha256 mismatch: {source_path}")
+    return (parts[1], parts[2], parts[3]), source_sha256
+
+
 def verified_receipts(
-    receipts: list[dict[str, Any]], *, content_repo: Path, output_index: dict[str, tuple[str, str, str]]
+    receipts: list[dict[str, Any]], *, content_repo: Path,
+    output_index: dict[str, tuple[str, str, str]],
+    source_index: dict[str, tuple[tuple[str, str, str], str]],
+    campaign_id: str,
 ) -> list[dict[str, Any]]:
     seen: set[str] = set()
     verified: list[dict[str, Any]] = []
@@ -90,8 +125,20 @@ def verified_receipts(
         if not output or output in seen:
             raise ValueError(f"duplicate or missing receipt ownership: {output or '<missing>'}")
         seen.add(output)
+        if str(receipt.get("campaign_id") or campaign_id) != campaign_id:
+            raise ValueError(f"receipt belongs to another campaign: {output}")
         if output not in output_index:
-            raise ValueError(f"receipt output is not in manifest: {output}")
+            # A fresh missing-only manifest necessarily omits an output that
+            # an earlier wave has already materialized. Preserve that valid
+            # receipt by recovering ownership from its still-governed source.
+            source_path = str(receipt.get("source_path") or "")
+            source_entry = source_index.get(source_path)
+            if source_entry is None:
+                source_entry = receipt_source_ownership(receipt, content_repo=content_repo)
+            group, source_sha256 = source_entry
+            if receipt.get("source_sha256") != source_sha256:
+                raise ValueError(f"receipt/source sha256 mismatch: {output}")
+            output_index[output] = group
         target = (content_repo / output).resolve()
         if content_repo not in target.parents or not target.is_file():
             raise ValueError(f"receipted output missing from content repo: {output}")
@@ -252,7 +299,13 @@ def reconcile(args: argparse.Namespace, manifest: CampaignManifest) -> int:
         if (str(receipt.get("output_path") or ""), receipt_digest(receipt)) not in completed
     ]
     index = manifest_output_index(manifest)
-    verified = verified_receipts(receipts, content_repo=content_repo, output_index=index)
+    verified = verified_receipts(
+        receipts,
+        content_repo=content_repo,
+        output_index=index,
+        source_index=manifest_source_index(manifest),
+        campaign_id=manifest.campaign_id,
+    )
     grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for receipt in verified:
         grouped[index[str(receipt["output_path"])]].append(receipt)
