@@ -3,7 +3,7 @@ campaign_id: portfolio-professionalize-unattended-20260921
 validation_policy: zero-defect
 content_repo: D:/onedrive/Documents/GitHub/aspose.org
 content_repo_sha: 543a36a2fd091dd3f488cd1cbf9eb73bd70bd73d
-translator_repo_sha: 627fc3367dc6da0d76743052c9ce0b4bcbf01d0d
+translator_repo_sha: 093e20a24e3a6f49e08d335c61e77cde46b4c6c0
 config_fingerprint: 9c50153b46f9ced5e32d7fd02b4bbb40c7ed78220021b05c43e1996cdb17df28
 model_fingerprints:
   model_registry: a22c06b1bf6b3b6feed3923c42c1aff173e3f88f6da15ad81b6b4f6ea6351193
@@ -244,7 +244,10 @@ sources:
     pl: content/docs.aspose.org/pl/cells/cpp/developer-guide/working-with-spreadsheet-management.md
     zh: content/docs.aspose.org/zh/cells/cpp/developer-guide/working-with-spreadsheet-management.md
   wave: 0
-  replace_existing: {}
+  replace_existing:
+    nl:
+      expected_sha256: 05f4c4e423ae2cb104e24c51aad50482323a07daed5f6231b3a49448fd65046c
+      reason_code: unreceipted_interrupted_candidate
 - site_id: docs.aspose.org
   family: cells
   platform: cpp
@@ -329,7 +332,10 @@ sources:
     ja: content/docs.aspose.org/ja/cells/typescript/developer-guide/_index.md
     nl: content/docs.aspose.org/nl/cells/typescript/developer-guide/_index.md
   wave: 0
-  replace_existing: {}
+  replace_existing:
+    de:
+      expected_sha256: 66b766ec1382703dea34709fa7bcafc0498eef77d2d9d4e80c2acb611eeef19c
+      reason_code: unreceipted_interrupted_candidate
 - site_id: docs.aspose.org
   family: cells
   platform: typescript
@@ -360,7 +366,10 @@ sources:
     pl: content/docs.aspose.org/pl/cells/typescript/developer-guide/working-with-spreadsheet-management.md
     zh: content/docs.aspose.org/zh/cells/typescript/developer-guide/working-with-spreadsheet-management.md
   wave: 0
-  replace_existing: {}
+  replace_existing:
+    de:
+      expected_sha256: d2838fe8cc2820863c2493a29761ec7df76d45f93032201f95499ead01cbdeed
+      reason_code: unreceipted_interrupted_candidate
 - site_id: docs.aspose.org
   family: cells
   platform: typescript
@@ -372,7 +381,10 @@ sources:
     ja: content/docs.aspose.org/ja/cells/typescript/getting-started/_index.md
     nl: content/docs.aspose.org/nl/cells/typescript/getting-started/_index.md
   wave: 0
-  replace_existing: {}
+  replace_existing:
+    de:
+      expected_sha256: 93b3b2588aabd1c246fd4073e58927f69c683a17b02f9646dda47b9df52ce7cb
+      reason_code: unreceipted_interrupted_candidate
 - site_id: docs.aspose.org
   family: cells
   platform: typescript
@@ -384,7 +396,10 @@ sources:
     ja: content/docs.aspose.org/ja/cells/typescript/getting-started/installation.md
     nl: content/docs.aspose.org/nl/cells/typescript/getting-started/installation.md
   wave: 0
-  replace_existing: {}
+  replace_existing:
+    de:
+      expected_sha256: 6c5f1d4b41c38ff145341e65e9068460fd8799d2c9456d8d340db70acc577b60
+      reason_code: unreceipted_interrupted_candidate
 - site_id: docs.aspose.org
   family: cells
   platform: typescript
