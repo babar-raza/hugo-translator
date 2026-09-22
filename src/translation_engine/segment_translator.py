@@ -1740,7 +1740,26 @@ class SegmentTranslator:
                 # candidate units directly to `doc.frontmatter`; applying the
                 # legacy segment map again here can overwrite an escalated LLM
                 # frontmatter value with an earlier unchanged MT result.
-                translated_frontmatter = doc.frontmatter
+                # The AST renderer mutates translated fields in-place but does
+                # not apply profile-level IGNORE/COMPUTED reconstruction rules.
+                # Run the same frontmatter policy used by the legacy path so
+                # route metadata such as ``aliases``/``url`` cannot leak into
+                # localized outputs. Empty translations preserve the already
+                # translated AST values while applying structural rules.
+                _fm_reconstruction_translations = (
+                    {}
+                    if _retry_original_frontmatter_value(
+                        model_id_override,
+                        retry_feedback,
+                        getattr(engine, "validation_policy", "standard"),
+                    )
+                    else translations
+                )
+                translated_frontmatter = MarkdownReconstructor(
+                    site_profile
+                ).reconstruct_frontmatter(
+                    doc.frontmatter, _fm_reconstruction_translations, target_lang
+                )
 
                 from .reconstructor import YAMLFormatter
 
@@ -1805,7 +1824,7 @@ class SegmentTranslator:
                 frontmatter_yaml = yaml_formatter.format_frontmatter(translated_frontmatter)
 
                 # RC-3 FIX: Verify frontmatter keys were not translated
-                _source_keys = set(doc.frontmatter.keys())
+                _source_keys = set(translated_frontmatter.keys())
                 _out_data = self._parse_formatted_frontmatter(frontmatter_yaml)
                 _out_keys = set(_out_data.keys()) if isinstance(_out_data, dict) else set()
                 if _source_keys != _out_keys:

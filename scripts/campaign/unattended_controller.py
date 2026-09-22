@@ -14,7 +14,8 @@ def boot_id() -> str:
 class Controller:
     def __init__(self, args):
         self.a=args; self.stop=False; self.child=None; self.session=str(uuid.uuid4())
-        self.root=args.ledger_root / CampaignManifest.load(args.manifest).campaign_id
+        self.manifest=CampaignManifest.load(args.manifest)
+        self.root=args.ledger_root / self.manifest.campaign_id
         self.state=self.root / "controller_state.json"; self.root.mkdir(parents=True,exist_ok=True)
         self.log_path=self.root / "controller.log"
         self.lock=FileLock(self.root / "controller.lock", timeout=0)
@@ -67,6 +68,14 @@ class Controller:
         if not self.lock.acquire(blocking=False):
             self.write("REFUSED","live_controller_lock")
             return 75
+        content_root=self.manifest.content_repo / "content"
+        if not content_root.is_dir():
+            self.write("FAILED",f"content_root_missing:{content_root}")
+            return 78
+        primary_model=str(self.manifest.retry_policy.get("primary_model", ""))
+        if primary_model != "professionalize_llm":
+            self.write("FAILED",f"provider_policy:{primary_model}")
+            return 78
         self.write("STARTING")
         merge=[sys.executable,str(self.a.runtime/"scripts/campaign/merge_campaign_journals.py"),"--campaign-id",self.root.name,"--ledger-root",str(self.a.ledger_root)]
         while not self.stop:
@@ -84,6 +93,10 @@ class Controller:
                 log.write(f"{datetime.now(timezone.utc).isoformat()} launching bounded wave session={self.session}\n")
                 flags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
                 child_env=os.environ.copy()
+                child_env["ASPOSE_ORG_CONTENT"]=str(self.manifest.content_repo / "content")
+                child_env["CUDA_VISIBLE_DEVICES"]="-1"
+                child_env["OMP_NUM_THREADS"]="1"
+                child_env["MKL_NUM_THREADS"]="1"
                 child_env["PYTHONPATH"]=os.pathsep.join(
                     [str(self.a.runtime),str(self.a.control),child_env.get("PYTHONPATH","")]
                 ).rstrip(os.pathsep)
