@@ -46,11 +46,17 @@ class CampaignProcessMonitor:
         # an operator is inspecting status.  Ownership therefore requires a
         # controller/launcher marker or an ancestor chain to one; a bare ID or
         # checkout path is never sufficient.
+        # Deliberately script names, not the runtime clone's bare directory name
+        # ("portfolio-runtime-64" was removed): that fragment can appear in any
+        # unrelated command line on a dev machine that happens to reference the
+        # same path (e.g. an operator's own shell history or tooling), which
+        # produced false "campaign_owned" incidents unrelated to the campaign's
+        # own process tree. Every genuine campaign process is still reachable:
+        # workers are direct children of the launcher, which matches by name.
         markers = (
             "unattended_controller.py",
             "launch_parallel_campaign_shards.py",
             "start_portfolio_missing_sweep_autonomous",
-            "portfolio-runtime-64",
         )
         text = row["command"].lower()
         if any(marker in text for marker in markers):
