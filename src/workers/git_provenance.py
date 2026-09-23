@@ -27,6 +27,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from src.utils.windows_process import hidden_subprocess_kwargs
+
 
 class GovernedProvenanceError(RuntimeError):
     """The path's git history does not constitute governed provenance."""
@@ -52,7 +54,14 @@ def governed_subject_pattern(
 def _run(
     repo: Path, args: list[str], *, check: bool = True, text: bool = False
 ) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=repo, check=check, capture_output=True, text=text)
+    return subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        check=check,
+        capture_output=True,
+        text=text,
+        **hidden_subprocess_kwargs(),
+    )
 
 
 def is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
