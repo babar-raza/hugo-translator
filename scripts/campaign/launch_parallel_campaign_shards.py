@@ -672,7 +672,10 @@ def _run_wave(
                 cwd=Path.cwd(),
                 stdout=handle,
                 stderr=subprocess.STDOUT,
-                **hidden_subprocess_kwargs(new_process_group=True),
+                # no_window=False: workers may host Fortran/MKL-backed local
+                # models; CREATE_NO_WINDOW was already tried historically and
+                # still produced a forrtl-200 abort (see hidden_creation_flags).
+                **hidden_subprocess_kwargs(new_process_group=True, no_window=False),
             )
         except BaseException:
             stop_children(children)
