@@ -2282,14 +2282,21 @@ class CampaignRunner:
             jobs = [job for shard in selected for job in shard["jobs"]]
             scope_sources = {source.source_path for source, _locale, _output in jobs}
             scope_outputs = {output for _source, _locale, output in jobs}
-        self.manifest.verify_environment(
-            translator_repo=self.translator_repo,
-            require_clean=require_clean,
-            allow_existing_accepted=set(receipts),
-            scope_sources=scope_sources,
-            scope_outputs=scope_outputs,
-            allow_campaign_tm_drift=resume,
-        )
+        # Git's index/process access is not safe to fan out through OneDrive:
+        # concurrent ``rev-parse``/``diff`` calls have intermittently failed
+        # with a Windows process-start error before any translation begins.
+        # Verification remains mandatory, but its repository probes are a
+        # short campaign-wide critical section; the actual source/output hash
+        # checks stay scoped to this worker's disjoint shard afterwards.
+        with FileLock(self.ledger.root / "content-preflight.lock", timeout=300):
+            self.manifest.verify_environment(
+                translator_repo=self.translator_repo,
+                require_clean=require_clean,
+                allow_existing_accepted=set(receipts),
+                scope_sources=scope_sources,
+                scope_outputs=scope_outputs,
+                allow_campaign_tm_drift=resume,
+            )
         return {
             **self.manifest.to_summary(),
             "accepted": len(receipts),
