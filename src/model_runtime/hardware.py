@@ -13,7 +13,15 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 
-import torch
+# Conditional torch import — mirrors loader.py: allows LLM-API-only usage (no
+# local model, no GPU) without PyTorch installed. Hardware detection falls
+# back to CPU-only when torch is absent.
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    torch = None  # type: ignore[assignment]
+    HAS_TORCH = False
 
 
 @dataclass
@@ -68,7 +76,7 @@ class HardwareDetector:
             total_ram = 16.0  # Assume 16GB as safe fallback
 
         # CUDA detection
-        has_cuda = torch.cuda.is_available()
+        has_cuda = HAS_TORCH and torch.cuda.is_available()
         cuda_devices = []
 
         if has_cuda:
@@ -84,7 +92,7 @@ class HardwareDetector:
 
         # Apple MPS detection
         has_mps = (
-            torch.backends.mps.is_available() if hasattr(torch.backends, "mps") else False
+            HAS_TORCH and hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
         )
 
         # Determine recommended device
