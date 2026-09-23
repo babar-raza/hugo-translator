@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.workers.campaign_manifest import CampaignManifest
-from src.workers.heal_queue import active_hold, is_source_path_quarantined
+from src.workers.heal_queue import quarantined_files
 
 try:  # Package execution (`python -m`) and direct script execution are both supported.
     from scripts.campaign.throughput_slo import ThroughputPolicy, evaluate_throughput
@@ -94,12 +94,23 @@ def live_llm_slots(path: Path, capacity: int = 0) -> dict[str, int]:
 def held_outputs(manifest: CampaignManifest, receipts: dict[str, dict]) -> set[str]:
     """Return receipt-incomplete outputs blocked by durable source-level holds."""
     queue = Path("data/campaigns/heal_queue.jsonl")
+    # One queue pass only: this status path runs continuously during a 100k
+    # campaign and must never rescan the queue once per manifest source.
+    latest_hold: dict[str, dict | None] = {}
+    for row in rows(queue):
+        source_path = str(row.get("source_path") or "")
+        if not source_path:
+            continue
+        if row.get("kind") == "hold":
+            latest_hold[source_path] = row
+        elif row.get("kind") == "release":
+            latest_hold[source_path] = None
+    held_sources = {path for path, hold in latest_hold.items() if hold is not None}
+    held_sources.update(path for path, _root in quarantined_files(heal_queue_path=queue))
     held: set[str] = set()
     for source in manifest.sources:
         source_path = str(source.source_path)
-        blocked = active_hold(source_path, heal_queue_path=queue) is not None
-        quarantined, _reason = is_source_path_quarantined(source_path, heal_queue_path=queue)
-        if blocked or quarantined:
+        if source_path in held_sources:
             held.update(output for output in source.outputs.values() if output not in receipts)
     return held
 
