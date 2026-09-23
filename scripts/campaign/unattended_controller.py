@@ -15,7 +15,7 @@ from pathlib import Path
 
 from src.utils.atomic_write import atomic_write
 from src.utils.file_lock import FileLock
-from src.utils.windows_process import hidden_subprocess_kwargs
+from src.utils.windows_process import hidden_python_executable, hidden_subprocess_kwargs
 from src.workers.campaign_manifest import CampaignManifest
 from src.workers.campaign_process_monitor import CampaignProcessMonitor
 
@@ -152,7 +152,7 @@ class Controller:
             return 78
         self.write("STARTING")
         merge = [
-            sys.executable,
+            hidden_python_executable(),
             str(self.a.runtime / "scripts/campaign/merge_campaign_journals.py"),
             "--campaign-id",
             self.root.name,
@@ -169,7 +169,7 @@ class Controller:
             self._recover_stale_claim()
             subprocess.run(merge, check=True, timeout=300, **hidden_subprocess_kwargs())
             cmd = [
-                sys.executable,
+                hidden_python_executable(),
                 "-u",
                 str(self.a.runtime / "scripts/campaign/launch_parallel_campaign_shards.py"),
                 "--campaign-manifest",
@@ -243,7 +243,7 @@ class Controller:
                 continue
             progress = subprocess.check_output(
                 [
-                    sys.executable,
+                    hidden_python_executable(),
                     str(self.a.runtime / "scripts/campaign/campaign_progress.py"),
                     "--manifest",
                     str(self.a.manifest),

@@ -3,6 +3,14 @@
 from __future__ import annotations
 
 import subprocess
+import sys
+from pathlib import Path
+
+
+def hidden_python_executable() -> str:
+    """Use pythonw for campaign children so Windows never allocates conhost."""
+    candidate = Path(sys.executable).with_name("pythonw.exe")
+    return str(candidate) if candidate.is_file() else sys.executable
 
 
 def hidden_creation_flags(*, new_process_group: bool = False) -> int:

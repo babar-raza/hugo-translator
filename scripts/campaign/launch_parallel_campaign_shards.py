@@ -55,7 +55,7 @@ from typing import Any
 
 from src.hardware.gpu_admission import GPUAdmissionController, make_admission_controller
 from src.utils.file_lock import FileLock, LockError
-from src.utils.windows_process import hidden_subprocess_kwargs
+from src.utils.windows_process import hidden_python_executable, hidden_subprocess_kwargs
 from src.workers import work_claims
 from src.workers.campaign_manifest import CampaignManifest
 from src.workers.campaign_runner import CampaignLedger
@@ -151,7 +151,7 @@ def checkpoint_wave(
                 break
             subprocess.run(
                 [
-                    sys.executable,
+                    hidden_python_executable(),
                     "-m",
                     "src.workers.tm_intent_writer",
                     "--repository-root",
@@ -173,7 +173,7 @@ def checkpoint_wave(
     try:
         subprocess.run(
             [
-                sys.executable,
+                hidden_python_executable(),
                 str(translator_repo / "scripts/campaign/reconcile_receipted_commits.py"),
                 "--manifest",
                 str(args.campaign_manifest),
@@ -493,7 +493,7 @@ def _child_command(
     shard_ids = [str(shard["shard_id"]) for shard in shards]
     if child == "gate5":
         command = [
-            sys.executable,
+            hidden_python_executable(),
             "-u",
             "scripts/campaign/run_gate5_batch.py",
             "--manifest",
@@ -532,7 +532,7 @@ def _child_command(
         # startup across a group. Fail closed rather than silently drop shards.
         raise ValueError("--child worker accepts one shard per process; use --child gate5")
     return [
-        sys.executable,
+            hidden_python_executable(),
         "-m",
         "src.workers.autonomous_content_translation_worker",
         "--config-root",
