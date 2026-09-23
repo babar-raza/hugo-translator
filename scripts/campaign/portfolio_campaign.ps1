@@ -116,7 +116,9 @@ if ($Action -eq 'Qualify') {
     if ($LASTEXITCODE -ne 0) { throw 'Language detector preflight failed.' }
     # Qualification intentionally uses the identical production topology. It is
     # bounded by SoakHours and cannot approve a release without clean evidence.
-    & $py (Join-Path $runtime 'scripts\campaign\llm_preflight_calibration.py') --model-id professionalize_llm --levels '1,2,4,8' --calls-per-level 8 --output "reports\campaigns\$CampaignId\evidence\professionalize-concurrency-calibration.json"
+    $calibrationEvidence = "reports\campaigns\$CampaignId\evidence\professionalize-concurrency-calibration.json"
+    $calibrationState = "reports\campaigns\$CampaignId\evidence\professionalize-calibration-state.json"
+    & $py (Join-Path $runtime 'scripts\campaign\supervise_professionalize_calibration.py') --runtime $runtime --evidence-output $calibrationEvidence --state $calibrationState --timeout-seconds 900 --model-id professionalize_llm --levels '1,2,4,8' --calls-per-level 8 --output $calibrationEvidence
     if ($LASTEXITCODE -ne 0) { throw 'Professionalize calibration failed.' }
     $env:CUDA_VISIBLE_DEVICES='-1'; $env:OMP_NUM_THREADS='1'; $env:MKL_NUM_THREADS='1'
     & $py (Join-Path $runtime 'scripts\campaign\unattended_controller.py') --manifest $manifest --runtime $runtime --control $control --ledger-root $ledger --spool $spool

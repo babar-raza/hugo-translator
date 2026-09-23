@@ -49,6 +49,7 @@ class Controller:
             "pid": os.getpid(),
             "boot_id": boot_id(),
             "updated_at": time.time(),
+            "last_progress_at": time.time(),
             **extra,
         }
         atomic_write(
@@ -57,6 +58,22 @@ class Controller:
             fsync=True,
             create_parents=True,
         )
+
+    def _classify_wave_exit(self, code: int) -> tuple[str, str, bool]:
+        """Return status, durable reason, and whether bounded retry is safe."""
+        try:
+            detail = self.log_path.read_text(encoding="utf-8", errors="replace")[-4000:].lower()
+        except OSError:
+            detail = ""
+        if "lacks qualified professionalize concurrency evidence" in detail or "throughput release" in detail:
+            return "PAUSED_QUALIFICATION_REQUIRED", "qualification_required", False
+        if "duplicate acceptance receipt" in detail or "manifest" in detail and "changed" in detail:
+            return "PAUSED_DATA_INTEGRITY", "manifest_or_receipt_integrity", False
+        if "campaign_owned_terminal_process" in detail:
+            return "PAUSED_CONSOLE_INCIDENT", "campaign_owned_terminal_process", False
+        if any(token in detail for token in ("429", "rate limit", "timeout", "connection", "circuit")):
+            return "RETRY_BACKOFF", f"provider_wave_exit_{code}", True
+        return "PAUSED_DATA_INTEGRITY", f"unclassified_wave_exit_{code}", False
 
     def on_signal(self, signum, _frame):
         self.stop = True
@@ -232,13 +249,17 @@ class Controller:
                 return 130
             if terminal_incident:
                 self.pause_path.touch(exist_ok=True)
-                self.write("PAUSED", "campaign_owned_terminal_process")
+                self.write("PAUSED_CONSOLE_INCIDENT", "campaign_owned_terminal_process")
                 return 2
             if self.pause_path.exists():
-                self.write("PAUSED", "pause_requested_after_wave")
+                self.write("PAUSED_OPERATOR", "pause_requested_after_wave")
                 return 0
             if code:
-                self.write("RETRY_WAIT", f"wave_exit_{code}")
+                status, reason, retry = self._classify_wave_exit(code)
+                self.write(status, reason, next_retry_at=time.time() + self.a.retry_seconds if retry else None)
+                if not retry:
+                    self.pause_path.touch(exist_ok=True)
+                    return code
                 time.sleep(self.a.retry_seconds)
                 continue
             progress = subprocess.check_output(
