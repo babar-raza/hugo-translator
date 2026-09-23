@@ -131,6 +131,10 @@ class Report:
     hard_stops: list[str] = field(default_factory=list)
     recommendations: dict[str, Any] = field(default_factory=dict)
     finished_at: str = ""
+    terminal_reason: str = "running"
+    timed_out: bool = False
+    last_progress_at: str = ""
+    stage: str = "starting"
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -142,6 +146,10 @@ class Report:
             "preflight": self.preflight,
             "calibration": self.calibration,
             "recommendations": self.recommendations,
+            "terminal_reason": self.terminal_reason,
+            "timed_out": self.timed_out,
+            "last_progress_at": self.last_progress_at,
+            "stage": self.stage,
         }
 
 
@@ -220,6 +228,8 @@ class LLMCalibrator:
 
     # ------------------------------------------------------------------ preflight
     def preflight(self, *, determinism_n: int = 10) -> dict[str, Any]:
+        self.report.stage = "preflight"
+        self.report.last_progress_at = datetime.now(timezone.utc).isoformat()
         pf: dict[str, Any] = {}
         stops = self.report.hard_stops
 
@@ -232,7 +242,14 @@ class LLMCalibrator:
 
         # 2) health check
         t0 = time.perf_counter()
-        healthy = bool(self.provider.health_check())
+        # Calibration must not consume the production retry budget.  Use one
+        # direct provider attempt; production workers retain governed retries.
+        try:
+            generate_once = getattr(self.provider, "_generate_impl", self.provider.generate)
+            text, _, _ = generate_once("Respond with exactly: OK", "Health check")
+            healthy = bool(text.strip())
+        except Exception:
+            healthy = False
         pf["health_check"] = {"ok": healthy, "seconds": round(time.perf_counter() - t0, 3)}
         if not healthy:
             stops.append("health_check failed")
@@ -358,7 +375,7 @@ class LLMCalibrator:
         if client is None or not hasattr(client, "models"):
             return {"supported": False, "reason": "provider exposes no models endpoint"}
         try:
-            listed = client.models.list()
+            listed = client.models.list(timeout=15)
             ids = sorted(str(getattr(m, "id", m)) for m in getattr(listed, "data", listed))
         except Exception as exc:
             return {"supported": False, "reason": f"{type(exc).__name__}: {exc}"[:200]}
@@ -383,6 +400,8 @@ class LLMCalibrator:
         calls_per_level: int = 8,
         pack_size: int = 8,
     ) -> dict[str, Any]:
+        self.report.stage = "calibration"
+        self.report.last_progress_at = datetime.now(timezone.utc).isoformat()
         cal: dict[str, Any] = {}
         classes = {
             "short_metadata": SHORT_METADATA,
@@ -614,6 +633,9 @@ class LLMCalibrator:
     # ------------------------------------------------------------------ persistence
     def finish(self, output: Path, baseline_path: Path | None) -> dict[str, Any]:
         self.report.finished_at = datetime.now(timezone.utc).isoformat()
+        if self.report.terminal_reason == "running":
+            self.report.terminal_reason = "completed" if not self.report.hard_stops else "failed"
+        self.report.last_progress_at = self.report.finished_at
         payload = self.report.as_dict()
         atomic_write(path=output, content=json.dumps(payload, indent=2))
         canary = self.report.preflight.get("canary") or {}
@@ -736,7 +758,19 @@ def main(argv: list[str] | None = None) -> int:
         long_probe_words=args.long_probe_words,
         sweep_words=tuple(int(x) for x in args.sweep_words.split(",") if x.strip()),
     )
-    pf = cal.preflight(determinism_n=args.determinism_n)
+    try:
+        pf = cal.preflight(determinism_n=args.determinism_n)
+    except TimeoutError as exc:
+        cal.report.terminal_reason = "timed_out"
+        cal.report.timed_out = True
+        cal.report.hard_stops.append(str(exc))
+        cal.finish(args.output, args.baseline)
+        return 2
+    except Exception as exc:
+        cal.report.terminal_reason = "failed"
+        cal.report.hard_stops.append(f"{type(exc).__name__}: {exc}"[:300])
+        cal.finish(args.output, args.baseline)
+        raise
     print(
         json.dumps(
             {

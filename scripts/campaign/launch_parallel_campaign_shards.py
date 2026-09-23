@@ -1065,6 +1065,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         try:
             evidence = json.loads(calibration_path.read_text(encoding="utf-8"))
+            if evidence.get("terminal_reason") != "completed" or evidence.get("timed_out"):
+                raise ValueError("calibration artifact is not complete")
             ramp = (evidence.get("calibration") or {}).get("concurrency_ramp") or []
             baseline = next(item for item in ramp if int(item.get("level", 0)) == 4)
             target = next(item for item in ramp if int(item.get("level", 0)) == args.max_workers)
