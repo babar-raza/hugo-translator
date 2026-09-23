@@ -41,7 +41,16 @@ class CampaignProcessMonitor:
                 continue
         return rows
 
-    def _owned(self, row: dict, all_processes: dict[int, dict]) -> bool:
+    def _owned(self, row: dict, all_processes: dict[int, dict]) -> dict | None:
+        """Return the matching ancestor's {pid, command} if owned, else None.
+
+        Returning the actual match (not just a bool) makes every incident
+        self-diagnosing in the evidence file -- previously an operator had to
+        catch the process alive to learn why it was flagged, which is
+        usually impossible since the console has already closed by the time
+        anyone looks (reproduced live: every incident this session was
+        already gone by the next check).
+        """
         # A watched shell command often contains the campaign ID merely because
         # an operator is inspecting status.  Ownership therefore requires a
         # controller/launcher marker or an ancestor chain to one; a bare ID or
@@ -60,17 +69,17 @@ class CampaignProcessMonitor:
         )
         text = row["command"].lower()
         if any(marker in text for marker in markers):
-            return True
+            return {"pid": row["pid"], "command": row["command"]}
         parent = row["ppid"]
         for _ in range(12):
             ancestor = all_processes.get(parent)
             if not ancestor:
-                return False
+                return None
             command = str(ancestor.get("command") or "").lower()
             if any(marker in command for marker in markers):
-                return True
+                return {"pid": parent, "command": ancestor.get("command") or ""}
             parent = int(ancestor.get("ppid") or 0)
-        return False
+        return None
 
     def baseline(self) -> None:
         self._known = set(self._snapshot())
@@ -97,9 +106,16 @@ class CampaignProcessMonitor:
         for pid, row in watched.items():
             if pid in self._known:
                 continue
-            owned = self._owned(row, all_processes)
-            self._append({"event": "process_created", "campaign_owned": owned, **row})
-            self.incident = self.incident or owned
+            match = self._owned(row, all_processes)
+            self._append(
+                {
+                    "event": "process_created",
+                    "campaign_owned": match is not None,
+                    "owning_ancestor": match,
+                    **row,
+                }
+            )
+            self.incident = self.incident or (match is not None)
         self._known.update(watched)
 
     def start(self) -> None:
