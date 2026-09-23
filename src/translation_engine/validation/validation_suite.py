@@ -306,7 +306,10 @@ class ValidationSuite:
         if validators_config.get("terminology_preservation", {}).get("enabled", True):
             validators.append(TerminologyPreservationValidator())
 
-        if validators_config.get("glued_identifier", {}).get("enabled", True):
+        # A config-driven suite must not silently add a validator absent from
+        # that config.  Production enables this explicitly in validation.yaml;
+        # the false default broke the all-validators-disabled contract.
+        if validators_config.get("glued_identifier", {}).get("enabled", False):
             validators.append(GluedIdentifierValidator())
 
         if validators_config.get("file_placement", {}).get("enabled", True):
