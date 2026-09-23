@@ -40,6 +40,8 @@ dependencies = [
     "structlog>=23.2.0",
     "python-dotenv>=1.0.0",
     "psutil>=5.9.0",
+    "openai>=1.0",
+    "langdetect>=1.0.9",
 ]
 
 [project.optional-dependencies]
