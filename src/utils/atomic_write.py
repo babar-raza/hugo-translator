@@ -12,6 +12,7 @@ import errno
 import logging
 import os
 import tempfile
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -169,9 +170,17 @@ def atomic_write(
 
         temp_fd = None  # Closed by context manager
 
-        # Atomic rename
-        # os.replace() is atomic on both POSIX and Windows
-        os.replace(temp_path, path)
+        # Atomic rename.  Antivirus/indexing services can briefly hold an
+        # existing Windows file open; retain atomicity and retry only that
+        # transient sharing/access-denied condition.
+        for attempt in range(6):
+            try:
+                os.replace(temp_path, path)
+                break
+            except PermissionError:
+                if attempt == 5:
+                    raise
+                time.sleep(0.25 * (attempt + 1))
 
         logger.debug(f"Atomically wrote {len(content)} bytes to {path}")
 
