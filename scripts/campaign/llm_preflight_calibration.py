@@ -203,18 +203,29 @@ class LLMCalibrator:
         self.long_probe_words = long_probe_words
         self.sweep_words = tuple(sweep_words)
         self._sleep = sleep
+        self._call_n = 0
         self.report = Report(model_id=model_id, started_at=datetime.now(timezone.utc).isoformat())
 
     # ------------------------------------------------------------------ primitives
     def call(self, system_prompt: str, user_text: str) -> CallResult:
+        self._call_n += 1
+        n = self._call_n
         t0 = time.perf_counter()
+        print(f"[SUPERVISED-DIAG] call #{n} start stage={self.report.stage}", flush=True)
         try:
             text, in_tok, out_tok = self.provider.generate(system_prompt, user_text)
-            return CallResult(True, time.perf_counter() - t0, text, in_tok, out_tok)
+            dt = time.perf_counter() - t0
+            print(f"[SUPERVISED-DIAG] call #{n} ok seconds={dt:.2f}", flush=True)
+            return CallResult(True, dt, text, in_tok, out_tok)
         except Exception as exc:  # the provider raises typed/untyped errors; record, never hide
+            dt = time.perf_counter() - t0
+            print(
+                f"[SUPERVISED-DIAG] call #{n} FAILED seconds={dt:.2f} error={type(exc).__name__}: {exc}"[:300],
+                flush=True,
+            )
             return CallResult(
                 False,
-                time.perf_counter() - t0,
+                dt,
                 error=f"{type(exc).__name__}: {exc}"[:300],
                 rate_limited=_is_rate_limit(exc),
             )
@@ -241,6 +252,8 @@ class LLMCalibrator:
             stops.append(f"api key env var {self.api_key_env!r} does not resolve")
 
         # 2) health check
+        self.report.stage = "preflight:health_check"
+        print(f"[SUPERVISED-DIAG] stage={self.report.stage}", flush=True)
         t0 = time.perf_counter()
         # Calibration must not consume the production retry budget.  Use one
         # direct provider attempt; production workers retain governed retries.
@@ -256,6 +269,8 @@ class LLMCalibrator:
             return pf
 
         # 3) model identity canary + capability probe
+        self.report.stage = "preflight:canary"
+        print(f"[SUPERVISED-DIAG] stage={self.report.stage}", flush=True)
         canary = self.call(CANARY_SYSTEM, CANARY_USER)
         pf["canary"] = {
             "ok": canary.ok,
@@ -286,6 +301,8 @@ class LLMCalibrator:
         }
         seg_out: dict[str, Any] = {}
         for name, (text, lang) in segments.items():
+            self.report.stage = f"preflight:segment:{name}"
+            print(f"[SUPERVISED-DIAG] stage={self.report.stage}", flush=True)
             res = self.call(self.translation_prompt(lang), text)
             checks: dict[str, bool] = {"ok": res.ok, "non_empty": bool(res.text.strip())}
             if name == "placeholder_tokens":
@@ -321,6 +338,8 @@ class LLMCalibrator:
         sweep: list[dict[str, Any]] = []
         max_safe = 0
         for words in self.sweep_words:
+            self.report.stage = f"preflight:sweep:{words}"
+            print(f"[SUPERVISED-DIAG] stage={self.report.stage}", flush=True)
             text = long_prose(words)
             res = self.call(self.translation_prompt("es"), text)
             ratio = len(res.text) / max(1, len(text)) if res.ok else 0.0
@@ -346,6 +365,8 @@ class LLMCalibrator:
         pf["long_input_sweep"] = {"probes": sweep, "max_safe_words": max_safe}
 
         # 5) determinism at temperature 0
+        self.report.stage = "preflight:determinism"
+        print(f"[SUPERVISED-DIAG] stage={self.report.stage} n={determinism_n}", flush=True)
         hashes: list[str] = []
         errors = 0
         for _ in range(determinism_n):
@@ -416,6 +437,8 @@ class LLMCalibrator:
         total_in = total_out = 0
         total_words = 0
         for name, text in classes.items():
+            self.report.stage = f"calibrate:latency:{name}"
+            print(f"[SUPERVISED-DIAG] stage={self.report.stage} samples={latency_samples}", flush=True)
             secs: list[float] = []
             errs = 0
             for _ in range(latency_samples):
@@ -451,6 +474,8 @@ class LLMCalibrator:
         safe = 1
         stop_reason = None
         for level in levels:
+            self.report.stage = f"calibrate:ramp:level={level}"
+            print(f"[SUPERVISED-DIAG] stage={self.report.stage} calls={calls_per_level}", flush=True)
             with ThreadPoolExecutor(max_workers=level) as pool:
                 results = list(
                     pool.map(
@@ -484,6 +509,8 @@ class LLMCalibrator:
         cal["ramp_stop_reason"] = stop_reason
 
         # 4) batch packing efficiency
+        self.report.stage = "calibrate:batch_packing"
+        print(f"[SUPERVISED-DIAG] stage={self.report.stage}", flush=True)
         segs = [f"{SHORT_METADATA} variant {i} for Aspose.Words" for i in range(pack_size)]
         packed_user = "\n".join(f"<<<SEG_{i + 1}>>> {s}" for i, s in enumerate(segs))
         packed = self.call(self._batch_prompt("en", "de", pack_size), packed_user)
