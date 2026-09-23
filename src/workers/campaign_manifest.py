@@ -286,7 +286,9 @@ class CampaignManifest:
         _professionalize_only = bool(self.retry_policy.get("professionalize_only", False))
         if _professionalize_only:
             if _primary != "professionalize_llm" or _escalation != "professionalize_llm":
-                errors.append("professionalize_only requires Professionalize as both primary and retry target")
+                errors.append(
+                    "professionalize_only requires Professionalize as both primary and retry target"
+                )
         elif (_primary, _escalation) not in _valid_pairs:
             errors.append(
                 "zero-defect campaign model pair must be M2M100 primary with "
@@ -299,14 +301,21 @@ class CampaignManifest:
         _llm_attempts = self.retry_policy.get("llm_escalation_attempts")
         if _professionalize_only:
             if _escalation_mode != "professionalize_only" or _llm_attempts != 0:
-                errors.append("professionalize_only requires professionalize_only mode and zero escalation attempts")
+                errors.append(
+                    "professionalize_only requires professionalize_only mode and zero escalation attempts"
+                )
         elif _escalation_mode == "immediate" and _llm_attempts != 2:
             errors.append("immediate LLM escalation requires exactly 2 LLM attempts")
         elif _escalation_mode == "deferred":
             if _llm_attempts != 0:
                 errors.append("deferred LLM escalation requires zero in-run LLM attempts")
-            if _primary not in {"m2m100_418m", "m2m100_1.2b"} or _escalation != "professionalize_llm":
-                errors.append("deferred LLM escalation requires an M2M100 primary and Professionalize queue target")
+            if (
+                _primary not in {"m2m100_418m", "m2m100_1.2b"}
+                or _escalation != "professionalize_llm"
+            ):
+                errors.append(
+                    "deferred LLM escalation requires an M2M100 primary and Professionalize queue target"
+                )
         elif _escalation_mode not in {"immediate", "deferred"}:
             errors.append("llm_escalation_mode must be immediate or deferred")
         if self.commit_policy.get("push") is not False:
@@ -380,9 +389,7 @@ class CampaignManifest:
             if not source_locales:
                 errors.append(f"{source.source_path}: source has no output locales")
             elif missing_only and not source_locales.issubset(campaign_locales):
-                errors.append(
-                    f"{source.source_path}: output locales are outside campaign locales"
-                )
+                errors.append(f"{source.source_path}: output locales are outside campaign locales")
             elif not missing_only and source_locales != campaign_locales:
                 errors.append(f"{source.source_path}: output locales do not match campaign locales")
             for output in source.outputs.values():
@@ -591,9 +598,7 @@ class CampaignManifest:
                     "config/inventory/",
                 )
                 dirty = [
-                    item
-                    for item in dirty
-                    if not Path(item).as_posix().startswith(_exempt_prefixes)
+                    item for item in dirty if not Path(item).as_posix().startswith(_exempt_prefixes)
                 ]
             if dirty:
                 errors.append(f"translator repository is dirty ({len(dirty)} paths)")
@@ -700,8 +705,9 @@ class CampaignManifest:
                 # Chunk immutable manifest jobs before removing completed cells.
                 # Otherwise accepting part 1 renumbers part 2 to part 1, and a
                 # durable wave cursor silently skips untranslated outputs.
-                pending_jobs = [job for job in jobs[offset : offset + max_outputs]
-                                if job[2] not in completed]
+                pending_jobs = [
+                    job for job in jobs[offset : offset + max_outputs] if job[2] not in completed
+                ]
                 if not pending_jobs:
                     continue
                 yield {

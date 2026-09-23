@@ -1,4 +1,5 @@
 """Render receipt-backed portfolio progress for launcher and PowerShell watch."""
+
 from __future__ import annotations
 
 import argparse
@@ -21,7 +22,9 @@ except ModuleNotFoundError:  # pragma: no cover - exercised by the CLI smoke com
 def rows(path: Path):
     if not path.is_file():
         return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
 
 
 def journal_rows(root: Path, name: str) -> list[dict]:
@@ -47,11 +50,16 @@ def current_run_progress(state: dict, now: float, remaining: int) -> dict:
     updated = float(state.get("updated_at") or 0)
     fresh = state.get("status") == "RUNNING" and 0 <= now - updated <= 120
     rate = accepted * 60 / elapsed if fresh and elapsed > 0 else None
-    return {"session_id": state.get("session_id"), "status": state.get("status", "UNKNOWN"),
-            "accepted": accepted, "rejected": int(state.get("rejected_current_run") or 0),
-            "fresh": fresh, "rate_per_minute": rate,
-            "eta_minutes": remaining / rate if rate else None,
-            "pause_reason": state.get("reason")}
+    return {
+        "session_id": state.get("session_id"),
+        "status": state.get("status", "UNKNOWN"),
+        "accepted": accepted,
+        "rejected": int(state.get("rejected_current_run") or 0),
+        "fresh": fresh,
+        "rate_per_minute": rate,
+        "eta_minutes": remaining / rate if rate else None,
+        "pause_reason": state.get("reason"),
+    }
 
 
 def rolling_receipt_rate(receipts: list[dict], *, now: float, window_seconds: int = 900) -> dict:
@@ -69,7 +77,11 @@ def rolling_receipt_rate(receipts: list[dict], *, now: float, window_seconds: in
         if stamp >= cutoff:
             recent.append(stamp)
     rate = len(recent) * 60.0 / window_seconds
-    return {"window_seconds": window_seconds, "accepted": len(recent), "rate_per_minute": round(rate, 3)}
+    return {
+        "window_seconds": window_seconds,
+        "accepted": len(recent),
+        "rate_per_minute": round(rate, 3),
+    }
 
 
 def live_llm_slots(path: Path, capacity: int = 0) -> dict[str, int]:
@@ -83,7 +95,9 @@ def live_llm_slots(path: Path, capacity: int = 0) -> dict[str, int]:
     active = 0
     for slot in slots.values():
         try:
-            expires = datetime.fromisoformat(str(slot.get("expires_at", "")).replace("Z", "+00:00")).timestamp()
+            expires = datetime.fromisoformat(
+                str(slot.get("expires_at", "")).replace("Z", "+00:00")
+            ).timestamp()
         except ValueError:
             continue
         if expires > now:
@@ -91,13 +105,17 @@ def live_llm_slots(path: Path, capacity: int = 0) -> dict[str, int]:
     return {"active": active, "capacity": int(payload.get("capacity", 0) or capacity)}
 
 
-def held_outputs(manifest: CampaignManifest, receipts: dict[str, dict]) -> set[str]:
+def held_outputs(
+    manifest: CampaignManifest,
+    receipts: dict[str, dict],
+    *,
+    heal_queue_path: Path,
+) -> set[str]:
     """Return receipt-incomplete outputs blocked by durable source-level holds."""
-    queue = Path("data/campaigns/heal_queue.jsonl")
     # One queue pass only: this status path runs continuously during a 100k
     # campaign and must never rescan the queue once per manifest source.
     latest_hold: dict[str, dict | None] = {}
-    for row in rows(queue):
+    for row in rows(heal_queue_path):
         source_path = str(row.get("source_path") or "")
         if not source_path:
             continue
@@ -106,7 +124,7 @@ def held_outputs(manifest: CampaignManifest, receipts: dict[str, dict]) -> set[s
         elif row.get("kind") == "release":
             latest_hold[source_path] = None
     held_sources = {path for path, hold in latest_hold.items() if hold is not None}
-    held_sources.update(path for path, _root in quarantined_files(heal_queue_path=queue))
+    held_sources.update(path for path, _root in quarantined_files(heal_queue_path=heal_queue_path))
     held: set[str] = set()
     for source in manifest.sources:
         source_path = str(source.source_path)
@@ -150,12 +168,27 @@ def main() -> int:
         (output, receipt_digest(receipt)) in committed_receipts
         for output, receipt in receipts.items()
     )
-    metrics = {key: 0 for key in ("i18n_hits", "tm_hits", "l1_hits", "l2_hits", "semantic_tm_hits", "professionalize_calls", "ast_batches", "individual_fallback_batches", "validation_retries")}
+    metrics = dict.fromkeys(
+        (
+            "i18n_hits",
+            "tm_hits",
+            "l1_hits",
+            "l2_hits",
+            "semantic_tm_hits",
+            "professionalize_calls",
+            "ast_batches",
+            "individual_fallback_batches",
+            "validation_retries",
+        ),
+        0,
+    )
     for receipt in receipts.values():
         for key in metrics:
             metrics[key] += int((receipt.get("translation_stats") or {}).get(key, 0) or 0)
     accepted = len(receipts)
-    accepted_times = sorted(str(r.get("accepted_at")) for r in receipts.values() if r.get("accepted_at"))
+    accepted_times = sorted(
+        str(r.get("accepted_at")) for r in receipts.values() if r.get("accepted_at")
+    )
     rate = 0.0
     if len(accepted_times) > 1:
         start = datetime.fromisoformat(accepted_times[0].replace("Z", "+00:00"))
@@ -173,12 +206,18 @@ def main() -> int:
             if not spool_path.is_file():
                 continue
             with sqlite3.connect(spool_path) as conn:
-                for state, count in conn.execute("select state, count(*) from tm_intents group by state"):
+                for state, count in conn.execute(
+                    "select state, count(*) from tm_intents group by state"
+                ):
                     spool[str(state)] += count
     expected_outputs = {output for source in manifest.sources for output in source.outputs.values()}
     accepted_in_manifest = len(expected_outputs.intersection(receipts))
     remaining = max(0, manifest.expected_output_count - accepted_in_manifest)
-    held = held_outputs(manifest, receipts)
+    held = held_outputs(
+        manifest,
+        receipts,
+        heal_queue_path=args.ledger_root / "heal_queue.jsonl",
+    )
     elapsed_seconds = 0.0
     if len(accepted_times) > 1:
         elapsed_seconds = max((end - start).total_seconds(), 0.0)
@@ -194,8 +233,26 @@ def main() -> int:
             min_rate_per_hour=args.slo_min_rate_per_hour,
         ),
     )
-    payload = {"campaign": manifest.campaign_id, "accepted": accepted, "failures": len(failures), "rate_per_minute": round(rate, 3), "remaining": remaining, "eligible_remaining": max(0, remaining - len(held)), "held_remaining": len(held), "eta_minutes": round(remaining / rate, 1) if rate else None, "committed": committed, "pending_commit": max(0, accepted-committed), "spool": spool, "metrics": metrics, "throughput": throughput}
-    payload["pending_journals"] = len(list((root / "journals").glob("*/acceptance_receipts.jsonl"))) if (root / "journals").is_dir() else 0
+    payload = {
+        "campaign": manifest.campaign_id,
+        "accepted": accepted,
+        "failures": len(failures),
+        "rate_per_minute": round(rate, 3),
+        "remaining": remaining,
+        "eligible_remaining": max(0, remaining - len(held)),
+        "held_remaining": len(held),
+        "eta_minutes": round(remaining / rate, 1) if rate else None,
+        "committed": committed,
+        "pending_commit": max(0, accepted - committed),
+        "spool": spool,
+        "metrics": metrics,
+        "throughput": throughput,
+    }
+    payload["pending_journals"] = (
+        len(list((root / "journals").glob("*/acceptance_receipts.jsonl")))
+        if (root / "journals").is_dir()
+        else 0
+    )
     payload["accepted_in_manifest"] = accepted_in_manifest
     payload["historical_accepted"] = accepted - accepted_in_manifest
     payload["rolling_15m"] = rolling_receipt_rate(receipts.values(), now=time.time())
@@ -211,7 +268,9 @@ def main() -> int:
     payload["rate_per_minute"] = current["rate_per_minute"]
     payload["eta_minutes"] = current["eta_minutes"]
     payload["current_run"] = current
-    throughput["measurement_scope"] = "historical_receipts_only_includes_downtime_excludes_rejected_calls"
+    throughput["measurement_scope"] = (
+        "historical_receipts_only_includes_downtime_excludes_rejected_calls"
+    )
     print(json.dumps(payload, sort_keys=True))
     return 0
 

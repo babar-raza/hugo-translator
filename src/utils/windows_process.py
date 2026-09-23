@@ -1,4 +1,5 @@
 """Windows-safe subprocess helpers for unattended campaign processes."""
+
 from __future__ import annotations
 
 import subprocess

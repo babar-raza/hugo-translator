@@ -72,12 +72,18 @@ class CampaignLedger:
         self.root = root / campaign_id
         self.root.mkdir(parents=True, exist_ok=True)
         self.partition_id = partition_id
-        self.write_root = self.root if partition_id is None else self.root / "journals" / partition_id
+        self.write_root = (
+            self.root if partition_id is None else self.root / "journals" / partition_id
+        )
         self.write_root.mkdir(parents=True, exist_ok=True)
         self.receipts_path = self.write_root / "acceptance_receipts.jsonl"
         self.failures_path = self.write_root / "failure_metadata.jsonl"
         self.summary_path = self.write_root / "summary.json"
-        self.heal_queue_path = self.root.parent / "heal_queue.jsonl" if partition_id is None else self.write_root / "heal_queue.jsonl"
+        self.heal_queue_path = (
+            self.root.parent / "heal_queue.jsonl"
+            if partition_id is None
+            else self.write_root / "heal_queue.jsonl"
+        )
         self._process_lock_path = self.write_root / "ledger-process.lock"
         self._lock = threading.RLock()
         self._receipt_index = self.receipts()
@@ -123,7 +129,11 @@ class CampaignLedger:
         return indexed
 
     def failures(self) -> list[dict[str, Any]]:
-        return [row for path in self._journal_paths("failure_metadata.jsonl") for row in self._read_jsonl(path)]
+        return [
+            row
+            for path in self._journal_paths("failure_metadata.jsonl")
+            for row in self._read_jsonl(path)
+        ]
 
     def append_receipt(self, receipt: dict[str, Any]) -> None:
         if "content" in receipt or "translated_content" in receipt:
@@ -341,8 +351,14 @@ class CampaignLedger:
         seen: set[tuple[str, str, str]] = set()
         for failure in self.failures():
             model_id = str(failure.get("model_id") or "unknown")
-            attempt = str(failure.get("attempt") if failure.get("attempt") is not None else "unknown")
-            key = (str(failure.get("job_id") or failure.get("output_path") or "unknown"), attempt, model_id)
+            attempt = str(
+                failure.get("attempt") if failure.get("attempt") is not None else "unknown"
+            )
+            key = (
+                str(failure.get("job_id") or failure.get("output_path") or "unknown"),
+                attempt,
+                model_id,
+            )
             if key in seen:
                 continue
             seen.add(key)
@@ -357,7 +373,11 @@ class CampaignLedger:
             model_id = str(
                 receipt.get("attempt_model_id") or receipt.get("model_fingerprint") or "unknown"
             )
-            attempt = str(receipt.get("campaign_attempt") if receipt.get("campaign_attempt") is not None else "unknown")
+            attempt = str(
+                receipt.get("campaign_attempt")
+                if receipt.get("campaign_attempt") is not None
+                else "unknown"
+            )
             key = (str(receipt.get("output_path") or "unknown"), attempt, model_id)
             counts = bucket(model_id, attempt)
             # A receipt may follow failure metadata for the same invocation
@@ -379,7 +399,10 @@ class CampaignLedger:
         stop_recommendation_after_attempts: int,
     ) -> dict[str, Any]:
         """Return advisory systemic-failure recommendations; never stop a run."""
-        if warning_after_attempts < 1 or stop_recommendation_after_attempts < warning_after_attempts:
+        if (
+            warning_after_attempts < 1
+            or stop_recommendation_after_attempts < warning_after_attempts
+        ):
             raise ValueError("zero-acceptance thresholds must be positive and ordered")
         recommendations: list[dict[str, Any]] = []
         for model_id, by_attempt in self.attempt_model_outcomes().items():
@@ -415,18 +438,23 @@ class CampaignLedger:
                 outcomes.setdefault(category, {}).get(outcome, 0) + 1
             )
         return {
-            category: dict(sorted(counts.items()))
-            for category, counts in sorted(outcomes.items())
+            category: dict(sorted(counts.items())) for category, counts in sorted(outcomes.items())
         }
 
     def acceleration_metrics(self) -> dict[str, int]:
         """Aggregate receipt-bound fast-path facts without reading candidate text."""
         fields = (
-            "i18n_hits", "tm_hits", "l1_hits", "l2_hits", "semantic_tm_hits",
-            "professionalize_calls", "ast_batches", "individual_fallback_batches",
+            "i18n_hits",
+            "tm_hits",
+            "l1_hits",
+            "l2_hits",
+            "semantic_tm_hits",
+            "professionalize_calls",
+            "ast_batches",
+            "individual_fallback_batches",
             "validation_retries",
         )
-        totals = {field: 0 for field in fields}
+        totals = dict.fromkeys(fields, 0)
         for receipt in self.receipts().values():
             metrics = receipt.get("translation_stats") or {}
             for field in fields:
@@ -621,10 +649,9 @@ class CampaignRunner:
         # cells fail closed and become queue tickets for the dedicated retry
         # consumer instead.
         if hasattr(self.engine, "campaign_context"):
-            self.engine.campaign_context["defer_llm_fallbacks"] = (
-                self.manifest.retry_policy.get("llm_escalation_mode") == "deferred"
-                or bool(self.manifest.retry_policy.get("professionalize_only", False))
-            )
+            self.engine.campaign_context["defer_llm_fallbacks"] = self.manifest.retry_policy.get(
+                "llm_escalation_mode"
+            ) == "deferred" or bool(self.manifest.retry_policy.get("professionalize_only", False))
 
     def _llm_event(self, event):
         self.ledger._append(self.ledger.root / "llm_calls.jsonl", event)
@@ -666,7 +693,9 @@ class CampaignRunner:
                 "failure_category": f"auto:{gate}",
                 "failure_fingerprint": candidate_sha256 or f"auto:{gate}",
                 "retry_budget": self._DEFERRED_RETRY_BUDGET,
-                "model_target": str(self.manifest.retry_policy.get("llm_model") or "professionalize_llm"),
+                "model_target": str(
+                    self.manifest.retry_policy.get("llm_model") or "professionalize_llm"
+                ),
             }
         )
         self._rejected_task_queue.enqueue(task)
@@ -697,14 +726,19 @@ class CampaignRunner:
                 historical = {k: v for k, v in receipt.items() if k != "receipt_sha256"}
                 historical_source = (self.content_repo / receipt.get("source_path", "")).resolve()
                 historical_output = (self.content_repo / output).resolve()
-                if (receipt.get("campaign_id") != self.manifest.campaign_id
+                if (
+                    receipt.get("campaign_id") != self.manifest.campaign_id
                     or receipt_fingerprint(historical) != receipt.get("receipt_sha256")
                     or not historical_source.is_relative_to(self.content_repo.resolve())
                     or not historical_output.is_relative_to(self.content_repo.resolve())
-                    or not historical_source.is_file() or not historical_output.is_file()
+                    or not historical_source.is_file()
+                    or not historical_output.is_file()
                     or sha256_file(historical_source) != receipt.get("source_sha256")
-                    or sha256_file(historical_output) != receipt.get("output_sha256")):
-                    raise CampaignManifestError(f"invalid historical receipt outside campaign scope: {output}")
+                    or sha256_file(historical_output) != receipt.get("output_sha256")
+                ):
+                    raise CampaignManifestError(
+                        f"invalid historical receipt outside campaign scope: {output}"
+                    )
                 continue
             source, locale = expected_outputs[output]
             claimed_fingerprint = receipt.get("receipt_sha256")
@@ -1158,7 +1192,9 @@ class CampaignRunner:
                 return
             except subprocess.CalledProcessError as exc:
                 stderr = (exc.stderr or "").lower()
-                is_ref_lock = any(pattern in stderr for pattern in self._GIT_REF_LOCK_RETRY_PATTERNS)
+                is_ref_lock = any(
+                    pattern in stderr for pattern in self._GIT_REF_LOCK_RETRY_PATTERNS
+                )
                 if not is_ref_lock or attempt == self._GIT_REF_LOCK_MAX_ATTEMPTS:
                     if exc.stderr:
                         logger.error("git commit failed: %s", exc.stderr.strip())
@@ -1396,7 +1432,9 @@ class CampaignRunner:
             )
             _issue_validator_severities.setdefault(_issue_name, set()).add(severity)
         validators = sorted(
-            name for name, severities in _issue_validator_severities.items() if "error" in severities
+            name
+            for name, severities in _issue_validator_severities.items()
+            if "error" in severities
         )
         warning_only_validators = sorted(
             name
@@ -2406,9 +2444,7 @@ class CampaignRunner:
         heal_queue_path = self.ledger.heal_queue_path
         hold = active_hold(source.source_path, heal_queue_path=heal_queue_path)
         if hold is not None:
-            self._append_advisory_hold_skip(
-                shard=shard, source=source, locale=locale, hold=hold
-            )
+            self._append_advisory_hold_skip(shard=shard, source=source, locale=locale, hold=hold)
             return False, resolved_output
 
         # QU-02: a (source_path, root_cause_class) pair whose OPEN heal tickets
@@ -2844,8 +2880,7 @@ class CampaignRunner:
         # existing locks and shard commits happen after all futures complete.
         if not self._force_serialize and max_parallel_jobs > 1:
             selected_shards = [
-                shard for shard in all_shards
-                if not shard_ids or shard["shard_id"] in shard_ids
+                shard for shard in all_shards if not shard_ids or shard["shard_id"] in shard_ids
             ]
             future_to_job: dict[Any, tuple[dict[str, Any], Any, str, str]] = {}
             with ThreadPoolExecutor(max_workers=max_parallel_jobs) as executor:

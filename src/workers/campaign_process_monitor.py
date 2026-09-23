@@ -1,9 +1,9 @@
 """Evidence-only monitor for campaign-owned Windows console processes."""
+
 from __future__ import annotations
 
 import json
 import threading
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,6 +22,7 @@ class CampaignProcessMonitor:
 
     def _snapshot(self) -> dict[int, dict]:
         import psutil
+
         rows: dict[int, dict] = {}
         for proc in psutil.process_iter(["pid", "ppid", "name", "cmdline", "create_time"]):
             try:
@@ -30,8 +31,10 @@ class CampaignProcessMonitor:
                 if name not in _WATCHED:
                     continue
                 rows[int(info["pid"])] = {
-                    "pid": int(info["pid"]), "ppid": int(info.get("ppid") or 0),
-                    "name": name, "command": " ".join(info.get("cmdline") or []),
+                    "pid": int(info["pid"]),
+                    "ppid": int(info.get("ppid") or 0),
+                    "name": name,
+                    "command": " ".join(info.get("cmdline") or []),
                     "started_at": float(info.get("create_time") or 0),
                 }
             except (psutil.Error, KeyError, TypeError):
@@ -65,9 +68,13 @@ class CampaignProcessMonitor:
 
     def poll(self) -> None:
         import psutil
+
         watched = self._snapshot()
         all_processes = {
-            int(proc.info["pid"]): {"ppid": proc.info.get("ppid"), "command": " ".join(proc.info.get("cmdline") or [])}
+            int(proc.info["pid"]): {
+                "ppid": proc.info.get("ppid"),
+                "command": " ".join(proc.info.get("cmdline") or []),
+            }
             for proc in psutil.process_iter(["pid", "ppid", "cmdline"])
             if proc.info.get("pid") is not None
         }
@@ -81,9 +88,11 @@ class CampaignProcessMonitor:
 
     def start(self) -> None:
         self.baseline()
+
         def run() -> None:
             while not self._stop.wait(5):
                 self.poll()
+
         self._thread = threading.Thread(target=run, name="campaign-process-monitor", daemon=True)
         self._thread.start()
 

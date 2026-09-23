@@ -55,9 +55,9 @@ from typing import Any
 
 from src.hardware.gpu_admission import GPUAdmissionController, make_admission_controller
 from src.utils.file_lock import FileLock, LockError
+from src.utils.windows_process import hidden_subprocess_kwargs
 from src.workers import work_claims
 from src.workers.campaign_manifest import CampaignManifest
-from src.utils.windows_process import hidden_subprocess_kwargs
 from src.workers.campaign_runner import CampaignLedger
 
 # Plan §6.1: the locales TC-APT-006 measured `m2m100_418m` better in.  These run
@@ -117,7 +117,9 @@ class TerminalLedgerTail:
         return rows
 
 
-def checkpoint_wave(args: argparse.Namespace, manifest: CampaignManifest, translator_repo: Path) -> bool:
+def checkpoint_wave(
+    args: argparse.Namespace, manifest: CampaignManifest, translator_repo: Path
+) -> bool:
     """Drain TM, then attempt a governed checkpoint commit.
 
     A TM drain is a correctness boundary: starting a new wave while its single
@@ -147,20 +149,46 @@ def checkpoint_wave(args: argparse.Namespace, manifest: CampaignManifest, transl
                 raise RuntimeError(f"checkpoint refuses failed TM intents: {spool_path}")
             if not before.get("PENDING", 0):
                 break
-            subprocess.run([
-                sys.executable, "-m", "src.workers.tm_intent_writer",
-                "--repository-root", str(args.tm_repository_root),
-                "--spool-path", str(spool_path), "--no-l3", "--limit", "500",
-                "--owner", f"{manifest.campaign_id}-wave-writer",
-            ], check=True, timeout=600, **hidden_subprocess_kwargs())
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "src.workers.tm_intent_writer",
+                    "--repository-root",
+                    str(args.tm_repository_root),
+                    "--spool-path",
+                    str(spool_path),
+                    "--no-l3",
+                    "--limit",
+                    "500",
+                    "--owner",
+                    f"{manifest.campaign_id}-wave-writer",
+                ],
+                check=True,
+                timeout=600,
+                **hidden_subprocess_kwargs(),
+            )
             if spool.stats().get("PENDING", 0) >= before["PENDING"]:
                 raise RuntimeError(f"TM checkpoint writer made no progress: {spool_path}")
     try:
-        subprocess.run([
-            sys.executable, str(translator_repo / "scripts/campaign/reconcile_receipted_commits.py"),
-            "--manifest", str(args.campaign_manifest), "--content-repo", str(manifest.content_repo),
-            "--ledger-root", str(args.ledger_root), "--min-batch-size", "5", "--execute",
-        ], check=True, timeout=900, **hidden_subprocess_kwargs())
+        subprocess.run(
+            [
+                sys.executable,
+                str(translator_repo / "scripts/campaign/reconcile_receipted_commits.py"),
+                "--manifest",
+                str(args.campaign_manifest),
+                "--content-repo",
+                str(manifest.content_repo),
+                "--ledger-root",
+                str(args.ledger_root),
+                "--min-batch-size",
+                "5",
+                "--execute",
+            ],
+            check=True,
+            timeout=900,
+            **hidden_subprocess_kwargs(),
+        )
     except (subprocess.SubprocessError, OSError) as exc:
         checkpoint_path = args.ledger_root / manifest.campaign_id / "checkpoint_backlog.jsonl"
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -190,8 +218,11 @@ def stop_children(children: list[subprocess.Popen]) -> None:
         if child.poll() is not None:
             continue
         if sys.platform == "win32":
-            result = subprocess.run(["taskkill.exe", "/PID", str(child.pid), "/T", "/F"],
-                                    capture_output=True, timeout=30)
+            result = subprocess.run(
+                ["taskkill.exe", "/PID", str(child.pid), "/T", "/F"],
+                capture_output=True,
+                timeout=30,
+            )
             if result.returncode and child.poll() is None:
                 raise RuntimeError(f"cannot terminate owned child tree {child.pid}")
         else:
@@ -564,6 +595,7 @@ def _run_wave(
     # Git and native dependencies spawned during preflight must never flash a
     # visible console for an unattended scheduled campaign.
     from src.utils.windows_process import hidden_subprocess_kwargs
+
     log_dir = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -685,21 +717,25 @@ def _run_wave(
                 state = {
                     "status": "PAUSED_INFRASTRUCTURE_TIMEOUT",
                     "reason": (
-                        f"no_terminal_progress_or_worker_heartbeat_seconds="
-                        f"{child_timeout_seconds}"
+                        f"no_terminal_progress_or_worker_heartbeat_seconds={child_timeout_seconds}"
                     ),
                     "accepted_current_run": line_count(receipt_path) - accepted_at_start,
                     "rejected_current_run": max(line_count(failure_path) - failed_at_start, 0),
                 }
                 if getattr(args, "watchdog_state", None):
                     args.watchdog_state.parent.mkdir(parents=True, exist_ok=True)
-                    args.watchdog_state.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
-                print("INFRASTRUCTURE TIMEOUT: terminating child workers", file=sys.stderr, flush=True)
+                    args.watchdog_state.write_text(
+                        json.dumps(state, indent=2, sort_keys=True), encoding="utf-8"
+                    )
+                print(
+                    "INFRASTRUCTURE TIMEOUT: terminating child workers", file=sys.stderr, flush=True
+                )
                 stop_children(children)
                 return 2
             if now - last_report >= args.progress_interval_seconds:
                 if getattr(args, "session_id", None) and not work_claims.acquire_claim(
-                    f"family:{manifest.campaign_id}", args.session_id,
+                    f"family:{manifest.campaign_id}",
+                    args.session_id,
                     purpose="active campaign wave heartbeat",
                     claims_path=args.ledger_root / "claims.jsonl",
                 ):
@@ -747,18 +783,34 @@ def _run_wave(
                     )
                 last_report = now
             # TC-PS-04: evaluate only rows created by this wave, never stale history.
-            roots = [str(row.get("gate") or row.get("root_cause_class") or "pipeline") for row in fresh_failures]
-            provider_error = any("provider" in root.lower() or "rate_limit" in root.lower() or "ratelimit" in root.lower() for root in roots)
+            roots = [
+                str(row.get("gate") or row.get("root_cause_class") or "pipeline")
+                for row in fresh_failures
+            ]
+            provider_error = any(
+                "provider" in root.lower()
+                or "rate_limit" in root.lower()
+                or "ratelimit" in root.lower()
+                for root in roots
+            )
             # Typed zero-defect outcomes are expected data backlog, not
             # controller failures.  Only repeated unknown/infrastructure
             # roots may pause the wave; otherwise a bad source would stop a
             # 100K-page campaign indefinitely on the same validator ticket.
             data_root_tokens = (
-                "gate", "validator", "language", "frontmatter", "repetition",
-                "fidelity", "translation_rejected", "placeholder", "markdown",
+                "gate",
+                "validator",
+                "language",
+                "frontmatter",
+                "repetition",
+                "fidelity",
+                "translation_rejected",
+                "placeholder",
+                "markdown",
             )
             infrastructure_roots = [
-                root for root in roots
+                root
+                for root in roots
                 if not any(token in root.lower() for token in data_root_tokens)
             ]
             identical = len(infrastructure_roots) >= 3 and len(set(infrastructure_roots[-3:])) == 1
@@ -768,16 +820,28 @@ def _run_wave(
                 and bool(infrastructure_roots)
             )
             if provider_error or identical or zero_accepts:
-                reason = ("provider_or_rate_limit" if provider_error else
-                          "three_consecutive_identical_root_cause" if identical else
-                          "zero_accepted_after_five_terminal_jobs")
-                state = {"status": "PAUSED_VALIDATION_REGRESSION", "reason": reason,
-                         "accepted_current_run": line_count(receipt_path) - accepted_at_start,
-                         "rejected_current_run": len(fresh_failures), "root_causes": roots}
+                reason = (
+                    "provider_or_rate_limit"
+                    if provider_error
+                    else "three_consecutive_identical_root_cause"
+                    if identical
+                    else "zero_accepted_after_five_terminal_jobs"
+                )
+                state = {
+                    "status": "PAUSED_VALIDATION_REGRESSION",
+                    "reason": reason,
+                    "accepted_current_run": line_count(receipt_path) - accepted_at_start,
+                    "rejected_current_run": len(fresh_failures),
+                    "root_causes": roots,
+                }
                 if getattr(args, "watchdog_state", None):
                     args.watchdog_state.parent.mkdir(parents=True, exist_ok=True)
-                    args.watchdog_state.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
-                print(f"WATCHDOG PAUSE: {reason}; terminating children", file=sys.stderr, flush=True)
+                    args.watchdog_state.write_text(
+                        json.dumps(state, indent=2, sort_keys=True), encoding="utf-8"
+                    )
+                print(
+                    f"WATCHDOG PAUSE: {reason}; terminating children", file=sys.stderr, flush=True
+                )
                 stop_children(children)
                 return 2
             if all(child.poll() is not None for child in children):
@@ -793,7 +857,9 @@ def _run_wave(
         }
         if getattr(args, "watchdog_state", None):
             args.watchdog_state.parent.mkdir(parents=True, exist_ok=True)
-            args.watchdog_state.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+            args.watchdog_state.write_text(
+                json.dumps(state, indent=2, sort_keys=True), encoding="utf-8"
+            )
         print("INTERRUPTED: terminating child workers", file=sys.stderr, flush=True)
         stop_children(children)
         return 2
@@ -807,6 +873,7 @@ def _run_wave(
         # pause, Ctrl+C, or controller exception.  This keeps restart
         # denominators exact and prevents accepted work being repeated.
         from scripts.campaign.merge_campaign_journals import merge as merge_journals
+
         merged = merge_journals(args.ledger_root / manifest.campaign_id)
         print(f"journal_merge {json.dumps(merged, sort_keys=True)}", flush=True)
 
@@ -845,16 +912,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--campaign-manifest", required=True, type=Path)
     parser.add_argument("--max-workers", type=int, default=4)
-    parser.add_argument("--checkpoint-wave-shards", type=int, default=0,
-                        help="Bound each wave to this many shards; drain TM and commit before continuing.")
-    parser.add_argument("--tm-repository-root", type=Path,
-                        help="Repository containing the canonical TM store used by workers.")
+    parser.add_argument(
+        "--checkpoint-wave-shards",
+        type=int,
+        default=0,
+        help="Bound each wave to this many shards; drain TM and commit before continuing.",
+    )
+    parser.add_argument(
+        "--tm-repository-root",
+        type=Path,
+        help="Repository containing the canonical TM store used by workers.",
+    )
     parser.add_argument("--progress-interval-seconds", type=int, default=30)
     parser.add_argument(
         "--child-timeout-seconds",
         type=int,
         default=900,
-            help="Maximum time without accepted/rejected job progress; zero disables the inactivity timeout.",
+        help="Maximum time without accepted/rejected job progress; zero disables the inactivity timeout.",
     )
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--max-gpu-memory-percent", type=int, default=90)
@@ -882,7 +956,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Campaign-scoped TM intent spool required for parallel gate5 children.",
     )
     parser.add_argument(
-        "--throughput-release", type=Path,
+        "--throughput-release",
+        type=Path,
         help="Immutable evidence-backed concurrency release artifact.",
     )
     parser.add_argument(
@@ -926,13 +1001,16 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
-        "--watchdog-state", type=Path,
+        "--watchdog-state",
+        type=Path,
         help="Write PAUSED_VALIDATION_REGRESSION state before stopping a bad wave.",
     )
     args = parser.parse_args(argv)
     if args.checkpoint_wave_shards < 0:
         parser.error("--checkpoint-wave-shards must be nonnegative")
-    if args.checkpoint_wave_shards and (not args.tm_repository_root or not args.tm_intent_spool_path):
+    if args.checkpoint_wave_shards and (
+        not args.tm_repository_root or not args.tm_intent_spool_path
+    ):
         parser.error("checkpoint waves require --tm-repository-root and --tm-intent-spool-path")
     if args.progress_interval_seconds < 5:
         raise SystemExit("--progress-interval-seconds must be at least 5")
@@ -941,7 +1019,9 @@ def main(argv: list[str] | None = None) -> int:
     if not args.wait:
         raise SystemExit("--wait is required for governed campaign launches")
     if args.recovery_qualification and (args.child != "gate5" or args.shard_list is None):
-        raise SystemExit("--recovery-qualification requires --child gate5 and an explicit --shard-list")
+        raise SystemExit(
+            "--recovery-qualification requires --child gate5 and an explicit --shard-list"
+        )
     if args.child == "worker" and args.ledger_root != DEFAULT_LEDGER_ROOT:
         # The legacy worker has no --ledger-root flag, so its CampaignRunner would
         # silently fall back to the default while this parent verified receipts
@@ -954,13 +1034,16 @@ def main(argv: list[str] | None = None) -> int:
     manifest = CampaignManifest.load(args.campaign_manifest)
     if args.throughput_release:
         from src.workers.throughput_release import verify_release
+
         runtime_root = Path(__file__).resolve().parents[2]
         runtime_sha = subprocess.check_output(
             ["git", "-C", str(runtime_root), "rev-parse", "HEAD"], text=True
         ).strip()
         release = verify_release(
-            args.throughput_release, campaign_id=manifest.campaign_id,
-            runtime_sha=runtime_sha, manifest_path=args.campaign_manifest,
+            args.throughput_release,
+            campaign_id=manifest.campaign_id,
+            runtime_sha=runtime_sha,
+            manifest_path=args.campaign_manifest,
         )
         if args.max_workers != release.processes:
             raise SystemExit("--max-workers does not match throughput release")
@@ -969,9 +1052,7 @@ def main(argv: list[str] | None = None) -> int:
     # Persist watchdog state by default so unattended launches cannot lose the
     # pause reason merely because a caller omitted the optional flag.
     if args.watchdog_state is None:
-        args.watchdog_state = (
-            args.ledger_root / manifest.campaign_id / "watchdog_state.json"
-        )
+        args.watchdog_state = args.ledger_root / manifest.campaign_id / "watchdog_state.json"
     # Eight is permitted only after the bounded Professionalize probe has
     # demonstrated zero provider/rate-limit errors and p95 no worse than
     # 1.5x the four-worker baseline.  Keep 16 out of this launcher until its
@@ -1001,7 +1082,12 @@ def main(argv: list[str] | None = None) -> int:
     professionalize_only = bool(manifest.retry_policy.get("professionalize_only", False))
     if args.no_force_serialize and not professionalize_only:
         raise SystemExit("--no-force-serialize requires retry_policy.professionalize_only=true")
-    if args.max_workers > 1 and args.child == "gate5" and not args.tm_intent_spool_path and not args.dry_run:
+    if (
+        args.max_workers > 1
+        and args.child == "gate5"
+        and not args.tm_intent_spool_path
+        and not args.dry_run
+    ):
         raise SystemExit("parallel gate5 launches require --tm-intent-spool-path")
     if professionalize_only:
         # There is no local-model work in this campaign; treating hu/ja/ro as
@@ -1019,7 +1105,9 @@ def main(argv: list[str] | None = None) -> int:
     # claim -- unlike the per-campaign parallel-launcher.lock below (a bare OS
     # mutex no other session can see), claims.jsonl lets peer sessions across
     # the fleet know this campaign is already being worked before they try it.
-    session_id = args.session_id or os.environ.get("AGENT_SESSION_ID") or f"launcher-pid{os.getpid()}"
+    session_id = (
+        args.session_id or os.environ.get("AGENT_SESSION_ID") or f"launcher-pid{os.getpid()}"
+    )
     args.session_id = session_id
     family_key = f"family:{manifest.campaign_id}"
     claims_path = args.ledger_root / "claims.jsonl"
@@ -1042,7 +1130,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         launched_any = False
-        completed_waves_path = args.ledger_root / manifest.campaign_id / "completed_wave_shards.json"
+        completed_waves_path = (
+            args.ledger_root / manifest.campaign_id / "completed_wave_shards.json"
+        )
         manifest_digest = hashlib.sha256(args.campaign_manifest.read_bytes()).hexdigest()
         visited: set[str] = set()
         if args.checkpoint_wave_shards and completed_waves_path.exists():
@@ -1063,10 +1153,14 @@ def main(argv: list[str] | None = None) -> int:
             if args.checkpoint_wave_shards:
                 pending_all = [s for s in pending_all if str(s["shard_id"]) not in visited]
             if args.shard_list:
-                allowed = {line.strip() for line in args.shard_list.read_text(encoding="utf-8").splitlines() if line.strip()}
+                allowed = {
+                    line.strip()
+                    for line in args.shard_list.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                }
                 pending_all = [s for s in pending_all if str(s["shard_id"]) in allowed]
             if args.checkpoint_wave_shards:
-                pending_all = pending_all[:args.checkpoint_wave_shards]
+                pending_all = pending_all[: args.checkpoint_wave_shards]
             gpu_bound, _api_bound = partition_by_device(pending_all, gpu_locales)
             if gpu_admission_on and gpu_bound:
                 # VR-01 path: real-telemetry admission instead of the single
@@ -1116,14 +1210,22 @@ def main(argv: list[str] | None = None) -> int:
                 try:
                     checkpoint_committed = checkpoint_wave(args, manifest, translator_repo)
                 except (RuntimeError, subprocess.SubprocessError, OSError) as exc:
-                    args.watchdog_state.write_text(json.dumps({
-                        # Only the TM drain reaches this path.  It is a
-                        # correctness boundary and must pause before another
-                        # wave is permitted.  Receipt-commit failures are
-                        # handled inside checkpoint_wave as durable backlog.
-                        "status": "PAUSED_TM_CHECKPOINT_FAILURE", "reason": str(exc),
-                        "session_id": session_id, "updated_at": time.time(),
-                    }, sort_keys=True), encoding="utf-8")
+                    args.watchdog_state.write_text(
+                        json.dumps(
+                            {
+                                # Only the TM drain reaches this path.  It is a
+                                # correctness boundary and must pause before another
+                                # wave is permitted.  Receipt-commit failures are
+                                # handled inside checkpoint_wave as durable backlog.
+                                "status": "PAUSED_TM_CHECKPOINT_FAILURE",
+                                "reason": str(exc),
+                                "session_id": session_id,
+                                "updated_at": time.time(),
+                            },
+                            sort_keys=True,
+                        ),
+                        encoding="utf-8",
+                    )
                     return 2
                 if not checkpoint_committed:
                     print(
@@ -1138,8 +1240,17 @@ def main(argv: list[str] | None = None) -> int:
                     return wave_status
                 visited.update(str(shard["shard_id"]) for group in groups for shard in group)
                 temporary = completed_waves_path.with_suffix(".tmp")
-                temporary.write_text(json.dumps({"schema_version": 1, "manifest_sha256": manifest_digest,
-                                                "shards": sorted(visited)}, sort_keys=True), encoding="utf-8")
+                temporary.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "manifest_sha256": manifest_digest,
+                            "shards": sorted(visited),
+                        },
+                        sort_keys=True,
+                    ),
+                    encoding="utf-8",
+                )
                 temporary.replace(completed_waves_path)
                 continue
             if wave_status != 0:
@@ -1154,7 +1265,12 @@ def main(argv: list[str] | None = None) -> int:
         if getattr(args, "watchdog_state", None):
             receipt_path = args.ledger_root / manifest.campaign_id / "acceptance_receipts.jsonl"
             failure_path = args.ledger_root / manifest.campaign_id / "failure_metadata.jsonl"
-            count_lines = lambda path: sum(1 for _ in path.open("rb")) if path.exists() else 0
+            def count_lines(path: Path) -> int:
+                if not path.exists():
+                    return 0
+                with path.open("rb") as handle:
+                    return sum(1 for _ in handle)
+
             args.watchdog_state.write_text(
                 json.dumps(
                     {
