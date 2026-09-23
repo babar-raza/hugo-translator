@@ -3,7 +3,7 @@ campaign_id: portfolio-professionalize-unattended-20260921
 validation_policy: zero-defect
 content_repo: D:/onedrive/Documents/GitHub/aspose.org
 content_repo_sha: 543a36a2fd091dd3f488cd1cbf9eb73bd70bd73d
-translator_repo_sha: cd8021210e4c004251eee8ee8a65269dd63bf0d5
+translator_repo_sha: 4bdb10c4f518340705c5658286ea3d18ca3308b9
 config_fingerprint: 9c50153b46f9ced5e32d7fd02b4bbb40c7ed78220021b05c43e1996cdb17df28
 model_fingerprints:
   model_registry: a22c06b1bf6b3b6feed3923c42c1aff173e3f88f6da15ad81b6b4f6ea6351193
