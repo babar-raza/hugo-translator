@@ -166,6 +166,10 @@ def checkpoint_wave(
                 ],
                 check=True,
                 timeout=600,
+                # pythonw.exe does not reliably inherit stdio; without capturing
+                # output, this hangs until the timeout every time the child prints.
+                capture_output=True,
+                text=True,
                 **hidden_subprocess_kwargs(),
             )
             if spool.stats().get("PENDING", 0) >= before["PENDING"]:
@@ -187,6 +191,10 @@ def checkpoint_wave(
             ],
             check=True,
             timeout=900,
+            # pythonw.exe does not reliably inherit stdio; without capturing
+            # output, this hangs until the timeout every time the child prints.
+            capture_output=True,
+            text=True,
             **hidden_subprocess_kwargs(),
         )
     except (subprocess.SubprocessError, OSError) as exc:

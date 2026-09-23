@@ -25,19 +25,40 @@ def main() -> int:
     parser.add_argument("--timeout-seconds", type=int, default=900)
     args, remainder = parser.parse_known_args()
     command = [hidden_python_executable(), str(args.runtime / "scripts/campaign/llm_preflight_calibration.py"), *remainder]
+    # pythonw.exe (a GUI-subsystem executable, used here to suppress console
+    # flashes) does not reliably inherit a console parent's stdio handles.
+    # Without an explicit redirect, the child's first print() blocks forever
+    # on an unusable stdout handle -- reproduced directly: the same workload
+    # completes normally with this redirect in place, and hangs from the
+    # very first line without it. This was silent for every past run: no
+    # error, no output, just an indefinite hang until the timeout kill.
+    child_log_path = args.evidence_output.with_suffix(".child-log.txt")
+    child_log_path.parent.mkdir(parents=True, exist_ok=True)
     write_state(args.state, status="RUNNING", stage="calibration", started_at=time.time(), deadline_at=time.time() + args.timeout_seconds)
-    child = subprocess.Popen(command, cwd=args.runtime, **hidden_subprocess_kwargs(new_process_group=True))
-    deadline = time.monotonic() + args.timeout_seconds
-    while child.poll() is None and time.monotonic() < deadline:
-        write_state(args.state, status="RUNNING", stage="calibration", child_pid=child.pid, deadline_at=time.time() + max(0, deadline-time.monotonic()))
-        time.sleep(5)
-    if child.poll() is None:
-        subprocess.run(["taskkill.exe", "/PID", str(child.pid), "/T", "/F"], capture_output=True, check=False)
-        payload = {"terminal_reason": "timed_out", "timed_out": True, "finished_at": time.time(), "calibration": {"concurrency_ramp": []}}
-        atomic_write(args.evidence_output, json.dumps(payload, indent=2), create_parents=True, fsync=True)
-        write_state(args.state, status="TIMED_OUT", stage="calibration", child_pid=child.pid)
-        return 2
-    write_state(args.state, status="COMPLETED" if child.returncode == 0 else "FAILED", stage="calibration", exit_code=child.returncode)
+    with child_log_path.open("w", encoding="utf-8") as child_log:
+        child = subprocess.Popen(
+            command,
+            cwd=args.runtime,
+            stdout=child_log,
+            stderr=subprocess.STDOUT,
+            **hidden_subprocess_kwargs(new_process_group=True),
+        )
+        deadline = time.monotonic() + args.timeout_seconds
+        while child.poll() is None and time.monotonic() < deadline:
+            write_state(args.state, status="RUNNING", stage="calibration", child_pid=child.pid, child_log=str(child_log_path), deadline_at=time.time() + max(0, deadline-time.monotonic()))
+            time.sleep(5)
+        if child.poll() is None:
+            subprocess.run(["taskkill.exe", "/PID", str(child.pid), "/T", "/F"], capture_output=True, check=False)
+            payload = {
+                "terminal_reason": "timed_out",
+                "timed_out": True,
+                "finished_at": time.time(),
+                "child_log": str(child_log_path),
+            }
+            atomic_write(args.evidence_output, json.dumps(payload, indent=2), create_parents=True, fsync=True)
+            write_state(args.state, status="TIMED_OUT", stage="calibration", child_pid=child.pid, child_log=str(child_log_path))
+            return 2
+    write_state(args.state, status="COMPLETED" if child.returncode == 0 else "FAILED", stage="calibration", exit_code=child.returncode, child_log=str(child_log_path))
     return child.returncode
 
 

@@ -184,7 +184,11 @@ class Controller:
             if self.stop:
                 break
             self._recover_stale_claim()
-            subprocess.run(merge, check=True, timeout=300, **hidden_subprocess_kwargs())
+            # capture_output: pythonw.exe (hidden_python_executable) does not reliably
+            # inherit stdio -- an unredirected print() in the child blocks forever on
+            # an unusable handle. Without this, merge_campaign_journals.py (which does
+            # print its result) hangs every wave until the 300s timeout kills it.
+            subprocess.run(merge, check=True, timeout=300, capture_output=True, text=True, **hidden_subprocess_kwargs())
             cmd = [
                 hidden_python_executable(),
                 "-u",
@@ -275,6 +279,7 @@ class Controller:
                 ],
                 cwd=self.a.control,
                 text=True,
+                stderr=subprocess.DEVNULL,
                 **hidden_subprocess_kwargs(),
             )
             remaining = int(json.loads(progress)["remaining"])
