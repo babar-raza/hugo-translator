@@ -25,6 +25,7 @@ from src.tm.rejected_task_queue import RejectedTaskQueue
 from src.tm.retry_records import RejectedTranslationTask
 from src.utils.atomic_write import atomic_write
 from src.utils.file_lock import FileLock, LockError
+from src.utils.windows_process import hidden_subprocess_kwargs
 from src.workers.content_commit_title import content_commit_title
 from src.workers.git_provenance import (
     GovernedProvenanceError,
@@ -1152,6 +1153,7 @@ class CampaignRunner:
                     check=True,
                     capture_output=True,
                     text=True,
+                    **hidden_subprocess_kwargs(),
                 )
                 return
             except subprocess.CalledProcessError as exc:
@@ -1187,6 +1189,7 @@ class CampaignRunner:
             check=True,
             capture_output=True,
             text=True,
+            **hidden_subprocess_kwargs(),
         ).stdout.strip()
         if current_branch != branch:
             raise CampaignManifestError(
@@ -1220,6 +1223,7 @@ class CampaignRunner:
             ["git", "add", "--", *commit_paths],
             cwd=self.content_repo,
             check=True,
+            **hidden_subprocess_kwargs(),
         )
         staged = subprocess.run(
             ["git", "diff", "--cached", "--name-only"],
@@ -1227,6 +1231,7 @@ class CampaignRunner:
             check=True,
             capture_output=True,
             text=True,
+            **hidden_subprocess_kwargs(),
         ).stdout.splitlines()
         if {Path(item).as_posix() for item in staged} != set(commit_paths):
             raise CampaignManifestError("staged diff differs from accepted output set")
@@ -1257,6 +1262,7 @@ class CampaignRunner:
             check=True,
             capture_output=True,
             text=True,
+            **hidden_subprocess_kwargs(),
         ).stdout.strip()
         self._finalize_governed_skill_run(run_id, "success", commit_sha)
         return commit_sha
@@ -1293,6 +1299,7 @@ class CampaignRunner:
             check=True,
             capture_output=True,
             text=True,
+            **hidden_subprocess_kwargs(),
         )
         match = re.search(r"Created skill run record:\s*(\S+)", created.stdout)
         if not match:
@@ -1317,6 +1324,7 @@ class CampaignRunner:
             check=True,
             capture_output=True,
             text=True,
+            **hidden_subprocess_kwargs(),
         )
         return run_id
 
@@ -1345,6 +1353,7 @@ class CampaignRunner:
             check=True,
             capture_output=True,
             text=True,
+            **hidden_subprocess_kwargs(),
         )
 
     @staticmethod

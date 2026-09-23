@@ -16,6 +16,8 @@ from typing import Any
 
 import yaml
 
+from src.utils.windows_process import hidden_subprocess_kwargs
+
 SCHEMA_VERSION = 1
 ZERO_DEFECT_POLICY = "zero-defect"
 #: TC-APT-032: how verify_environment treats a dirty content repository.
@@ -69,6 +71,7 @@ def git_sha(repo: Path) -> str:
         check=True,
         capture_output=True,
         text=True,
+        **hidden_subprocess_kwargs(),
     )
     return completed.stdout.strip()
 
@@ -79,6 +82,7 @@ def git_is_ancestor(repo: Path, ancestor: str, descendant: str = "HEAD") -> bool
         cwd=repo,
         capture_output=True,
         text=True,
+        **hidden_subprocess_kwargs(),
     )
     return completed.returncode == 0
 
@@ -90,6 +94,7 @@ def git_changed_paths(repo: Path, start: str, end: str = "HEAD") -> list[str]:
         check=True,
         capture_output=True,
         text=True,
+        **hidden_subprocess_kwargs(),
     )
     return [Path(line).as_posix() for line in completed.stdout.splitlines() if line.strip()]
 
@@ -100,6 +105,7 @@ def git_dirty_paths(repo: Path) -> list[str]:
         cwd=repo,
         check=True,
         capture_output=True,
+        **hidden_subprocess_kwargs(),
     )
     entries = completed.stdout.decode("utf-8", errors="surrogateescape").split("\0")
     paths: list[str] = []

@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from src.workers.campaign_manifest import CampaignManifest
+from src.workers.heal_queue import active_hold, is_source_path_quarantined
 
 try:  # Package execution (`python -m`) and direct script execution are both supported.
     from scripts.campaign.throughput_slo import ThroughputPolicy, evaluate_throughput
@@ -90,6 +91,19 @@ def live_llm_slots(path: Path, capacity: int = 0) -> dict[str, int]:
     return {"active": active, "capacity": int(payload.get("capacity", 0) or capacity)}
 
 
+def held_outputs(manifest: CampaignManifest, receipts: dict[str, dict]) -> set[str]:
+    """Return receipt-incomplete outputs blocked by durable source-level holds."""
+    queue = Path("data/campaigns/heal_queue.jsonl")
+    held: set[str] = set()
+    for source in manifest.sources:
+        source_path = str(source.source_path)
+        blocked = active_hold(source_path, heal_queue_path=queue) is not None
+        quarantined, _reason = is_source_path_quarantined(source_path, heal_queue_path=queue)
+        if blocked or quarantined:
+            held.update(output for output in source.outputs.values() if output not in receipts)
+    return held
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
@@ -153,6 +167,7 @@ def main() -> int:
     expected_outputs = {output for source in manifest.sources for output in source.outputs.values()}
     accepted_in_manifest = len(expected_outputs.intersection(receipts))
     remaining = max(0, manifest.expected_output_count - accepted_in_manifest)
+    held = held_outputs(manifest, receipts)
     elapsed_seconds = 0.0
     if len(accepted_times) > 1:
         elapsed_seconds = max((end - start).total_seconds(), 0.0)
@@ -168,7 +183,7 @@ def main() -> int:
             min_rate_per_hour=args.slo_min_rate_per_hour,
         ),
     )
-    payload = {"campaign": manifest.campaign_id, "accepted": accepted, "failures": len(failures), "rate_per_minute": round(rate, 3), "remaining": remaining, "eta_minutes": round(remaining / rate, 1) if rate else None, "committed": committed, "pending_commit": max(0, accepted-committed), "spool": spool, "metrics": metrics, "throughput": throughput}
+    payload = {"campaign": manifest.campaign_id, "accepted": accepted, "failures": len(failures), "rate_per_minute": round(rate, 3), "remaining": remaining, "eligible_remaining": max(0, remaining - len(held)), "held_remaining": len(held), "eta_minutes": round(remaining / rate, 1) if rate else None, "committed": committed, "pending_commit": max(0, accepted-committed), "spool": spool, "metrics": metrics, "throughput": throughput}
     payload["pending_journals"] = len(list((root / "journals").glob("*/acceptance_receipts.jsonl"))) if (root / "journals").is_dir() else 0
     payload["accepted_in_manifest"] = accepted_in_manifest
     payload["historical_accepted"] = accepted - accepted_in_manifest

@@ -57,6 +57,7 @@ from src.hardware.gpu_admission import GPUAdmissionController, make_admission_co
 from src.utils.file_lock import FileLock, LockError
 from src.workers import work_claims
 from src.workers.campaign_manifest import CampaignManifest
+from src.utils.windows_process import hidden_subprocess_kwargs
 from src.workers.campaign_runner import CampaignLedger
 
 # Plan §6.1: the locales TC-APT-006 measured `m2m100_418m` better in.  These run
@@ -151,7 +152,7 @@ def checkpoint_wave(args: argparse.Namespace, manifest: CampaignManifest, transl
                 "--repository-root", str(args.tm_repository_root),
                 "--spool-path", str(spool_path), "--no-l3", "--limit", "500",
                 "--owner", f"{manifest.campaign_id}-wave-writer",
-            ], check=True, timeout=600)
+            ], check=True, timeout=600, **hidden_subprocess_kwargs())
             if spool.stats().get("PENDING", 0) >= before["PENDING"]:
                 raise RuntimeError(f"TM checkpoint writer made no progress: {spool_path}")
     try:
@@ -159,7 +160,7 @@ def checkpoint_wave(args: argparse.Namespace, manifest: CampaignManifest, transl
             sys.executable, str(translator_repo / "scripts/campaign/reconcile_receipted_commits.py"),
             "--manifest", str(args.campaign_manifest), "--content-repo", str(manifest.content_repo),
             "--ledger-root", str(args.ledger_root), "--min-batch-size", "5", "--execute",
-        ], check=True, timeout=900)
+        ], check=True, timeout=900, **hidden_subprocess_kwargs())
     except (subprocess.SubprocessError, OSError) as exc:
         checkpoint_path = args.ledger_root / manifest.campaign_id / "checkpoint_backlog.jsonl"
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -562,10 +563,7 @@ def _run_wave(
     # the controller's own console).  CREATE_NO_WINDOW is paired with it:
     # Git and native dependencies spawned during preflight must never flash a
     # visible console for an unattended scheduled campaign.
-    flags = (
-        subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
-        if sys.platform == "win32" else 0
-    )
+    from src.utils.windows_process import hidden_subprocess_kwargs
     log_dir = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -632,9 +630,9 @@ def _run_wave(
                 # Keep mutable progress/model-cache state in the accessible
                 # control workspace; --translator-repo still pins code/config.
                 cwd=Path.cwd(),
-                creationflags=flags,
                 stdout=handle,
                 stderr=subprocess.STDOUT,
+                **hidden_subprocess_kwargs(new_process_group=True),
             )
         except BaseException:
             stop_children(children)

@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from src.utils.atomic_write import atomic_write
 from src.utils.file_lock import FileLock
+from src.utils.windows_process import hidden_subprocess_kwargs
+from src.workers.campaign_process_monitor import CampaignProcessMonitor
 from src.workers.campaign_manifest import CampaignManifest
 
 def boot_id() -> str:
@@ -19,6 +21,7 @@ class Controller:
         self.state=self.root / "controller_state.json"; self.root.mkdir(parents=True,exist_ok=True)
         self.log_path=self.root / "controller.log"
         self.lock=FileLock(self.root / "controller.lock", timeout=0)
+        self.pause_path=self.root / "pause.requested"
     def write(self,status,reason=None,**extra):
         payload={"schema":1,"status":status,"reason":reason,"session_id":self.session,
                  "pid":os.getpid(),"boot_id":boot_id(),"updated_at":time.time(),**extra}
@@ -99,10 +102,13 @@ class Controller:
         self.write("STARTING")
         merge=[sys.executable,str(self.a.runtime/"scripts/campaign/merge_campaign_journals.py"),"--campaign-id",self.root.name,"--ledger-root",str(self.a.ledger_root)]
         while not self.stop:
+            if self.pause_path.exists():
+                self.write("PAUSED", "pause_requested")
+                return 0
             self._adopt_orphan_wave()
             if self.stop: break
             self._recover_stale_claim()
-            subprocess.run(merge,check=True,timeout=300)
+            subprocess.run(merge,check=True,timeout=300,**hidden_subprocess_kwargs())
             cmd=[sys.executable,"-u",str(self.a.runtime/"scripts/campaign/launch_parallel_campaign_shards.py"),
                  "--campaign-manifest",str(self.a.manifest),"--ledger-root",str(self.a.ledger_root),"--child","gate5",
                  "--max-workers","8","--wait","--device","cpu","--no-force-serialize","--checkpoint-wave-shards","64",
@@ -112,8 +118,6 @@ class Controller:
             self.write("RUNNING",command="bounded_wave")
             with self.log_path.open("a",encoding="utf-8",buffering=1) as log:
                 log.write(f"{datetime.now(timezone.utc).isoformat()} launching bounded wave session={self.session}\n")
-                flags=(subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
-                       if sys.platform == "win32" else 0)
                 child_env=os.environ.copy()
                 child_env["ASPOSE_ORG_CONTENT"]=str(Path(self.manifest.content_repo) / "content")
                 child_env["CUDA_VISIBLE_DEVICES"]="-1"
@@ -122,13 +126,29 @@ class Controller:
                 child_env["PYTHONPATH"]=os.pathsep.join(
                     [str(self.a.runtime),str(self.a.control),child_env.get("PYTHONPATH","")]
                 ).rstrip(os.pathsep)
-                self.child=subprocess.Popen(cmd,cwd=self.a.control,stdout=log,stderr=subprocess.STDOUT,
-                                            creationflags=flags,env=child_env)
+                monitor=CampaignProcessMonitor(
+                    campaign_id=self.root.name,
+                    evidence_path=self.root / "evidence" / "terminal-processes.jsonl",
+                    roots=(self.a.runtime,self.a.control),
+                )
+                monitor.start()
+                self.child=subprocess.Popen(
+                    cmd,cwd=self.a.control,stdout=log,stderr=subprocess.STDOUT,env=child_env,
+                    **hidden_subprocess_kwargs(new_process_group=True),
+                )
                 code=self._wait_for_wave()
+                terminal_incident=monitor.close()
             self.child=None
             if self.stop: self.write("INTERRUPTED","controller_signal"); return 130
+            if terminal_incident:
+                self.pause_path.touch(exist_ok=True)
+                self.write("PAUSED", "campaign_owned_terminal_process")
+                return 2
+            if self.pause_path.exists():
+                self.write("PAUSED", "pause_requested_after_wave")
+                return 0
             if code: self.write("RETRY_WAIT",f"wave_exit_{code}"); time.sleep(self.a.retry_seconds); continue
-            progress=subprocess.check_output([sys.executable,str(self.a.runtime/"scripts/campaign/campaign_progress.py"),"--manifest",str(self.a.manifest),"--ledger-root",str(self.a.ledger_root),"--spool",str(self.a.spool)],cwd=self.a.control,text=True)
+            progress=subprocess.check_output([sys.executable,str(self.a.runtime/"scripts/campaign/campaign_progress.py"),"--manifest",str(self.a.manifest),"--ledger-root",str(self.a.ledger_root),"--spool",str(self.a.spool)],cwd=self.a.control,text=True,**hidden_subprocess_kwargs())
             remaining=int(json.loads(progress)["remaining"])
             self.write("RUNNING",remaining=remaining)
             if remaining==0: self.write("COMPLETE",remaining=0); return 0
