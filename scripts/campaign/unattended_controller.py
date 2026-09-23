@@ -112,7 +112,8 @@ class Controller:
             self.write("RUNNING",command="bounded_wave")
             with self.log_path.open("a",encoding="utf-8",buffering=1) as log:
                 log.write(f"{datetime.now(timezone.utc).isoformat()} launching bounded wave session={self.session}\n")
-                flags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+                flags=(subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+                       if sys.platform == "win32" else 0)
                 child_env=os.environ.copy()
                 child_env["ASPOSE_ORG_CONTENT"]=str(Path(self.manifest.content_repo) / "content")
                 child_env["CUDA_VISIBLE_DEVICES"]="-1"

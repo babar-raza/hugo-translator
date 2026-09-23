@@ -559,10 +559,13 @@ def _run_wave(
     # so the worker itself is immune to this regardless of console
     # configuration; that is the actual fix. CREATE_NEW_PROCESS_GROUP is kept
     # here only as defense in depth (isolates the worker's signal group from
-    # the controller's own console without detaching it) -- it does not
-    # create a new console and does not reintroduce the DETACHED_PROCESS
-    # failure mode.
-    flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+    # the controller's own console).  CREATE_NO_WINDOW is paired with it:
+    # Git and native dependencies spawned during preflight must never flash a
+    # visible console for an unattended scheduled campaign.
+    flags = (
+        subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+        if sys.platform == "win32" else 0
+    )
     log_dir = Path("logs")
     log_dir.mkdir(parents=True, exist_ok=True)
 
