@@ -35,7 +35,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from src.utils.file_lock import FileLock
+from src.utils.file_lock import FileLock, LockError
 
 _SLOTS_FILE = Path("data/campaigns/llm_slots.json")
 # TC-APT-064 sustained-load calibration (2026-09-06) held 16/32/48/64 concurrent
@@ -151,7 +151,16 @@ def acquire_slot(
     OTHER holders -- the caller must wait and retry, never proceed anyway.
     """
     path = _slots_path(slots_path)
-    with FileLock(_lock_path(path), timeout=lock_timeout):
+    # poll_interval=0.05: this lock's critical section is a few ms (small-JSON
+    # read/write), but the default 1.0s poll interval wastes most of a missed
+    # window waiting to retry. Under real 8-worker contention (reproduced
+    # live: 8 processes, ~10ms critical sections each) worst-case wait climbed
+    # to 6s+ against the default poll interval alone -- close enough to this
+    # 10s timeout that ordinary production load pushed it over, permanently
+    # failing translations (see LLMSlot.__enter__ below for the other half of
+    # this fix). A tight poll interval gives ~20x more retry attempts in the
+    # same budget without adding meaningful CPU cost.
+    with FileLock(_lock_path(path), timeout=lock_timeout, poll_interval=0.05):
         now = datetime.now(timezone.utc)
         data = _load(path)
         slots = _reap_expired(data.get("slots", {}), now)
@@ -189,7 +198,7 @@ def release_slot(
 ) -> None:
     """Free `slot_id` early. No-op if it is not live or owned by a different holder."""
     path = _slots_path(slots_path)
-    with FileLock(_lock_path(path), timeout=lock_timeout):
+    with FileLock(_lock_path(path), timeout=lock_timeout, poll_interval=0.05):
         data = _load(path)
         slots = data.get("slots", {})
         slot = slots.get(slot_id)
@@ -227,12 +236,24 @@ class LLMSlot:
     def __enter__(self) -> LLMSlot:
         start = time.monotonic()
         while True:
-            self.slot_id = acquire_slot(
-                self.holder_id,
-                capacity=self.capacity,
-                ttl_seconds=self.ttl_seconds,
-                slots_path=self.slots_path,
-            )
+            try:
+                self.slot_id = acquire_slot(
+                    self.holder_id,
+                    capacity=self.capacity,
+                    ttl_seconds=self.ttl_seconds,
+                    slots_path=self.slots_path,
+                )
+            except LockError:
+                # A single missed contention window on the shared slots file
+                # is exactly the transient condition this class exists to
+                # wait out (up to wait_timeout) -- it must not surface as a
+                # translation failure. Previously this propagated unhandled,
+                # so any acquire_slot() call that lost a lock race outright
+                # failed the whole translation (reproduced live under real
+                # 8-worker load: 100% failure rate, watchdog paused after
+                # zero acceptances) instead of retrying like every other
+                # "not free yet" outcome below.
+                self.slot_id = None
             if self.slot_id is not None:
                 return self
             if time.monotonic() - start >= self.wait_timeout:
