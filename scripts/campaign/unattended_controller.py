@@ -63,10 +63,30 @@ class Controller:
             if not active: return
             self.write("RUNNING","adopting_orphan_wave",active_shard_locks=len(active))
             time.sleep(15)
+    def _recover_stale_claim(self):
+        """Reclaim only after OS evidence proves the prior launcher is gone."""
+        import psutil
+        from src.workers import work_claims
+        key = f"family:{self.root.name}"
+        path = self.a.ledger_root / "claims.jsonl"
+        claim = work_claims.active_claim(key, claims_path=path)
+        if not claim or claim["session_id"] == self.session:
+            return
+        probe = FileLock(self.root / "parallel-launcher.lock", timeout=0)
+        if not probe.acquire(blocking=False):
+            return
+        try:
+            for proc in psutil.process_iter(["pid", "cmdline"]):
+                command = " ".join(proc.info.get("cmdline") or [])
+                if claim["session_id"] in command and "launch_parallel_campaign_shards" in command:
+                    return
+            if not self._active_shard_locks():
+                work_claims.release_claim(key, claim["session_id"], claims_path=path)
+        finally:
+            probe.release()
     def run(self):
         for sig in (signal.SIGINT,signal.SIGTERM): signal.signal(sig,self.on_signal)
         if not self.lock.acquire(blocking=False):
-            self.write("REFUSED","live_controller_lock")
             return 75
         content_root=Path(self.manifest.content_repo) / "content"
         if not content_root.is_dir():
@@ -81,6 +101,7 @@ class Controller:
         while not self.stop:
             self._adopt_orphan_wave()
             if self.stop: break
+            self._recover_stale_claim()
             subprocess.run(merge,check=True,timeout=300)
             cmd=[sys.executable,"-u",str(self.a.runtime/"scripts/campaign/launch_parallel_campaign_shards.py"),
                  "--campaign-manifest",str(self.a.manifest),"--ledger-root",str(self.a.ledger_root),"--child","gate5",
