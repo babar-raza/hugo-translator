@@ -12,6 +12,7 @@ $ErrorActionPreference = 'Stop'
 $control = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $py = if ($PythonPath) { $PythonPath } elseif ($env:HUGO_TRANSLATOR_PYTHON) { $env:HUGO_TRANSLATOR_PYTHON } else { Join-Path $control '.venv\Scripts\python.exe' }
 $controlVenv = Join-Path $control '.venv\Scripts\python.exe'
+$pyw = Join-Path (Split-Path $py -Parent) 'pythonw.exe'
 $env:HUGO_TRANSLATOR_PYTHON = $py
 $runtime = Join-Path $control '.local\portfolio-runtime-64'
 $manifest = Join-Path $control "data\campaigns\manifests\$CampaignId.yaml"
@@ -51,7 +52,8 @@ function Sync-Runtime {
 
 function Build-Manifest([string]$RuntimeSha) {
     New-Item -ItemType Directory -Force (Split-Path $manifest),(Split-Path $spool),(Split-Path $evidence) | Out-Null
-    & $py (Join-Path $runtime 'scripts\campaign\build_campaign_manifest.py') --content-repo $contentRepo --translator-repo $runtime --inventory-output "reports\campaigns\$CampaignId\baseline\inventory.json" --manifest-output $manifest --campaign-id $CampaignId --missing-only --professionalize-only --max-parallel-jobs 8 --exclude-dirty-sources
+    $builder = if (Test-Path $pyw) { $pyw } else { $py }
+    & $builder (Join-Path $runtime 'scripts\campaign\build_campaign_manifest.py') --content-repo $contentRepo --translator-repo $runtime --inventory-output "reports\campaigns\$CampaignId\baseline\inventory.json" --manifest-output $manifest --campaign-id $CampaignId --missing-only --professionalize-only --max-parallel-jobs 8 --exclude-dirty-sources
     if ($LASTEXITCODE -ne 0) { throw 'Manifest build failed.' }
     & $py -c "import yaml; from pathlib import Path; p=Path(r'$manifest'); d=yaml.safe_load(p.read_text(encoding='utf-8')); d['translator_repo_sha']=r'$RuntimeSha'; p.write_text(yaml.safe_dump(d,sort_keys=False,allow_unicode=True),encoding='utf-8')"
     if ($LASTEXITCODE -ne 0) { throw 'Manifest runtime binding failed.' }
