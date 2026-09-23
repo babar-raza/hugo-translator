@@ -42,8 +42,18 @@ class CampaignProcessMonitor:
         return rows
 
     def _owned(self, row: dict, all_processes: dict[int, dict]) -> bool:
+        # A watched shell command often contains the campaign ID merely because
+        # an operator is inspecting status.  Ownership therefore requires a
+        # controller/launcher marker or an ancestor chain to one; a bare ID or
+        # checkout path is never sufficient.
+        markers = (
+            "unattended_controller.py",
+            "launch_parallel_campaign_shards.py",
+            "start_portfolio_missing_sweep_autonomous",
+            "portfolio-runtime-64",
+        )
         text = row["command"].lower()
-        if self.campaign_id.lower() in text or any(root in text for root in self.roots):
+        if any(marker in text for marker in markers):
             return True
         parent = row["ppid"]
         for _ in range(12):
@@ -51,7 +61,7 @@ class CampaignProcessMonitor:
             if not ancestor:
                 return False
             command = str(ancestor.get("command") or "").lower()
-            if self.campaign_id.lower() in command or any(root in command for root in self.roots):
+            if any(marker in command for marker in markers):
                 return True
             parent = int(ancestor.get("ppid") or 0)
         return False
