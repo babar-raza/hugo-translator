@@ -21,6 +21,7 @@ from typing import Any
 
 from src.workers.campaign_manifest import CampaignManifest
 from src.utils.file_lock import FileLock
+from src.utils.windows_process import hidden_subprocess_kwargs
 
 
 def sha256_file(path: Path) -> str:
@@ -30,6 +31,7 @@ def sha256_file(path: Path) -> str:
 def sha256_blob(repo: Path, revision: str, path: str) -> str:
     return hashlib.sha256(subprocess.check_output(
         ["git", "show", f"{revision}:{path}"], cwd=repo, timeout=30,
+        **hidden_subprocess_kwargs(),
     )).hexdigest()
 
 
@@ -198,7 +200,7 @@ def recover_recorded_commits(repo: Path, ledger_path: Path) -> None:
         matches = subprocess.check_output([
             "git", "log", "main", f"{row['base_sha']}..main", "--format=%H",
             "--fixed-strings", f"--grep={marker}",
-        ], cwd=repo, text=True, timeout=30).splitlines()
+        ], cwd=repo, text=True, timeout=30, **hidden_subprocess_kwargs()).splitlines()
         if not matches:
             continue
         if len(matches) != 1:
@@ -206,7 +208,7 @@ def recover_recorded_commits(repo: Path, ledger_path: Path) -> None:
         commit = matches[0]
         changed = subprocess.check_output([
             "git", "diff-tree", "--no-commit-id", "--name-only", "-r", commit,
-        ], cwd=repo, text=True, timeout=30).splitlines()
+        ], cwd=repo, text=True, timeout=30, **hidden_subprocess_kwargs()).splitlines()
         hashes = row["output_hashes"]
         if set(changed) != set(row["outputs"]) or any(
             sha256_blob(repo, commit, path) != hashes[path] for path in row["outputs"]
@@ -248,6 +250,7 @@ def commit_group(
     init = subprocess.run(
         [sys.executable, str(ledger_tool), "init", "--session-id", session_id, "--if-missing"],
         cwd=content_repo, text=True, encoding="utf-8", errors="replace", capture_output=True,
+        **hidden_subprocess_kwargs(),
     )
     if init.returncode:
         return init.returncode, (init.stdout + "\n" + init.stderr)[-8000:]
@@ -255,6 +258,7 @@ def commit_group(
         [sys.executable, str(ledger_tool), "adopt", "--files", *paths,
          "--skill", "S-HT-02", "--session-id", session_id],
         cwd=content_repo, text=True, encoding="utf-8", errors="replace", capture_output=True,
+        **hidden_subprocess_kwargs(),
     )
     if adopt.returncode:
         return adopt.returncode, (adopt.stdout + "\n" + adopt.stderr)[-8000:]
@@ -271,6 +275,7 @@ def commit_group(
         result = subprocess.run(
             cmd,
             cwd=content_repo, text=True, encoding="utf-8", errors="replace", capture_output=True,
+            **hidden_subprocess_kwargs(),
         )
     return result.returncode, (result.stdout + "\n" + result.stderr)[-8000:]
 
@@ -337,7 +342,9 @@ def reconcile(args: argparse.Namespace, manifest: CampaignManifest) -> int:
             aged[group[0]].extend(grouped.pop(group))
     for site, rows in aged.items():
         grouped[(site, "portfolio", "mixed")].extend(rows)
-    base_sha = subprocess.check_output(["git", "rev-parse", "main"], cwd=content_repo, text=True).strip()
+    base_sha = subprocess.check_output(
+        ["git", "rev-parse", "main"], cwd=content_repo, text=True, **hidden_subprocess_kwargs()
+    ).strip()
     planned = 0
     for group in sorted(grouped):
         rows = sorted(grouped[group], key=lambda row: str(row["output_path"]))
@@ -377,7 +384,7 @@ def reconcile(args: argparse.Namespace, manifest: CampaignManifest) -> int:
             matches = subprocess.check_output([
                 "git", "log", "main", f"{base_sha}..main", "--format=%H",
                 "--fixed-strings", f"--grep={marker}",
-            ], cwd=content_repo, text=True, timeout=30).splitlines()
+            ], cwd=content_repo, text=True, timeout=30, **hidden_subprocess_kwargs()).splitlines()
             if len(matches) != 1:
                 record.update({"status": "FAILED", "error": "plumbing commit identity is ambiguous"})
                 append_jsonl(batches_path, record)

@@ -48,7 +48,12 @@ def main() -> int:
             write_state(args.state, status="RUNNING", stage="calibration", child_pid=child.pid, child_log=str(child_log_path), deadline_at=time.time() + max(0, deadline-time.monotonic()))
             time.sleep(5)
         if child.poll() is None:
-            subprocess.run(["taskkill.exe", "/PID", str(child.pid), "/T", "/F"], capture_output=True, check=False)
+            subprocess.run(
+                ["taskkill.exe", "/PID", str(child.pid), "/T", "/F"],
+                capture_output=True,
+                check=False,
+                **hidden_subprocess_kwargs(),
+            )
             payload = {
                 "terminal_reason": "timed_out",
                 "timed_out": True,

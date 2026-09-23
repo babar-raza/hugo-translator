@@ -96,6 +96,7 @@ class Controller:
                     capture_output=True,
                     timeout=60,
                     check=False,
+                    **hidden_subprocess_kwargs(),
                 )
         else:
             self.child.terminate()

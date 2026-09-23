@@ -230,6 +230,7 @@ def stop_children(children: list[subprocess.Popen]) -> None:
                 ["taskkill.exe", "/PID", str(child.pid), "/T", "/F"],
                 capture_output=True,
                 timeout=30,
+                **hidden_subprocess_kwargs(),
             )
             if result.returncode and child.poll() is None:
                 raise RuntimeError(f"cannot terminate owned child tree {child.pid}")
@@ -1048,7 +1049,8 @@ def main(argv: list[str] | None = None) -> int:
 
         runtime_root = Path(__file__).resolve().parents[2]
         runtime_sha = subprocess.check_output(
-            ["git", "-C", str(runtime_root), "rev-parse", "HEAD"], text=True
+            ["git", "-C", str(runtime_root), "rev-parse", "HEAD"], text=True,
+            **hidden_subprocess_kwargs(),
         ).strip()
         release = verify_release(
             args.throughput_release,
